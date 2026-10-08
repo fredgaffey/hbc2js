@@ -1,0 +1,9 @@
+{
+  "schema": "hbc2js-export/1",
+  "modules": [
+    { "id": 1, "path": "src/index.js", "bucket": "app", "owner": null },
+    { "id": 2, "path": "src/_vendor/react-native/module_2.js", "bucket": "vendor", "owner": "react-native" },
+    { "id": 3, "path": "src/_vendor/react-native/module_3.js", "bucket": "vendor", "owner": "react-native" },
+    { "id": 4, "path": "src/_vendor/lodash/module_4.js", "bucket": "vendor", "owner": "lodash" }
+  ]
+}

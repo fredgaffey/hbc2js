@@ -1,0 +1,3 @@
+normal call: 42
+extracted: undefined-value
+explicit this: 42

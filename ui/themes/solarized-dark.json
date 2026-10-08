@@ -1,0 +1,80 @@
+{
+  "name": "solarized-dark",
+  "mode": "dark",
+  "family": "solarized",
+  "palette": {
+    "bg": "#002b36",
+    "surface": "#073642",
+    "surface-2": "#0b3d4a",
+    "border": "#586e75",
+    "text": "#839496",
+    "text-muted": "#586e75",
+    "accent": "#268bd2",
+    "accent-fg": "#002b36"
+  },
+  "severity": {
+    "crit": "#dc322f",
+    "high": "#cb4b16",
+    "med": "#b58900",
+    "ok": "#859900"
+  },
+  "fonts": {
+    "sans": "'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    "mono": "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
+  },
+  "radius": "4px",
+  "spacing": {
+    "0": "0px",
+    "1": "4px",
+    "2": "8px",
+    "3": "12px",
+    "4": "16px",
+    "5": "20px",
+    "6": "24px",
+    "7": "32px",
+    "8": "40px"
+  },
+  "density": "comfortable",
+  "densities": {
+    "comfortable": {
+      "unit": "0.3rem",
+      "fontSize": "15px",
+      "rowHeight": "32px"
+    },
+    "compact": {
+      "unit": "0.22rem",
+      "fontSize": "13px",
+      "rowHeight": "24px"
+    }
+  },
+  "type": {
+    "xs": "0.75rem",
+    "sm": "0.875rem",
+    "base": "1rem",
+    "lg": "1.125rem"
+  },
+  "elevation": {
+    "level0": {
+      "bg": "#073642",
+      "border": "#586e75"
+    },
+    "level1": {
+      "bg": "#0b3d4a",
+      "border": "#586e75"
+    }
+  },
+  "border": {
+    "strong": "#586e75",
+    "focus": "#268bd2"
+  },
+  "syntax": {
+    "comment": "#586e75",
+    "keyword": "#268bd2",
+    "string": "#859900",
+    "number": "#b58900",
+    "function": "#839496",
+    "variable": "#839496",
+    "operator": "#586e75",
+    "invalid": "#dc322f"
+  }
+}

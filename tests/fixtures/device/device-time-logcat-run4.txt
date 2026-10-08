@@ -1,0 +1,5 @@
+--------- beginning of main
+09-20 10:21:10.001  1400  1400 I ActivityManager: Start proc com.example.app for activity
+09-20 10:21:10.781  1400  1400 I ReactNativeJS: HBC2JS_DEVICE_MARKER launch 780
+09-20 10:21:11.151  1400  1400 I ReactNativeJS: HBC2JS_DEVICE_MARKER firstContentCommit 1150
+09-20 10:21:11.751  1400  1400 I ReactNativeJS: HBC2JS_DEVICE_MARKER interactive 1750

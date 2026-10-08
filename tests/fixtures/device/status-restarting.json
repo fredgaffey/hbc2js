@@ -1,0 +1,19 @@
+{
+  "schema": "device/1",
+  "tool": "device",
+  "subcommand": "status",
+  "platform": "android",
+  "platformSource": "single-adb-device",
+  "ok": true,
+  "reason": null,
+  "locked": false, "lockedSource": "dumpsys-window",
+  "bundleSha": null, "bundleShaSource": "no-pid-yet",
+  "expectedBundleSha": "3f2a9c0011deadbeef", "expectedBundleShaSource": "flag",
+  "bundleMatches": null, "bundleMatchesSource": "no-deployed-sha",
+  "mode": null, "modeSource": "seam-file-absent",
+  "seed": null, "seedSource": "seam-file-absent",
+  "env": null, "envSource": "seam-file-absent",
+  "pid": null, "pidSource": "no-pid",
+  "startTime": null, "startTimeSource": "no-pid",
+  "restarting": true, "restartingSource": "no-pid-yet"
+}

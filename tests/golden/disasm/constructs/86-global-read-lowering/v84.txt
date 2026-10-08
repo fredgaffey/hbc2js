@@ -1,0 +1,58 @@
+; hbc2js disassembly of 86-global-read-lowering/v84.hbc
+; version=84 layout=B opcodeTable=hbc84 functions=3 strings=14 globalCodeIndex=0
+function #0 "global"  params=1 frame=12 env=0 flags=dbg  @0x0000015c size=84
+  0000  DeclareGlobalVar     s11 "unshadowed"
+  0005  DeclareGlobalVar     s8 "loopy"
+  000a  CreateEnvironment    r1
+  000c  CreateClosure        r2, r1, f1 "unshadowed"
+  0011  GetGlobalObject      r0
+  0013  PutById              r0, r2, #c1, s11 "unshadowed"
+  0019  CreateClosure        r1, r1, f2 "loopy"
+  001e  PutById              r0, r1, #c2, s8 "loopy"
+  0024  TryGetById           r3, r0, #c1, s10 "print"
+  002a  GetByIdShort         r1, r0, #c2, s11 "unshadowed"
+  002f  LoadConstUndefined   r2
+  0031  Call1                r1, r1, r2
+  0035  Call2                r1, r3, r2, r1
+  003a  TryGetById           r1, r0, #c1, s10 "print"
+  0040  GetByIdShort         r3, r0, #c3, s8 "loopy"
+  0045  LoadConstUInt8       r0, 3
+  0048  Call2                r0, r3, r2, r0
+  004d  Call2                r0, r1, r2, r0
+  0052  Ret                  r0
+
+function #1 "unshadowed"  params=1 frame=1 env=0 flags=dbg  @0x000001b0 size=15
+  0000  GetGlobalObject      r0
+  0002  TryGetById           r0, r0, #c1, s4 "Error"
+  0008  GetByIdShort         r0, r0, #c2, s9 "name"
+  000d  Ret                  r0
+
+function #2 "loopy"  params=2 frame=22 env=0 flags=dbg  @0x000001bf size=100
+  0000  LoadParam            r6, 1
+  0003  LoadConstString      r1, s0 ""
+  0007  GetGlobalObject      r4
+  0009  LoadConstNull        r3
+  000b  LoadConstUInt8       r2, 1
+  000e  Mov                  r0, r1
+  0011  LoadConstZero        r5
+  0013  JNotLess             L2, r5, r6
+L1:
+  0017  TryGetById           r10, r4, #c1, s5 "Reflect"
+  001d  GetByIdShort         r9, r10, #c2, s6 "apply"
+  0022  TryGetById           r8, r4, #c3, s2 "String"
+  0028  NewArray             r7, 1
+  002c  PutOwnByIndex        r7, r5, 0
+  0030  Call4                r7, r9, r10, r8, r3, r7
+  0037  Add                  r8, r1, r7
+  003b  NewObject            r7
+  003d  PutNewOwnByIdShort   r7, r5, s12 "x"
+  0041  GetByIdShort         r9, r8, #c4, s3 "length"
+  0046  PutNewOwnByIdShort   r7, r9, s7 "y"
+  004a  PutNewOwnByIdShort   r7, r6, s13 "z"
+  004e  GetByIdShort         r7, r7, #c5, s12 "x"
+  0053  Add                  r1, r8, r7
+  0057  Add                  r5, r5, r2
+  005b  Mov                  r0, r1
+  005e  JLess                L1, r5, r6
+L2:
+  0062  Ret                  r0

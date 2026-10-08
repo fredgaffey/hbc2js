@@ -1,0 +1,378 @@
+// src/projdb/rebuild.ts — `hbcproj rebuild`: docs/specs/18-project-storage-
+// integrity.md §6 step 1 / §8 "Recovery / fresh clone" / §9 `rebuild` verb /
+// §R4 step 1. The JSON->DB recovery direction: `analysis/` + `log/` are the
+// durable authority (§3/§8), `cache.db` is disposable; this regenerates the
+// annotation stratum (`revisions` + `d_*` + `log`) of an EMPTY `.hbcproj`
+// from them. Intended target is a fresh DB (a brand-new file, or one just
+// created by `openProjectDb` on a path that didn't exist) — `revisions`/
+// `log` are append-only (schema.sql §2.5 triggers forbid UPDATE/DELETE), so
+// rebuild cannot wipe-in-place a populated DB; the recovery scenario itself
+// is always "cache.db absent or corrupt" (§8), i.e. always a fresh file.
+//
+// What CAN be reconstructed exactly, and what can't (a real limitation of
+// step-0's export format, not of this module): `analysis/*.json` shards only
+// carry the CURRENTLY ACTIVE value per record (§3); `log/*.jsonl` carries
+// every historical write's rid/ts/op/actor/kind/target but never its VALUE
+// once superseded (export.ts's "known step-0 simplification"). So rebuild
+// reconstructs:
+//   - one real, content-bearing, QUERYABLE `revisions` row per active shard
+//     entry, at its ORIGINAL `rid` (so a subsequent `export` reproduces the
+//     same rid/ts/prov and is byte-identical, §R3 metric 1), in the slot the
+//     normal write verbs (`annotations.ts`) would compute for it, with its
+//     `d_*` detail row filled in from the shard's own fields;
+//   - one INERT placeholder `revisions` row per non-active (superseded or
+//     revert-bookkeeping) log entry, at its original rid, `cleared=1` so it
+//     is invisible to `v_active`/`DbRevisionStore.allRecords()` — it exists
+//     only so `log.rid` still has a `revisions` row to join against (schema
+//     FK) and so `export`'s log pass recomputes the identical `kind`/
+//     `target` for that historical rid. It carries no `d_*` row and no
+//     supersession chain: `history()` on an already-superseded slot is
+//     necessarily incomplete after a rebuild (the old VALUE was never
+//     durable outside cache.db pre-crash) — a documented gap for step 2
+//     ("write-path export", R4) to close by exporting every write, not just
+//     the final state.
+//   - the `log` table verbatim: rid/ts/op/actor straight from the JSONL;
+//     `detail` is deterministically `JSON.stringify({kind, target})` (target
+//     omitted when unknown), matching `DbRevisionStore`'s own `appendLog`
+//     exactly (revision-store.ts, since spec 26 L1) — same field order too,
+//     since `stateBindingOf`'s hash is over the log table's raw `detail`
+//     strings, not a reparsed/re-sorted form (export.ts).
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { restoreTransactionShard } from "./readability-shards.ts";
+import { join } from "node:path";
+import type { DatabaseSync } from "node:sqlite";
+import { bookmarkAdapter, commentAdapter, findingAdapter, nameAdapter, tagAdapter } from "./annotations.ts";
+import type { BookmarkValue, CommentRangeValue, CommentValue, FindingValue, NameValue, TagValue } from "./annotations.ts";
+import type { RevisionKind } from "./revision-store.ts";
+
+interface ShardProv {
+  readonly source: "human" | "llm" | "tool";
+  readonly who: string;
+  readonly run?: string | null;
+}
+
+interface ActiveRecord {
+  readonly rid: number;
+  readonly kind: RevisionKind;
+  readonly target: string;
+  readonly ts: string;
+  readonly prov: ShardProv;
+  readonly value: unknown;
+}
+
+interface LogEntry {
+  readonly seq: number;
+  readonly ts: string;
+  readonly op: string;
+  readonly actor: ShardProv;
+  readonly kind?: RevisionKind;
+  readonly target?: string;
+  readonly rid: string;
+  /** §R4 step 2 (write-path export): the record's own written value, present
+   *  on every `op:'annotate'` entry from a step-2-or-later exporter — this is
+   *  what lets a SUPERSEDED write be reconstructed with its real content
+   *  below, instead of the step-0 inert placeholder. Absent on entries from
+   *  an older (step-0/1) bulk export, which only ever recorded the shard's
+   *  final-state reference — those still fall back to the placeholder path. */
+  readonly value?: unknown;
+  /** The write's own supersession slot (kind+target[+discriminator], §2.1)
+   *  — present alongside `value`/on `op:'revert'` entries; lets rebuild
+   *  reinsert the row under the EXACT slot it was written to without
+   *  re-deriving it (`slotFor` below is only a fallback for entries that
+   *  predate this field). */
+  readonly slot?: string;
+  /** `op:'revert'` only: the rid this revert reactivated, or `null` for a
+   *  revert-to-nothing (clears the slot). Absent on older exporters' entries
+   *  (those fall back to always treating a revert as a clear). */
+  readonly reactivates?: string | null;
+}
+
+export interface RebuildResult {
+  /** How many `revisions` rows were written back (active + placeholder). */
+  readonly revisionsWritten: number;
+  /** How many of those are the real, content-bearing active rows. */
+  readonly activeWritten: number;
+  /** How many `log` rows were written back. */
+  readonly logEntriesWritten: number;
+  /** Non-fatal inconsistencies found between `log/` and `analysis/`
+   *  (e.g. a log entry's kind/target disagreeing with the shard's) — surfaced
+   *  rather than silently ignored, but rebuild still completes best-effort. */
+  readonly warnings: readonly string[];
+}
+
+function readJsonFilesIn(dir: string): unknown[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((f) => f.endsWith(".json"))
+    .sort()
+    .map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")) as unknown);
+}
+
+/** Every `analysis/**` active record, keyed by its `rid` (globally unique —
+ *  it is the `revisions.rid` it was minted at, §5/§7). */
+function collectActiveRecords(analysisDir: string): Map<number, ActiveRecord> {
+  const out = new Map<number, ActiveRecord>();
+
+  for (const raw of readJsonFilesIn(join(analysisDir, "names"))) {
+    const shard = raw as { entries?: Record<string, { name: string; rid: string; ts: string; prov: ShardProv }> };
+    for (const [target, e] of Object.entries(shard.entries ?? {})) {
+      out.set(Number(e.rid), { rid: Number(e.rid), kind: "name", target, ts: e.ts, prov: e.prov, value: { name: e.name } satisfies NameValue });
+    }
+  }
+
+  for (const raw of readJsonFilesIn(join(analysisDir, "annotations"))) {
+    const shard = raw as {
+      tags?: readonly { target: string; tag: string; note?: string; rid: string; ts: string; prov: ShardProv }[];
+      comments?: readonly { target: string; body: string; range?: CommentRangeValue; rid: string; ts: string; prov: ShardProv }[];
+      bookmarks?: readonly { target: string; label?: string; rid: string; ts: string; prov: ShardProv }[];
+    };
+    for (const t of shard.tags ?? []) {
+      out.set(Number(t.rid), { rid: Number(t.rid), kind: "tag", target: t.target, ts: t.ts, prov: t.prov, value: { tag: t.tag, ...(t.note !== undefined ? { note: t.note } : {}) } satisfies TagValue });
+    }
+    for (const c of shard.comments ?? []) {
+      out.set(Number(c.rid), { rid: Number(c.rid), kind: "comment", target: c.target, ts: c.ts, prov: c.prov, value: { body: c.body, ...(c.range !== undefined ? { range: c.range } : {}) } satisfies CommentValue });
+    }
+    for (const b of shard.bookmarks ?? []) {
+      out.set(Number(b.rid), { rid: Number(b.rid), kind: "bookmark", target: b.target, ts: b.ts, prov: b.prov, value: (b.label !== undefined ? { label: b.label } : {}) satisfies BookmarkValue });
+    }
+  }
+
+  for (const raw of readJsonFilesIn(join(analysisDir, "findings"))) {
+    const shard = raw as { target: string; findingNo: number; severity: string; status: string; claim: string; evidence: readonly { ref: string; role: string }[]; rid: string; ts: string; prov: ShardProv };
+    out.set(Number(shard.rid), {
+      rid: Number(shard.rid),
+      kind: "finding",
+      target: shard.target,
+      ts: shard.ts,
+      prov: shard.prov,
+      value: { findingNo: shard.findingNo, severity: shard.severity, status: shard.status, claim: shard.claim, evidence: shard.evidence } satisfies FindingValue,
+    });
+  }
+
+  return out;
+}
+
+/** Every `log/*.jsonl` entry, in global rid order — day files sort
+ *  lexicographically by name and, within a file, lines are already
+ *  rid-ascending (export.ts's `exportLog`), so concatenating sorted files in
+ *  line order reproduces the DB's original global `log` order exactly. */
+function collectLogEntries(logDir: string): LogEntry[] {
+  if (!existsSync(logDir)) return [];
+  const out: LogEntry[] = [];
+  for (const f of readdirSync(logDir).filter((f) => f.endsWith(".jsonl")).sort()) {
+    const text = readFileSync(join(logDir, f), "utf8");
+    for (const line of text.split("\n")) {
+      if (line.trim() === "") continue;
+      out.push(JSON.parse(line) as LogEntry);
+    }
+  }
+  return out;
+}
+
+function slotFor(kind: RevisionKind, target: string, value: unknown): string {
+  switch (kind) {
+    case "name":
+      return `name:${target}`;
+    case "tag":
+      return `tag:${target}:${(value as TagValue).tag}`;
+    case "comment": {
+      const range = (value as CommentValue).range;
+      if (range === undefined) return `comment:${target}`;
+      return range.col !== undefined ? `comment:${target}:${range.line}:${range.col}` : `comment:${target}:${range.line}`;
+    }
+    case "bookmark":
+      return `bookmark:${target}`;
+    case "finding":
+      // patternId (annotations.ts's optional discriminator) is not carried
+      // by the finding shard — only `target` is. Every current write path
+      // calls `dbSetFinding` without one, so this is exact in practice;
+      // documented as a known gap for a caller that does pass one.
+      return `finding:${target}`;
+    default:
+      return `${kind}:${target}`;
+  }
+}
+
+const detailAdapters = { name: nameAdapter, tag: tagAdapter, comment: commentAdapter, bookmark: bookmarkAdapter, finding: findingAdapter } as const;
+
+function insertRevisionRow(
+  db: DatabaseSync,
+  rid: number,
+  kind: RevisionKind,
+  target: string,
+  slot: string,
+  prov: ShardProv,
+  ts: string,
+  cleared: 0 | 1,
+  supersedes: number | null = null,
+  reactivates: number | null = null,
+): void {
+  db.prepare(
+    `INSERT INTO revisions
+       (rid, kind, target, slot, prov_source, prov_who, prov_run, ts,
+        supersedes, reactivates, cleared, ctx_name, ctx_loc, ctx_owner, legacy_rid)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL)`,
+  ).run(rid, kind, target, slot, prov.source, prov.who, prov.run ?? null, ts, supersedes, reactivates, cleared);
+}
+
+/** `target`, when known, rides along exactly as `src/projdb/revision-
+ *  store.ts`'s live `appendLog` writes it (`{kind, target}`, same field
+ *  order) — `exportLog` derives `entry.target` from the `revisions` table
+ *  independently of `detail` (it never round-trips `detail`'s raw bytes),
+ *  so passing it through here is what makes a rebuilt DB's `log` table
+ *  content — and therefore `stateBindingOf`'s hash over it — match a
+ *  freshly-written one field-for-field (`tests/projdb/rebuild-verify.
+ *  test.ts`'s byte-identical round-trip). */
+function insertLogRow(db: DatabaseSync, rid: number | null, ts: string, actor: ShardProv, op: string, kind: RevisionKind | undefined, target?: string): void {
+  db.prepare(`INSERT INTO log (ts, actor_source, actor_who, actor_run, op, rid, gen, detail) VALUES (?, ?, ?, ?, ?, ?, NULL, ?)`).run(
+    ts,
+    actor.source,
+    actor.who,
+    actor.run ?? null,
+    op,
+    rid,
+    JSON.stringify(target !== undefined && target !== "" ? { kind: kind ?? null, target } : { kind: kind ?? null }),
+  );
+}
+
+/** Regenerates `db`'s annotation stratum (`revisions`/`d_*`/`log`) from
+ *  `<projectDir>/analysis/**` + `<projectDir>/log/*.jsonl` (§6 step 1, §8
+ *  "Recovery / fresh clone" — the JSON wins because it's all that exists).
+ *  `db` must be a FRESH `.hbcproj` (no prior `revisions`/`log` rows) — see
+ *  module header on why (append-only triggers forbid in-place wipe).
+ *  Deterministic: re-running on the same shards produces the same rows, and
+ *  a subsequent `exportProject(db, projectDir)` reproduces the source
+ *  shards byte-identically (§R3 metric 1) because every active row keeps
+ *  its original rid/ts/prov and the `log` table is replayed verbatim. */
+export function rebuildProject(db: DatabaseSync, projectDir: string): RebuildResult {
+  const analysisDir = join(projectDir, "analysis");
+  const logDir = join(projectDir, "log");
+  const active = collectActiveRecords(analysisDir);
+  const logEntries = collectLogEntries(logDir);
+  const warnings: string[] = [];
+  const seenRid = new Set<number>();
+
+  // Tracks, per reconstructed slot, the rid of the row just inserted for it
+  // — lets a fresh row's `supersedes` point at its true predecessor even
+  // though a superseded write's own `revisions` row is now reconstructed
+  // too (§R4 step 2), not skipped as an inert placeholder.
+  const lastRidForSlot = new Map<string, number>();
+
+  db.exec("BEGIN;");
+  try {
+    // Readability transactions (spec 28 §9.5) are restored from their own
+    // shard family, which carries the whole row plus the blobs a revert
+    // restores from. Their `log/` entries are a derived tail (export.ts's
+    // `exportLog`), so they are SKIPPED in the replay below rather than
+    // turned into ridless `log` rows -- otherwise a rebuilt DB would
+    // re-export them twice and the round-trip would stop being byte-exact.
+    for (const raw of readJsonFilesIn(join(analysisDir, "readability"))) {
+      if (!restoreTransactionShard(db, raw as Record<string, unknown>)) {
+        warnings.push("analysis/readability: a shard has no string `id` and was skipped");
+      }
+    }
+    for (const entry of logEntries) {
+      if (entry.op === "readability") continue;
+      // Non-annotation bookkeeping ops (`init`/`rebuild-index`/`import`/
+      // `merge`/`export`/`render`, schema.sql §2.2's `op` enum) never had a
+      // `revisions` row to begin with — the live db's own `log.rid` is SQL
+      // NULL for them, round-tripped through export.ts's `exportLog` as the
+      // literal string `"null"` (`String(row.rid)` over a JS `null`). Two
+      // such entries (e.g. `init` immediately followed by `rebuild-index`,
+      // both ridless) used to collide: `Number("null")` is `NaN` for both,
+      // and both fell through to the "legacy inert placeholder" branch
+      // below, which synthesised a REAL `revisions` row at that same
+      // (bogus) rid for each — a `UNIQUE constraint failed: revisions.rid`
+      // crash the moment a real `init`-created project's log was replayed.
+      // Reconstruct them as what they actually are: a `log` row with no
+      // `revisions` row at all, never entering `seenRid`/the rid-keyed
+      // branches below.
+      if (entry.op !== "annotate" && entry.op !== "revert") {
+        insertLogRow(db, null, entry.ts, entry.actor, entry.op, entry.kind);
+        continue;
+      }
+      const rid = Number(entry.rid);
+      seenRid.add(rid);
+      const activeRec = active.get(rid);
+
+      if (entry.op === "annotate" && entry.value !== undefined && entry.kind !== undefined && entry.target !== undefined) {
+        // §R4 step 2: the entry carries the write's own value (a step-2+
+        // exporter, live write-path OR bulk) — reconstruct a REAL
+        // content-bearing row whether it is still active or has since been
+        // superseded. This is what closes the step-0/1 placeholder gap:
+        // `history()` on this slot now returns every write, not just the
+        // live head.
+        if (activeRec !== undefined) {
+          if (entry.kind !== activeRec.kind) warnings.push(`rid ${rid}: log kind '${entry.kind}' != shard kind '${activeRec.kind}'`);
+          if (entry.target !== activeRec.target) warnings.push(`rid ${rid}: log target '${entry.target}' != shard target '${activeRec.target}'`);
+        }
+        const slot = entry.slot ?? slotFor(entry.kind, entry.target, entry.value);
+        const supersedes = lastRidForSlot.get(slot) ?? null;
+        insertRevisionRow(db, rid, entry.kind, entry.target, slot, entry.actor, entry.ts, 0, supersedes);
+        (detailAdapters[entry.kind as keyof typeof detailAdapters].writeDetail as (db: DatabaseSync, rid: number, value: unknown) => void)(db, rid, entry.value);
+        insertLogRow(db, rid, entry.ts, entry.actor, entry.op, entry.kind, entry.target);
+        lastRidForSlot.set(slot, rid);
+      } else if (entry.op === "revert" && entry.reactivates !== undefined && entry.kind !== undefined && entry.target !== undefined) {
+        // Likewise for a revert (step-2+ entry): `reactivates` says exactly
+        // which prior rid (if any) it restored, so the bookkeeping row's
+        // `cleared`/`reactivates` columns are reconstructed EXACTLY as the
+        // live engine wrote them (`revision-store.ts`'s `revert`), not
+        // always-cleared as the step-0/1 placeholder assumed.
+        const kind = entry.kind;
+        const target = entry.target;
+        const slot = entry.slot ?? `hist:${kind}:${rid}`;
+        const reactivatesRid = entry.reactivates === null ? null : Number(entry.reactivates);
+        const cleared: 0 | 1 = reactivatesRid === null ? 1 : 0;
+        const supersedes = lastRidForSlot.get(slot) ?? null;
+        insertRevisionRow(db, rid, kind, target, slot, entry.actor, entry.ts, cleared, supersedes, reactivatesRid);
+        insertLogRow(db, rid, entry.ts, entry.actor, entry.op, entry.kind, target);
+        lastRidForSlot.set(slot, rid);
+      } else if (entry.op === "annotate" && activeRec !== undefined) {
+        // Legacy (pre-step-2) bulk-export entry with no embedded `value`:
+        // fall back to the step-0/1 behaviour — reconstruct it ONLY when
+        // the shard says it is still the active head for its slot.
+        const rec = activeRec;
+        if (entry.kind !== undefined && entry.kind !== rec.kind) warnings.push(`rid ${rid}: log kind '${entry.kind}' != shard kind '${rec.kind}'`);
+        if (entry.target !== undefined && entry.target !== rec.target) warnings.push(`rid ${rid}: log target '${entry.target}' != shard target '${rec.target}'`);
+        const slot = slotFor(rec.kind, rec.target, rec.value);
+        insertRevisionRow(db, rid, rec.kind, rec.target, slot, rec.prov, rec.ts, 0);
+        (detailAdapters[rec.kind as keyof typeof detailAdapters].writeDetail as (db: DatabaseSync, rid: number, value: unknown) => void)(db, rid, rec.value);
+        insertLogRow(db, rid, entry.ts, entry.actor, entry.op, rec.kind, rec.target);
+        lastRidForSlot.set(slot, rid);
+      } else {
+        // Legacy inert placeholder: a pre-step-2 entry for a write whose
+        // value is not recoverable from `analysis/**` (superseded, or a
+        // revert whose `reactivates` field is absent) — exists only so
+        // `log.rid` still has a `revisions` row to join against (§6 header
+        // note on `rebuild.ts`).
+        const kind = entry.kind ?? "name";
+        const target = entry.target ?? "";
+        insertRevisionRow(db, rid, kind, target, entry.slot ?? `hist:${kind}:${rid}`, entry.actor, entry.ts, 1);
+        insertLogRow(db, rid, entry.ts, entry.actor, entry.op, entry.kind, target);
+      }
+    }
+
+    // Any active shard record whose rid never showed up in `log/` (a data
+    // gap the log-chain check in verify.ts should already have flagged) —
+    // still land it so the DB is at least as complete as `analysis/` claims.
+    for (const rec of active.values()) {
+      if (seenRid.has(rec.rid)) continue;
+      warnings.push(`rid ${rec.rid}: active in ${rec.kind} shard but missing from log/ — inserted without a log row`);
+      const slot = slotFor(rec.kind, rec.target, rec.value);
+      insertRevisionRow(db, rec.rid, rec.kind, rec.target, slot, rec.prov, rec.ts, 0);
+      (detailAdapters[rec.kind as keyof typeof detailAdapters].writeDetail as (db: DatabaseSync, rid: number, value: unknown) => void)(db, rec.rid, rec.value);
+    }
+
+    db.exec("COMMIT;");
+  } catch (err) {
+    db.exec("ROLLBACK;");
+    throw err;
+  }
+
+  return {
+    revisionsWritten: seenRid.size + [...active.values()].filter((r) => !seenRid.has(r.rid)).length,
+    activeWritten: active.size,
+    logEntriesWritten: logEntries.length,
+    warnings,
+  };
+}

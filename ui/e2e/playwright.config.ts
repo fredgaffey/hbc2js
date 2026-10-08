@@ -1,0 +1,81 @@
+// ui/e2e/playwright.config.ts — Playwright smoke suite config (docs/UI.md
+// "Smoke test (Playwright)"). Two modes, selected by env vars set by the
+// npm scripts in ui/package.json:
+import { defineConfig, devices } from "@playwright/test";
+import { API_PORT, BUNDLE, DIST_DIR, PREVIEW_PORT, PROJECT_DIR } from "./prepare-fixture.mjs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = join(__dirname, "..", "..");
+const uiDir = join(__dirname, "..");
+
+const baseURL = process.env["PW_BASE_URL"] ?? `http://127.0.0.1:${PREVIEW_PORT}`;
+const usingFixture = process.env["PW_BASE_URL"] === undefined;
+
+export default defineConfig({
+  testDir: __dirname,
+  fullyParallel: false,
+  workers: 1,
+  retries: 0,
+  reporter: [["list"]],
+  timeout: usingFixture ? 30_000 : 150_000,
+  use: {
+    baseURL,
+    trace: "retain-on-failure",
+    // Visual determinism (spec 26 L7): fixed viewport so a screenshot never
+    // depends on the runner's window size, and reduced motion so a CSS
+    // transition never lands mid-animation in the captured frame.
+    viewport: { width: 1280, height: 800 },
+    reducedMotion: "reduce",
+  },
+  // ui/e2e/visual.spec.ts's baselines (spec 26 L7). Kept under
+  // ui/e2e/__screenshots__ (the path the spec names) rather than
+  // Playwright's default <spec>-snapshots/ sibling directory.
+  snapshotPathTemplate: "{testDir}/__screenshots__/{testFilePath}/{arg}{ext}",
+  expect: {
+    toHaveScreenshot: {
+      // Cross-platform font rendering (Linux CI vs macOS) is the known
+      // source of pixel noise here — tolerant on purpose, and the pixel
+      // assertion itself is gated behind HBC2JS_E2E_VISUAL (see
+      // visual.spec.ts); this threshold only matters when that flag is set.
+      maxDiffPixelRatio: 0.03,
+      animations: "disabled",
+    },
+  },
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  ...(usingFixture
+    ? {
+        webServer: [
+          {
+            // `--hbc` is needed for the live verbs (disasm, locals, and
+            // spec 17 §14.1's who-calls-by-name) — without it those 400,
+            // same as against a plain `--split` artifact with no bytecode.
+            // `--no-auth` (spec 26 L2): this rig is a throwaway project on
+            // loopback for the life of one Playwright run — no token
+            // ceremony needed, and the client build below never sets one.
+            command: `node ${join(repoRoot, "src/cli.ts")} ui-server ${PROJECT_DIR} --port ${API_PORT} --hbc ${BUNDLE} --no-auth`,
+            url: `http://127.0.0.1:${API_PORT}/api/segregation`,
+            env: { ...process.env, HBC2JS_LLM_BACKEND: "heuristic" },
+            reuseExistingServer: false,
+            // The route answers as soon as the server listens, but the box
+            // measured this at ~30-45s of whole-bundle "warming analysis"
+            // work happening concurrently (see the ui-server log line) even
+            // on the 435-module fixture bundle; under load (other agents'
+            // test runs sharing the same CPU) 30s was observed to time out
+            // here even though the route itself responds in a few seconds
+            // once the process is up. 90s keeps `npm run e2e` well inside
+            // the < 4 min budget while giving the warm real headroom.
+            timeout: 90_000,
+          },
+          {
+            command: `npx vite preview --outDir ${DIST_DIR} --port ${PREVIEW_PORT} --strictPort`,
+            cwd: uiDir,
+            url: `http://127.0.0.1:${PREVIEW_PORT}`,
+            reuseExistingServer: false,
+            timeout: 30_000,
+          },
+        ],
+      }
+    : {}),
+});

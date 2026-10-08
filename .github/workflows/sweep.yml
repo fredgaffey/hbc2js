@@ -1,0 +1,30 @@
+name: sweep
+on:
+  schedule: [{ cron: "0 3 * * *" }]
+  workflow_dispatch:
+  push: { branches: [main] }
+concurrency:
+  group: sweep-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      HBC2JS_REQUIRE_ORACLES: "1"
+      HBC2JS_TIER: sweep
+      # ubuntu-latest's shared runner misses T9's unscaled pro-rata parse
+      # budget (tests/sweep/parse/bundles.test.ts) by enough margin under
+      # normal load to flake this workflow — see the status notes's CI line.
+      HBC2JS_TIME_SCALE: "2.5"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: npm }
+      - run: npm ci
+      - uses: actions/cache@v4             # hermesc binaries, keyed on the fetch script (see ci.yml)
+        with:
+          path: tools/hermesc
+          key: hermesc-${{ runner.os }}-${{ hashFiles('tools/get-hermesc.sh') }}
+      - run: tools/get-hermesc.sh all
+      - run: npm run test:sweep            # bundles/**, round-trip, obfuscated variants

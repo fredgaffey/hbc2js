@@ -1,0 +1,105 @@
+; hbc2js disassembly of 84-array-literal/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=7 strings=12 globalCodeIndex=0
+function #0 "global"  params=1 frame=25 env=0 flags=dbg,overflowed  @0x00000198 size=232
+  0000  DeclareGlobalVar     s9 "normalFold"
+  0005  DeclareGlobalVar     s7 "empty"
+  000a  DeclareGlobalVar     s8 "partialRun"
+  000f  DeclareGlobalVar     s5 "ctorNew"
+  0014  DeclareGlobalVar     s6 "selfReferencingStore"
+  0019  DeclareGlobalVar     s2 "holedLiteral"
+  001e  GetGlobalObject      r4
+  0020  LoadConstUndefined   r3
+  0022  CreateClosure        r5, r3, f1 "normalFold"
+  0027  PutByIdLoose         r4, r5, #c0, s9 "normalFold"
+  002d  CreateClosure        r5, r3, f2 "empty"
+  0032  PutByIdLoose         r4, r5, #c1, s7 "empty"
+  0038  CreateClosure        r5, r3, f3 "partialRun"
+  003d  PutByIdLoose         r4, r5, #c2, s8 "partialRun"
+  0043  CreateClosure        r5, r3, f4 "ctorNew"
+  0048  PutByIdLoose         r4, r5, #c3, s5 "ctorNew"
+  004e  CreateClosure        r5, r3, f5 "selfReferencingStore"
+  0053  PutByIdLoose         r4, r5, #c4, s6 "selfReferencingStore"
+  0059  CreateClosure        r5, r3, f6 "holedLiteral"
+  005e  PutByIdLoose         r4, r5, #c5, s2 "holedLiteral"
+  0064  GetByIdShort         r5, r4, #c0, s9 "normalFold"
+  0069  LoadConstUInt8       r0, 3
+  006c  LoadConstUInt8       r1, 2
+  006f  LoadConstUInt8       r2, 1
+  0072  Call4                r13, r5, r3, r2, r1, r0
+  0079  GetByIdShort         r5, r4, #c1, s7 "empty"
+  007e  Call1                r12, r5, r3
+  0082  GetByIdShort         r5, r4, #c2, s8 "partialRun"
+  0087  Call3                r11, r5, r3, r2, r1
+  008d  GetByIdShort         r5, r4, #c3, s5 "ctorNew"
+  0092  Call2                r10, r5, r3, r0
+  0097  GetByIdShort         r5, r4, #c4, s6 "selfReferencingStore"
+  009c  LoadConstUInt8       r0, 5
+  009f  Call2                r9, r5, r3, r0
+  00a4  GetByIdShort         r5, r4, #c5, s2 "holedLiteral"
+  00a9  Call3                r8, r5, r3, r2, r1
+  00af  TryGetById           r5, r4, #c6, s10 "print"
+  00b5  TryGetById           r7, r4, #c7, s4 "JSON"
+  00bb  GetByIdShort         r6, r7, #c8, s11 "stringify"
+  00c0  NewArray             r4, 6
+  00c4  DefineOwnInDenseArray r4, r13, 0
+  00c8  DefineOwnInDenseArray r4, r12, 1
+  00cc  DefineOwnInDenseArray r4, r11, 2
+  00d0  DefineOwnInDenseArray r4, r10, 3
+  00d4  DefineOwnInDenseArray r4, r9, 4
+  00d8  DefineOwnInDenseArray r4, r8, 5
+  00dc  Call2                r4, r6, r7, r4
+  00e1  Call2                r4, r5, r3, r4
+  00e6  Ret                  r4
+
+function #1 "normalFold"  params=4 frame=2 env=0 flags=none  @0x00000280 size=27
+  0000  NewArray             r0, 3
+  0004  LoadParam            r1, 1
+  0007  DefineOwnInDenseArray r0, r1, 0
+  000b  LoadParam            r1, 2
+  000e  DefineOwnInDenseArray r0, r1, 1
+  0012  LoadParam            r1, 3
+  0015  DefineOwnInDenseArray r0, r1, 2
+  0019  Ret                  r0
+
+function #2 "empty"  params=1 frame=1 env=0 flags=none  @0x0000029b size=6
+  0000  NewArray             r0, 0
+  0004  Ret                  r0
+
+function #3 "partialRun"  params=3 frame=3 env=0 flags=dbg,overflowed  @0x000002a1 size=29
+  0000  NewArray             r1, 3
+  0004  LoadParam            r2, 1
+  0007  DefineOwnInDenseArray r1, r2, 0
+  000b  LoadParam            r2, 2
+  000e  DefineOwnInDenseArray r1, r2, 1
+  0012  LoadConstUInt8       r0, 3
+  0015  PutByIdLoose         r1, r0, #c0, s1 "length"
+  001b  Ret                  r1
+
+function #4 "ctorNew"  params=2 frame=12 env=0 flags=dbg,overflowed  @0x000002be size=28
+  0000  GetGlobalObject      r0
+  0002  TryGetById           r2, r0, #c0, s3 "Array"
+  0008  CreateThisForNew     r1, r2, 1
+  000c  LoadParam            r3, 1
+  000f  Mov                  r4, r1
+  0012  Construct            r0, r2, 2
+  0016  SelectObject         r0, r1, r0
+  001a  Ret                  r0
+
+function #5 "selfReferencingStore"  params=2 frame=3 env=0 flags=dbg,overflowed  @0x000002da size=30
+  0000  NewArray             r1, 0
+  0004  LoadConstZero        r0
+  0006  LoadParam            r2, 1
+  0009  PutByValLoose        r1, r0, r2
+  000d  GetByIndex           r2, r1, 0
+  0011  LoadConstUInt8       r0, 1
+  0014  Add                  r2, r2, r0
+  0018  PutByValLoose        r1, r0, r2
+  001c  Ret                  r1
+
+function #6 "holedLiteral"  params=3 frame=2 env=0 flags=none  @0x000002f8 size=20
+  0000  NewArray             r0, 3
+  0004  LoadParam            r1, 1
+  0007  DefineOwnInDenseArray r0, r1, 0
+  000b  LoadParam            r1, 2
+  000e  DefineOwnInDenseArray r0, r1, 2
+  0012  Ret                  r0

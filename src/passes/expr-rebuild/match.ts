@@ -1,0 +1,809 @@
+// expr-rebuild matcher — docs/LOWERING-CATALOGUE.md row R1,
+// docs/specs/passes/02-expr-rebuild.md §4.
+//
+// Site = one statement list `L` (`ctx.fnBody` reachable, innermost first).
+// Scans `L` for the first register store `rX = E` that satisfies one of
+// R1a (forward inline) / R1b (dead store) / R1c (self-move), in that order.
+// `classifySite` is exported so `check.ts` can re-derive the same verdict
+// from `before` alone (it gets no access to this match's `data`) and so unit
+// tests can assert the exact refuse reason without going through the driver.
+import type { Expr, IdentUses, Stmt } from "../ast.ts";
+import { identUses, isPure, isPureStmt, isRegisterName, registerUses, registerUsesIfMemoised } from "../ast.ts";
+import { anyPassThroughBetween, nextRelevant, stmtInterest } from "./stmt-index.ts";
+
+const NO_USES = { reads: 0, writes: 0, nested: 0 } as const;
+import type { Match, PassContext } from "../types.ts";
+
+export type ExprRebuildRule = "R1a" | "R1b" | "R1c";
+
+export interface ExprRebuildSite {
+  readonly rule: ExprRebuildRule;
+  /** Index of the store `rX = E` in `L`. */
+  readonly i: number;
+  /** R1a: index of the read site (`j > i`). R1b/R1c: equal to `i`. */
+  readonly j: number;
+  readonly reg: string;
+  readonly value: Expr;
+}
+
+export type ExprRebuildMatch = Match<readonly Stmt[], ExprRebuildSite>;
+
+export type RefuseReason = "not-dead" | "impure-move" | "input-clobbered" | "use-under-control-flow" | "two-reads" | "protocol-name" | "generator-frame" | "loop-variant-input" | "env-slot-order";
+
+export type ClassifyResult = { readonly ok: true; readonly rule: ExprRebuildRule; readonly j: number } | { readonly ok: false; readonly reason: RefuseReason };
+
+// ---------------------------------------------------------------------------
+// Small Expr/Stmt helpers local to this rung (D12a: no import beyond ../ast.ts).
+// ---------------------------------------------------------------------------
+
+/** "Simple" per §4: cannot transfer control. */
+export function isSimple(s: Stmt): boolean {
+  return s.k === "expr" || s.k === "init" || s.k === "decl" || s.k === "comment";
+}
+
+/** `rX = …` with the target exactly `ident rX` — a "plain store". */
+export function isPlainStoreTo(s: Stmt, reg: string): boolean {
+  return s.k === "expr" && s.expr.k === "assign" && s.expr.target.k === "ident" && s.expr.target.name === reg;
+}
+
+/** "Any `ident rX` anywhere in `s`, including nested lists and nested func
+ *  bodies" (§4's `mentions`). */
+export function mentions(s: Stmt, reg: string): boolean {
+  const u = identUses([s], reg);
+  return u.reads + u.writes + u.nested > 0;
+}
+
+/** The one field R1a may read `rX` from, per statement kind (§4). `null` for
+ *  a kind with no such field (its only mentions, if any, are in a body/case
+ *  list, which is `use-under-control-flow`, never a valid `j`). */
+export function topLevelExprOf(s: Stmt): Expr | null {
+  switch (s.k) {
+    case "expr":
+      return s.expr;
+    case "init":
+      return s.value;
+    case "return":
+      return s.arg;
+    case "throw":
+      return s.arg;
+    case "if":
+      return s.test;
+    case "while":
+      return s.test ?? null;
+    case "do-while":
+      return s.test;
+    case "for":
+      return s.test;
+    case "for-in":
+    case "for-of":
+      // `left` is a write target (the loop's own binding), not a read here
+      // — `right` is the one expression this statement's own position reads,
+      // the same role `for`'s `test` plays.
+      return s.right;
+    case "switch":
+      return s.disc;
+    default:
+      return null;
+  }
+}
+
+interface ExprCounts {
+  readonly reads: number;
+  readonly writes: number;
+  readonly nested: number;
+}
+
+// `exprCounts(topLevelExprOf(s), name).reads` for every `name` at once,
+// memoised on the statement's identity. The forward scan in `classifySite`
+// and `stmtVerdict` ask this of the same statements for candidate after
+// candidate, iteration after iteration (a statement keeps its identity
+// across every rewrite that does not touch it — `rewrite.ts` slices, never
+// copies), so one visit per statement replaces one per (statement,
+// candidate, iteration) — the last big term of the M5 pipeline's cost on a
+// large bundle. The read half of `exprCounts`'s visit,
+// kept in lock-step with it: a read is an `ident` reached without crossing
+// an `assign` target or a nested `func` body (`exprCounts` never credits
+// `reads` for anything inside a `func`, for any name — a nested occurrence
+// lands in `nested`), so the counts here equal `.reads` for every name.
+const topLevelReadsMemo = new WeakMap<Stmt, ReadonlyMap<string, number>>();
+
+function topLevelReads(s: Stmt): ReadonlyMap<string, number> {
+  let m = topLevelReadsMemo.get(s);
+  if (m !== undefined) return m;
+  const counts = new Map<string, number>();
+  const visit = (x: Expr): void => {
+    switch (x.k) {
+      case "ident":
+        counts.set(x.name, (counts.get(x.name) ?? 0) + 1);
+        return;
+      case "assign":
+        if (x.target.k !== "ident") visit(x.target);
+        visit(x.value);
+        return;
+      case "member":
+        visit(x.obj);
+        if (x.computed) visit(x.prop);
+        return;
+      case "call":
+      case "new":
+        visit(x.callee);
+        x.args.forEach(visit);
+        return;
+      case "bin":
+      case "logical":
+        visit(x.left);
+        visit(x.right);
+        return;
+      case "unary":
+        visit(x.arg);
+        return;
+      case "cond":
+        visit(x.test);
+        visit(x.then);
+        visit(x.else);
+        return;
+      case "array":
+        x.elements.forEach(visit);
+        return;
+      case "object":
+        x.props.forEach((p) => visit("k" in p ? p.arg : p.value));
+        return;
+      case "seq":
+        x.exprs.forEach(visit);
+        return;
+      default:
+        return; // func (a nested body is never a top-level read), lit, this, argumentsObject
+    }
+  };
+  const tl = topLevelExprOf(s);
+  if (tl !== null) visit(tl);
+  m = counts;
+  topLevelReadsMemo.set(s, m);
+  return m;
+}
+
+/** `identUses`'s expr-visiting logic, applied to one `Expr` directly rather
+ *  than a statement list — needed to isolate "reads within just this
+ *  top-level field", which `identUses` (statement-list granularity) cannot
+ *  distinguish from a read inside a body a few fields over. Mirrors
+ *  `identUses`'s own read/write/nested split exactly, including the `func`
+ *  case (delegates to `identUses` for the nested body). `topLevelReads`
+ *  above is its memoised, all-names `.reads` half. */
+export function exprCounts(e: Expr, reg: string): ExprCounts {
+  let reads = 0;
+  let writes = 0;
+  let nested = 0;
+  const visit = (x: Expr): void => {
+    switch (x.k) {
+      case "ident":
+        if (x.name === reg) reads++;
+        return;
+      case "assign":
+        if (x.target.k === "ident" && x.target.name === reg) writes++;
+        else visit(x.target);
+        visit(x.value);
+        return;
+      case "member":
+        visit(x.obj);
+        if (x.computed) visit(x.prop);
+        return;
+      case "call":
+      case "new":
+        visit(x.callee);
+        x.args.forEach(visit);
+        return;
+      case "bin":
+      case "logical":
+        visit(x.left);
+        visit(x.right);
+        return;
+      case "unary":
+        visit(x.arg);
+        return;
+      case "cond":
+        visit(x.test);
+        visit(x.then);
+        visit(x.else);
+        return;
+      case "array":
+        x.elements.forEach(visit);
+        return;
+      case "object":
+        x.props.forEach((p) => visit("k" in p ? p.arg : p.value));
+        return;
+      case "seq":
+        x.exprs.forEach(visit);
+        return;
+      case "func": {
+        // Mirror `identUses`'s own function-scope boundary exactly: `x.body`
+        // is a genuinely separate register frame (Hermes restarts `r0` per
+        // function), so a register name can never be the same binding in
+        // there — only a non-register name (an env slot, collision-free by
+        // construction) can be a real cross-scope reference. See
+        // `IdentUses.nested`'s doc in `../ast.ts`.
+        if (isRegisterName(reg)) return;
+        const inner = identUses(x.body, reg);
+        nested += inner.reads + inner.writes + inner.nested;
+        return;
+      }
+      default:
+        return; // lit, this, argumentsObject
+    }
+  };
+  visit(e);
+  return { reads, writes, nested };
+}
+
+/** Register names a *pure* `Expr` reads (the only node kinds `isPure`
+ *  allows are exactly the ones below, so this is always answerable for a
+ *  value `classifySite` has already proven `isPure`). */
+export function namesReadBy(e: Expr): readonly string[] {
+  switch (e.k) {
+    case "ident":
+      return [e.name];
+    case "unary":
+      return namesReadBy(e.arg);
+    case "bin":
+    case "logical":
+      return [...namesReadBy(e.left), ...namesReadBy(e.right)];
+    case "cond":
+      return [...namesReadBy(e.test), ...namesReadBy(e.then), ...namesReadBy(e.else)];
+    default:
+      return []; // lit, this: no register reads
+  }
+}
+
+/** H1 (a removed report): `list[j]` being a `while`/`do-while`/
+ *  `for` means the read R1a found in its `test` field is *multiply
+ *  executed* — the test re-runs once per iteration, while the store at `i`
+ *  ran exactly once. Folding `E` there is only sound if `E`'s value cannot
+ *  change across iterations, i.e. it is loop-invariant. Conservative in
+ *  both directions per the review's instruction: an impure `E` is refused
+ *  outright (repeating its side effect every iteration is unsound
+ *  regardless of what it reads — and `namesReadBy` is only meaningful for a
+ *  pure `Expr`, so it must not be asked about one), and a pure `E` is
+ *  refused unless every register it reads is written *nowhere* reachable
+ *  from the loop's body or (for `for`) its `update` — including inside a
+ *  nested `func` (`identUses`'s `nested` bucket), since a closure created
+ *  in the body could still mutate a captured register between iterations
+ *  and this rung has no way to rule that out from here. */
+function loopTestGuard(loop: Stmt, value: Expr): RefuseReason | null {
+  if (loop.k !== "while" && loop.k !== "do-while" && loop.k !== "for") return null;
+  if (!isPure(value)) return "loop-variant-input";
+  const update = loop.k === "for" ? loop.update : null;
+  // A `for`'s `init` runs *before* the first `test`, so a header that writes
+  // one of `E`'s inputs makes the very first evaluation of the folded `E`
+  // read the wrong value — not just later iterations. (fuzz family F2,
+  // fixture 46: `r1 = "" + r1; for (r1 = 2, r4 = 0; r4 < r1; …)` folded to
+  // `r4 < "" + r1` with `r1` still the *pre-init* environment read, turning
+  // `r4 < 2` into `0 < "0"` and skipping the loop.)
+  const init = loop.k === "for" ? loop.init : null;
+  for (const name of namesReadBy(value)) {
+    const u = identUses(loop.body, name);
+    if (u.writes + u.nested > 0) return "loop-variant-input";
+    if (update !== null && exprCounts(update, name).writes > 0) return "loop-variant-input";
+    if (init !== null && exprCounts(init, name).writes > 0) return "input-clobbered";
+  }
+  return null;
+}
+
+/** A `for` header's own verdict for `reg`, or `null` when the header says
+ *  nothing about it (and for `while`/`do-while`, which have no header).
+ *
+ *  `topLevelExprOf` names only the one field the rewriter may fold into —
+ *  `test` for every loop — so `init` and `update` are invisible to the
+ *  scans, even though `for-header` (stage A) routinely hoists a store into
+ *  `init` and the increment into `update`. Order of execution decides:
+ *  `init` runs once, before the first `test`, so a store there redefines
+ *  `reg` before anything in the loop can read the incoming value (`dead`),
+ *  while a read there consumes it (`read`). `update` runs between
+ *  iterations; a read there is still a read of whatever `reg` held, so it
+ *  is reported as one. A bare `update` *store* settles nothing (a `break`
+ *  in the body can leave the loop before it ever runs), so the caller
+ *  keeps scanning, exactly as before this function existed. */
+function forHeaderVerdict(s: Stmt, reg: string): Verdict | null {
+  if (s.k !== "for") return null;
+  if (s.init !== null) {
+    const c = exprCounts(s.init, reg);
+    if (c.reads + c.nested > 0) return "read";
+    if (c.writes > 0) return "dead";
+  }
+  if (s.update !== null) {
+    const c = exprCounts(s.update, reg);
+    if (c.reads + c.nested > 0) return "read";
+  }
+  return null;
+}
+
+/** The environment id of a lexical environment-slot name (`_e<env>_<slot>`,
+ *  `src/emit/names.ts`'s `envSlot`), or `null` for anything else (a register
+ *  `rN`, a hoisted var, a free name). Written out here rather than imported
+ *  because a rung may not import `src/emit` (D12a); the shape is pinned by
+ *  `tests/gate/passes/env-slot-order.test.ts`. */
+const ENV_SLOT_RE = /^_e(\d+)_\d+$/;
+function envIdOf(name: string): string | null {
+  const m = ENV_SLOT_RE.exec(name);
+  return m === null ? null : m[1]!;
+}
+
+/** Environment ids whose slots a *pure* `Expr` reads (deduplicated). */
+function envIdsReadBy(e: Expr): readonly string[] {
+  const out: string[] = [];
+  for (const name of namesReadBy(e)) {
+    const id = envIdOf(name);
+    if (id !== null && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
+/** Does `s` (assumed `isPureStmt`, so its only write is a top-level
+ *  `ident = <pure>`) store into a slot of one of `envs`? */
+function writesEnvOf(s: Stmt, envs: readonly string[]): boolean {
+  if (s.k !== "expr" || s.expr.k !== "assign" || s.expr.target.k !== "ident") return false;
+  const id = envIdOf(s.expr.target.name);
+  return id !== null && envs.includes(id);
+}
+
+/** Does `s` (assumed `isPureStmt`) write one of `regs`? */
+function writesAnyOf(s: Stmt, regs: readonly string[]): boolean {
+  return s.k === "expr" && s.expr.k === "assign" && s.expr.target.k === "ident" && regs.includes(s.expr.target.name);
+}
+
+type Verdict = "dead" | "read" | "clear";
+/** A single statement's contribution to a scan (`stmtVerdict`): a terminal
+ *  `Verdict`, or `next` — "this statement neither settles nor escapes
+ *  anything for `reg`; the scan carries on with the statement after it".
+ *  The distinction matters: a statement whose sub-lists were handed the
+ *  list's own continuation (`if`/`switch`/`labeled`/`iife`, a `try`
+ *  handler) has *already* scanned the rest of the list on every
+ *  falling-through path, so a `clear` from it means some path escaped to a
+ *  place this site cannot see (a `break` to a label outside the scan, a
+ *  `continue`) — and that is terminal: carrying on would re-scan the rest
+ *  and credit a later redefinition to a path that never reaches it. That
+ *  was the `01-if-else-chain.min` v84/v94 wrong output (docs/BUGS.md,
+ *  consolidation item 3): once label-clean flattened the inner label, the
+ *  site `r0 = "negative"; … if (…) { break L0; } … r0 = r1;` sat in one
+ *  list, the `if` came back `clear` (its `break L0` leaves the site, whose
+ *  own `L0` is not in `labels`), the scan stepped on to `r0 = r1` and
+ *  deleted the store — while `break L0` runs straight into `return r0`. */
+type StepVerdict = Verdict | "next";
+/** The label key for a label-less `break`: the innermost enclosing loop or
+ *  `switch` maps it to its own continuation (the rest of the list that
+ *  statement sits in). */
+const UNLABELLED_BREAK = "";
+/** "What verdict follows if control reaches this point" — a label's own
+ *  continuation (`break L` resumes there), or "the rest of the enclosing
+ *  list" (`rest`), or "unknown, beyond this site" (`CLEAR`, the top-level
+ *  default: a stage-B site never sees past its own statement list). */
+type Cont = () => Verdict;
+
+const NO_LABELS: ReadonlyMap<string, Cont> = new Map();
+const CLEAR: Cont = () => "clear";
+
+/**
+ * Memoises `scanFrom(list, from)` for one search episode (one `classifySite`
+ * call, hence one fixed `reg`). Sound because `(list, from)` — list identity
+ * plus index — names a fixed lexical position in the (unchanging, for the
+ * duration of one search) tree: every root call this rung makes anchors
+ * `labels`/`after` the same way (`NO_LABELS`/`CLEAR`), so whatever `labels`
+ * map and `after` continuation eventually reach a given `(list, from)` are
+ * themselves always the same lexically-determined value, however many
+ * different `break` sites or candidate scans lead there. Without this, a
+ * cascade of `if (cond) { … } else { …; break L }` sites all naming the same
+ * outer label — exactly what hermesc emits for a chain of guarded
+ * destructuring defaults — revisits the same `(list, from)` an amount that
+ * multiplies with every level of nesting (each level's `rest` thunk gets
+ * invoked once per `break` beneath it, and *its* computation redoes the same
+ * multiplication one level further in), which is exponential in the chain's
+ * length and was the M5 label-clean-enablement hang (see BUGS.md): label-
+ * clean's own unwrapping of unrelated labels elsewhere in the function
+ * merges previously-separate statement lists into the single larger one
+ * this cascade sits in, which is what exposes it. Scoped to one `Memo`
+ * instance per `classifySite` call (never reused across a rewrite, since the
+ * tree changes and a stale cache would be unsound), this turns the
+ * recursion from a tree (one node per path) into a DAG evaluated once per
+ * distinct `(list, from)` — linear in tree size, not exponential in nesting
+ * depth.
+ */
+type Memo = Map<readonly Stmt[], Map<number, Verdict>>;
+
+/** Merges the verdicts of a statement's alternative branches (an `if`'s two
+ *  arms, a `switch`'s cases): `read` wins if any branch reads the stale
+ *  value; `dead` only if *every* branch is guaranteed to redefine it first
+ *  (so every reachable path clears it); otherwise `clear` (inconclusive —
+ *  at least one path neither reads nor redefines it). */
+function mergeBranches(verdicts: readonly Verdict[]): Verdict {
+  if (verdicts.some((v) => v === "read")) return "read";
+  if (verdicts.length > 0 && verdicts.every((v) => v === "dead")) return "dead";
+  return "clear";
+}
+
+/**
+ * What happens to `reg`'s *current* (stale, about-to-be-orphaned) value
+ * across `s`'s own sub-lists, given `s` itself is already known not to read
+ * or plainly overwrite `reg` at its own top level (`stmtVerdict` checks that
+ * first). `labels` maps every label in scope to *its* continuation (so
+ * `break L` resumes scanning exactly where `L`'s own statement would have
+ * continued — this is what lets a hermesc-style cascade of
+ * `if (r0===k) { break L } else { r0 = k'; … }` prove `r0`'s earlier value
+ * dead: the `break` follows `L`'s continuation straight to the next
+ * redefinition, rather than stopping the proof at the list boundary).
+ * `rest` is "the rest of the list `s` itself sits in", handed to a branch
+ * that falls through normally (an `if` with no `break`/`return`/`throw`,
+ * `try`'s block, a `labeled`/`iife` wrapper).
+ *
+ * A loop's body might run zero times, so a loop can never be credited
+ * `dead` from its body alone — only `read` (a body that reads it might run)
+ * or `clear`; a `try` block is treated the same way, conservatively, since
+ * an exception can leave it before reaching a redefinition (the handler, if
+ * reached at all, still falls through to `rest` normally). `if`/`switch`
+ * are the only shapes with exhaustive, unconditionally-taken branches, so
+ * they are the only ones `mergeBranches` can promote to `dead`.
+ */
+function branchVerdict(s: Stmt, reg: string, labels: ReadonlyMap<string, Cont>, rest: Cont, memo: Memo): StepVerdict {
+  switch (s.k) {
+    case "break":
+      // A label outside the scan (the site's own enclosing block, say) is an
+      // escape to a point this site cannot see: terminal `clear`, never
+      // "carry on" (see `StepVerdict`).
+      return labels.get(s.label ?? UNLABELLED_BREAK)?.() ?? "clear";
+    case "continue":
+      return "clear"; // next iteration/update, not modelled: never claim `dead` through it
+    case "if":
+      return mergeBranches([scanFrom(s.then, reg, 0, labels, rest, memo), scanFrom(s.else, reg, 0, labels, rest, memo)]);
+    case "switch": {
+      if (s.cases.length === 0) return "next";
+      const withBreak = new Map(labels);
+      withBreak.set(UNLABELLED_BREAK, rest);
+      return mergeBranches(s.cases.map((c) => scanFrom(c.body, reg, 0, withBreak, rest, memo)));
+    }
+    case "while":
+    case "do-while":
+    case "for": {
+      const header = forHeaderVerdict(s, reg);
+      if (header !== null) return header;
+      const withBreak = new Map(labels);
+      withBreak.set(UNLABELLED_BREAK, rest);
+      const body = scanFrom(s.body, reg, 0, withBreak, CLEAR, memo);
+      return body === "read" ? "read" : "next";
+    }
+    case "for-in":
+    case "for-of": {
+      // `right` is `topLevelExprOf`'s job (handled by `stmtVerdict`'s own
+      // top-level-read check before this ever runs); `left` is a fresh
+      // per-iteration binding, not a read of `reg`'s old value, so there is
+      // no header verdict here the way `for`'s `init`/`update` give one —
+      // only the body can still read the stale value.
+      const withBreak = new Map(labels);
+      withBreak.set(UNLABELLED_BREAK, rest);
+      const body = scanFrom(s.body, reg, 0, withBreak, CLEAR, memo);
+      return body === "read" ? "read" : "next";
+    }
+    case "try": {
+      const block = scanFrom(s.block, reg, 0, labels, CLEAR, memo);
+      const handler = scanFrom(s.handler, reg, 0, labels, rest, memo);
+      if (block === "read" || handler === "read") return "read";
+      // The handler already scanned `rest`; its `clear` is an escape.
+      return handler === "clear" ? "clear" : "next";
+    }
+    case "labeled": {
+      const withLabel = new Map(labels);
+      withLabel.set(s.label, rest);
+      return scanFrom(s.body, reg, 0, withLabel, rest, memo);
+    }
+    case "iife":
+      return scanFrom(s.body, reg, 0, labels, rest, memo);
+    default:
+      return "next";
+  }
+}
+
+/** One statement's verdict: `read` (`reg`'s stale value is read — at top
+ *  level, including a self-referential store's own value like
+ *  `reg = reg + 1` or `reg = reg.prop`, since `topLevelExprOf` for an
+ *  `expr`-kind store is the *whole* assign expression, target and value
+ *  both, and `exprCounts` counts the value's read regardless of whether the
+ *  same statement also happens to be a store; or inside a sub-list,
+ *  following any `break` to its target); `dead` (a plain store to `reg`
+ *  whose own value does *not* read `reg` — redefined, full stop); or
+ *  `clear` (inconclusive: some path escapes — see `branchVerdict`); or
+ *  `next` (irrelevant here — see `StepVerdict`). The read
+ *  check must run *before* the plain-store check: a self-referential store
+ *  is simultaneously "reads the stale value" and "is a store", and it is
+ *  the read that must win — treating it as an unconditional `dead` (module
+ *  review found this exact bug) discards the read, then a later, unrelated
+ *  statement that also reads `reg` observes a dangling name once some
+ *  earlier store folds into this one and deletes itself. */
+function stmtVerdict(s: Stmt, reg: string, labels: ReadonlyMap<string, Cont>, rest: Cont, memo: Memo): StepVerdict {
+  if ((topLevelReads(s).get(reg) ?? 0) > 0) return "read";
+  if (isPlainStoreTo(s, reg)) return "dead";
+  return branchVerdict(s, reg, labels, rest, memo);
+}
+
+// ---------------------------------------------------------------------------
+// P-1: which statements can change a scan's verdict at all.
+//
+// A statement that mentions `reg` nowhere in its own frame *and* contains no
+// `break`/`continue` is always `clear`-and-keep-going for `reg`: `stmtVerdict`
+// finds no top-level read and no plain store, and `branchVerdict` on its
+// sub-lists finds nothing either and falls through to the continuation of
+// the enclosing list — i.e. exactly the verdict scanning would reach by
+// stepping to the next statement (a loop/`try` block hands `CLEAR` to its
+// body, which is `clear` too). Only a jump can send the scan somewhere else
+// (a `break L` follows `L`'s own continuation, possibly past the end of this
+// list), so any statement containing one is kept as "relevant" and evaluated
+// exactly as before. Both scanning loops therefore hop between relevant
+// positions instead of touching every statement in between: on hermesc's
+// unoptimised output (hundreds of stores per list, each read far from its
+// store) the per-list cost went from cubic to ~linear in the list, and
+// rn-template's `noopt` bundle from 32 s to a few seconds. Per-statement facts are memoised on the statement's identity (an
+// untouched statement survives every rewrite by identity — `rewrite.ts`
+// slices, never copies), the per-list index on the list's.
+// ---------------------------------------------------------------------------
+
+// `stmtInterest`, `nextRelevant` and `anyPassThroughBetween` live in
+// `./stmt-index.ts`: per-node facts memoised on statement identity, plus the
+// per-register position index that answers both queries without walking the
+// statements in between (perf part 6, docs/BUGS.md's "452 s / 946 s" row --
+// on a module-root list a scan for a register that is never mentioned again
+// runs to the end of the list, once per candidate site).
+
+/** Scans `list` from `from`, statement by statement, stopping at the first
+ *  `dead` (redefined — nothing further in `list` matters) or `read`
+ *  (unsafe); once the list is exhausted, hands off to `after` (`clear` if
+ *  the caller has nothing further to say). Memoised per `(list, from)` — see
+ *  `Memo`'s doc — so a `(list, from)` reached through more than one `break`
+ *  or candidate scan is computed once. Steps between relevant statements
+ *  only (`nextRelevant`): the ones in between are `next` by construction. */
+function scanFrom(list: readonly Stmt[], reg: string, from: number, labels: ReadonlyMap<string, Cont>, after: Cont, memo: Memo): Verdict {
+  let cache = memo.get(list);
+  if (cache === undefined) {
+    cache = new Map();
+    memo.set(list, cache);
+  }
+  const cached = cache.get(from);
+  if (cached !== undefined) return cached;
+  let result: Verdict = "clear";
+  for (let x = nextRelevant(list, reg, from); x < list.length; x = nextRelevant(list, reg, x + 1)) {
+    const rest: Cont = () => scanFrom(list, reg, x + 1, labels, after, memo);
+    const v = stmtVerdict(list[x]!, reg, labels, rest, memo);
+    if (v !== "next") {
+      result = v;
+      cache.set(from, result);
+      return result;
+    }
+  }
+  result = after();
+  cache.set(from, result);
+  return result;
+}
+
+/** D-a, generalised: is `reg`'s value (as of just after `j`) guaranteed to
+ *  be redefined somewhere reachable from `list[j+1..]` before it is ever
+ *  read again? A single `L[k] = reg <- …` is the simplest such
+ *  redefinition, but an `if`/`switch` that redefines `reg` on *every* arm
+ *  is just as good, and so is a `break L` that leads straight to one —
+ *  `scanFrom` (via `stmtVerdict`/`branchVerdict`) proves any of these.
+ *  `[i+1, j-1]` (`i` the original store) is not re-checked here: R1a's own
+ *  travel-legality clause already proved it pure/simple/mention-free (or it
+ *  is empty, for an impure move) — that is a *different* question (may `E`
+ *  legally move there), answered before this is ever called. */
+function tryDA(list: readonly Stmt[], j: number, reg: string, memo: Memo): boolean {
+  return scanFrom(list, reg, j + 1, NO_LABELS, CLEAR, memo) === "dead";
+}
+
+/**
+ * D-a (local to `list`, `tryDA`) or D-b: "`identUses(ctx.fnBody, rX)` reports
+ * exactly one write (at `i`) and one read (at `j`)". `readsAtJ` is how many
+ * of `reg`'s reads the caller has *already* independently verified sit at
+ * `j` — for R1a that is the one top-level read `classifySite`'s forward
+ * scan already found there (always 1); for R1b (`j === i`) it is
+ * `exprCounts(value, reg).reads`, i.e. whether the store's own value reads
+ * `reg` (a self-referential increment such as `rX = rX + 1`; 0 for an
+ * ordinary store). D-b only holds when the *whole function's* read count
+ * matches exactly what is already accounted for at that one position — a
+ * read living anywhere else (a different `stmtLists` site the current one
+ * cannot see, as `08/09/10`'s switch-lowering cascades do) is precisely the
+ * live use D-b exists to catch, and must refuse the site, not credit it as
+ * "single-use". Comparing `identUses(fnBody, reg).reads` against a bare `1`
+ * instead — every read in the function, wherever it lives, treated as
+ * interchangeable with "the one read D-b is asked to certify" — is exactly
+ * the bug review M5-pass-2 found: a register genuinely read later, in a
+ * sibling site the current list cannot see, was still deleted as dead
+ * because it happened to have only one read *in the whole function*, none
+ * of it at `j`.
+ */
+function isDeadAfter(list: readonly Stmt[], fnBody: readonly Stmt[], j: number, reg: string, readsAtJ: number, memo: Memo): boolean {
+  // D-a `||` D-b, two pure predicates — so the cheaper one may be tried
+  // first, and which one is cheaper depends only on whether `fnBody`'s
+  // register-use map has already been paid for. When it has (the usual
+  // case once `check.ts` carries it across each splice), D-b is one map
+  // lookup, while D-a's scan is `O(distance to `reg`'s next mention)` —
+  // unbounded, and a full walk to the end of the list for exactly the
+  // shape a module-root function is made of: a register stored once, read
+  // once and never mentioned again. That walk was `Theta(sites x
+  // list.length)` over the whole pass (`docs/BUGS.md`'s superlinear-pass
+  // row, part 5; `a removed report`). Same
+  // predicates, same values, same verdict for every site — only the order
+  // of evaluation changes.
+  const warm = registerUsesIfMemoised(fnBody);
+  const dbHolds = (u: IdentUses): boolean => u.reads === readsAtJ && u.writes === 1 && u.nested === 0;
+  if (warm !== undefined && dbHolds(warm.get(reg) ?? NO_USES)) return true;
+  if (tryDA(list, j, reg, memo)) return true;
+  if (warm !== undefined) return false; // D-b already asked and answered above
+  return dbHolds(registerUses(fnBody).get(reg) ?? NO_USES); // one memoised walk per fnBody, not one per candidate (P-1)
+}
+
+/** §4's whole matcher for one candidate store `L[i] = reg <- value`, tried
+ *  as R1a then R1b then R1c (R1c always matches, checked by the caller
+ *  before this is even called). Exported for `check.ts` (re-derives the
+ *  same verdict from `before`) and for direct unit tests of the refuse
+ *  reasons. */
+export function classifySite(list: readonly Stmt[], fnBody: readonly Stmt[], i: number, reg: string, value: Expr): ClassifyResult {
+  if (value.k === "ident" && value.name === reg) return { ok: true, rule: "R1c", j: i };
+
+  // One search episode, one register: every `scanFrom` this call makes
+  // (the forward loop below, and `isDeadAfter`/`tryDA`) shares this cache —
+  // see `Memo`'s doc for why that is sound.
+  const memo: Memo = new Map();
+
+  // No `nested-capture` refusal here (removed — see the work log and
+  // `IdentUses.nested`'s doc in `../ast.ts`): `reg` is a register name
+  // (`match` only calls this after `isRegisterName(reg)`), and a register
+  // can never be the same binding a nested `func` body reads — Hermes
+  // restarts register numbering per function, and a genuine capture is
+  // always copied to a collision-free env-slot name first. A nested `func`
+  // mentioning the literal string `reg` is provably that closure's own,
+  // unrelated local; `isDeadAfter` below (via `identUses(fnBody, reg)
+  // .nested`, always `0` for a register name) already reflects this.
+
+  // Forward scan for R1a's candidate read (a top-level occurrence of `reg`),
+  // or a statement that redefines `reg` before any read reaches it (R1b's
+  // territory), or a disqualifying read reachable before either.
+  let readAt: number | null = null;
+  let readTopCount = 0;
+  let blocked = false;
+  // Relevant statements only (P-1, `nextRelevant`): a skipped statement
+  // neither reads nor stores `reg` and has no sub-list verdict of its own.
+  for (let m = nextRelevant(list, reg, i + 1); m < list.length; m = nextRelevant(list, reg, m + 1)) {
+    const s = list[m]!;
+    // A `for` header settles `reg` before its `test` is ever evaluated (see
+    // `forHeaderVerdict`): an `init` store means the `test` read found below
+    // is of the *fresh* value, not this site's, and an `init`/`update` read
+    // consumes this site's value outside the one field the rewriter can
+    // fold into. Either way the `test` read must not be taken as `j`.
+    const headerVerdict = forHeaderVerdict(s, reg);
+    if (headerVerdict === "read") {
+      blocked = true;
+      break;
+    }
+    if (headerVerdict === "dead") break; // redefined by `init`, no read ever reached it
+    const tlReads = topLevelReads(s).get(reg) ?? 0;
+    if (tlReads > 0) {
+      // Stepping statement by statement, a pass-through compound statement
+      // (`if`, `try`, …) sitting between the store and this read would have
+      // reported `read` first — its branches fall through to the rest of the
+      // list, which starts with this read — and refused the site as
+      // `use-under-control-flow` before the read was ever reached. Keep that
+      // verdict (and its reason) exactly.
+      if (anyPassThroughBetween(list, i + 1, m)) {
+        blocked = true;
+        break;
+      }
+      readAt = m;
+      readTopCount = tlReads;
+      break;
+    }
+    if (isPlainStoreTo(s, reg)) break; // redefined, no read ever reached it
+    const restAfterM: Cont = () => scanFrom(list, reg, m + 1, NO_LABELS, CLEAR, memo);
+    const v = branchVerdict(s, reg, NO_LABELS, restAfterM, memo);
+    if (v === "read") {
+      blocked = true;
+      break;
+    }
+    if (v === "dead") break; // redefined on every reachable path inside `s`
+    // v === "clear": irrelevant to `reg`, or inconclusive; keep scanning.
+  }
+
+  if (readAt !== null) {
+    if (readTopCount > 1) return { ok: false, reason: "two-reads" };
+    const j = readAt;
+    // Does `L[j]`'s own body (not its top-level field, already counted
+    // above) also read the same stale value — e.g. `if (reg) { use(reg) }`?
+    const restAfterJ: Cont = () => scanFrom(list, reg, j + 1, NO_LABELS, CLEAR, memo);
+    const consumerVerdict = branchVerdict(list[j]!, reg, NO_LABELS, restAfterJ, memo);
+    if (consumerVerdict === "read") return { ok: false, reason: "use-under-control-flow" };
+    // if-chain regression (M5 rung 9, 2026-09-01; found by T2 on 51-default-
+    // params/38/39/21/46 the moment if-chain produced the guard shape): a
+    // jump *inside the consuming statement itself* escapes this site with
+    // the stale value still bound — `rX = E; if (rX !== u) { break L };
+    // rX = fresh` runs the `break` path straight into a read of `rX` outside
+    // the list (`return rX`), which `branchVerdict` reports as the same
+    // `clear` an irrelevant fall-through produces. The read-check above
+    // therefore lets it through, and `isDeadAfter` then credits the *local*
+    // redefinition. With any `break`/`continue` in the consumer's own frame,
+    // only a proven `dead` (every internal path redefines `rX` before any
+    // read) may pass; `clear` is an escape and must refuse — unless D-b's
+    // whole-function count proves the escape harmless: with exactly one
+    // read (the one at `j`), one write (the store at `i`) and no nested
+    // mention in the entire function, there is no statement anywhere the
+    // escape could reach that reads the stale value. Consumers without
+    // jumps are unaffected: their every path falls through to `j + 1`,
+    // which `isDeadAfter` already answers.
+    if (stmtInterest(list[j]!).jump && consumerVerdict !== "dead") {
+      const u = registerUses(fnBody).get(reg) ?? NO_USES;
+      if (!(u.reads === 1 && u.writes === 1 && u.nested === 0)) return { ok: false, reason: "use-under-control-flow" };
+    }
+    const loopGuard = loopTestGuard(list[j]!, value);
+    if (loopGuard !== null) return { ok: false, reason: loopGuard };
+    if (isPure(value)) {
+      const inputs = namesReadBy(value);
+      // docs/BUGS.md 2026-09-01 "captured-variable declaration order" row:
+      // folding a read of one environment slot forward past a *store* to a
+      // different slot of the SAME environment is value-safe (the two slots
+      // are independent bindings) but it swaps the two operations' order in
+      // the emitted JS, and therefore the order of the
+      // `LoadFromEnvironment`/`StoreToEnvironment` pair hermesc emits when
+      // the decompiled source is recompiled. `arr[i++]` with `arr` at slot 0
+      // and `i` at slot 1 is the shape that shows it: the baseline emits
+      // `r1 = _e1_0; r0 = _e1_1; ...; _e1_1 = r2; r0 = r1[r0];` (slot 0 read
+      // first, exactly as the original bytecode does) and folding `_e1_0`
+      // into the member base turns it into `_e1_1` read first. ECMAScript
+      // member-expression evaluation order agrees with the bytecode: in
+      // `arr[i++]` the base `arr` is evaluated before the index. So keep the
+      // temp where the baseline put it whenever the travel would cross a
+      // store into the same environment. Cross-environment moves and moves
+      // over register-only statements are untouched.
+      const envs = envIdsReadBy(value);
+      for (let x = i + 1; x < j; x++) {
+        const t = list[x]!;
+        if (!isSimple(t) || !isPureStmt(t) || mentions(t, reg)) return { ok: false, reason: "impure-move" };
+        if (writesAnyOf(t, inputs)) return { ok: false, reason: "input-clobbered" };
+        if (envs.length > 0 && writesEnvOf(t, envs)) return { ok: false, reason: "env-slot-order" };
+      }
+    } else if (j !== i + 1) {
+      return { ok: false, reason: "impure-move" };
+    }
+    // If `L[j]` is itself a plain store to `reg` (self-referential, e.g. a
+    // second `reg = reg + x` landing right where we are folding a *first*
+    // one in), the value being folded away is dead the instant `j` finishes
+    // — `j` overwrites `reg`'s binding there, so nothing after `j` can ever
+    // observe it, whatever `j`'s own new value happens to read. Skipping
+    // this and going straight to `isDeadAfter` (which starts looking for a
+    // redefinition *after* `j`, never re-examining `j` itself) used to
+    // treat `j`'s own read of its fresh output as an unrelated live use of
+    // the value being folded away, and refuse a genuinely safe site.
+    if (!isPlainStoreTo(list[j]!, reg) && !isDeadAfter(list, fnBody, j, reg, 1, memo)) return { ok: false, reason: "not-dead" };
+    return { ok: true, rule: "R1a", j };
+  }
+
+  if (blocked) return { ok: false, reason: "use-under-control-flow" };
+
+  // R1b candidate: j = i. D-b's "one read at j" becomes "reg's own value
+  // reads reg" (a self-referential store like `reg = reg + 1`) — 0 for an
+  // ordinary store, which is the common case (see `isDeadAfter`'s comment).
+  if (!isDeadAfter(list, fnBody, i, reg, exprCounts(value, reg).reads, memo)) return { ok: false, reason: "not-dead" };
+  return { ok: true, rule: "R1b", j: i };
+}
+
+function isGeneratorFrame(ctx: PassContext): boolean {
+  const info = ctx.cfg?.generator?.info;
+  return info !== undefined && info.era === "opcode" && info.kind !== "normal";
+}
+
+export function match(list: readonly Stmt[], ctx: PassContext): ExprRebuildMatch | null {
+  if (isGeneratorFrame(ctx)) return null; // refuse the whole function (§7 generator-frame)
+  const fnBody = ctx.fnBody ?? list;
+  for (let i = 0; i < list.length; i++) {
+    const s = list[i]!;
+    if (s.k !== "expr" || s.expr.k !== "assign" || s.expr.target.k !== "ident") continue;
+    const reg = s.expr.target.name;
+    if (!isRegisterName(reg)) continue; // protocol-name: not our business
+    const value = s.expr.value;
+    const verdict = classifySite(list, fnBody, i, reg, value);
+    if (verdict.ok) {
+      return { root: list, nodes: [list], data: { rule: verdict.rule, i, j: verdict.j, reg, value }, at: { functionIndex: ctx.functionIndex, offset: i } };
+    }
+  }
+  return null;
+}

@@ -1,0 +1,1005 @@
+# Spec 05 — Emitter: tree IR → JavaScript (M4, stage 3)
+
+**Milestone:** M4 (baseline), third stage — the one that defines "M4 done"
+**Status:** ready to implement
+**Prerequisites:** specs 01, 02, 03, 04
+**Consumers:** spec 06 (harness), spec 07 (pass ladder)
+
+Reference: `docs/DECISIONS.md` **D9** (v97+ generators get a runtime shim first),
+**D11** (baseline first, ugly allowed), **D14** (ground truth is the Hermes VM,
+not Node), **D15** (three-valued equivalence);
+`docs/PRIOR-ART.md` **§1.2** (the four defects we must not reproduce), **§5**
+(registers → variables), **§6.1**, **§6.2**, **§6.5**, **§6.6**;
+`docs/EQUIVALENCE.md` **§5.2** (Hermes ≠ Node), **§8**.
+
+> **Ownership notice.** Do not edit `src/**`, `package.json` or
+> `tests/**/*.test.ts`.
+
+---
+
+## 1. What M4 means
+
+> **M4 baseline, defined:** for every gate fixture at every version it compiles
+> at, `hbc2js <fixture>.hbc` emits JavaScript that (a) passes `node --check`,
+> and (b) is **PASS** under the equivalence checker (spec 06) against the
+> reference trace. Output may be ugly: `while(true)` with `break`, register-named
+> variables, `Reflect.apply` calls, duplicated `finally` bodies, generator shims.
+> **Nothing about readability is in scope for M4.** (D11)
+
+Everything readable — real `while(c)`, `for`, `switch`, `yield`, expression
+rebuilding, sensible names — is spec 07's pass ladder, each pass gated on this
+baseline staying green.
+
+---
+
+## 2. Pipeline and API
+
+```
+StructuredFunction (spec 04)  ─┐
+FunctionCfg (spec 03)          ├─►  lower()  ─►  JS AST  ─►  print()  ─►  text
+HbcModule tables (spec 01)     │
+EnvGraph (spec 03)            ─┘
+```
+
+```ts
+// src/emit/index.ts
+export function emitModule(a: ModuleAnalysis, opts?: EmitOptions): EmitResult;
+
+export interface EmitOptions {
+  /** Emit `"use strict"` per function when FunctionFlags.strictMode. Default true. */
+  readonly strictDirectives?: boolean;
+  /** Include `// fn#N @0x…` provenance comments. Default true; off for goldens
+   *  that are compared against a recompile. */
+  readonly provenanceComments?: boolean;
+  /** Runtime helpers: "inline" (default, self-contained output) or "import"
+   *  (emit `import {…} from "./hbc-runtime.js"`, for debugging). */
+  readonly helpers?: "inline" | "import";
+  /** Fail rather than emit a materialised environment object. Default true. */
+  readonly strictEnv?: boolean;
+  readonly indent?: string;                       // default two spaces
+}
+
+export interface EmitResult {
+  readonly code: string;
+  /** Helpers actually emitted, in dependency order. */
+  readonly helpersUsed: readonly string[];
+  /** Offset map: JS line -> (functionIndex, bytecode offset). Feeds spec 06's
+   *  divergence reports and is cheap to maintain. */
+  readonly lineMap: readonly LineMapEntry[];
+  readonly diagnostics: readonly Diagnostic[];
+}
+```
+
+The JS AST is our own minimal node set (~30 kinds), not ESTree — we emit a
+narrow subset and an in-house printer avoids a dependency and gives byte-stable
+output. It must be *convertible* to ESTree if spec 07 later wants a parser-based
+`check`; keep the node names ESTree-compatible (`BinaryExpression`,
+`CallExpression`, …) so that stays a mechanical mapping.
+
+---
+
+## 3. Names
+
+Fixed, deterministic, collision-free by construction. **Never emit an identifier
+that is not declared** — that is hermes-dec's defect 5 and risk R3.
+
+| Thing | Name | Notes |
+|---|---|---|
+| register *n* of the current frame | `r<n>` | declared once per function: `let r0, r1, …, r<frameSize-1>;` |
+| function-table entry *n* | `_fn<n>` | the top-level binding for a closure body |
+| environment slot (lexical) | `_e<envNodeId>_<slot>` | declared in the *owner* function (spec 03 §6.3) |
+| materialised environment | `_env<envNodeId>` | an object literal with `s<slot>` keys |
+| catch binding | `_exc<regionIndex>` | the `Catch` register is also assigned to `r<n>` |
+| structurer label | `L<labelId>` | from `LabelInfo` |
+| irreducible dispatch variable | `__state<n>` | spec 04 §4.4 |
+| debug `switch(pc)` fallback | `__dispatchPc` | **mandated** by spec 00 §8 — the licence guard greps for `_funN_ip`, hermes-dec's name, and our own must not collide |
+| runtime helper | `__hbc_<name>` | §7 |
+| `CreateThis` / `CreateThisForNew` / `SelectObject` | *(no identifier)* | consumed by the `new` pattern (§7.5); never lowered standalone |
+| generator resume state | `__state` | written by `SaveGenerator`, read by the shim (§7.2) |
+| generator shim state object | `__hbc_gen<n>` | §7 |
+
+`functionName` from the header is used **only in a comment** (`// fn#6 "ze"`),
+never as an identifier — it can be `?anon_0_gen`, can collide, and SPEC puts name
+recovery out of scope.
+
+**Register declaration, not SSA.** M4 declares `let r0…rN` at the top of each
+function and assigns them exactly as the bytecode does. This is the ugly, obviously
+correct floor. SSA construction (Braun et al., `docs/PRIOR-ART.md` §5) and
+expression rebuilding are stage-B passes in spec 07 — they turn 40 lines of
+`rN = …` into one expression, and they are where readability actually comes from.
+Do not attempt them in M4.
+
+---
+
+## 4. Statement lowering
+
+One IR node → one JS construct, mechanically:
+
+| IR | JS |
+|---|---|
+| `block` | the block's instructions, lowered one per statement |
+| `seq` | statements in order |
+| `labeled(L, b)` | `L: { b }` |
+| `loop(L, b)` | `L: while (true) { b }` |
+| `if(B, t, e)` | `if (<cond of B's terminator>) { t } else { e }` |
+| `break(L)` / `continue(L)` | `break L;` / `continue L;` |
+| `return(B)` | `return r<n>;` from the block's `Ret` |
+| `throw(B)` | `throw r<n>;` |
+| `unreachable` | `throw new Error("unreachable");` — **not** an empty statement; the Hermes opcode traps, and a silent fallthrough would change behaviour |
+| `switch(B, jumptable, arms, default)` | `switch (r<n>) { case k: …; default: … }` where every arm body ends in `break` unless the CFG says it falls through |
+| `try(R, body, handler, reg)` | `try { body } catch (_exc<R>) { r<reg> = _exc<R>; handler }` |
+
+Conditional lowering: each conditional-jump opcode maps to a JS expression
+(`JmpTrue rC` → `r<C>`, `JLess a,b` → `r<a> < r<b>`, `JStrictEqual` → `===`, and
+the `Not`-variants negated). Build this as a **table** in `src/emit/conds.ts`
+keyed by opcode name, not a `switch` statement, so an unhandled conditional is a
+loud `E_EMIT_UNSUPPORTED` naming the opcode rather than a silently wrong branch.
+
+**Numeric fast-path opcodes are not shortcuts.** `AddN`, `MulN` etc. assert their
+operands are numbers; they lower to the same `+`/`*` as the general form. The
+assertion is a VM optimisation, not observable behaviour.
+
+---
+
+## 5. Values: strings, regexps, BigInt, literal buffers
+
+**Strings** (`docs/HBC-FORMAT.md` §5, PRIOR-ART §6.5). Emit as a double-quoted
+literal with the escape rule of spec 02 §6.2: `\\`, `\"`, `\n`, `\r`, `\t`,
+`\xNN` below 0x20, `\uNNNN` for everything ≥ 0x80 **including lone surrogates**.
+The result is pure ASCII, which makes output byte-stable and immune to the
+editor/locale problems that eat non-BMP text. The v94 fixture already contains a
+U+202F and a literal NUL inside a regexp pattern — both must survive.
+
+*Identifier* vs *String* kind matters for **property access**, not for literals:
+`GetById r, o, #c, s19` where s19 is an Identifier emits `r = o.gen` when the
+text is a valid ES identifier, else `o["…"]`. A `String`-kind operand in the same
+position still emits bracket form. Getting this wrong is cosmetic, not semantic —
+but `o.constructor`-style names and reserved words must go through the bracket
+path, so validate with a real identifier regex plus a reserved-word set.
+
+**RegExp.** `CreateRegExp dst, patternStrId, flagsStrId, tableIdx` → `new RegExp(<pattern>, <flags>)`.
+**Never decode `regExpStorage`** — the source pattern is right there as strings
+(§8 of HBC-FORMAT). Do not emit a `/…/flags` literal in M4: it needs escaping
+analysis (unescaped `/`, newlines) and buys nothing. `regexp-literal` is a
+stage-B pass.
+
+**BigInt.** `LoadConstBigInt[LongIndex] dst, idx` → the decimal expansion plus
+`n`, from spec 01 §3.6's two's-complement decoder. `46-bigint-arithmetic` has 6
+entries at v94/v98/v99 and is the test.
+
+**Literal buffers** (HBC-FORMAT §6). `NewArrayWithBuffer[Long] dst, sizeHint,
+numElems, bufIdx` → an array literal built from `readLiterals(arrayBuffer,
+bufIdx, numElems)`. For v≤96 `NewObjectWithBuffer` carries key- and value-buffer
+indices; for v≥97 it carries a shape-table index plus a value-buffer offset, and
+keys come from `objKeyBuffer` at `shape.keyBufferOffset` for `shape.numProps`
+entries. Emit an object literal preserving **key order** — property order is
+observable in JS (`Object.keys`, `for…in`, `JSON.stringify`) and the equivalence
+checker compares it (`docs/EQUIVALENCE.md` §2.2).
+
+**Undefined has no tag** in the serialized-literal encoding; treat "string" as
+the fallback per HBC-FORMAT §6.3 and assert the resulting string id is in range.
+
+**Object shapes: `Put`/`GetOwnBySlotIdx`.** These name a property by its *slot
+index* in the hidden class the object was created with, never by name, so the
+key list has to be recovered from the `NewObjectWithBuffer*` that created the
+object in the register being read. That is a control-flow question, not a
+textual one, and `src/emit/shapes.ts` answers it with a forward **must**-analysis
+over the function's CFG (shaped like available expressions), run once per
+function before lowering:
+
+* **Lattice.** State is a register → interned key-array map. The entry block
+  starts empty; every other block starts at ⊤ ("not yet reached"); a block's IN
+  is the meet of its analysed predecessors' OUTs, iterated to a fixpoint. Meet
+  keeps a register only when both sides map it to the *same* key array, so a
+  join of two different literals resolves to nothing. Blocks still ⊤ at the
+  fixpoint are unreachable through normal edges and finalise as empty, and an
+  exception-handler entry always starts empty (a throw can arrive from anywhere
+  in the region).
+* **Transfer.** A `NewObjectWithBuffer`/`…Long`/`…AndParent` sets its
+  destination's shape; `Mov`/`MovLong` copies the source's (same object, same
+  hidden class); any other write to a register drops it.
+* **Rule.** A slot read resolves *only* when every path from the function entry
+  to it agrees on one creation shape — i.e. a creation dominates it and nothing
+  in between clobbers the register. Otherwise the emitter raises
+  `E_EMIT_UNSUPPORTED` naming the register, the slot and the offset. A property
+  name is never guessed (artifact truth, `docs/DECISIONS.md`), and per-function
+  isolation turns that refusal into one throwing stub rather than a lost module.
+
+This replaced a single mutable map advanced in *statement emission order*, which
+is not the order the VM executes blocks in: on react-navigation-example fn#8640
+the `if` arm printed first clobbered r3, so the `PutOwnBySlotIdx r3, …, 1` in
+the arm printed second saw no shape at all even though the creating
+`NewObjectWithBuffer` dominates both arms (`docs/BUGS.md`). Tests:
+`tests/gate/emit/shape-across-blocks.test.ts` (the analysis' properties) and
+`tests/sweep/emit/shape-across-blocks.test.ts` (that bundle's fn#8640).
+
+---
+
+## 6. Environments → closure variables
+
+Input: `EnvGraph` from spec 03. Output: real JS scoping.
+
+**`lexical` slots (the normal case).** The slot becomes one `let _e<env>_<slot>;`
+declared in the env's `ownerFunction`, immediately after the register
+declarations. Every `LoadFromEnvironment`/`StoreToEnvironment` in that function
+or a lexical descendant becomes a direct read/write of that identifier. Nesting
+the emitted functions correctly is then *sufficient* — no environment object
+exists at runtime. This is what PRIOR-ART §6.1 step 2 describes and it is the
+difference between readable output and hermes-dec's dangling names.
+
+**Function nesting.** `_fn<n>` is emitted **inside** the function that owns its
+`closureEnvOf` environment, so JS closure capture does the work. The global
+function is the outermost. A function with no known creation site (orphan,
+`W_ORPHAN_FUNCTION`) is emitted at top level with a comment saying so.
+
+**One body per creation context.** A function whose `closureCopies` (spec 03
+§6.2) hold more than one environment has more than one lexical identity, so it
+is emitted **once per environment**. Copy `i` goes in the owner of the
+environment *it* captured — the same rule every other function follows — and
+every `Create*Closure` / `Create*Class` site emits the name of the copy that
+captured the environment that site passed, so no site is ever left referring to
+a body it cannot see. The copy's whole lexical subtree is emitted with it, under
+that copy's `envRemap`, which rewrites every `_e<env>_<slot>` the subtree emits
+into the environment the copy really captured; copies nested inside another
+copy's subtree compose the two remaps. Copy 0 keeps the plain `_fn<n>` name and
+its ordinary home so that any reference the env graph did not record as a
+creation site (a `CallDirect`, say) still resolves; copies `i > 0` are
+`_fn<n>__c<i>`. Orphan placement (below) is therefore left with only the
+functions that have no resolved creation site at all.
+
+**Placement is a property of the instance, not of the function index.** "The
+copy's whole lexical subtree" is more than the `closureEnvOf` children. A
+closure `g` created *inside* a duplicated function `f`, over an environment `f`
+itself captured, has `closureEnvOf(g)` pointing at an ancestor's environment, so
+the nesting rule above hosts `g` beside copy 0 and copies `1..n` reference a
+`_fn<g>` they cannot see. `g` therefore travels per **instance**: while emitting
+a copy (and anything inside it), every closure the body creates whose home is
+not already inside the instance being emitted gets its own instance there, under
+this instance's remap and under the name its creation site emits. Moving the
+*function index* inward instead is wrong and was measured worse: `g` is usually
+also created from sites that are not duplicated, and those sites keep the copy-0
+instance exactly where it is. For the same reason a copy's `emitName` renames
+only that instance — never its children, which keep their own `_fn<n>` names.
+
+**A copy hosted inside its own recursion group goes in every instance of that
+host.** Duplicated functions that create each other (or themselves) form a
+**recursion group**: the strongly connected components of the "creates" relation
+restricted to functions with copies (spec 03 §6.2). When a copy's environment is
+owned by a member of its own group, that host is itself multi-instance, and
+hosting the copy once — beside copy 0 — leaves every other instance of the group
+referring to a body it cannot see. Such a copy is therefore emitted inside
+*every* instance of its host, under that instance's composed remap. The
+recursion terminates on the set of group-copy names an enclosing instance
+already hoisted, which includes the instance's own name: the copy that would
+nest inside itself finds its own function declaration, and that is the right
+binding, because the site that would create it there is exactly the
+self-reference. Depth is bounded by the number of copies in the group. See the.
+
+**A copy that captured a loop-local environment is emitted at its creation
+site.** An environment created inside a loop is a fresh record per iteration, so
+its slots are declared at the `Create*Environment` (a `let` in the loop body's
+own block) and every closure made with it is emitted as a function *expression*
+at its `Create*Closure` site — see the loop-local rule below. A copy hosted in
+the owner of such an environment must take the same form: hoisted to the top of
+its host it cannot see a `let` that lives inside the loop block, which is
+`E_UNBOUND_IDENT` (react-navigation's `_fn10396__c1` / `_fn10397__c1` reading
+`_e2192_0`). The inline form is used only when every recorded creation site of
+that function index inside the host body belongs to *this* copy, because the
+inline map is keyed by function index; otherwise the hoisted form is kept, since
+a wrong-scope binding that the unbound check reports is better than a silent
+binding to the wrong body.
+
+**`materialised` slots.** `const _env<id> = { s0: undefined, … };` in the owner,
+accesses become `_env<id>.s<slot>`, and any closure created with that env
+captures the object. Correct, uglier, and rare.
+
+**`StoreNPToEnvironment` is `StoreToEnvironment`.** The `NP` is a GC
+write-barrier hint. Emitting anything different is a bug.
+
+**The hard rule (R3).** With `strictEnv: true` (default) an unresolved
+`(env, slot)` is `E_ENV_UNRESOLVED` at *analysis* time (spec 03 §6.4) and never
+reaches the emitter. The emitter additionally asserts, before printing, that
+**every identifier it emits is declared in an enclosing emitted scope** — a
+cheap scope-stack check during lowering, not a post-hoc parse. `E_UNBOUND_IDENT`
+if not. hermes-dec ships `_closure1_slot1` that is never declared; we must make
+that unrepresentable.
+
+---
+
+## 7. Runtime helpers
+
+### 7.1 Policy — when a helper is acceptable
+
+A helper is acceptable **only** if all four hold:
+
+1. **It implements a VM primitive with no direct JS surface form** — the
+   generator protocol, `arguments` reification, `CallBuiltin`'s reverse argument
+   order. "It would be repetitive otherwise" is *not* a reason.
+2. **It is self-contained and pure** with respect to the program: no module
+   state, no monkey-patching of built-ins, no prototype mutation.
+3. **It is emitted inline into the output file** (`helpers: "inline"`, the
+   default), so the emitted JS is one runnable file with no imports. The
+   `"import"` mode exists for debugging only.
+4. **It has its own unit test and a row in `docs/LOWERING-CATALOGUE.md`**, and it
+   is emitted **only when used** (`helpersUsed` records which).
+
+Everything else is inlined at the use site. In particular: property access,
+arithmetic, comparisons, `typeof`, `instanceof`, array/object literals, `throw`
+and `try` all lower to plain JS with no helper. If you find yourself writing
+`__hbc_add`, stop.
+
+### 7.2 `__hbc_makeGenerator` (D9) — the v≥97 shim
+
+Static Hermes removed the generator opcodes; the compiler lowers the body to an
+explicit state machine and marks the function with `FunctionHeader.flags.kind`
+(spec 03 §3.4). Strategy A of PRIOR-ART §6.2, which D9 mandates for v1:
+
+* Emit the **inner** function verbatim, structured by spec 04, as an ordinary
+  function. Its signature is whatever the lowered body expects — determined
+  empirically per version (see O-1), and the shim adapts to it.
+* Emit `CreateGenerator dst, env, innerFnId` as
+  `r<dst> = __hbc_makeGenerator(_fn<innerFnId>, <env expr>);`.
+* `__hbc_makeGenerator` returns an object implementing the iterator protocol —
+  `next(v)`, `return(v)`, `throw(e)`, `[Symbol.iterator]()` — by driving the
+  state machine exactly as the VM does: call the body with an action code and a
+  value, interpret the `{value, done}` result object it builds via
+  `NewObjectWithBuffer`, and propagate `throw` by entering the body's throw path.
+
+Why this is the right first move: it is **provably behaviour-preserving because
+it is what the VM does**, it requires zero pattern recognition, and it makes the
+v98/v99 generator fixtures pass the trace test on day one. The cost is that the
+output has a helper and no `yield`. Strategy B (state-machine inversion to
+recover real `yield`) is a spec 07 / v2 item, and it is where every other tool in
+PRIOR-ART §2 currently fails.
+
+**Async at v≥97** is the same shape with the promise driver; `async-generator`
+combines both. Emit `__hbc_makeAsyncFunction` / `__hbc_makeAsyncGenerator` on the
+same principle.
+
+### 7.2.1 v≤96 goes through the same shim, at the same instruction
+
+The v≤96 era has VM opcodes rather than a lowered state machine, but the
+*emission* rule is identical, and deliberately so — M4's bar is "a mechanical
+per-opcode lowering, not pattern recognition".
+
+**`CreateGenerator` is the shim site at both eras.** Spec 03 §3.4.1 measured that
+both eras use the same two-hop shape: the creation site names a **trampoline**,
+and the trampoline's own `CreateGenerator` names the body.
+
+```
+v94  global:   CreateGeneratorClosure r4, r2, fn#1     -> ordinary closure creation
+v94  fn#1:     CreateEnvironment r0
+               CreateGenerator r0, r0, fn#2            -> THE SHIM SITE
+               Ret r0
+v99  fn#N:     CreateGenerator r1, r1, fn#3            -> THE SHIM SITE
+```
+
+So the lowering rules are, for every version:
+
+| Opcode | Lowering |
+|---|---|
+| `CreateGeneratorClosure dst, env, fnId` / `CreateAsyncClosure dst, env, fnId` | `r<dst> = _fn<fnId>;` — an **ordinary closure**. No special case. The trampoline body is emitted like any other function |
+| `CreateGenerator dst, env, fnId` | `r<dst> = __hbc_makeGenerator(_fn<fnId>, <env expr>);` |
+
+This is the review's option (a), chosen because it needs **zero** new pattern
+recognition and keeps one rule for both eras. Option (b) — special-casing
+`CreateGeneratorClosure` to skip the trampoline and wrap the true body directly —
+would require resolving the two-hop at emit time and deleting a function, which
+is pattern recognition and belongs in a spec 07 pass if it is ever wanted.
+
+**The body's contract with the shim.** Spec 03 §4.5 gives the v≤96 body a
+synthetic resume-dispatch entry whose `switch` selects state `0` (first call) or
+state `k` (resume at suspend point *k*). The three generator opcodes lower to
+plain assignments against that contract:
+
+| Opcode | Lowering |
+|---|---|
+| `StartGenerator` | *nothing* — the dispatcher `switch` replaces it |
+| `SaveGenerator L_k` | `__state = k;` (`k` is `SuspendPoint.state`) |
+| the `Ret r` that follows it | `return r;` — the yielded value |
+| `ResumeGenerator dst, isReturnReg` | `r<dst> = __sent; r<isReturnReg> = __isReturn;` |
+| `CompleteGenerator` | `__done = true;` |
+
+`__hbc_makeGenerator(body, env)` then drives it: it holds `__state` (initially 0),
+`__sent`, `__isReturn` and `__done` in its own closure, calls `body` on each
+`next(v)` / `return(v)` / `throw(e)`, and builds the `{value, done}` result. That
+is precisely what the VM does with the saved pc, which is why this is
+behaviour-preserving without any recognition of *what* the generator computes.
+
+`yield` recovery — collapsing `__state = k; return v;` … resume-case *k* back
+into `r = yield v` and emitting a real `function*` — is a spec 07 stage-A pass
+(`yield-recovery`), which runs first in stage A and is easier at this era than at
+v≥97. Until it lands, both eras emit the shim, so **one code path is green
+everywhere at M4**.
+
+### 7.3 The other sanctioned helpers
+
+| Helper | Why it qualifies | Notes |
+|---|---|---|
+| `__hbc_makeGenerator` / `__hbc_makeAsyncFunction` / `__hbc_makeAsyncGenerator` | VM primitive, no JS form | §7.2 |
+| `__hbc_arguments(fnArgs)` | `ReifyArguments`/`GetArgumentsPropByVal` build a *mapped* arguments object; see §8 | must reproduce Hermes's aliasing behaviour, not the spec's |
+| `__hbc_callBuiltin(n, args)` | `CallBuiltin` reads arguments in reverse from the frame top and always passes `undefined` as `this` | the builtin *number* → real global is a generated table (spec 01 §5.4) |
+
+That is the whole list for M4. Adding a fifth requires an entry in
+`docs/DECISIONS.md`.
+
+### 7.4 Calls — inline, never `bind`
+
+PRIOR-ART §1.2 defect 4: hermes-dec emits `callee.bind(thisArg)(args)`, which
+allocates a new function per call, breaks `Function.prototype.toString`, breaks
+callee identity comparison, and re-evaluates the receiver. Do not.
+
+* **Method-call fast path (the common case).** When the callee register was
+  produced by a `GetById`/`GetByIdShort` on the very register used as `thisArg`,
+  emit `r<obj>.<name>(a, b)` (or `r<obj>[expr](…)`). This is both correct and
+  readable, and it covers the overwhelming majority of calls.
+* **General case.** `Reflect.apply(r<callee>, r<this>, [r<a>, r<b>])`. No helper
+  needed — `Reflect.apply` is standard.
+### 7.5 `new` — a three-instruction pattern, never lowered per opcode
+
+`hermesc` **never** emits a bare `Construct` for `new X(…)`. It emits a triple,
+and `CreateThis`/`CreateThisForNew` and `SelectObject` have no JS expression form
+on their own — so §4's "one instruction, one statement" model does not apply and
+they must be recognised as a unit, exactly like the method-call fast path.
+
+Measured on `tests/fixtures/constructs/13-try-finally-no-catch` (`new Error('propagated')`):
+
+**v84 / v94 / v96** — `CreateThis dst, prototypeReg, closureReg`:
+
+```
+[@ 19] TryGetById    2<Reg8>, 0<Reg8>, 2<UInt8>, 9<UInt16>    ; r2 = global.Error
+[@ 25] GetByIdShort  0<Reg8>, 2<Reg8>, 3<UInt8>, 13<UInt8>    ; r0 = r2.prototype
+[@ 30] CreateThis    1<Reg8>, 0<Reg8>, 2<Reg8>                ; r1 = OrdinaryCreateFromConstructor(r2, r0)
+[@ 34] LoadConstString 4<Reg8>, 6<UInt16>                     ; arg
+[@ 38] Mov           5<Reg8>, 1<Reg8>                         ; thisArg slot <- r1
+[@ 41] Construct     0<Reg8>, 2<Reg8>, 2<UInt8>               ; r0 = r2.[[Construct]](this=r1, arg)
+[@ 45] SelectObject  0<Reg8>, 1<Reg8>, 0<Reg8>                ; r0 = isObject(r0) ? r0 : r1
+```
+
+**v98 / v99** — `CreateThisForNew dst, closureReg, cacheIdx<UInt8>` reads
+`.prototype` itself through an inline cache, so there is no separate
+`GetByIdShort`:
+
+```
+[@ 19] TryGetById       2<Reg8>, 0<Reg8>, 1<UInt8>, 9<UInt16>
+[@ 25] CreateThisForNew 1<Reg8>, 2<Reg8>, 2<UInt8>
+[@ 29] LoadConstString  4<Reg8>, 6<UInt16>
+[@ 33] Mov              5<Reg8>, 1<Reg8>
+[@ 36] Construct        0<Reg8>, 2<Reg8>, 2<UInt8>
+[@ 40] SelectObject     0<Reg8>, 1<Reg8>, 0<Reg8>
+```
+
+**Semantics.** `CreateThis`/`CreateThisForNew` allocate the `this` object from
+the callee's `.prototype` *before* the call; `SelectObject dst, allocatedThis,
+callResult` implements the spec rule "if the constructor returned an object use
+that, else use the allocated `this`" *after* it.
+
+**Matcher.** Recognise the triple:
+
+1. a `CreateThis`/`CreateThisForNew` writing `rT`, whose closure operand is `rC`;
+2. a `Construct rR, rC, argCount` whose `thisArg` frame slot was written by a
+   `Mov` from `rT` (or is `rT` itself);
+3. a `SelectObject rD, rT, rR` combining **the same two registers**.
+
+Emit `r<D> = new r<C>(<args>);` for the whole triple and consume all three
+instructions (plus the `Mov` and, at v≤96, the `GetByIdShort … "prototype"`
+whose only use is the `CreateThis`). Do not emit anything for the individual
+opcodes.
+
+**Fallbacks, both loud.** A `CreateThis`/`CreateThisForNew` or `SelectObject`
+reached **outside** a recognised triple is `E_EMIT_UNSUPPORTED` naming the opcode
+and offset (EM-05) — not a crash, and not a silent skip. A bare `Construct` with
+no surrounding triple (hermesc does not emit one today, but hand-written or
+obfuscated bytecode might) lowers to
+`Reflect.construct(r<callee>, [args])`. `CallWithNewTarget` with a new.target
+distinct from the callee lowers to `Reflect.construct(callee, args, newTarget)`.
+
+**Scope, measured.** `CreateThis` appears in **12 of 53** construct fixtures at
+v94 — `05-for-in-object`, `07-for-of-iterable`, `12`–`16` (all five try/catch
+fixtures), `24-generator-return-throw`, `28-async-await-error`,
+`29-promise-chaining`, `47-typeof-instanceof-in`, `50-this-binding` — through
+ordinary `new Error(…)` / `new Promise(…)`, not contrived cases. Without this
+rule roughly a quarter of the gate corpus throws `E_EMIT_UNSUPPORTED` on the
+first `new`.
+
+---
+
+## 8. Hermes semantics, not spec semantics (D14)
+
+This is the subtlest requirement in the whole project and it inverts the usual
+instinct.
+
+> The decompiler's job is to reproduce **what the bytecode does**, not what the
+> original source meant. Where the Hermes VM disagrees with the ECMAScript spec
+> (and with Node), the emitted JS must match **Hermes**.
+
+`docs/EQUIVALENCE.md` §5.2 measured this: running the 45 v84 construct fixtures'
+own `.hbc` under the v84 Hermes VM and comparing with the Node sandbox trace
+gives **41/45 agreement**, and all four disagreements are pre-Static-Hermes
+Hermes simply not implementing part of ES2015+. Reproduced identically on the
+HBC-89 VM, so it is not a v84 quirk.
+
+| Divergence | Node / spec | Hermes 84–99 (measured at 84, 89, 94, 99) | What the emitter must do |
+|---|---|---|---|
+| per-iteration `let` in a `for` head (`18-closure-loop-let`) | closures capture `0,1,2` | `3,3,3` | **Emit one binding.** The bytecode contains *one* environment slot for `i`; emit `let` **outside** the loop (or `var`). Never re-introduce a per-iteration binding just because the loop header looks like `for(let …)` — there is no such thing in the bytecode |
+| TDZ with shadowing (`20-let-const-tdz`) | inner-block `let` read before init → `ReferenceError` | no TDZ; the inner `let` writes through to the outer binding | **Emit no TDZ.** Only emit a TDZ throw where the bytecode has an explicit `ThrowIfEmpty`/`ThrowIfHasRestrictedGlobalProperty`-style check |
+| non-strict `arguments` aliasing (`42-rest-params`, `49-arguments-object`) | writing `arguments[0]` mutates the parameter | no aliasing — parameter keeps its original value | `__hbc_arguments` builds an **unmapped** object at every version we target |
+
+**Two corollaries the implementer must internalise:**
+
+1. **A "more correct" emission is a bug.** If the emitted JS prints `0,1,2` where
+   the bytecode prints `3,3,3`, the equivalence checker reports DIVERGENT and it
+   is *right* to. Do not fix it by making the output more spec-compliant.
+2. **The behaviour is version-dependent in principle — but not in fact, so far.**
+   Measured: the 10-fixture cross-check
+   under the newly built `tools/hermes-vm/v{94,99}/bin/hermes` found that **all
+   four divergences persist unchanged at v94 and v99**. So Static Hermes has
+   *not* fixed them, and the same emission rules apply at 84, 94, 96, 98 and 99.
+   Keep the mechanism anyway: a per-version flag table in one place
+   (`src/emit/semantics.ts`), citing EQUIVALENCE §5.2 for the behaviour and the
+   v94/v99 confirmation, so that the day a version fixes
+   one, it is a one-line data change and not an archaeology exercise.
+
+---
+
+## 9. Output shape
+
+One ES module, this order:
+
+```js
+// hbc2js — decompiled from <basename>
+// HBC version 94, layout C, opcode table hbc94
+"use strict";                              // only when the global function is strict
+<runtime helpers actually used>            // §7, inline
+<top-level: the global function's body, with nested _fn<n> declarations>
+```
+
+* **Strict mode is per function.** `FunctionFlags.strictMode` decides; emit
+  `"use strict";` as the function's first statement where set. Do not hoist one
+  directive to the file — a module with mixed strictness is normal in Hermes
+  output and hoisting changes semantics.
+* **Provenance comments** (`// fn#6 "ze" @0x56a`, and per-statement
+  `// @0x1e` when `provenanceComments`) make divergence reports actionable. They
+  are stripped for the round-trip oracle (which recompiles the output) because
+  comments do not survive compilation anyway.
+* **`functionSourceTable` free win.** When a function appears there
+  (`docs/HBC-FORMAT.md` §9), its *original source text* is in the string table.
+  Emit that verbatim instead of decompiling — with a comment saying so. Both
+  sample fixtures have `functionSourceCount = 2`. **But** verify the recovered
+  text parses and matches the expected arity before trusting it, and put it
+  behind `--use-function-sources` (default on) so a mismatch can be isolated.
+
+---
+
+## 10. Invariants
+
+| # | Invariant | Violation |
+|---|---|---|
+| EM-01 | every emitted identifier is declared in an enclosing emitted scope | `E_UNBOUND_IDENT` |
+| EM-02 | output passes `node --check` | acceptance gate |
+| EM-03 | no helper is emitted that is not in `helpersUsed`, and vice versa | `E_INTERNAL` |
+| EM-04 | no `.bind(` appears anywhere in emitted call lowering | grep test |
+| EM-05 | every opcode encountered has a lowering; unknown → `E_EMIT_UNSUPPORTED` naming it | never silently skip an instruction |
+| EM-06 | object-literal key order matches the key buffer order | golden + equivalence |
+| EM-07 | emitted strings are pure ASCII (all non-ASCII escaped) | golden test |
+| EM-08 | `unreachable` emits a throw, never nothing | golden test |
+| EM-09 | strict directives are per function, never hoisted | golden test |
+| EM-10 | two runs produce byte-identical output | golden test |
+| EM-11 | `lineMap` covers every emitted line that came from an instruction | spec 06 relies on it |
+| EM-12 | no emitted identifier matches `/_fun\d+_ip/` (spec 00 §8 licence guard) | CI grep |
+
+---
+
+## 11. Test plan
+
+`tests/gate/emit/**`, `tests/sweep/emit/**`.
+
+### T1 — `node --check` on everything
+
+Every gate binary at every version → emit → `node --check`. Zero failures. This
+is the cheapest possible gate and it catches the whole class of "emitted a
+keyword as an identifier" bugs.
+
+### T2 — Equivalence gate (the real acceptance test)
+
+Every gate fixture through spec 06's checker: **PASS**, with the reference trace
+chosen per D14 (Hermes VM for the fixture's version where one exists — v84 from
+`tools/hermesc/v84/hermes`, v94 and v99 from `tools/hermes-vm/v{94,99}/bin/hermes`
+— else `expected.txt`). INCONCLUSIVE is not a pass (D15).
+
+Expected known-divergent set: the four EQUIVALENCE §5.2 fixtures, **only** when
+compared against Node. Against the matching VM they must PASS. If they do not,
+§8 is wrong and that is a finding, not a test to relax.
+
+### T3 — Emission goldens
+
+`tests/golden/emit/<group>/<name>/vNN.js`, committed. Reviewable diffs are how
+spec 07's passes will be seen to improve things. Emit with
+`provenanceComments: false` so the goldens stay stable when offsets shift.
+
+### T4 — Targeted lowering assertions
+
+| Fixture | Assert |
+|---|---|
+| `45-regex-literals` | `new RegExp("…", "gmi")`, no `/…/` literal, `regExpStorage` never read |
+| `46-bigint-arithmetic` | six distinct `…n` literals with the right decimal values |
+| `37/40` (array literals) | array literal from the buffer, right length and values |
+| `38/41` (object literals) | object literal, **key order preserved** |
+| `17/21/22` (closures) | nested `function` declarations, no `_env` object, every captured variable declared in the right scope |
+| `18-closure-loop-let` | **one** binding for the loop variable; output prints Hermes's answer |
+| `49-arguments-object` | `__hbc_arguments`, unmapped |
+| `23`–`26` v84/v94/v96 | `__hbc_makeGenerator(_fn<body>, …)` emitted at the **trampoline's** `CreateGenerator`, never at `CreateGeneratorClosure`; the body contains the state `switch`, `__state = k`, and no bare `SaveGenerator`/`StartGenerator`/`ResumeGenerator`/`CompleteGenerator` text |
+| `23`–`26` v98/v99 | `__hbc_makeGenerator(_fn<n>, …)`, same rule, same site |
+| `13-try-finally-no-catch` and the other **12** `new`-using fixtures (§7.5) | `new r<C>(…)` for the triple; no identifier or statement is emitted for `CreateThis`/`CreateThisForNew`/`SelectObject` |
+| `52/53` | a real `switch` with the right case values, or an equivalent `if`-chain — either is acceptable at M4 provided the trace matches |
+| any fixture with `functionSourceTable` entries | the verbatim source is used and parses |
+
+### T5 — Round-trip (D3), per function
+
+Emit → `hermesc -emit-binary` at the fixture's version → disassemble both →
+normalised diff (spec 06 §6). Report the **per-function match percentage** as a
+ratchet, not a global score (`docs/EQUIVALENCE.md` §4.3 — one extra instruction
+shifts every register number and drags a whole function to 72%). Commit a
+baseline; CI fails on regression, not on absolute score.
+
+### T6 — Obfuscated variants
+
+All `.obf.hbc` (241 today): emit → `node --check` → equivalence against
+`expected.txt`/VM. These are behaviour-preserving transformations of the same
+programs, so **they must PASS too** — the flattened dispatcher is exactly the
+`while(true)` + `switch` the baseline emits natively, so this is a fair test of
+the ugly path. Budget generously; INCONCLUSIVE on timeout is acceptable here,
+DIVERGENT is not.
+
+### T7 — Sweep: large bundles
+
+`bundles/rn-template-0.72/*.hbc` → emit → `node --check` (they cannot execute
+outside an RN host) → round-trip ratchet. Record output size, wall time, and the
+count of functions using each helper.
+
+---
+
+## 12. Acceptance criteria (this is the M4 gate)
+
+- [ ] Every gate fixture at every version emits JS that passes `node --check`.
+- [ ] Every gate fixture is **PASS** under spec 06, with the D14 reference:
+      Hermes VM for 84/94/99 where the fixture compiles, `expected.txt`
+      otherwise. Zero DIVERGENT. INCONCLUSIVE only where a budget was hit, and
+      each one listed in the project status with a reason.
+- [ ] The four EQUIVALENCE §5.2 divergences PASS against their matching VM, and
+      the emitter reproduces Hermes's answer, not Node's, for each.
+- [ ] All `.obf.hbc` variants (241 today) pass T6.
+- [ ] **The 12 `new`-using fixtures emit `new`** (§7.5): `05-for-in-object`,
+      `07-for-of-iterable`, `12`, `13`, `14`, `15`, `16`,
+      `24-generator-return-throw`, `28-async-await-error`, `29-promise-chaining`,
+      `47-typeof-instanceof-in`, `50-this-binding` — at every version they
+      compile at, with the v84/94/96 (`CreateThis`) and v98/99
+      (`CreateThisForNew`) shapes both handled.
+- [ ] A `CreateThis` or `SelectObject` outside a recognised triple raises
+      `E_EMIT_UNSUPPORTED` naming the opcode — negative test, hand-built input.
+- [ ] Every v≤96 generator/async fixture emits the shim at the trampoline's
+      `CreateGenerator` and nothing special at `CreateGeneratorClosure`, and its
+      body honours the §7.2.1 state contract.
+- [ ] EM-01…EM-12 each have a test; EM-01 has a negative test proving it fires.
+- [ ] `helpersUsed` is minimal: no fixture emits a helper it does not call, and
+      the total helper set is exactly the four of §7.3.
+- [ ] `grep -n '\.bind(' ` over emitted output for the whole corpus returns
+      nothing (EM-04).
+- [ ] Emission goldens are byte-stable across two runs and across macOS/Linux.
+- [ ] Round-trip baseline recorded, with the per-function ratchet committed.
+- [ ] the project status records the M4 baseline as reached, with the fixture
+      counts and the helper inventory.
+
+---
+
+## 13. Estimated complexity
+
+**The largest single component in the project.** ~2500 lines plus tests.
+
+| Component | Size |
+|---|---|
+| `ast.ts` + `print.ts` (node set, printer, escaping) | ~450 lines |
+| `lower-stmt.ts` (IR → statements) | ~300 lines |
+| `lower-instr.ts` (per-opcode lowering, the big table) | ~700 lines, mechanical but long |
+| `conds.ts` | ~120 lines |
+| `literals.ts` (strings, regexp, bigint, buffers) | ~300 lines |
+| **`env.ts`** (slots → variables, scope stack, EM-01) | ~350 lines — this is R3 |
+| **`calls.ts`** (method fast path, the §7.5 `new` triple, Reflect.apply, builtins) | ~280 lines — defect 4 and the `new` pattern both live here |
+| **`runtime.ts`** (`__hbc_makeGenerator` and friends) | ~350 lines — must match VM semantics exactly |
+| `semantics.ts` (D14 per-version flags) | ~80 lines |
+| tests T1–T7 | ~1200 lines |
+
+**Sequence.** Get one fixture end-to-end first (`01-if-else-chain`, v94), then
+`node --check` across the corpus, then the equivalence gate one fixture family at
+a time in fixture-number order (D11). The generator shim last, because it needs
+the rest working to test against.
+
+---
+
+
+## 16. Bytecode origin: the source↔disasm line map
+
+The UI shows decompiled source over the raw disassembly of the same function
+(`docs/UI.md`). Selecting a source line should scroll the disassembly to the
+instruction that produced it. That needs a **line → instruction** map, which
+the emitter is the only stage able to produce honestly.
+
+**The one hard rule** is the artifact truth rule (`docs/specs/10-artifact-
+format.md` §0): *a mapped line must point at an instruction that really
+contributed to it*. Coverage is therefore explicitly partial — a wrong row is
+worse than a missing one — and the design says no wherever the answer would be
+a guess.
+
+### 16.1 `Origin`, and where it is set
+
+`src/emit/ast.ts` declares
+
+```ts
+export interface Origin { readonly fn: number; readonly start: number; readonly end: number }
+```
+
+— the half-open byte range of ONE instruction, plus the Hermes function index
+it belongs to. `fn` is not redundant: `emitModule` nests a child closure's body
+inside its parent's, and every function's offsets restart at 0, so a row
+without it would silently point at the wrong instruction.
+
+It is an optional field on the statement kinds that can come straight from an
+instruction (`expr`, `decl`, `init`, `if`, `while`, `do-while`, `for`, `break`,
+`continue`, `return`, `throw`, `switch`). It is never read or written directly:
+`src/emit/origin.ts` owns `originOfInsn`, `originOf`, `withOrigin` and
+`stampFrom`, so the carrier can change without touching call sites.
+
+Two places set it, both in `src/emit/function.ts`:
+
+1. **Per instruction.** `lowerBlock` records `out.length` before
+   `lowerInstruction` and stamps every statement that call appended. One
+   instruction may produce several statements; they all point back at it.
+2. **Per block terminator**, for the statements the *structurer* builds rather
+   than the lowerer: an `if`/`while`/`do-while`/`for` header takes the
+   conditional jump that ends its condition block, a `return` takes the `Ret*`,
+   a `throw` the `Throw*`, a `switch` the `Switch*`. `terminatorOrigin` takes
+   an opcode predicate and returns `undefined` when the terminator is not of
+   that class — a generator's resume dispatcher or an irreducible-loop rewrite
+   can leave a `return` sitting after a `JmpTrue`, and that instruction did not
+   produce the `return` line.
+
+Statements a stage-B pass rebuilds with object spread keep their origin for
+free. Statements a pass *synthesises* have none, and nothing tries to invent
+one for them.
+
+### 16.2 The printer hook
+
+`PrintOptions.onStmtLine?: (line, origin) => void` is called once per printed
+statement that carries an origin, with the 1-based line **within that
+`printProgram` call's own returned text**. It reuses the prefix-sum post-pass
+`onFunctionRange` already had, so it costs one extra pass over the output
+array and nothing per statement.
+
+It is **purely observational**: the returned text is byte-identical with and
+without the hook. `tests/gate/emit/line-map.test.ts` asserts exactly that over
+the whole v96 construct corpus, so no golden, no `expected.txt` and no
+equivalence verdict can move because the map exists.
+
+**Inline function expressions** (`useEffect(function(){…})`,
+`module.exports = function(){…}`, a generator's resume dispatcher — the
+dominant React Native idiom) need one more step, because `render()`'s own
+`"func"` case prints its body into a *separate* array whose text is then
+spliced into the middle of an enclosing `out` entry: a mark taken there would
+index the wrong array, and the line the function's `{` lands on depends on how
+much of the enclosing expression printed before it, which no local computation
+can know. Without that mapping those statements were simply unmapped.
+
+The mechanism that maps them, without guessing:
+
+1. While a hook is live, the inline `func` case collects its body's marks
+   against its **own** array and converts them to lines *relative to its own
+   text* (line 1 is the `function … (…) {` header, so `out[0]` starts on line
+   2). It pushes them as one record and returns its text prefixed with
+   `\uE000<record id, base 36>\uE001` — a private-use **sentinel** containing
+   no newline, so it shifts no line count and no other measurement.
+2. `printProgram`'s post-pass already walks `out` once to build the prefix sum.
+   The same walk finds each sentinel, reads off the absolute line it is sitting
+   on (`lineStart[i]` plus the newlines seen so far inside that entry),
+   **removes** it, and rebases the record's rows onto that line.
+3. The returned text is therefore byte-identical with and without the hook —
+   the property `tests/gate/emit/line-map.test.ts` asserts over the whole v96
+   construct corpus, and the reason the sentinel is stripped rather than chosen
+   to be invisible.
+
+Nested inline functions compose for free: a child's sentinel travels upwards
+*inside* its parent's text and is resolved by the same single top-level scan,
+so an inline function inside an inline function inside a statement needs no
+recursion and no parent-relative arithmetic. Each row keeps the `fn` its
+statement's origin already carried — the **inner** function's Hermes index,
+whose offsets restart at 0 (§16.1) — so no row is ever attributed to the
+enclosing function by accident. A record whose sentinel is found twice, or not
+at all (a rendered string the printer discarded), is dropped rather than
+guessed at.
+
+Cost when no hook is set: none. No sentinel is inserted (`inlineRecords` is
+`undefined`, and the inline `func` case takes exactly the code path it had
+before the sentinel existed) and no scan is done.
+
+`onFunctionRange` falls out of the same record: an inline function expression
+now reports its own range (when `emitModule` gave it the `_fnN` name
+`ranges.jsonl` keys on — an anonymous one gets no row, since a range naming
+nothing is not a usable fact) and so does every statement-level `function`
+declaration nested inside its body. Its end line is the line its closing brace
+is on, which for an inline function is shared with the rest of the enclosing
+statement (`});`).
+
+### 16.3 Serving it
+
+`src/name-overlay/render.ts`'s `renderFrame` collects the rows from the SAME
+print that produces the served text (`lineMapCollector`), so the line numbers
+are that text's own by construction rather than by agreement. One row per line,
+owned by the first statement printed on it.
+
+`ArtifactService.lineMap(fn)` reads the memoised per-function render `source()`
+serves and returns
+
+```ts
+{ fn, fnStartLine: number | null, lines: readonly [line, fn, start, end][] }
+```
+
+`line` is 1-based inside the function's own text; `fnStartLine` is that text's
+first line in the module file, so a caller showing the whole file can rebase.
+`lines: []` — never an error — when the service has no `--hbc` (the render is a
+live verb) or the function has no emitted frame. `McpResources.lineMap` and
+`GET /api/fn/:fn/linemap` expose it unchanged; the rows are uncapped, because a
+truncated map would be a *wrong* map for the lines it dropped.
+
+### 16.4 The coverage ratchet
+
+`tests/gate/emit/line-map.test.ts` measures mapped rows over non-blank rendered
+lines and fails if it drops below a floor. Measured when this section landed
+(after §16.2's inline-function mapping):
+**0.6432** over the whole `rn-template-0.72` bundle, 0.6286 over the first 600
+functions (the sample the gate uses, for speed), 0.5481 over the whole v96
+construct corpus, 0.6761 over `02-while-loop`, 0.7667 over
+`04-for-loop-basic`, 0.4650 over `23-generator-basic`. Floors are 0.61, 0.66,
+0.53 and 0.44. They are **raised** as coverage improves and never lowered.
+
+Inline-function mapping is what separates the two measurements taken that day:
+the construct corpus went 0.3832 → 0.5481 and `23-generator-basic` 0.1306 →
+0.4650, because a generator's whole state machine prints inside the resume-
+dispatcher closure, an inline function expression. `rn-template` moved only
+0.6408 → 0.6432: the UI renders one function per frame, and at that granularity
+most React Native closures are hoisted `function _fnN` siblings, already mapped.
+
+What is unmapped today, and why: closing braces and `else`/`} while` joins (no
+statement starts there); `let`/`var` hoisting blocks the emitter synthesises;
+runtime-helper preludes and the module IIFE; the generator resume dispatcher's
+own scaffolding; the header and closing brace of an inline function expression
+(no statement starts on either — its *body* is mapped, §16.2); an anonymous
+inline function's `onFunctionRange` row (§16.2);
+and any statement a stage-B pass built from scratch.
+
+## 17. Global-read lowering
+
+Global-read lowering is not an emitter concern: `reconstruction.md` describes
+the actual mechanism, which lives in `src/passes/global-access`, outside the
+emitter.
+
+**Finding: the fold this row asks for already exists**, as a dedicated
+stage-B pass (`src/passes/global-access`, `docs/specs/passes/03-global-access.md`,
+`catalogue: ["R2"]`), registered by
+default (`registry.ts`, right after `expr-rebuild`, before every renaming
+rung). It recognises exactly the guard shape `src/emit/lower.ts`'s `GETBYID`
+branch emits for a `Try`-prefixed opcode (`if (!("p" in G)) throw new
+ReferenceError(...)`), proves `G` is genuinely `globalThis` at the read
+(`isProvenGlobal`, plus loop-reentry and pre-guard clobber checks, §4
+conditions 3–6), checks the target name is not shadowed anywhere in the
+function (`isShadowed`, §4.2), and only then deletes the guard and stamps the
+surviving read `{k:"ident", global:true}` — the ONE marker
+`src/emit/scope-check.ts`'s EM-01 (`checkBindings`) accepts as a deliberate
+free identifier, everywhere else still an `E_UNBOUND_IDENT` bug. `src/emit`'s
+own role in this feature is exactly two lines: emit the guard unconditionally
+(baseline, always safe) and trust that one marker (EM-01) — the actual
+soundness proof lives entirely in the pass, by design (an emit-time proof
+would have to duplicate the pass's own whole-function scope analysis with no
+extra benefit over doing it once, after structuring, where the tree already
+exists).
+
+**No `src/emit` code change is needed.** The mechanism lives in
+`src/passes/global-access`, outside the emitter, and is already
+present and already sound (see measurement below for how much it actually
+recovers), so there is nothing left to *build* in the emitter — the
+design principle ("a partial lowering that is provably sound
+everywhere it fires beats a complete one that is sometimes wrong") is
+already what is shipped. The deliverables below are validation, not a fix.
+
+### 17.1 Construct fixture and gate test
+
+`tests/fixtures/constructs/86-global-read-lowering` (`unshadowed`/`loopy`,
+compiled all five versions via `tests/fixtures/build.sh`).
+`tests/gate/emit/global-read-lowering.test.ts` (10 tests, `docs/test-count-
+baseline.json` 2082 → 2084) proves, per version, real hermesc-compiled
+bytecode, not a hand-built AST:
+
+- `unshadowed` (`return Error.name;`, nothing else in its own scope) folds:
+  the guard disappears, and recompiling the decompiled output reproduces the
+  EXACT original opcode shape (`GetGlobalObject` + one `TryGetById "Error"` +
+  `GetByIdShort "name"`, zero `Throw` either side of the round trip).
+- `loopy` (two guarded reads, `Reflect`/`String`, inside a `do...while` with
+  enough live registers) keeps BOTH guards, at every one of the five
+  versions: applying the fold there would leave a register read before its
+  first definition in the rewritten statement list — the pass ladder's own
+  post-rewrite soundness check (shared by every stage-B pass, not specific to
+  `global-access`'s own named refuse reasons), abandoning the rewrite rather
+  than risking a wrong one. Recompiling that survives guard costs exactly 2
+  real `Throw` opcodes the original never had (`TryGetById`'s own throw is
+  intrinsic to the opcode; a JS-level `throw` statement is not) — the
+  measured, accepted cost of correctly refusing an unsafe fold, not a defect.
+
+**On literal source-level name shadowing:** a genuine `var`/`let`/parameter
+named the same as a global, anywhere the guarded read's identifier is
+statically in scope, is not reproducible from ordinary hermesc-compiled
+source at all — Hermes's own compiler proves the read resolves to the local
+binding and never emits `TryGetById` for it in the first place. What survives
+compilation as a real, version-stable "not safe to fold" case is the register
+side of the same hazard the row's own text describes ("no local/closure
+binding... in scope" ⊇ "the register this read flows through is not provably
+`globalThis` at this point") — exactly what `loopy` exercises, and exactly
+what `isShadowed`'s own whole-function, name-collision check exists to catch
+for the one case that DOES survive compilation without debug info: a nested
+closure's own (Hermes always keeps function names, debug info or not) name
+coinciding with the global being read.
+
+### 17.2 Measurement (rn-template RELEASE `index.android.hbc`, held-out
+RELEASE `react-navigation-example.hbc`; both named per this worker's brief)
+
+Method: `decompile(bytes, {})` (global-access ON, the default/current
+pipeline) vs `decompile(bytes, { passes: { skip: ["global-access"] } })`
+(OFF — the row's own baseline shape), each recompiled whole-module
+with the matching hermesc version (v94 for rn-template, v98 for the held-out
+app) and disassembled to count real opcodes — not a textual guess.
+
+| bundle | metric | original | OFF (baseline) | ON (current) | ON vs OFF |
+|---|---|---|---|---|---|
+| rn-template `index.android.hbc` | TryGetById | 2,875 | 9,450 | 7,170 | -24.1% |
+| rn-template `index.android.hbc` | Throw | 389 | 3,260 | 1,887 | -42.1% |
+| rn-template `index.android.hbc` | recompiled .hbc bytes | 1,232,481 | 1,795,367 | 1,647,179 | -8.3% |
+| rn-template `index.android.hbc` | decompiled .js bytes | n/a | 4,940,242 | 4,700,436 | -4.9% |
+| held-out `react-navigation-example.hbc` | TryGetById | 13,928 | 46,469 | 43,737 | -5.9% |
+| held-out `react-navigation-example.hbc` | Throw | 1,951 | 20,476 | 13,350 | -34.8% |
+| held-out `react-navigation-example.hbc` | recompiled .hbc bytes | 4,517,730 | 6,591,221 | 6,212,471 | -5.8% |
+| held-out `react-navigation-example.hbc` | decompiled .js bytes | n/a | 20,864,658 | 19,930,912 | -4.5% |
+
+The OFF column's rn-template `Throw` figure (3,260) matches the BUGS row's
+own quoted baseline exactly, confirming this measurement method reproduces
+the row's methodology. **Honest result: real, but partial.** `global-access`
+already recovers a substantial share of the inflation on both bundles
+(`Throw` -42%/-35%, moving materially back toward the original), but
+`TryGetById` recovers far less, especially on the larger held-out app (-24%
+on rn-template, only -6% held-out) — the real corpus's functions are bigger
+and more register-pressured than the construct corpus this pass's own
+`clean-function` metric (73.7%) was measured against, so more sites fall into
+`unproven-global`/`loop-reentry-clobber`/`pre-guard-clobber`/`read-twice`
+refusals that the construct corpus rarely exercises. Neither bundle reaches
+"back to the original's" `TryGetById` count; both move the `Throw` count
+substantially closer to it. **Prove-fixed verdict: partially met** — the
+unshadowed/shadowed-equivalent proof bar is met exactly (§17.1); the "`Throw`
+counts... drop back toward the original's" bar is met directionally and
+substantially, not to parity. Closing it further is `src/passes/global-
+access` work (widening `isProvenGlobal`/the clobber conditions for
+real-world register pressure), out of scope for the emitter.
+
+### 17.3 A separate, smaller fidelity gap found while measuring (not fixed)
+
+`src/emit/lower.ts`'s `GetGlobalObject` case prints the literal identifier
+`globalThis`. That is faithful (the property is self-referential and can
+never be missing or shadowed) but not opcode-for-opcode round-trip-stable on
+its own: Hermes has no dedicated "give me the global object" expression
+form, so recompiling a bare `globalThis` reference costs its own
+`GetGlobalObject` + `TryGetById "globalThis"` pair — one MORE `TryGetById`
+than the original `GetGlobalObject` alone ever cost (confirmed directly,
+`tests/gate/emit/global-read-lowering.test.ts`'s `countLiteralGlobalThis`
+helper and comment). Every site where a guard survives (like `loopy` above)
+pays this once per surviving `r = globalThis;` statement, which very slightly
+inflates the `TryGetById` numbers in §17.2 beyond the guard-fold
+question itself. Not fixed here: it is a genuinely separate question (how to
+print "the global object" so it round-trips, independent of whether a given
+property read off it is guarded) and any fix risks the same EM-01/KNOWN_
+GLOBALS surface this section's feature already depends on — better done as
+its own reviewed step than folded in here.

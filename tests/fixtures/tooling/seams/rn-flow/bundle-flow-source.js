@@ -1,0 +1,1 @@
+__d(function(g,r,i,a,m,e,d){"use strict";m.exports=function(t,n){var o=r(d[0]).jsx(View,{style:{color:"blue"},children:t});return n&&n.duration?"flowtoast-android["+n.duration+"]:"+t+String(null!=o):"flowtoast-android:"+t+String(null!=o)}}, 0, []);

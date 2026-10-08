@@ -1,0 +1,5 @@
+--------- beginning of main
+09-20 10:19:40.001  1355  1355 I ActivityManager: Start proc com.example.app for activity
+09-20 10:19:40.901  1355  1355 I ReactNativeJS: HBC2JS_DEVICE_MARKER launch 900
+09-20 10:19:41.401  1355  1355 I ReactNativeJS: HBC2JS_DEVICE_MARKER firstContentCommit 1400
+09-20 10:19:43.900  1355  1355 W ReactNativeJS: still loading, spinner stuck

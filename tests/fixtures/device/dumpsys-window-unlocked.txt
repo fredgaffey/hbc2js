@@ -1,0 +1,8 @@
+WINDOW MANAGER POLICY STATE (dumpsys window policy)
+  mAwake=true
+  mScreenOnEarly=true
+  mScreenOnFully=true
+  mKeyguardDrawComplete=true
+  mDreamingLockscreen=false
+  isStatusBarKeyguard=false
+  mHdmiPlugged=false

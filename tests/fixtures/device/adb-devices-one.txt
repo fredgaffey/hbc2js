@@ -1,0 +1,3 @@
+List of devices attached
+FAKE0001            device usb:1-1.2 product:pixel7 model:Pixel_7 device:panther transport_id:3
+

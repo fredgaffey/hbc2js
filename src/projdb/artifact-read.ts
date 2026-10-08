@@ -1,0 +1,279 @@
+// src/projdb/artifact-read.ts — §8 step 4 (docs/specs/16-project-db.md §3.2,
+// §5.2): the DB-backed read path for `ArtifactService`. Loads the exact same
+// row shapes `src/artifact/write.ts`'s JSONL readers produce, via prepared
+// SELECTs over `ix_*`, so `ArtifactService` can populate its private maps
+// identically regardless of backend — the verb layer (caps, slicing,
+// truncation) is byte-for-byte the same code either way (§3.2's "same
+// answers, same caps" is enforced by construction, not by parallel logic).
+//
+// Staleness (§5.2): `checkDbStaleness` mirrors the JSONL path's two checks
+// (`E_STALE_RANGES` for a render-hash mismatch, `E_STALE_INDEX` for a
+// bundle/producer mismatch) but reads its "current" value from `meta`
+// instead of `ranges.jsonl`'s header / `manifest.index.builtFor`.
+import { DatabaseSync } from "node:sqlite";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { ErrorCode, Hbc2jsError } from "../errors.ts";
+import {
+  ARTIFACT_SCHEMA,
+  INDEX_SCHEMA,
+  sha256Hex,
+  type CallRow,
+  type DepEdge,
+  type FunctionRow,
+  type GlobalRow,
+  type Manifest,
+  type ModulesIndex,
+  type NativeRow,
+  type RangeRow,
+  type ResolvedCallRow,
+  type StringRow,
+  type StringUseRow,
+  type StringsIndex,
+} from "../artifact/schema.ts";
+import { ProjectDbVersionError, SCHEMA_MINOR, verifyProjectDb } from "./db.ts";
+
+/** True iff `artifactDir` holds a `project.hbcproj` — the §4.3 backend
+ *  selector every DB-aware constructor in `src/artifact/service.ts` and
+ *  `src/project/service.ts` calls first. */
+export function hasProjectDb(artifactDir: string): boolean {
+  return existsSync(dbPath(artifactDir));
+}
+
+export function dbPath(artifactDir: string): string {
+  return join(artifactDir, "project.hbcproj");
+}
+
+/** Opens `project.hbcproj` read-only for a query-time backend, verifying its
+ *  identity pragmas + `meta.schema` (§1.1) — refuses a mismatch rather than
+ *  guessing, same rule as `openProjectDb`. Read-only: query paths never
+ *  write `ix_*` (§2.5 — only `rebuild-index`, §5.2, does).
+ *
+ *  Also refuses a DB whose `meta.schema_minor` is behind this build's
+ *  `SCHEMA_MINOR` (docs/BUGS.md 2026-09-18 `ix_module_dep_kind` row): a
+ *  read-only connection cannot `ALTER TABLE`/`CREATE TABLE`, so
+ *  `migrateProjectDb` cannot run here — every caller that owns a
+ *  read-write path to the same file (`hbc2js ui-server`, `hbc2js
+ *  mcp-server`) migrates it forward BEFORE opening it read-only (see their
+ *  own ordering comments), so this only fires for a genuinely read-only
+ *  caller (e.g. a `hbc2js` query verb run directly against a project no
+ *  read-write command has touched since it was upgraded). A named,
+ *  actionable error beats the raw `no such table: …` a stale query would
+ *  otherwise throw. */
+export function openProjectDbReadonly(artifactDir: string): DatabaseSync {
+  const path = dbPath(artifactDir);
+  const db = new DatabaseSync(path, { readOnly: true });
+  verifyProjectDb(db, path);
+  let minorRow: { value: string } | undefined;
+  try {
+    minorRow = db.prepare("SELECT value FROM meta WHERE key = 'schema_minor'").get() as { value: string } | undefined;
+  } catch {
+    minorRow = undefined;
+  }
+  const minor = minorRow === undefined ? 1 : Number.parseInt(minorRow.value, 10);
+  if (!Number.isFinite(minor) || minor < SCHEMA_MINOR) {
+    db.close();
+    throw new ProjectDbVersionError(
+      `openProjectDbReadonly: ${path} is at schema_minor ${minorRow?.value ?? "1"}, this build expects ${SCHEMA_MINOR} — ` +
+        `open it once read-write (e.g. \`hbc2js ui-server\` or any \`hbc2js project\`/\`init\` command) to migrate it forward, then retry`,
+    );
+  }
+  return db;
+}
+
+export function readMeta(db: DatabaseSync): Map<string, string> {
+  const rows = db.prepare("SELECT key, value FROM meta").all() as { key: string; value: string }[];
+  return new Map(rows.map((r) => [r.key, r.value]));
+}
+
+function metaGet(meta: Map<string, string>, key: string): string {
+  const v = meta.get(key);
+  if (v === undefined) throw new Hbc2jsError(ErrorCode.E_IO, `project.hbcproj: meta.${key} missing — not a fully-initialised project DB`);
+  return v;
+}
+
+/** Builds a `Manifest`-shaped object from `meta` alone, for a DB project with
+ *  no `manifest.json` on disk (§4.1's spec-10 build step has not yet been
+ *  layered onto `hbc2js init`'s current CLI implementation — see AGENT-LOG).
+ *  Every field the query verbs actually read (`bundle`, `producer`,
+ *  `render.hash`, `index.builtFor`) is populated from `meta`; fields with no
+ *  DB analogue (`render.form`/`ts`, `degraded`, `index.semanticHash`) get
+ *  conservative defaults that are never compared against anything. */
+export function synthesizeManifestFromMeta(meta: Map<string, string>): Manifest {
+  const bundleSha256 = metaGet(meta, "bundle_sha256");
+  const producerJson = metaGet(meta, "producer_json");
+  const producer = JSON.parse(producerJson) as Manifest["producer"];
+  return {
+    schema: ARTIFACT_SCHEMA,
+    bundle: {
+      sha256: bundleSha256,
+      bytes: Number(metaGet(meta, "bundle_bytes")),
+      hbcVersion: Number(metaGet(meta, "hbc_version")),
+      functionCount: Number(metaGet(meta, "function_count")),
+    },
+    producer,
+    render: {
+      hash: metaGet(meta, "render_hash"),
+      form: "flat",
+      ts: meta.get("created_at") ?? new Date(0).toISOString(),
+      overlayHash: null,
+    },
+    index: {
+      semanticHash: "",
+      builtFor: { bundleSha256, producer: sha256Hex(producerJson) },
+    },
+  };
+}
+
+export function checkDbStaleness(artifactDir: string, meta: Map<string, string>, manifest: Manifest): void {
+  const renderHash = metaGet(meta, "render_hash");
+  if (renderHash !== manifest.render.hash) {
+    throw new Hbc2jsError(
+      ErrorCode.E_STALE_RANGES,
+      `${artifactDir}: project.hbcproj meta.render_hash (${renderHash}) != manifest.render.hash (${manifest.render.hash}) — ` +
+        `run \`hbc2js render\` to regenerate before querying (docs/specs/16-project-db.md §5.2)`,
+    );
+  }
+  const bundleSha256 = metaGet(meta, "bundle_sha256");
+  const expectedIndexBuiltFor = sha256Hex(`${manifest.bundle.sha256}:${JSON.stringify(manifest.producer)}`);
+  const indexBuiltFor = metaGet(meta, "index_built_for");
+  if (bundleSha256 !== manifest.bundle.sha256 || indexBuiltFor !== expectedIndexBuiltFor) {
+    throw new Hbc2jsError(
+      ErrorCode.E_STALE_INDEX,
+      `${artifactDir}: project.hbcproj's index was built for a different bundle/producer than this manifest — ` +
+        `the semantic layer is stale (docs/specs/16-project-db.md §5.2); run \`hbc2js project rebuild-index\``,
+    );
+  }
+}
+
+export interface DbIndexRows {
+  readonly functionRows: readonly FunctionRow[];
+  readonly callRows: readonly CallRow[];
+  /** §2.2a `ix_calls_resolved` (MIGRATION 5) — the `require(N)` points-to
+   *  pass's edges, read back exactly as `ArtifactService`'s JSONL path reads
+   *  `index/calls-resolved.jsonl` (docs/BUGS.md 2026-09-05 `ix_calls_resolved`
+   *  row). A DB written before MIGRATION 5 is migrated forward on open
+   *  (`migrateProjectDb`), so this table always exists here, though it may be
+   *  empty for a bundle the pass found no edges in. */
+  readonly resolvedCallRows?: readonly ResolvedCallRow[];
+  readonly stringsIndex: StringsIndex;
+  readonly stringUseRows: readonly StringUseRow[];
+  readonly globalRows: readonly GlobalRow[];
+  readonly nativeRows: readonly NativeRow[];
+  readonly modulesIndex: ModulesIndex;
+  readonly rangeRows: readonly RangeRow[];
+}
+
+/** Reads every `ix_*` table into the exact row shapes the JSONL loader
+ *  produces (§2.4's "one table per JSONL kind" makes this a direct column
+ *  mapping, no re-derivation) — prepared SELECTs, one per table, `ORDER BY`
+ *  the table's own primary key (matching the `v_json_*` views' sort order,
+ *  §3.1) so a DB-backed artifact iterates in the same order a JSONL one did. */
+export function loadIndexRowsFromDb(db: DatabaseSync): DbIndexRows {
+  const functionRows = (
+    db.prepare("SELECT fn, name, params, module, parent, kind, offset, size FROM ix_functions ORDER BY fn").all() as {
+      fn: number;
+      name: string | null;
+      params: number;
+      module: number | null;
+      parent: number | null;
+      kind: FunctionRow["kind"];
+      offset: number;
+      size: number;
+    }[]
+  // `ix_functions` has no `rendersJsx` column yet (reconstruction lane item
+  // 1: JSONL-only for now, same gap `src/ui-server/list.ts`'s
+  // `modulesFromDb` documents) — `false` is a known gap, not a claim.
+  ).map((r) => ({ ...r, rendersJsx: false }));
+
+  const callRowsRaw = db.prepare("SELECT caller, site, callee, kind, via, why FROM ix_calls ORDER BY caller, site").all() as {
+    caller: number;
+    site: number;
+    callee: string;
+    kind: CallRow["kind"];
+    via: string | null;
+    why: string | null;
+  }[];
+  const callRows: CallRow[] = callRowsRaw.map((r) => ({
+    caller: r.caller,
+    site: r.site,
+    callee: /^[0-9]+$/.test(r.callee) ? Number(r.callee) : r.callee,
+    kind: r.kind,
+    ...(r.via !== null ? { via: r.via } : {}),
+    ...(r.why !== null ? { why: r.why } : {}),
+  }));
+
+  // §2.2a: a DB opened read-only (this function's only caller,
+  // `openProjectDbReadonly`) is never migrated forward in place — migration
+  // needs a writable connection (`db.ts`'s `migrateProjectDb`, run by
+  // `openProjectDb`). A project DB written before MIGRATION 5 therefore has
+  // no `ix_calls_resolved` table yet; treated exactly like the JSONL path's
+  // own `existsSync(resolvedPath) ? … : []` fallback for an artifact built
+  // before the points-to pass existed (§2.2a) — empty, never an error.
+  let resolvedCallRows: readonly ResolvedCallRow[] = [];
+  try {
+    resolvedCallRows = db.prepare("SELECT caller, site, callee, module, name, confidence FROM ix_calls_resolved ORDER BY caller, site").all() as unknown as ResolvedCallRow[];
+  } catch {
+    resolvedCallRows = [];
+  }
+
+  const stringRowsRaw = db.prepare("SELECT sid, v, len, sha256, head FROM ix_strings ORDER BY sid").all() as {
+    sid: number;
+    v: string | null;
+    len: number;
+    sha256: string | null;
+    head: string | null;
+  }[];
+  const stringEntries: StringRow[] = stringRowsRaw.map((r) => (r.v !== null ? { sid: r.sid, v: r.v } : { sid: r.sid, len: r.len, sha256: r.sha256 as string, head: r.head as string }));
+  const stringsIndex: StringsIndex = { schema: INDEX_SCHEMA, kind: "strings", renderIndependent: true, entries: stringEntries };
+
+  const stringUseRows = db.prepare("SELECT sid, fn, role, n FROM ix_string_uses ORDER BY sid, fn, role").all() as unknown as StringUseRow[];
+  const globalRows = db.prepare("SELECT g, fn, access, n FROM ix_globals ORDER BY g, fn, access").all() as unknown as GlobalRow[];
+  const nativeRows = db.prepare("SELECT fn, surface, name, n FROM ix_native ORDER BY fn, surface, name").all() as unknown as NativeRow[];
+
+  const moduleRowsRaw = db.prepare("SELECT id, file, factory_fn, segment FROM ix_modules ORDER BY id").all() as {
+    id: number;
+    file: string;
+    factory_fn: number | null;
+    segment: number;
+  }[];
+  // MIGRATION 7 (reconstruction lane item 5): `ix_module_dep_kind` carries
+  // each `(id,ord)` row's `DepEdge.kind`/`site`, keyed the same as
+  // `ix_module_deps` -- a DB written before MIGRATION 7 simply has no rows
+  // here, so every dep reads the same `eager`+`site:null` default
+  // `buildModulesIndex` uses for a dep it could not classify either
+  // (`v_json_module_dep_edges`'s own `COALESCE`, mirrored here).
+  const depKindByKey = new Map<string, { kind: "eager" | "lazy"; site: { fn: number; ord: number } | null }>();
+  for (const k of db.prepare("SELECT id, ord, kind, site_fn, site_ord FROM ix_module_dep_kind").all() as { id: number; ord: number; kind: "eager" | "lazy"; site_fn: number | null; site_ord: number | null }[]) {
+    depKindByKey.set(`${k.id}:${k.ord}`, { kind: k.kind, site: k.site_fn === null || k.site_ord === null ? null : { fn: k.site_fn, ord: k.site_ord } });
+  }
+  const depsById = new Map<number, DepEdge[]>();
+  for (const d of db.prepare("SELECT id, ord, dep FROM ix_module_deps ORDER BY id, ord").all() as { id: number; ord: number; dep: number }[]) {
+    const list = depsById.get(d.id) ?? [];
+    const classified = depKindByKey.get(`${d.id}:${d.ord}`);
+    list.push({ id: d.dep, kind: classified?.kind ?? "eager", site: classified?.site ?? null });
+    depsById.set(d.id, list);
+  }
+  const fnOwnership: Record<string, number> = {};
+  for (const f of functionRows) if (f.module !== null) fnOwnership[String(f.fn)] = f.module;
+  const modulesIndex: ModulesIndex = {
+    schema: INDEX_SCHEMA,
+    kind: "modules",
+    renderIndependent: true,
+    // Same DB gap as `functionRows` above: `false` until a migration adds
+    // the column, never a guess either way.
+    modules: moduleRowsRaw.map((m) => ({ id: m.id, file: m.file, factoryFn: m.factory_fn, deps: depsById.get(m.id) ?? [], segment: m.segment, rendersJsx: false })),
+    entry: null,
+    fnOwnership,
+  };
+
+  const rangeRowsRaw = db.prepare("SELECT fn, file, line_start, line_end FROM ix_ranges ORDER BY fn").all() as {
+    fn: number;
+    file: string;
+    line_start: number;
+    line_end: number;
+  }[];
+  const rangeRows: RangeRow[] = rangeRowsRaw.map((r) => ({ fn: r.fn, file: r.file, lines: [r.line_start, r.line_end] }));
+
+  return { functionRows, callRows, resolvedCallRows, stringsIndex, stringUseRows, globalRows, nativeRows, modulesIndex, rangeRows };
+}

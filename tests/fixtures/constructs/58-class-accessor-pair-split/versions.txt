@@ -1,0 +1,30 @@
+v84: FAILS - hermesc rejects the `class` keyword entirely ("invalid statement
+     encountered"): no IRGen lowering for classes in this lineage — same root
+     cause as 32-class-basic .. 36-class-getters-setters, see
+     36-class-getters-setters/versions.txt for the full analysis.
+v94: FAILS - identical, same root cause.
+v96: FAILS - identical, same root cause.
+v98: OK - compiles (Static Hermes lineage); PASSES (the accessor-pair emit bug
+     described below is fixed).
+v99: OK - compiles; PASSES (trace-EQUIVALENT under the v99 VM after the
+     fix).
+
+This fixture is the minimal reproducer for the bug behind adversarial fixture
+21-class-private-fields (CONSOLIDATION 26 triage, docs/BUGS.md): Static
+Hermes lowers a class getter/setter PAIR as two DefineOwnGetterSetterByVal
+instructions, each with the other half `undefined`, and `src/emit/lower.ts`
+emits both halves as a full `Object.defineProperty(o, k, {get, set})`, so the
+second one clobbers the first (`get after pair: undefined`). The Hermes VM
+(`caseDefineOwnGetterSetterByVal`, Interpreter-slowpaths.cpp) only sets
+`setGetter`/`setSetter` for the non-undefined operand and leaves the other
+half alone. Object-literal accessor pairs are unaffected at every version
+(hermesc merges them into ONE instruction even when other keys sit between the
+two halves — verified v94 and v99), which is why 36-class-getters-setters'
+`temp` object passes and why this is a v98/v99 class-only bug.
+
+FIXED (consolidation item 3, 2026-08-31): `src/emit/lower.ts` omits the
+`get:`/`set:` key whose operand register statically holds a literal
+`undefined` (`isLiteralUndefinedReg`), so the second instruction leaves the
+first half alone. v98/v99 run as ordinary gate fixtures (the former
+`KNOWN_WRONG_OUTPUT` entries were removed); this fixture is the regression
+test.

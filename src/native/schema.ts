@@ -1,0 +1,259 @@
+// src/native/schema.ts — the `<artifact>/native/` table contracts.
+// docs/specs/27-native-side.md §L1 "Artifact tables (contracts)" + §1.4: every
+// file carries a schema header line; a row exists only because bytes said so.
+import { createHash } from "node:crypto";
+
+/** §1.4: the header schema id shared by every `native/*.jsonl` file. */
+export const NATIVE_SCHEMA = "hbc2js-native/1";
+
+export type NativeKind = "classes" | "methods" | "strings" | "resources" | "assets" | "react-modules" | "seams" | "env";
+/** `join` (spec 27 L3) is not a byte source: a `seams.jsonl` row is derived
+ *  from the ALREADY-materialised native tables and JS artifact index rows,
+ *  never re-read from bytes. */
+export type NativeSource = "dex" | "axml" | "arsc" | "zip" | "join";
+
+/** §1.4: the first line of every native table. */
+export interface NativeHeader {
+  readonly schema: typeof NATIVE_SCHEMA;
+  readonly kind: NativeKind;
+  readonly source: NativeSource;
+}
+
+export function nativeHeader(kind: NativeKind, source: NativeSource): NativeHeader {
+  return { schema: NATIVE_SCHEMA, kind, source };
+}
+
+/** An annotation as it appears in DEX, verbatim — no interpretation. */
+export interface NativeAnnotation {
+  /** Type descriptor, e.g. `Lcom/facebook/react/module/annotations/ReactModule;`. */
+  readonly type: string;
+  /** Element name -> value, in DEX order. Values are strings/numbers/booleans/
+   *  arrays/`null`; a value we cannot decode is `{unresolved:true}`. */
+  readonly elements: Record<string, unknown>;
+}
+
+/** `native/classes.jsonl`. */
+export interface NativeClassRow {
+  readonly key: string; // native:type:Lcom/x/Foo;
+  readonly name: string; // Lcom/x/Foo;
+  readonly super: string | null;
+  readonly interfaces: readonly string[];
+  readonly access: readonly string[];
+  readonly sourceFile: string | null;
+  readonly annotations: readonly NativeAnnotation[];
+  readonly dex: number;
+}
+
+/** `native/methods.jsonl`. */
+export interface NativeMethodRow {
+  readonly key: string; // native:method:Lcom/x/Foo;->bar(I)V
+  readonly class: string; // native:type:...
+  readonly name: string;
+  readonly proto: string; // (Lcom/x/Y;)V
+  readonly access: readonly string[];
+  readonly annotations: readonly NativeAnnotation[];
+  readonly dex: number;
+  /** §L2's bounded getName()-const channel (see `dex.ts`'s
+   *  `decodeTrivialStringReturn`): `undefined` when the method has no code
+   *  item, `null` when it has one that is not the trivial
+   *  const-string+return-object shape, the string when it is. Never a general
+   *  method-body value. */
+  readonly constStringReturn?: string | null;
+}
+
+/** `native/strings.jsonl` — the raw DEX string pool, the evidence itself. */
+export interface NativeStringRow {
+  readonly i: number;
+  readonly s: string;
+  readonly dex: number;
+}
+
+/** A resource value: a literal, or a still-unflattened reference (§L1). */
+export type NativeResourceValue = string | number | boolean | { readonly ref: string } | { readonly unresolved: true };
+
+/** `native/resources.jsonl`. */
+export interface NativeResourceRow {
+  readonly key: string; // native:res:pkg/string/api_url
+  readonly value: NativeResourceValue;
+  readonly config: string;
+  readonly type: string;
+}
+
+/** `native/assets.jsonl` — inventory only; bytes are never copied (§4.4). */
+export interface NativeAssetRow {
+  readonly path: string;
+  readonly size: number;
+  readonly sha256: string;
+  readonly kind: "json" | "png" | "font" | "other";
+}
+
+export interface NativeManifestComponent {
+  readonly kind: "activity" | "service" | "receiver" | "provider";
+  readonly name: string;
+  /** `null` = the attribute is absent and no default is soundly inferable. */
+  readonly exported: boolean | null;
+  readonly intentFilters: readonly {
+    readonly actions: readonly string[];
+    readonly categories: readonly string[];
+    readonly data: readonly { readonly scheme: string | null; readonly host: string | null; readonly pathPrefix: string | null }[];
+  }[];
+}
+
+/** `native/manifest.json`. */
+export interface NativeManifest {
+  readonly package: string | null;
+  readonly versionName: string | null;
+  readonly versionCode: number | null;
+  readonly permissions: readonly string[];
+  readonly usesSdk: { readonly min: number | null; readonly target: number | null };
+  readonly components: readonly NativeManifestComponent[];
+  readonly notes: readonly string[];
+}
+
+/** The `native` block spec 27 §L1.4 wires into the artifact `manifest.json`. */
+export interface NativeProvenance {
+  readonly schema: typeof NATIVE_SCHEMA;
+  readonly source: string;
+  readonly sourceSha256: string;
+  readonly dexCount: number;
+  readonly tool: "own-parser";
+  readonly files: Record<string, { readonly sha256: string; readonly rows: number }>;
+  readonly counts: Record<string, number>;
+  readonly notes: readonly string[];
+}
+
+export function sha256Hex(bytes: Uint8Array | string): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+/** Header line + one JSON object per row, newline-terminated (spec 10 §1.1). */
+export function toNativeJsonl(header: NativeHeader, rows: readonly unknown[]): string {
+  const lines = [JSON.stringify(header)];
+  for (const r of rows) lines.push(JSON.stringify(r));
+  return lines.join("\n") + "\n";
+}
+
+/** Inverse of `toNativeJsonl` for a reader that only wants the rows. */
+export function parseNativeJsonl(text: string): { header: NativeHeader; rows: unknown[] } {
+  const lines = text.split("\n").filter((l) => l.length > 0);
+  if (lines.length === 0) throw new Error("native table is empty (no schema header line)");
+  const header = JSON.parse(lines[0]!) as NativeHeader;
+  if (header.schema !== NATIVE_SCHEMA) {
+    throw new Error(`unknown native schema ${JSON.stringify(header.schema)} (expected ${NATIVE_SCHEMA}) — refused, not guessed`);
+  }
+  return { header, rows: lines.slice(1).map((l) => JSON.parse(l) as unknown) };
+}
+
+// --- spec 27 §L2 — RN native-module registration extraction ----------------
+
+/** How a module's JS-visible name was recovered.
+ *  - `annotation`: an `@ReactModule(name=...)` class annotation value.
+ *  - `getName-const`: the sole const-string a trivial `getName()` returns
+ *    (`dex.ts`'s `decodeTrivialStringReturn`).
+ *  - `classname`: a codegen naming convention (`Native<X>Spec` -> `X`) —
+ *    deterministic, not a body read, not a guess; a fourth, additive evidence
+ *    kind beyond the three the spec text lists inline, used only for
+ *    TurboModule spec classes that carry no `@ReactModule` annotation.
+ *  - `unresolved`: no channel above applies; the row is still emitted (a
+ *    module with no recoverable name is a real, honest fact), `jsName` is
+ *    `null`. */
+export type NativeModuleNameEvidence = "annotation" | "getName-const" | "classname" | "unresolved";
+
+export type NativeModuleKind = "bridge" | "turbo" | "viewmanager";
+
+export interface NativeModuleMethodRow {
+  readonly jsName: string;
+  readonly nativeMethod: string; // native:method:...
+}
+
+/** `native/react-modules.jsonl` (spec 27 §L2). */
+export interface NativeModuleRow {
+  readonly key: string; // native:module:X (or native:module:<class descriptor> when unresolved)
+  readonly jsName: string | null;
+  readonly kind: NativeModuleKind;
+  readonly implClass: string; // native:type:...
+  readonly methods: readonly NativeModuleMethodRow[];
+  readonly nameEvidence: NativeModuleNameEvidence;
+  /** Filled by L4 (first/third-party labelling); always `null` at L2. */
+  readonly firstParty: boolean | null;
+}
+
+/** Asset kind by extension — a classification of the *path*, never of bytes. */
+export function assetKind(path: string): NativeAssetRow["kind"] {
+  const lower = path.toLowerCase();
+  if (lower.endsWith(".json")) return "json";
+  if (lower.endsWith(".png")) return "png";
+  if (lower.endsWith(".ttf") || lower.endsWith(".otf") || lower.endsWith(".woff") || lower.endsWith(".woff2")) return "font";
+  return "other";
+}
+
+// --- spec 27 L3 -- JS<->native linkage join (`native/seams.jsonl`) ---------
+
+/** Which JS-side host anchor produced the JS half of a seam row. `null` on a
+ *  `native-only` row (there is no JS half at all). */
+export type SeamChannel = "NativeModules" | "TurboModuleRegistry" | "requireNativeComponent";
+
+/** Strength of the JS-side evidence, spec 27 L3's own vocabulary:
+ *  - `points-to`: a proven receiver (an `index/calls-resolved.jsonl` edge).
+ *    Never produced today -- that pass resolves `require(N)` module exports,
+ *    not host-object receivers, so no seam can cite one yet (see
+ *    docs/specs/10-artifact-format.md 2.8's "known gap").
+ *  - `by-name`: the receiver is named by a resolved call edge.
+ *  - `string-only`: the name is a string used in a function that also touches
+ *    the host anchor -- the honest strength of every row v1 emits. */
+export type SeamResolved = "points-to" | "by-name" | "string-only";
+
+export type SeamStatus = "linked" | "js-only" | "native-only";
+
+export interface SeamJsEvidence {
+  /** `sid:<n>` ids, each resolvable in `index/string-uses.jsonl`/`strings.json`. */
+  readonly stringUses: readonly string[];
+  /** `fn:<n>` ids of the functions the strings above were used in. */
+  readonly callSites: readonly string[];
+  readonly resolved: SeamResolved;
+}
+
+export interface SeamNativeRef {
+  readonly module: string; // native:module:X
+  readonly method: string | null; // native:method:...
+}
+
+/** `native/seams.jsonl` (spec 27 L3). One row per seam, citing BOTH sides'
+ *  evidence; `jsEvidence` is `null` exactly on a `native-only` row and
+ *  `native` is `null` exactly on a `js-only` row. */
+export interface SeamRow {
+  readonly key: string; // seam:X.method / seam:X
+  readonly jsName: string | null;
+  readonly jsMethod: string | null;
+  readonly jsEvidence: SeamJsEvidence | null;
+  readonly native: SeamNativeRef | null;
+  readonly status: SeamStatus;
+  readonly channel: SeamChannel | null;
+  /** Filled by L4; always `null` at L3. */
+  readonly firstParty: boolean | null;
+}
+
+// --- spec 27 §L6 -- `.env` recovery from strings.xml / BuildConfig ---------
+
+/** Which channel produced an `env.jsonl` row. */
+export type EnvSource = "strings.xml" | "BuildConfig";
+
+/** How the value was recovered.
+ *  - `own-parser`: a plain ARSC string value, or a DEX `static_values`
+ *    compile-time-constant literal — both read from tables, no method body.
+ *  - `baksmali`: reserved for the optional external oracle (§1.2); the own
+ *    parser never sets this.
+ *  - `none`: no value could be recovered; `value` is `"unresolved"`. */
+export type EnvResolvedBy = "own-parser" | "baksmali" | "none";
+
+/** `native/env.jsonl` (spec 27 §L6). One row per recovered (or key-only)
+ *  `.env` entry. A value assembled at runtime (a `BuildConfig` field with no
+ *  `static_values` entry, i.e. only settable from a `<clinit>` this parser
+ *  does not read) is `"unresolved"` -- the key is a real, honest fact even
+ *  when its value is not. */
+export interface EnvRow {
+  readonly key: string;
+  readonly value: string | "unresolved";
+  readonly source: EnvSource;
+  readonly resolvedBy: EnvResolvedBy;
+}

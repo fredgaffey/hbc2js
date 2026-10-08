@@ -1,0 +1,7 @@
+== Devices ==
+-- iOS 17.5 --
+    iPhone 15 (A1B2C3D4-1111-2222-3333-444455556666) (Shutdown)
+    iPhone 15 Pro (B2C3D4E5-2222-3333-4444-555566667777) (Booted)
+-- iOS 16.4 --
+    iPhone SE (3rd generation) (C3D4E5F6-3333-4444-5555-666677778888) (Shutdown)
+== Device Pairs ==

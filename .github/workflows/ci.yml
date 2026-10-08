@@ -1,0 +1,117 @@
+name: ci
+on:
+  push: { branches: ["**"] }
+  pull_request:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: ["22.18", "24"]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      HBC2JS_REQUIRE_ORACLES: "1"
+      HBC2JS_TIER: gate
+      # Shared runners (and slow-per-core-but-many-cores boxes generally)
+      # don't reach a fast dev machine's throughput even at the same core
+      # count — scale perf-sensitive wall-clock/timeout budgets accordingly.
+      # See tests/support/tiers.ts's timeScale() and the status notes's CI line.
+      HBC2JS_TIME_SCALE: "2.5"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ matrix.node }}", cache: npm }
+      - uses: actions/setup-python@v5    # for the hermes-dec oracle (7.B diff, hbc-file-parser cross-check)
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tools/oracles/requirements-hermes-dec.txt
+      - run: pip install -r tools/oracles/requirements-hermes-dec.txt
+      - run: pip install semgrep==1.176.1 androguard==4.1.4  # tests/security/* Lane S/M toolchain oracles (pinned; docs/BUGS.md CI red-run fix)
+      - run: npm ci
+      - run: npm ci --prefix ui   # tests/ui-core/**/*.test.ts import ui/src, which needs ui's own deps for both typecheck and test:gate
+      - run: npm run typecheck
+      - run: npm run gen:tables:check      # generated tables are reproducible
+      - uses: actions/cache@v4             # hermesc binaries, keyed on the fetch script
+        with:
+          path: tools/hermesc
+          key: hermesc-${{ runner.os }}-${{ hashFiles('tools/get-hermesc.sh') }}
+      - run: tools/get-hermesc.sh all      # v84, v94, v96, v98, v99
+      - run: npm run build                 # also proves dist/cli.js is executable
+      - name: hbcproj verify --full smoke (docs/specs/18-project-storage-integrity.md §11 — the non-bypassable twin of the pre-commit hook's fast check)
+        run: |
+          out=$(mktemp -d)
+          node dist/cli.js init tests/fixtures/constructs/04-for-loop-basic/v96.hbc --out "$out"
+          node dist/cli.js hbcproj export "$out/project.hbcproj"
+          node dist/cli.js hbcproj verify --full "$out/project.hbcproj"
+      - run: npm run test:gate
+
+  oracle-hermes-dec:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HBC2JS_REQUIRE_ORACLES: "1"
+      HBC2JS_TIER: gate
+      HBC2JS_TIME_SCALE: "2.5"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: npm }
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tools/oracles/requirements-hermes-dec.txt
+      - run: pip install -r tools/oracles/requirements-hermes-dec.txt
+      - run: pip install semgrep==1.176.1 androguard==4.1.4  # tests/security/* Lane S/M toolchain oracles (pinned; docs/BUGS.md CI red-run fix)
+      - run: npm ci
+      - run: npm ci --prefix ui   # tests/ui-core/**/*.test.ts import ui/src, which needs ui's own deps for test:gate
+      - uses: actions/cache@v4             # hermesc binaries, keyed on the fetch script (see build-test)
+        with:
+          path: tools/hermesc
+          key: hermesc-${{ runner.os }}-${{ hashFiles('tools/get-hermesc.sh') }}
+      - run: tools/get-hermesc.sh all      # v84, v94, v96, v98, v99 — needed for 7.A diff + round-trip oracle
+      - run: npm run test:gate
+
+  app-metrics:
+    # QUEUE lane A "CI app decompile metrics": scores a whole real RN app
+    # decompile every run, so a readability/correctness regression on a real
+    # bundle (not just the synthetic construct corpus) is visible per commit.
+    # Report-only — see tools/app-metrics.mjs's SCOPE GUARD: exits nonzero
+    # only if the *tool* crashes, never on a metric value (a stubbed
+    # function, a node --check failure etc. are reported, not thrown).
+    # No hermesc/VM needed: decompile() is pure parse->cfg->structure->emit,
+    # so this job doesn't need build-test's hermesc cache. Whole-file with
+    # all M5 passes on takes ~3-5 s on rn-template, well inside the
+    # timeout below; if a future bundle/regression makes whole-file too slow
+    # for CI, switch this job to `--split` (per-module) timing instead.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: npm }
+      - run: npm ci
+      - run: node tools/app-metrics.mjs --split --json > app-metrics.json
+      - run: node tools/app-metrics.mjs --split >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-metrics
+          path: app-metrics.json
+
+  licence-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No AGPL contamination (D4 / risk R6)
+        run: |
+          set -e
+          ! grep -rInE 'hermes_dec|hermes-dec/|site-packages|pass[0-9]_transform_code|_fun[0-9]+_ip|CatchBlockStart' \
+              src/ tools/gen-tables/ \
+            || { echo "hermes-dec-derived identifier found in src/ — see docs/DECISIONS.md D4"; exit 1; }

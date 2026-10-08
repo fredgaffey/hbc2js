@@ -1,0 +1,583 @@
+# Spec 28 — `super-call`: rebuild a derived class constructor (readability row R14)
+
+Status: **implemented 2026-09-05** (`src/passes/super-call/`); refusal **R-SC6
+folded the same day** (section 9). Acceptance tests:
+`tests/gate/passes/super-call.test.ts`.
+
+## 1. Why
+
+`ctor-this` (spec 26) folds a **base** class constructor's stand-in receiver
+onto the real `this`. Its very first refusal, **R-CT1**, is the derived case:
+a derived constructor's `this` does not come from an allocation of its own, it
+comes from `super()`. Measured on react-navigation-example-0.85.3 (spec 26
+section 10, `tools/passes/ctor-this-refusals.ts`), **304 of 448** recovered
+class constructors are exactly that. Every one of them prints today as a raw
+`Reflect.construct(Object.getPrototypeOf(_eD_S), [...], new.target)` with a
+dead `"super() called twice"` guard after it, and every later use of the
+receiver prints as a register instead of `this`. This rung is R-CT1's answer.
+
+## 2. The shape
+
+Measured on `tests/fixtures/constructs/33-class-inheritance-super`, v98
+function #4 `"Dog"` (`class Dog extends Animal { constructor(name, breed) {
+super(name); this.breed = breed; } }`), identical at v99:
+
+```
+  0000  GetNewTarget         r3
+  0002  GetParentEnvironment r0, 0
+  0005  LoadFromEnvironment  r0, r0, 1        ; the class's OWN binding
+  0009  LoadParentNoTraps    r2, r0           ; superclass = getPrototypeOf(Dog)
+  000c  CreateThisForSuper   r1, r2, r3, 0    ; the TDZ stand-in (empty)
+  0011  LoadParam            r4, 1
+  0014  Mov                  r5, r1           ; the call frame's `this` slot
+  0017  CallWithNewTarget    r0, r2, r3, 2
+  001c  SelectObject         r0, r1, r0
+  0020  LoadConstEmpty       r1
+  0022  ThrowIfThisInitialized r1             ; "super() called twice"
+  0024  LoadParam            r1, 2
+  0027  PutByIdStrict        r0, r1, "breed"
+  002d  Ret                  r0
+```
+
+which `src/emit/lower.ts` prints, and which this rung therefore sees as the
+exact statement pattern (`--passes=none`, v98):
+
+```js
+constructor(a1, a2) {
+  let r0, r1, r2, r3, r4, r5, /* … */;
+  r3 = new.target;
+  r0 = undefined;
+  r0 = _e0_1;
+  r2 = Object.getPrototypeOf(r0);
+  r4 = a1;
+  r5 = r1;
+  r0 = Reflect.construct(r2, [r4], r3);
+  r0 = r0;
+  r1 = __hbc_empty;
+  if (r1 !== __hbc_empty) { throw new ReferenceError("super() called twice"); }
+  r1 = a2;
+  r0.breed = r1;
+  return r0;
+}
+```
+
+and rewrites to
+
+```js
+constructor(a1, a2) {
+  let r4 = a1;
+  super(r4);
+  let r1_3 = a2;
+  this.breed = r1_3;
+}
+```
+
+## 3. Why it is sound
+
+ES2024 13.3.7.1 (SuperCall) evaluates to exactly
+`Construct(GetSuperConstructor(), argList, newTarget)` where
+`GetSuperConstructor()` is `activeFunction.[[GetPrototypeOf]]()` and
+`newTarget` is the running execution context's NewTarget — then binds the
+result to `this` (BindThisValue) and throws a ReferenceError if `this` was
+already initialised. That is instruction-for-instruction the bytecode above.
+So the rewrite is an identity **provided** the three operands are the
+constructor's own, which is what the matcher proves:
+
+* `new.target` — the third `Reflect.construct` argument must dereference to the
+  emitter's own `new.target` literal (`GetNewTarget`), not to any other value.
+* the superclass — the callee must be `Object.getPrototypeOf(B)` where `B` is
+  an **env slot that provably holds this very class**. Section 4.
+* the arguments — a plain array literal with no spread element.
+
+and that the call **dominates** every later use of the receiver: one site, at
+the top level of the constructor's own frame, with no write to the stand-in
+after it and no mention of it in a nested frame.
+
+`super(...)` is emitted as a `k:"lit"` callee (the same node kind that already
+carries `new.target`), so it introduces no binding: the checker's
+`freeNames(after) ⊆ freeNames(before)` obligation holds trivially, and
+`parses(after)` is what confirms the call landed inside a derived constructor
+(a `super()` anywhere else is a SyntaxError).
+
+### 3.1 Deleted statements
+
+Three deletions, each justified:
+
+1. **The `"super() called twice"` guard.** hermesc emits `LoadConstEmpty rT`
+   immediately followed by `ThrowIfThisInitialized rT`: the register it tests
+   is the one it has just set to `empty`, so the branch is statically dead —
+   hermesc's own optimiser has already proved the single super call cannot run
+   twice and left the reset behind. The rung deletes the `if` unconditionally
+   (it is dead by inspection of the two adjacent statements) and the
+   `rT = __hbc_empty` store only when the next statement in the same list
+   overwrites `rT` without reading it, or `rT` is never mentioned again.
+   The language re-creates this guard from `super(...)`: one super call
+   dominating the body is exactly the case in which BindThisValue can never
+   see an initialised `this`.
+2. **The operand stores** (`rN = new.target`, `rN = <slot>`,
+   `rM = Object.getPrototypeOf(rN)`, `Mov rS, rThis`, the `SelectObject`
+   move). Deleted one at a time, in reverse, only when the value provably
+   cannot run user code (an identifier, a literal, `this`, a non-computed
+   member on one of those — or the one `Object.getPrototypeOf` call this site
+   itself consumed, whose argument is a class and therefore never a Proxy with
+   a `getPrototypeOf` trap) **and** the target has no surviving read in the
+   head, in the super arguments or in the tail, and is not mentioned in a
+   nested closure.
+3. **A trailing `return this;`.** A derived constructor that falls off its end
+   yields its `this` binding, and the `super(...)` above dominates the end, so
+   the explicit return is noise. Only the *tail* return goes; an earlier one is
+   a real early exit and is kept (as `return this;`).
+
+## 4. R-SC1: proving the superclass is this class's own binding
+
+The constructor reads its class from an env slot of an **enclosing** frame
+(`_e0_1` above), so the proof cannot be local to the constructor. It is
+available in the rung's own input: `super-call` is a stage-B rung that runs on
+the *enclosing* function's statement list, which `class-recover` has already
+rewritten, and which therefore contains both the class expression and the store
+that publishes it:
+
+```js
+r6 = class Dog extends r5 { … };
+r3 = r6.prototype;
+_e0_1 = r6;
+```
+
+`classBindingSlots(module, cls)` accepts `_eD_S` when
+
+* some statement list of the module body stores the **identical** class node
+  into a holder `X` (node identity, not a structural match), and
+* a later statement in the **same list** is `_eD_S = X`, with nothing between
+  the two that overwrites `X` or that can run user code (only identifiers,
+  literals, `this` and non-computed member reads on those are allowed — a
+  `.prototype` read, which is what hermesc puts there), and
+* `_eD_S` is written **exactly once** anywhere in the module body, nested
+  frames included, so the slot can never come to hold anything else.
+
+Anything else is R-SC1. In particular a bare register name is never accepted:
+a Hermes register never crosses a frame boundary, so a constructor reading one
+free is not reading its own class.
+
+## 5. Ordering
+
+`after: ["class-recover"]`, `before: ["ctor-this", "private-fields",
+"fn-naming", "reg-split", "var-naming"]`.
+
+* **After `class-recover`** — the rung needs the `class` node (to know it is
+  looking at a derived class's constructor, and to have the constructor body in
+  hand) and the enclosing body's `_eD_S = <class>` store.
+* **Before `ctor-this`** — and `ctor-this` needs no change at all. Its R-CT1
+  refusal keys on `cls.superClass !== null`, which is still true after this
+  rung runs, and a derived constructor never contains the
+  `new.target.prototype` + `Object.create(...)` allocation `ctor-this` folds,
+  so there is no site here for it either before or after. Extending `ctor-this`
+  to "accept the rebuilt derived shape" would be busywork: the rebuilt shape
+  already *is* `this`. Keeping the two rungs disjoint also keeps each
+  checker's independent re-derivation exact.
+* **Before every renaming rung** (P-21 / D23) — the matcher follows register
+  identity, which `reg-split`'s per-store renaming would corrupt.
+
+Versions: `hbcVersion >= 98 && layoutClass === "E"`, the same gate
+`class-recover` and `ctor-this` use.
+
+## 6. Refusals
+
+| code | refused when | note |
+| --- | --- | --- |
+| R-SC0 | base class, or no `Reflect.construct` site in the constructor | silent (not reported as a refusal): this is simply "not my shape" |
+| R-SC1 | the superclass expression, or `new.target`, is not provably the constructor's own — the callee is not `Object.getPrototypeOf(B)`, `B` is not a single resolvable binding, or `B` is not an env slot that section 4 proves holds this class | the one refusal that protects correctness rather than shape |
+| R-SC2 | more than one `Reflect.construct` site in the constructor (a conditional super) | no single call dominates the body |
+| R-SC3 | the single site is not a top-level store of the constructor's own frame — it is inside a loop, a `try`, an `if` or a closure | |
+| R-SC4 | the stand-in register is written again after the super call | the rung cannot then say the register *is* `this` |
+| R-SC5 | the stand-in register name also occurs inside a nested closure, where the same register number is a different frame's local | same reason as `ctor-this`'s R-CT5 |
+| R-SC6 | *(retired 2026-09-05 -- the implicit/forwarding derived constructor is now folded; section 9)* | was: `return __hbc_b_applyArguments(...)`. The code is not reused for anything else, so an old report's R-SC6 still reads as this shape |
+| R-SC7 | the super arguments are not a plain array literal, or contain a spread element | `docs/BUGS.md`. Fixture 78's `Explicit` is this shape at v98/v99 (hermesc reaches it through `copyRestArgs` + `arraySpread` + `applyWithNewTarget`, so today it lands in R-SC0 -- no `Reflect.construct` site at all -- rather than in R-SC7 itself) |
+| R-SC8 | in the section 9 forward, an operand is not provably the constructor's own: the target is not `Object.getPrototypeOf(B)` with `B` this class's own binding, the `new.target` argument is not the frame's own `new.target` literal, the forwarded list is not the frame's own `arguments`, or a receiver is passed (the helper's *apply* path, not the construct path) | R-SC1's twin, for the forward |
+| R-SC9 | the forward is not the constructor's whole body: another statement, another `arguments` read (in the constructor or a nested arrow), a declared parameter, a returned expression that is not the forward, or a directive other than `"use strict"` | shape, not correctness. Section 9.6: `return <ident>` also refuses here when the immediately-preceding statement does not store the forward into that identifier, when the identifier is read or written anywhere else in the body, or when the immediately-preceding statement's stored value is not the forward call itself |
+
+Reads of the stand-in register *before* the super call are not refused and not
+rewritten: the register is reused by the operand sequence itself
+(`r0 = _e0_1` above), and the construct overwrites it, so no later read can
+observe the earlier value.
+
+## 7. Checker
+
+The same three obligations `ctor-this` carries, for the same reason —
+everything this rung touches lives inside a constructor body, which
+`effectSequence` deliberately does not evaluate:
+
+1. **Independent re-derivation.** `foldAll(before)` is recomputed and compared
+   to the writer's output statement for statement.
+2. **An unchanged class-definition effect sequence.** Not "modulo a declared
+   deletion" as `class-recover`'s is: any difference at all means the rewrite
+   escaped the constructor body.
+3. **No new free name, and `parses(after)`** — the latter is also what proves
+   the emitted `super(...)` is legal where it landed.
+
+## 8. Measurement
+
+`tools/passes/ctor-this-refusals.ts` reports R-SC codes alongside the R-CT
+ones (`--codes`), so the same command re-measures both rungs on a bundle.
+Numbers at landing are in the landing report.
+
+## 9. R-SC6 folded: the implicit derived constructor
+
+Measured on fixture 78 (`tests/fixtures/constructs/78-class-implicit-derived-ctor`)
+at v98 and v99, and on fixture 33's `class Puppy extends Dog {}`, a derived
+class with **no constructor of its own** gets one whose entire body is
+
+```js
+constructor() {
+  // fn#3 "Implicit"
+  "use strict";
+  return __hbc_b_applyArguments(arguments, Object.getPrototypeOf(_e0_0), undefined, new.target);
+}
+```
+
+`__hbc_b_applyArguments` (`src/runtime/helpers.ts`, spelled from
+`src/emit/builtins.ts`'s own intrinsic table -- a forward spelled any other
+way is not this emitter's output and is never claimed) is
+
+```js
+if (newTarget !== undefined) return Reflect.construct(fn, Array.prototype.slice.call(callerArgs), newTarget);
+return Reflect.apply(fn, thisArg, callerArgs);
+```
+
+and a class constructor can only ever be reached with a NewTarget (ES2024
+10.2.1 step 2 throws before the body runs otherwise), so the construct branch
+is the only reachable one. That branch is
+`Construct(GetSuperConstructor(), <the caller's whole argument list>, newTarget)`
+followed by returning the result -- which is ECMAScript 15.7.14 step 14's
+default derived constructor, `constructor(...args) { super(...args); }`,
+statement for statement. The rewrite is therefore an identity given what
+`foldForwardBody` proves: R-SC8's four operand obligations and R-SC9's shape
+obligations (the forward is the constructor's whole body, `arguments` is read
+nowhere else, and the constructor declares no parameters of its own).
+
+### 9.1 Why the explicit form and not an elided constructor
+
+The recovered text is `constructor(...args) { super(...args); }`, never "no
+constructor at all", even though the source almost certainly had none:
+
+* **Provenance.** The emitted constructor carries the `// fn#N "<name>"`
+  comment that maps it to a real Hermes function. Deleting the member would
+  delete the only anchor between function #N and the output, which every
+  per-function tool (`tools/passes/*`, the round-trip corpus, the name
+  overlay) keys on. Keeping one emitted function per bytecode function is a
+  pipeline-wide invariant; a readability rung is the wrong place to break it.
+* **It costs one line.** The elided form is shorter but says the same thing,
+  and the explicit form is legal source an author could have written.
+* **It is not needed to disambiguate.** hermesc does *not* lower the explicit
+  `constructor(...a) { super(...a); }` to this shape -- fixture 78 pins that
+  it lowers to `copyRestArgs` + an array spread + `applyWithNewTarget`
+  instead. So the forward really does mean "the source had no constructor",
+  and a future rung may elide it; that is a separate, purely cosmetic step
+  which must first answer the provenance question above. Recorded here rather
+  than done, deliberately.
+
+### 9.2 The `"use strict"` directive is dropped
+
+The rebuilt constructor has a **non-simple parameter list**, and ES2024 15.2.1
+(Early Errors for FunctionBody) makes a "use strict" directive prologue a
+SyntaxError there. The directive is deleted, which is a no-op: a class body is
+always strict code (ES2024 15.7). Any *other* directive is refused (R-SC9)
+rather than dropped. This was caught by the checker's own `parses(after)`
+obligation, which is exactly what it is for.
+
+### 9.3 The parameter list
+
+This is the ladder's first stage-B rung to change a function's parameter list,
+and **no framework helper was missing**: `Param` (`src/emit/ast.ts`) already
+carries `rest?: true`, `mapStmts`/`mapParams` already carry a params list
+through unchanged, and `spread-rest`'s writer (`src/passes/spread-rest/rewrite.ts`)
+already rebuilds one as `{ ...fn, params: [...] }`. The class member is
+rebuilt the same way, in `foldAll`: `{ ...ctor, params, body }`. The rest
+parameter is named `args`; it can shadow nothing that is read, because the
+body it lands in contains no other name.
+
+### 9.4 What the constructor may also contain
+
+The forward must be the constructor's **last** statement; before it the rung
+accepts only what the emitter puts there and what it can account for: the
+`// fn#N` provenance comment (kept), the `"use strict"` directive (dropped,
+9.2), a hoisted `function` declaration this frame merely hosts (kept -- a
+declaration runs no user code and is legal before `super()`), a register `let`
+(kept only while something still reads it), and the operand moves the forward
+itself consumed. Those moves are how the operands actually reach the call
+(`r5 = r2; r3 = r1; applyArguments(arguments, r5, r4, r3)`), so the matcher
+chases each operand with `derefChain`: up to four hops, each resolved against
+the stores preceding the hop it came from and never a later one, so a register
+reused after its move is never followed. The moves are then deleted in
+reverse, and only when nothing that survives -- a later head statement, a
+nested closure -- still reads the target; a store that cannot be deleted is
+R-SC9 rather than left behind. The rest parameter is renamed (`args2`, ...)
+if any surviving statement would be shadowed by `args`.
+
+### 9.5 Residue on react-navigation-example-0.85.3
+
+`node tools/passes/ctor-this-refusals.ts` before -> after: FOLD 39 -> 52,
+R-SC6 168 -> 0, and a new R-SC9 147 -- so 13 of the 168 folded and 147 became
+a *narrower* refusal. 136 of those 147 have the shape `R-SC9 func`: a
+forwarding constructor whose frame also hosts a hoisted `function`
+declaration. Section 9.4 accepts the declaration itself, so what still refuses
+them is `argumentsUses(body) !== 1`: the check counts an `arguments` mention
+anywhere in the constructor, **nested frames included**, and a hosted
+declaration that uses its own `arguments` therefore reads as a second use of
+the constructor's. That is deliberately conservative (over-refusing is safe),
+and it is the next step: a non-arrow nested `func` has its own `arguments`
+object, so the count should skip nested frames unless `sameFrame === true`
+(the generator-resume closure, `src/emit/ast.ts`) -- the same distinction
+`countUses` already makes. Not done here: it changes what the rung claims on
+136 real constructors and deserves its own measurement.
+
+**Done.**: `argumentsUses` is now frame-aware, mirroring
+`countUses`'s `func`/`sameFrame` distinction (`src/passes/super-call/match.ts`).
+A bare `argumentsObject` read counts only in this frame or a `sameFrame`
+closure; an `ident{name:"arguments"}` read counts everywhere however deep,
+because that shape is never a non-arrow nested `function`'s own (which always
+reifies its own `argumentsObject`, a separate frame) -- it is only how a
+nested arrow surfaces a lexical read of an enclosing frame's `arguments`
+(`arguments-form/match.ts`'s own recognition of the two shapes as
+equivalent). Three unit tests pin the three cases (`tests/gate/passes/
+super-call.test.ts`): a hosted function's own `arguments` no longer counts
+and the constructor folds; a nested arrow's `arguments` (the `ident` shape)
+still counts and refuses; a `sameFrame` closure's `arguments` (the
+`argumentsObject` shape, still this frame) still counts and refuses.
+
+**Measured, and it does not move react-navigation-example-0.85.3**:
+`node tools/passes/ctor-this-refusals.ts` before -> after is unchanged, FOLD
+52, R-SC9 147 (`R-SC9 func` 136 of them). Dumping the actual refused bodies
+(a spied `foldSuperBody`, not committed) shows why: none of the 136 are
+blocked by `argumentsUses` at all -- they fail the *earlier* "the
+applyArguments forward is not the constructor's last statement" check,
+because their last statement is `return r0;` with `r0 = __hbc_b_applyArguments(
+...)` assigned on the *previous* statement, not `return
+__hbc_b_applyArguments(...)` directly. `foldForwardBody` (section 9.4) only
+ever matches the latter -- there is no dereference of a `return <ident>`
+back through a preceding store, unlike the operand moves *into* the call,
+which `derefChain` already chases. So section 9.5's original diagnosis was
+half right (the hosted declaration's own `arguments` is real conservatism,
+now fixed and independently correct/tested) but named the wrong blocker for
+this bundle's 136: the store-then-return split gates them first, and
+`argumentsUses` is never reached. This is a materially different, larger
+change (deref through a `return`, with the same conservatism `derefChain`
+already has about a register reused after its move) and is not done here --
+tracked as its own residue in `docs/BUGS.md`'s `diff:GetOwnPrivateBySym/
+GetByVal` row (tail), since the corpus payoff cannot be checked until it
+lands. `node tools/e2e/roundtrip-corpus.ts --only react-navigation-example-
+0.85.3 --passes on` before -> after: IDENTICAL count and the `diff:
+GetOwnPrivateBySym/GetByVal` bucket unchanged, exactly as expected from a
+fix whose own real-bundle payoff is still gated by the residue above.
+
+### 9.6 The store-then-return dereference, and the corrected diagnosis of the 136
+
+`foldForwardBody` now dereferences `return <ident>` back through exactly one
+immediately-preceding `<ident> = <call>` store when `<ident>` has no other
+read or write anywhere in the body (`identUses`, which -- for a register name
+-- already never follows into a nested closure, so no separate
+`mentionedInNestedFunction` check is needed here the way section 9.4's
+operand-store deletion needs one). This is the same one-hop conservatism
+`derefChain` already applies to the forward's *operand* moves (section 9.4):
+a register reused after its move is never followed, because nothing can
+prove which of two conflicting writes the read actually observed. Once
+dereferenced, the found call is treated exactly as `return call(...)` would
+be -- the store statement itself is simply excluded from `head`, the same way
+the direct shape excludes its own `return`. Three unit tests pin fold /
+refuse (store not immediately before the return) / refuse (the identifier is
+read elsewhere) / refuse (the immediately-preceding store is not the forward
+call) (`tests/gate/passes/super-call.test.ts`).
+
+**Measured, and the diagnosis in section 9.5 was wrong about the shape, not
+just the blocker**: dumping the actual 136 `R-SC9 func` bodies on
+react-navigation-example-0.85.3 (a spied `foldSuperBody`, not committed)
+shows their tail is not `r0 = __hbc_b_applyArguments(...); return r0;` with
+nothing else -- it is `super(...args)` (via `applyArguments`, stored into a
+register) followed by **several more statements that read that register**:
+`r0.someBoundMethod = someBoundMethod; r0.otherBoundMethod = otherBoundMethod;
+...; return r0;`, i.e. a derived constructor whose source really is
+`constructor(...args) { super(...args); this.method = () => {...}; ... }`
+(arrow class fields, installed onto the constructed object after `super()`
+returns). That is real user code after the forward, not an artifact of how
+the forward's *own* result reaches `return` -- so it is correctly refused by
+the very check section 9.6 adds (`the identifier is used elsewhere in the
+body`), not merely by a still-too-strict adjacency requirement. Folding this
+shape is not "one more hop" of the dereference above; it needs `foldForwardBody`
+to accept `this.<name> = <name>;` field-install statements between the
+forward and the `return`, in the same way section 9.4 already accepts a
+hosted `function` declaration -- a materially different, larger change than
+this section's, and not done here. `node tools/passes/ctor-this-refusals.ts`
+before -> after this section's fix: FOLD and R-SC9 unchanged (52 / 147, `R-SC9
+func` still 136 of them) -- none of the 136 are the pure adjacency shape this
+section folds. `node tools/e2e/roundtrip-corpus.ts --only
+react-navigation-example-0.85.3 --passes on` before -> after: IDENTICAL 6222
+(43.10 percent) of 14437 both times, `diff:GetOwnPrivateBySym/GetByVal` 177
+both times. Tracked in `docs/BUGS.md`'s `diff:GetOwnPrivateBySym/GetByVal`
+row (tail): the next step is field-install statements after the forward, not
+a further dereference hop.
+
+### 9.7 Field installs (and a receiver capture for a nested closure) after the forward
+
+`foldForwardBody` now accepts a run of statements between the store
+(`name = __hbc_b_applyArguments(...)`) and the `return name;` it feeds,
+rather than requiring the return to sit immediately after the store. Two
+shapes are accepted, tracked by a growing `receiverAliases` set (`name`
+itself, to start):
+
+* **A field install**, `X.<prop> = <expr>;` where `X` is `name` or an
+  already-proven alias, `<prop>` is a non-computed literal key, and `<expr>`
+  contains no read of `name` or any alias (a computed key, or a value that
+  reads the receiver, is refused with its own distinct reason -- the brief's
+  "does not read r0" rule, generalised to whichever alias the install
+  targets).
+* **A receiver capture**, `_eD_S = X;` where `X` is `name` or an alias and
+  `_eD_S` is an env slot proved to hold exactly one value for the rest of the
+  body (`identUses(body, alias).writes === 1`, the same proof
+  `classBindingSlots` uses for a class binding). This is the shape an arrow
+  class field forces: `handle = () => this.x` has to be created *before*
+  `super()` runs (Hermes builds the closure, then calls the forward, then
+  installs it), so the closure cannot read `this` directly -- it reads the
+  frame's own env slot instead, and the emitter fills that slot once the
+  receiver exists.
+
+Anything else between the store and the return is refused (R-SC9, "neither a
+field install nor a receiver capture" when it does not mention the receiver
+at all, "used elsewhere in the body" -- the same reason `identUses`'s old
+reads-count check gave -- when it does).
+
+The key simplification: **only `name` itself is ever substituted for
+`this`.** An env-slot alias is never rewritten. The capture statement's own
+right-hand side reads `name`, so substitution turns `_eD_S = name;` into
+`_eD_S = this;`, and every existing read of `_eD_S` elsewhere (inside the
+nested closure, unchanged) keeps working exactly as before, now against the
+right value -- there is no need to chase the substitution into the closure's
+own body at all, because unlike a raw register, an env slot is legitimately
+shared across frames (that is the entire reason the emitter uses one here).
+This also means the closure declaration itself needs no rewriting: it is
+still a plain hoisted `function` in `head`, and it still ends up correct at
+the call site (`this.handle = handle; ... b.handle()`), because a plain
+function's own `this` at a method call is exactly the object it is called
+on -- the same value the arrow lexically captured. A small amount of
+resulting noise (`_eD_S = this;` and its `let _eD_S;` declaration usually
+become dead once nothing but the substituted-away closure read the slot) is
+left in place rather than cleaned up -- correct, just not maximally tidy;
+not a `docs/BUGS.md` row, since it is not incorrect.
+
+The decl-liveness filter (section 9.4, "register declarations nothing reads
+any more go with them") now scans `head` **and** the accepted tail
+statements together: an env slot is declared in `head` but only written in
+the tail, so a head-only scan would see zero uses and wrongly drop a
+declaration the tail's capture statement still needs.
+
+Fixture: `tests/fixtures/constructs/80-super-forward-field-installs`
+(`class B extends A { handle = () => this.x; other = 1; describe() {...} }`,
+plus `class C extends A { constructor(...args) { super(...args); this.y =
+args.length; } describe() {...} }` as the contrast -- `C` reads its own rest
+parameter for something besides the forward, so hermesc never uses the
+`applyArguments` intrinsic for it at all; it gets the spread/apply lowering
+instead, fixture 78's `Explicit` shape, which stays refused). Six new unit
+tests (`tests/gate/passes/super-call.test.ts`): two installs fold, a receiver
+capture plus install folds and the closure body is left untouched, a
+computed key is refused, an install reading the receiver is refused, plus
+two pre-existing store-then-return unit tests whose reason strings changed
+(the store is now found by scanning rather than assumed adjacent, so an
+unrelated statement before the store is now caught by the `head` loop's
+existing "statement the forward did not consume" refusal instead of a
+whole-body reads count -- same refusal, same `R-SC9` code, a more accurate
+message).
+
+**Measured**: `node tools/passes/ctor-this-refusals.ts` before -> after:
+FOLD 52 -> 118 (+66; the recovered-constructor denominator also grows, 448
+-> 534, because class-recover picks up additional classes once the fold
+removes dead register statements from earlier ones -- a downstream effect,
+not re-verified further here), R-SC9 147 -> 61, `R-SC9 func` 136 -> 56 (80 of
+the 136 now fold). `node tools/e2e/roundtrip-corpus.ts --only
+react-navigation-example-0.85.3 --passes on` before -> after: IDENTICAL 6222
+(43.10 percent) of 14437 and `diff:GetOwnPrivateBySym/GetByVal` 177, both
+unchanged again. Classified (`--show 122:2646`, `122:2647`, `122:2649`): all
+three of the bucket's sampled functions are one-parameter private-field
+*getters* (`fn(1) ~ ... GetOwnPrivateBySym %0, %0, 0, %1`), not constructors,
+and the bucket-restricted class breakdown (`--corpus ... --bucket`) shows
+zero `FOLD` among the bucket's 22 modules' classes either before or after --
+this bucket was never causally downstream of `super-call`'s own fold count;
+it is a shared checkpoint metric across the whole class-rung ladder, rooted
+in `src/passes/private-fields`' own row. The remaining 56 `R-SC9 func`
+refusals are the next residue, not classified by this landing.
+
+## 10. The private-field derived constructor
+This section was first framed as a different rung: "after `super-call`
+has rebuilt `super(...)`, substitute `this` for the register that receives
+it", read off `ctor-this`'s R-CT1 count (140 classes with a private name in
+scope on react-navigation-example-0.85.3). That substitution is **already
+this rung's**, and has been since its first landing: section 2's worked
+example ends in `this.breed = r1_3`, section 3 makes the argument, R-SC4 and
+R-SC5 are exactly the two refusals that protect it, and section 5 says in as
+many words that extending `ctor-this` instead would be busywork. R-CT1 is a
+*vacuous* refusal code -- `ctor-this` declines every derived class, folded or
+not -- so its count is not a count of missed folds.
+
+What the 140 do contain is a real, previously unmeasured blocker, found by
+building the brief's fixture 81 and reading the refusal the rung actually
+gives it. A derived constructor **with a private field** refuses twice over,
+for reasons that have nothing to do with `this`:
+
+1. **R-SC1, "the getPrototypeOf argument is not a single binding this rung
+   can resolve".** The brand check hermesc emits for `#x` costs registers, so
+   the allocator reuses ONE register for both the class load and the
+   `getPrototypeOf` result -- `r2 = _e0_1; r2 = Object.getPrototypeOf(r2);`
+   -- where fixture 33's `Dog` has two (`r0 = _e0_1; r2 =
+   Object.getPrototypeOf(r0)`). The matcher resolved the binding with
+   `deref(body, at, ...)`, i.e. searching back from the *super site*, which
+   finds the self-overwriting store again and answers "a call, not a
+   binding". Fixed by resolving it from the index of the store the callee
+   itself came from (`calleeStoreAt`) -- which is `derefChain`'s own
+   documented rule, "each hop resolves against the stores that precede the
+   hop it came from, never a later one", applied to the single hop `deref`
+   makes here. Nothing is loosened: a register written between the
+   `getPrototypeOf` store and the site still fails, because the search still
+   starts at that store and walks backwards only.
+
+2. **R-SC4, "the stand-in register is written again after the super call".**
+   The brand check's failure arm is `r2 = __hbc_b_throwTypeError("Cannot
+   initialize private field twice."); throw new Error("hbc2js:
+   unreachable");` -- a store no path can read, because the helper never
+   returns. `ctor-this` has discounted exactly this shape since its own
+   landing (spec 26 section 5 item 3, R-CT3) and demotes each one to its bare
+   call, which is what keeps the substituted body legal JS (`this = f()` is
+   not). `super-call` meets the identical shape in a derived constructor, so
+   the helper is now shared rather than copied: `deadCallStores` moved to
+   `src/passes/ast.ts` and both rungs call it, and `super-call`'s writer
+   gained the same `demote` step. The R-SC4 guard is `writes -
+   deadCallStores > 0`, so a live write still refuses (pinned by its own
+   unit test alongside the dead one).
+
+Both fixes are in the matcher/writer only; the checker's three obligations
+(section 7) are unchanged and re-derive the new output the same way.
+
+**Known residue, left deliberately.** The folded body still carries the two
+operand stores `let r2 = _e0_1; r2 = Object.getPrototypeOf(r2);` as dead
+noise: the head-deletion loop refuses to drop a store whose target is read in
+the tail, and it counts those reads *before* substitution, when the tail's
+`r2`s are still `r2` rather than `this`. Correct, just not tidy; not a
+`docs/BUGS.md` row, for the same reason section 9.7's `_eD_S = this;` residue
+is not one.
+
+**Still refused downstream.** `private-fields` (row 20) does not yet fold this
+constructor's `#x`: after the substitution the install reads
+`Object.defineProperty(this, r4, ...)` with `r4 = _e0_0` one store earlier,
+and that rung matches a direct symbol operand, not a register holding one.
+That is its own rung's residue and is recorded in the `docs/BUGS.md`
+`diff:GetOwnPrivateBySym/GetByVal` row tail, not fixed here.
+
+**Also found, not fixed.** `class-recover` recovers fixture 81's `class B`
+but recovers *nothing at all* from a module that also holds a second derived
+class with a private field, and nothing from a derived class with a private
+field and no prototype member. Both were found while building fixture 81
+(which is why the fixture ships the single-class shape); they are a different
+rung's bug and are recorded in the same `docs/BUGS.md` row tail.
+
+Fixture: `tests/fixtures/constructs/81-derived-ctor-private-fields` (v98 and
+v99). Unit tests: the reused-register callee, the brand-check store that must
+not count as a write and must be demoted, and the live write that must still
+refuse (`tests/gate/passes/super-call.test.ts`).
+
+**Measured** (react-navigation-example-0.85.3, v98), `node tools/passes/ctor-this-refusals.ts <bundle> --bucket GetOwnPrivateBySym` before -> after: FOLD 118 -> 129, R-SC1 22 -> 3, R-SC4 3 -> 1, R-SC9 61 and R-SC3 36 unchanged. `node tools/e2e/roundtrip-corpus.ts --only react-navigation-example-0.85.3 --passes on` before -> after: IDENTICAL 6223 of 14437 both times (DIFFERENT 8214 both times), and the `diff:GetOwnPrivateBySym/GetByVal` bucket 177 -> 163 -- the first time that bucket has moved at all under this ladder. The 14 that left it did not become IDENTICAL; they moved to other DIFFERENT buckets, because the `#x` install is still symbol-keyed (the `private-fields` residue above). R-CT1 stays at 140 in the private-name bucket, exactly as this section predicts: it is a vacuous code, and folding a derived constructor cannot move it.

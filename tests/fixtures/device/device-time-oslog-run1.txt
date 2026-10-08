@@ -1,0 +1,4 @@
+2026-09-20 10:15:20.100301-0700  localhost kernel[0]: process com.example.app launched
+2026-09-20 10:15:20.798456-0700  localhost HostApp[1234:5678]: HBC2JS_DEVICE_MARKER launch 798
+2026-09-20 10:15:21.190112-0700  localhost HostApp[1234:5678]: HBC2JS_DEVICE_MARKER firstContentCommit 1190
+2026-09-20 10:15:21.760998-0700  localhost HostApp[1234:5678]: HBC2JS_DEVICE_MARKER interactive 1761

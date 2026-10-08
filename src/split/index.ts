@@ -1,0 +1,561 @@
+// src/split/index.ts — D17i stage 1 (ISOLATE): turn a decompiled Metro bundle
+// into a project tree, one file per `__d(factory, id, deps)` registration,
+// with `require` edges restored (docs/DECISIONS.md D17i point 1, D19).
+import { analyseModule } from "../cfg/index.ts";
+import type { ModuleAnalysis } from "../cfg/types.ts";
+import { buildInventoryFromModule } from "../deps/inventory.ts";
+import type { Stmt } from "../emit/ast.ts";
+import { emitModule } from "../emit/index.ts";
+import { printProgram } from "../emit/print.ts";
+import { ErrorCode, Hbc2jsError } from "../errors.ts";
+import { parseHbc } from "../parse/module.ts";
+import type { HbcModule } from "../parse/types.ts";
+import { astPassHook, passHook } from "../passes/index.ts";
+import type { PassPipelineOptions } from "../passes/index.ts";
+import { helperPrelude } from "../runtime/helpers.ts";
+import { resolveEntryModuleId } from "./entry.ts";
+import { rewriteFactoryBody } from "./rewrite.ts";
+
+/**
+ * `index.js`'s runtime: a Metro-style `__d`/`__r` registry (Gap A) plus the
+ * hbc2js helper prelude installed as globals (Gap B).
+ *
+ * Ordering matters: every `module_<id>.js` is `require`'d once up front
+ * (plain Node CJS load — cheap, just runs the file's top-level `__d(factory,
+ * id, deps)` call, registering the *unexecuted* factory) *before* `Module._load`
+ * is patched, so that bootstrap loop itself is never rerouted through `__r`
+ * — only the `require('./module_N.js')` calls src/split/rewrite.ts left
+ * inside factory *bodies* are (those only run once a factory executes, i.e.
+ * after the patch is installed). `__r(id)` then lazily runs a factory once,
+ * caching the module object *before* invoking the factory (Metro's own
+ * circular-dependency protocol: a cycle sees the partially-populated
+ * `exports` of the module still executing, not an infinite loop).
+ */
+function buildLoaderIndexJs(modules: readonly SplitModuleInfo[], resolvedEntry: number | null, helpersUsed: readonly string[]): string {
+  const lines: string[] = [];
+  lines.push(`// hbc2js --split -- entry point: a Metro-style __d/__r loader.`);
+  lines.push(`"use strict";`);
+  lines.push(``);
+
+  const prelude = helperPrelude(helpersUsed);
+  if (prelude.names.length > 0) {
+    lines.push(`// Runtime helper prelude (src/runtime/helpers.ts) -- every module's factory`);
+    lines.push(`// references these as bare globals, exactly as the single-file decompile()`);
+    lines.push(`// path's prelude does within one shared top-level scope.`);
+    lines.push(`Object.assign(globalThis, (function () {`);
+    lines.push(prelude.code);
+    lines.push(`  return { ${prelude.names.map((n) => `${n}: ${n}`).join(", ")} };`);
+    lines.push(`})());`);
+    lines.push(``);
+  }
+
+  lines.push(`var __hbc_split_registry = new Map();`);
+  lines.push(`var __hbc_split_instances = new Map();`);
+  lines.push(``);
+  lines.push(`function __d(factory, id, deps) {`);
+  lines.push(`  __hbc_split_registry.set(id, { factory: factory, deps: deps || [] });`);
+  lines.push(`}`);
+  lines.push(``);
+  lines.push(`function __hbc_importDefault(id) {`);
+  lines.push(`  var ns = __r(id);`);
+  lines.push(`  return ns && ns.__esModule ? ns : { default: ns };`);
+  lines.push(`}`);
+  lines.push(``);
+  lines.push(`function __hbc_importAll(id) {`);
+  lines.push(`  var ns = __r(id);`);
+  lines.push(`  if (ns && ns.__esModule) return ns;`);
+  lines.push(`  var copy = {};`);
+  lines.push(`  if (ns) for (var key in ns) if (Object.prototype.hasOwnProperty.call(ns, key)) copy[key] = ns[key];`);
+  lines.push(`  copy.default = ns;`);
+  lines.push(`  return copy;`);
+  lines.push(`}`);
+  lines.push(``);
+  lines.push(`function __r(id) {`);
+  lines.push(`  var inst = __hbc_split_instances.get(id);`);
+  lines.push(`  if (inst !== undefined) return inst.exports;`);
+  lines.push(`  var entry = __hbc_split_registry.get(id);`);
+  lines.push(`  if (entry === undefined) throw new Error("hbc2js split loader: module " + id + " is not registered");`);
+  lines.push(`  var mod = { id: id, exports: {} };`);
+  lines.push(`  __hbc_split_instances.set(id, mod);`); // cache before running: tolerates circular deps
+  lines.push(`  var requireFn = function (depId) { return __r(depId); };`);
+  lines.push(`  requireFn.importDefault = __hbc_importDefault;`);
+  lines.push(`  requireFn.importAll = __hbc_importAll;`);
+  lines.push(`  entry.factory(globalThis, requireFn, __hbc_importDefault, __hbc_importAll, mod, mod.exports, entry.deps);`);
+  lines.push(`  // Optional test/instrumentation hook (tests/gate/split/loadable.test.ts):`);
+  lines.push(`  // a no-op unless something defines it before requiring index.js.`);
+  lines.push(`  if (typeof globalThis.__hbc_split_onModuleRun === "function") globalThis.__hbc_split_onModuleRun(id);`);
+  lines.push(`  return mod.exports;`);
+  lines.push(`}`);
+  lines.push(``);
+  lines.push(`globalThis.__d = __d;`);
+  lines.push(`globalThis.__r = __r;`);
+  lines.push(``);
+  lines.push(`// Register every module -- runs each file's top-level __d() call only, no`);
+  lines.push(`// factory executes yet (module_<id>.js no longer sets module.exports; see`);
+  lines.push(`// src/split/index.ts).`);
+  for (const m of modules) lines.push(`require('./${m.file}');`);
+  lines.push(``);
+  lines.push(`// From here on, a factory's own require('./module_N.js') call (the literal`);
+  lines.push(`// rewrite src/split/rewrite.ts left in place) must resolve to the module's`);
+  lines.push(`// real, *executed* exports, not Node's cached factory function -- intercept`);
+  lines.push(`// at the Node module loader level and route it through __r.`);
+  lines.push(`var __hbc_split_Module = require("module");`);
+  lines.push(`var __hbc_split_origLoad = __hbc_split_Module._load;`);
+  lines.push(`__hbc_split_Module._load = function (request, parent, isMain) {`);
+  lines.push(`  var m = /^\\.\\/module_(\\d+)\\.js$/.exec(request);`);
+  lines.push(`  if (m) return __r(Number(m[1]));`);
+  lines.push(`  return __hbc_split_origLoad.apply(this, arguments);`);
+  lines.push(`};`);
+  lines.push(``);
+  lines.push(resolvedEntry !== null ? `module.exports = __r(${resolvedEntry});` : `// entry module id could not be resolved; see MODULES.json's "entry" -- nothing invoked.`);
+  lines.push(``);
+  return lines.join("\n");
+}
+
+export interface SplitModuleInfo {
+  readonly id: number;
+  readonly file: string;
+  readonly factoryFunctionIndex: number;
+  readonly deps: readonly number[];
+  readonly requireRewrites: number;
+}
+
+export interface SplitResult {
+  readonly files: ReadonlyMap<string, string>;
+  readonly modules: readonly SplitModuleInfo[];
+  readonly entryModuleId: number | null;
+  readonly diagnostics: readonly string[];
+  /** P2.1 §2.7: fnIndex -> the `{file, lines:[start,end]}` it actually
+   *  printed at. Only covers functions this split pass rendered as a
+   *  statement-level declaration (the vast majority — see `functionRanges`'s
+   *  declaration comment above); a function with no textual home in the
+   *  split tree (unreached, or the rare inline-closure form) has no entry —
+   *  never a fabricated one. */
+  readonly functionRanges: ReadonlyMap<number, { readonly file: string; readonly lines: readonly [number, number] }>;
+  /** The parsed module + `{strictEnv:false}` analysis this split pass built
+   *  internally (`decompileAllBodies`'s own `analyseModule` call) — exposed
+   *  so `src/artifact/write.ts` can reuse them instead of re-parsing +
+   *  re-analysing the whole bundle a second time when the caller runs
+   *  `splitProject` then `writeArtifact` back to back on the same bytes
+   *  (the common `--split`/index-build path; docs/BUGS.md 2026-09-03 "index
+   *  build 51.4% of decompile" row — this was ~78% of that gap). An
+   *  artifact builder that does NOT have a `SplitResult` in hand (or is
+   *  building against different bytes) still re-parses on its own; the
+   *  semantic layer's spec-mandated independence from the render (§0) is
+   *  about correctness of WHEN the index is rebuilt, not about forcing a
+   *  redundant parse on every combined call. */
+  readonly module: HbcModule;
+  readonly analysis: ModuleAnalysis;
+  /** The whole bundle's runtime-helper set (`DecompiledBodies.helpersUsed`
+   *  above), exposed so a caller building an alternate loader/prelude for
+   *  this same tree (`src/export/registry.ts`'s `helpers.js`) does not have
+   *  to re-run `decompileAllBodies` just to recover the exact `__hbc_*`
+   *  names `buildLoaderIndexJs`'s own prelude already computed. */
+  readonly helpersUsed: readonly string[];
+}
+
+export interface SplitOptions {
+  readonly moduleName?: string;
+  /**
+   * Run the readability pass pipeline (spec 07) on every function before it
+   * is written, exactly as `decompile` does. Default (undefined): no
+   * passes — the M4 baseline shape, see the file header. Added for the E2E
+   * tier-1 round-trip harness (`tools/e2e/roundtrip-corpus.ts`,
+   * docs/TESTING.md "E2E tier 1"), which needs the split tree in both
+   * modes; `{}` means "every registered pass at its default".
+   */
+  readonly passes?: PassPipelineOptions;
+  /** D20 `--jsx`: the CLI passes `optIn: ["jsx-recover"]` in `passes` and sets
+   *  this so `jsx` nodes print as JSX (`src/emit/print.ts` `PrintOptions.jsx`). */
+  readonly jsx?: boolean;
+}
+
+function isFuncStmt(s: Stmt | undefined): s is Extract<Stmt, { k: "func" }> {
+  return s !== undefined && s.k === "func";
+}
+
+/** Decompile every function once (no passes, no isomorphism verify — see the
+ *  file header) and hand back each function's own top-level JS AST, keyed by
+ *  function index, exactly as `decompileAst` does internally (spec 07 F1) but
+ *  without running the pass pipeline. */
+interface DecompiledBodies {
+  readonly bodies: ReadonlyMap<number, Extract<Stmt, { k: "func" }>>;
+  /** The whole module's helper set (`emitModule`'s own `helpersUsed`, EM-03) —
+   *  used to build the split tree's shared runtime prelude (Gap B, see
+   *  `helperGlobalsPrelude` below): every `__hbc_*` name any module's body
+   *  references, computed once from the same single `emitModule` pass this
+   *  function already runs (no second traversal). */
+  readonly helpersUsed: readonly string[];
+  readonly analysis: ModuleAnalysis;
+}
+
+function decompileAllBodies(module: HbcModule, passes: PassPipelineOptions | undefined, diagnostics: string[]): DecompiledBodies {
+  const analysis = analyseModule(module, { strictEnv: false });
+  const bodies = new Map<number, Extract<Stmt, { k: "func" }>>();
+  const hook = passes !== undefined ? astPassHook(analysis, passes) : undefined;
+  let helpersUsed: readonly string[] = [];
+  try {
+    const result = emitModule(analysis, {
+      moduleName: "input.hbc",
+      provenanceComments: false,
+      strictEnv: false,
+      structure: { verify: false },
+      ...(passes !== undefined ? { passes: passHook(analysis, passes) } : {}),
+      astPasses: (fn, cfg) => {
+        const out = hook !== undefined ? hook(fn, cfg) : { fn, diagnostics: [] };
+        if (out.fn.k === "func") bodies.set(cfg.functionIndex, out.fn);
+        return out;
+      },
+    });
+    helpersUsed = result.helpersUsed;
+  } catch (e) {
+    if (!(e instanceof Hbc2jsError) || e.code !== ErrorCode.E_UNBOUND_IDENT) throw e;
+    diagnostics.push(`module-level scope check failed after every function was emitted (${e.code}: ${e.message}); bodies kept as emitted`);
+  }
+  return { bodies, helpersUsed, analysis };
+}
+
+function fileNameFor(moduleId: number): string {
+  return `module_${moduleId}.js`;
+}
+
+/** Half-open [start, end) byte ranges of every `//` and block comment in
+ *  printed JS, skipping over string and template literals so a `//` inside a
+ *  string is not mistaken for a comment. Used by the reference scan below;
+ *  see `scanFnIdentifiers`. */
+function commentRanges(text: string): ReadonlyArray<readonly [number, number]> {
+  const ranges: Array<readonly [number, number]> = [];
+  const n = text.length;
+  let i = 0;
+  while (i < n) {
+    const c = text[i]!;
+    if (c === '"' || c === "'" || c === "`") {
+      const quote = c;
+      i++;
+      while (i < n) {
+        const d = text[i]!;
+        if (d === "\\") {
+          i += 2;
+          continue;
+        }
+        if (d === quote) {
+          i++;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+    if (c === "/" && text[i + 1] === "/") {
+      const start = i;
+      while (i < n && text[i] !== "\n") i++;
+      ranges.push([start, i]);
+      continue;
+    }
+    if (c === "/" && text[i + 1] === "*") {
+      const start = i;
+      i += 2;
+      while (i < n && !(text[i] === "*" && text[i + 1] === "/")) i++;
+      i = Math.min(n, i + 2);
+      ranges.push([start, i]);
+      continue;
+    }
+    i++;
+  }
+  return ranges;
+}
+
+function insideAny(ranges: ReadonlyArray<readonly [number, number]>, at: number): boolean {
+  let lo = 0;
+  let hi = ranges.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const r = ranges[mid]!;
+    if (at < r[0]) hi = mid - 1;
+    else if (at >= r[1]) lo = mid + 1;
+    else return true;
+  }
+  return false;
+}
+
+/** The `_fn<n>` identifiers a printed body DECLARES and the ones it REFERENCES,
+ *  counting only occurrences in code.
+ *
+ *  A mention inside a comment is not a reference. `src/emit` prints provenance
+ *  and scope-check comments that name functions by their emitted identifier —
+ *  e.g. `// emitted identifier "_fn13844" is not declared in any enclosing
+ *  scope (module > _fn0 > _fn525 > ...)` — and the split file's
+ *  referenced-but-undeclared pull below used to match those, pulling the named
+ *  function (in the observed case the bundle's GLOBAL function, whose body is
+ *  the whole program) into an unrelated module file. On
+ *  react-navigation-example-0.85.3 that turned module_523.js from 46 KB into
+ *  28 MB and the whole split from 24 MB into 52 MB
+ *  (docs/BUGS.md `split-comment-ref-pull`). */
+export function scanFnIdentifiers(text: string): { readonly declared: readonly number[]; readonly referenced: readonly number[] } {
+  const ranges = commentRanges(text);
+  const declared: number[] = [];
+  const referenced: number[] = [];
+  for (const mm of text.matchAll(/function _fn(\d+)\(/g)) {
+    if (mm.index !== undefined && !insideAny(ranges, mm.index)) declared.push(Number(mm[1]));
+  }
+  for (const mm of text.matchAll(/_fn(\d+)/g)) {
+    if (mm.index !== undefined && !insideAny(ranges, mm.index)) referenced.push(Number(mm[1]));
+  }
+  return { declared, referenced };
+}
+
+/**
+ * Where a pulled-in orphan declaration goes inside the factory body.
+ *
+ * Hermes allocates a scope's environment slots in TEXTUAL declaration order:
+ * hoisting moves a function declaration's *closure creation* to the top of the
+ * scope, but not its slot. Probed on hermesc v98 with two captured function
+ * declarations either side of a `let a0, a1, a2;` — the same
+ * `CreateClosure`/`StoreToEnvironment` sequence either way, but the `let`
+ * bindings took slots 0..2 only when the function declarations came after
+ * them (docs/BUGS.md 2026-09-05, `diff:LoadFromEnvironment(imm)`).
+ *
+ * So prepending these declarations to the factory body — which is what this
+ * used to do — pushed every one of the factory's OWN `_e<env>_<slot>`
+ * bindings up by the number of orphans pulled in, and every getter/closure
+ * reading them recompiled with a shifted slot immediate. On
+ * react-navigation-example module 681 / fn#683 (a lazy re-export barrel with
+ * eleven getters) that was the uniform +2 the bug row describes: two orphans,
+ * `_fn13951` and `_fn13952`.
+ *
+ * The declarations therefore go exactly where `emitFunction` puts a function's
+ * own nested children: after the whole prologue (the `"use strict"` directive,
+ * the register/env-slot `let`s, `__this`/`__args`, the dispatch and generator
+ * state variables), i.e. at the first `func` statement, or after the leading
+ * run of declaration-shaped statements when the body has no children of its
+ * own. They stay hoisted function declarations, so every reference in the
+ * factory — including ones textually above them — still resolves.
+ */
+function withExtraDeclarations(body: readonly Stmt[], extras: readonly Extract<Stmt, { k: "func" }>[]): Stmt[] {
+  let at = body.findIndex((s) => s.k === "func");
+  if (at < 0) {
+    at = 0;
+    while (at < body.length && (body[at]!.k === "directive" || body[at]!.k === "comment" || body[at]!.k === "decl" || body[at]!.k === "init")) at++;
+  }
+  return [...body.slice(0, at), ...extras, ...body.slice(at)];
+}
+
+export function splitProject(bytes: Uint8Array, opts: SplitOptions = {}): SplitResult {
+  const module = parseHbc(bytes);
+  const inventory = buildInventoryFromModule(module);
+  const diagnostics: string[] = [];
+  const { bodies, helpersUsed, analysis } = decompileAllBodies(module, opts.passes, diagnostics);
+  const printOpts = { indent: "  ", jsx: opts.jsx === true };
+
+  const files = new Map<string, string>();
+  const modules: SplitModuleInfo[] = [];
+  // §2.7 `ranges.jsonl` — the render-coupled presentation layer: every
+  // statement-level `k:"func"` this pass actually prints, keyed by fnIndex,
+  // with the `file:line` it was actually emitted at (never fabricated; see
+  // `src/emit/print.ts`'s `onFunctionRange` doc for what is deliberately
+  // left out and why).
+  const functionRanges = new Map<number, { readonly file: string; readonly lines: readonly [number, number] }>();
+
+  const known = new Set<number>();
+  for (const m of inventory.modules) if (m.localModuleId !== null) known.add(m.localModuleId);
+
+  // A module's factory Stmt (`bodies.get(factoryFunctionIndex)`) already embeds,
+  // recursively, every descendant function whose lexical parent chain
+  // (`envGraph.closureEnvOf`) stays inside the factory (`emitModule`'s
+  // `childrenOf`/`inlineFunctions`, either hoisted siblings or inline
+  // expressions — both print as `function _fnN(...)`, see `src/emit/print.ts`
+  // "func"). But `emitModule`'s per-function closure-env analysis sometimes
+  // finds no creation site for a function (an "orphan" — W_ORPHAN_FUNCTION /
+  // W_UNEMITTED_FUNCTION) even though the factory's own decompiled body still
+  // calls it by name; in the *unsplit* `decompile` path this is harmless
+  // because every function lands in the one shared top-level scope, but a
+  // split module file only contains its factory's own subtree, so the
+  // reference resolved to nothing and threw `ReferenceError` at runtime
+  // (docs/BUGS.md "e2e split unmatched-closure", e.g. react-navigation's
+  // module_8.js calling an undeclared `_fn1953`). Fix: after printing a
+  // module's factory, scan the printed text for any `_fnN` reference not
+  // declared anywhere in it, and pull that function's own body (already
+  // decompiled into `bodies` — `decompileAllBodies`'s hook captures every
+  // function `emitModule` reaches, orphans included) into the same file as
+  // an extra declaration nested inside the factory (a real JS closure, not a
+  // file-top-level sibling — see the nesting note further down), transitively
+  // (that body may itself reference further undeclared functions). D17i is
+  // silent on a function
+  // referenced from *two different* modules (this only arises for orphans,
+  // which by definition capture no shared closure environment, so duplicating
+  // the declaration would be safe, but the design doesn't say to) — so the
+  // first module (inventory order) to claim an orphan gets the declaration;
+  // later modules record a diagnostic instead of guessing at sharing
+  // semantics.
+  const claimedBy = new Map<number, number>();
+
+  for (const m of inventory.modules) {
+    const id = m.localModuleId;
+    if (id === null) {
+      diagnostics.push(`factory fn#${m.factoryFunctionIndex} has no resolved local module id; skipped`);
+      continue;
+    }
+    const fnStmt = bodies.get(m.factoryFunctionIndex);
+    const depIds = (m.depIds ?? []).filter((d) => known.has(d));
+    if (!isFuncStmt(fnStmt)) {
+      diagnostics.push(`module ${id}: factory fn#${m.factoryFunctionIndex} was not emitted; wrote an empty stub`);
+      const file = fileNameFor(id);
+      // Still registers with the loader's `__d` (see `buildLoaderIndexJs`
+      // below) so a dependent module's `__r(id)` doesn't throw
+      // "not registered" — it gets an empty exports object instead, same as
+      // the pre-loader `module.exports = {}` shape this replaces.
+      files.set(
+        file,
+        `// hbc2js --split -- module ${id}: factory fn#${m.factoryFunctionIndex} was not reachable from the module graph\nfunction factory(global, require, importDefault, importAll, module, exports, dependencyMap) {}\n__d(factory, ${id}, ${JSON.stringify(depIds)});\n`,
+      );
+      modules.push({ id, file, factoryFunctionIndex: m.factoryFunctionIndex, deps: depIds, requireRewrites: 0 });
+      continue;
+    }
+    const { body, rewrites } = rewriteFactoryBody(
+      fnStmt.body,
+      fnStmt.params.map((x) => x.name),
+      m.depIds ?? [],
+    );
+    let factoryMarks: Array<{ readonly name: string; readonly startLine: number; readonly endLine: number }> = [];
+    const funcText = printProgram([{ ...fnStmt, name: "factory", body }], {
+      ...printOpts,
+      onFunctionRange: (name, startLine, endLine) => factoryMarks.push({ name, startLine, endLine }),
+    });
+
+    // Pull in every function transitively referenced-but-undeclared, so no
+    // reference in this file resolves to nothing (see comment above). These
+    // become extra function *declarations inside the factory's own body*
+    // (nested inside `factory`, not file-top-level siblings, and placed by
+    // `withExtraDeclarations` after the factory's declaration prologue so
+    // they cannot renumber its environment slots): a
+    // top-level declaration would recompile as a module-scope function
+    // (hermesc never emits a `CreateClosure` for it), tripping the E2E
+    // harness's closure-tree comparison even harder than the original bug —
+    // nesting them inside the factory keeps them "the factory plus every
+    // nested function" (`tools/e2e/roundtrip-corpus.ts`'s own framing of what
+    // one split module is), which is the closest approximation available
+    // without knowing their true original nesting depth (that is the
+    // still-open, harder half of docs/BUGS.md "e2e split unmatched-closure":
+    // envGraph could not find a closure creation site for them at all).
+    const declaredIdx = new Set<number>();
+    const extraStmts: Extract<Stmt, { k: "func" }>[] = [];
+    const queue: number[] = [];
+    const scan = (text: string): void => {
+      // Comments never reference anything: see `scanFnIdentifiers`.
+      const found = scanFnIdentifiers(text);
+      for (const d of found.declared) declaredIdx.add(d);
+      for (const idx of found.referenced) {
+        if (!declaredIdx.has(idx)) queue.push(idx);
+      }
+    };
+    scan(funcText);
+    while (queue.length > 0) {
+      const idx = queue.shift()!;
+      if (declaredIdx.has(idx)) continue;
+      if (idx === module.header.globalCodeIndex) {
+        // The global function's body is the whole bundle's registration code
+        // (every `__d(...)` in the program); it is never a module-local helper,
+        // so a reference to it from one module file is a decompilation defect,
+        // not a function to copy in (docs/BUGS.md `split-comment-ref-pull`).
+        declaredIdx.add(idx);
+        diagnostics.push(`module ${id}: fn#${idx} (_fn${idx}) is the bundle's global function; left undeclared rather than copied into a module file`);
+        continue;
+      }
+      const owner = claimedBy.get(idx);
+      if (owner !== undefined) {
+        declaredIdx.add(idx);
+        if (owner !== id) {
+          diagnostics.push(
+            `module ${id}: fn#${idx} (_fn${idx}) is referenced but was already written into module ${owner}'s split file, not duplicated (D17i has no shared-orphan-closure rule)`,
+          );
+        }
+        continue;
+      }
+      const extraFn = bodies.get(idx);
+      if (!isFuncStmt(extraFn)) {
+        declaredIdx.add(idx);
+        diagnostics.push(`module ${id}: fn#${idx} (_fn${idx}) is referenced but has no emitted body; left undeclared (runtime ReferenceError if reached)`);
+        continue;
+      }
+      claimedBy.set(idx, id);
+      extraStmts.push(extraFn);
+      scan(printProgram([extraFn], printOpts));
+    }
+
+    const finalFnStmt = extraStmts.length > 0 ? { ...fnStmt, name: "factory", body: withExtraDeclarations(body, extraStmts) } : { ...fnStmt, name: "factory", body };
+    let finalFuncText: string;
+    if (extraStmts.length > 0) {
+      factoryMarks = [];
+      finalFuncText = printProgram([finalFnStmt], {
+        ...printOpts,
+        onFunctionRange: (name, startLine, endLine) => factoryMarks.push({ name, startLine, endLine }),
+      });
+    } else {
+      finalFuncText = funcText;
+    }
+    const file = fileNameFor(id);
+    // §2.7 `ranges.jsonl`: the file text this module writes prepends exactly
+    // one header comment line (below) before `finalFuncText`, so every mark's
+    // 1-based line (relative to `finalFuncText` alone) shifts down by one to
+    // become the line within `file`. "factory" -> the module's own factory
+    // fnIndex; everything else carries its real `_fn<idx>` name, EXCEPT a
+    // duplicated closure copy (`emit/index.ts`'s `copyNameOf`), which suffixes
+    // it `_fn<idx>__c<copy>` — stripping only the `_fn` prefix and calling
+    // `Number` on the remainder turned that suffix into `NaN` (docs/BUGS.md
+    // `ix_ranges.fn` UNIQUE-constraint row): a `NaN` bound as a
+    // `node:sqlite` INTEGER PRIMARY KEY silently auto-assigns the next free
+    // rowid, which can coincide with a real fn id inserted later and blow up
+    // `initProjectDb` on an unrelated row. Extract the leading digit run
+    // instead, so a copy's range is attributed to the ORIGINAL function id
+    // (last copy printed wins the one row `ix_ranges` has room for — same
+    // "no fabrication, whichever the render actually printed" contract the
+    // header above already documents for the non-duplicated case).
+    for (const mark of factoryMarks) {
+      const fnIdx = mark.name === "factory" ? m.factoryFunctionIndex : Number(/^_fn(\d+)/.exec(mark.name)?.[1] ?? NaN);
+      if (Number.isNaN(fnIdx)) {
+        diagnostics.push(`module ${id}: emitted function range named ${JSON.stringify(mark.name)} does not match _fn<idx>[__c<copy>]; range dropped rather than recorded under a fabricated fn id`);
+        continue;
+      }
+      functionRanges.set(fnIdx, { file, lines: [mark.startLine + 1, mark.endLine + 1] });
+    }
+    // `__d(factory, id, deps)` instead of `module.exports = factory` (Gap A):
+    // registers the factory with the
+    // loader (`buildLoaderIndexJs`'s `index.js`) instead of handing back the
+    // unexecuted factory function itself — a plain `require('./module_N.js')`
+    // from another module's rewritten call site (src/split/rewrite.ts) is
+    // intercepted at the `Module._load` level and routed through `__r(id)`,
+    // which runs (once, memoised) the factory registered here and returns
+    // its real `module.exports`.
+    files.set(
+      file,
+      `// hbc2js --split -- Metro module ${id} (source fn#${m.factoryFunctionIndex}, ${opts.moduleName ?? "input.hbc"})\n${finalFuncText}\n__d(factory, ${id}, ${JSON.stringify(depIds)});\n`,
+    );
+    modules.push({ id, file, factoryFunctionIndex: m.factoryFunctionIndex, deps: depIds, requireRewrites: rewrites });
+  }
+  modules.sort((a, b) => a.id - b.id);
+
+  const globalFn = bodies.get(module.header.globalCodeIndex);
+  const entryModuleId = isFuncStmt(globalFn) ? resolveEntryModuleId(globalFn.body) : null;
+  if (entryModuleId === null || !known.has(entryModuleId)) {
+    diagnostics.push(`could not resolve an entry module id from the global function's __r() call`);
+  }
+
+  const resolvedEntry = entryModuleId !== null && known.has(entryModuleId) ? entryModuleId : null;
+  files.set("index.js", buildLoaderIndexJs(modules, resolvedEntry, helpersUsed));
+
+  files.set(
+    "MODULES.json",
+    JSON.stringify(
+      {
+        hbcVersion: module.header.version,
+        moduleCount: modules.length,
+        entry: resolvedEntry,
+        modules: modules.map((m) => ({ id: m.id, file: m.file, factoryFunctionIndex: m.factoryFunctionIndex, deps: m.deps })),
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+
+  return { files, modules, entryModuleId: resolvedEntry, diagnostics, functionRanges, module, analysis, helpersUsed };
+}

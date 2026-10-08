@@ -1,0 +1,114 @@
+; hbc2js disassembly of 83-try-finally-trailing-code/v84.hbc
+; version=84 layout=B opcodeTable=hbc84 functions=7 strings=18 globalCodeIndex=0
+function #0 "global"  params=1 frame=15 env=0 flags=exc,dbg  @0x000001c0 size=143
+  .try T1..T2 -> L1 ; handler 0
+  0000  DeclareGlobalVar     s14 "out"
+  0005  DeclareGlobalVar     s13 "f"
+  000a  CreateEnvironment    r1
+  000c  CreateClosure        r2, r1, f1 "f"
+  0011  GetGlobalObject      r0
+  0013  PutById              r0, r2, #c1, s13 "f"
+  0019  NewArray             r2, 0
+  001d  PutById              r0, r2, #c2, s14 "out"
+  0023  GetByIdShort         r5, r0, #c1, s13 "f"
+  0028  LoadConstUndefined   r2
+  002a  CreateClosure        r4, r1, f3 ""
+  002f  CreateClosure        r3, r1, f4 ""
+  0034  Call3                r3, r5, r2, r4, r3
+T1:
+  003a  GetByIdShort         r4, r0, #c1, s13 "f"
+  003f  CreateClosure        r3, r1, f5 ""
+  0044  CreateClosure        r1, r1, f6 ""
+  0049  Call3                r1, r4, r2, r3, r1
+T2:
+  004f  Jmp                  L2
+L1:
+  0051  Catch                r1
+  0053  GetByIdShort         r4, r0, #c2, s14 "out"
+  0058  GetByIdShort         r3, r4, #c3, s17 "push"
+  005d  GetByIdShort         r5, r1, #c4, s10 "message"
+  0062  LoadConstString      r1, s8 "threw:"
+  0066  Add                  r1, r1, r5
+  006a  Call2                r1, r3, r4, r1
+L2:
+  006f  TryGetById           r1, r0, #c5, s15 "print"
+  0075  GetByIdShort         r4, r0, #c2, s14 "out"
+  007a  GetByIdShort         r3, r4, #c6, s12 "join"
+  007f  LoadConstString      r0, s1 " | "
+  0083  Call2                r0, r3, r4, r0
+  0088  Call2                r0, r1, r2, r0
+  008d  Ret                  r0
+
+function #1 "f"  params=3 frame=14 env=1 flags=exc,dbg  @0x0000024f size=61
+  .try T1..T2 -> L1 ; handler 0
+  0000  CreateEnvironment    r2
+  0002  CreateClosure        r0, r2, f2 "readFlag"
+  0007  LoadConstFalse       r1
+  0009  StoreNPToEnvironment r2, 0, r1
+T1:
+  000d  LoadConstTrue        r3
+  000f  StoreNPToEnvironment r2, 0, r3
+  0013  Mov                  r5, r0
+  0016  LoadParam            r3, 1
+  0019  LoadConstUndefined   r4
+  001b  Call2                r3, r3, r4, r5
+T2:
+  0020  StoreNPToEnvironment r2, 0, r1
+  0024  Mov                  r3, r0
+  0027  LoadParam            r0, 2
+  002a  Call2                r0, r0, r4, r3
+  002f  LoadConstString      r0, s7 "ret"
+  0033  Ret                  r0
+L1:
+  0035  Catch                r0
+  0037  StoreNPToEnvironment r2, 0, r1
+  003b  Throw                r0
+
+function #2 "readFlag"  params=1 frame=1 env=0 flags=none  @0x0000028c size=9
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r0, r0, 0
+  0007  Ret                  r0
+
+function #3 ""  params=2 frame=13 env=0 flags=dbg  @0x00000295 size=36
+  0000  GetGlobalObject      r0
+  0002  GetByIdShort         r3, r0, #c1, s14 "out"
+  0007  GetByIdShort         r2, r3, #c2, s17 "push"
+  000c  LoadParam            r1, 1
+  000f  LoadConstUndefined   r0
+  0011  Call1                r4, r1, r0
+  0015  LoadConstString      r1, s6 "inside-try:"
+  0019  Add                  r1, r1, r4
+  001d  Call2                r1, r2, r3, r1
+  0022  Ret                  r0
+
+function #4 ""  params=2 frame=13 env=0 flags=dbg  @0x000002b9 size=36
+  0000  GetGlobalObject      r0
+  0002  GetByIdShort         r3, r0, #c1, s14 "out"
+  0007  GetByIdShort         r2, r3, #c2, s17 "push"
+  000c  LoadParam            r1, 1
+  000f  LoadConstUndefined   r0
+  0011  Call1                r4, r1, r0
+  0015  LoadConstString      r1, s2 "after-try:"
+  0019  Add                  r1, r1, r4
+  001d  Call2                r1, r2, r3, r1
+  0022  Ret                  r0
+
+function #5 ""  params=1 frame=11 env=0 flags=dbg  @0x000002dd size=34
+  0000  GetGlobalObject      r0
+  0002  TryGetById           r2, r0, #c1, s11 "Error"
+  0008  GetByIdShort         r0, r2, #c2, s16 "prototype"
+  000d  CreateThis           r1, r0, r2
+  0011  LoadConstString      r3, s3 "boom"
+  0015  Mov                  r4, r1
+  0018  Construct            r0, r2, 2
+  001c  SelectObject         r0, r1, r0
+  0020  Throw                r0
+
+function #6 ""  params=1 frame=11 env=0 flags=dbg  @0x000002ff size=25
+  0000  GetGlobalObject      r0
+  0002  GetByIdShort         r2, r0, #c1, s14 "out"
+  0007  GetByIdShort         r1, r2, #c2, s17 "push"
+  000c  LoadConstString      r0, s9 "unreachable"
+  0010  Call2                r0, r1, r2, r0
+  0015  LoadConstUndefined   r0
+  0017  Ret                  r0

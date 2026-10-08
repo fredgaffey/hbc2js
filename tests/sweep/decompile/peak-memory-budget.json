@@ -1,0 +1,22 @@
+{
+  "_comment": "Committed budget for tests/sweep/decompile/peak-memory-budget.test.ts. rssKbBudget is a ceiling in kilobytes on the peak RSS of one `node --max-old-space-size=<maxOldSpaceSizeMb>` process running splitProject() over the held-out app's react-navigation-example.hbc (release build; NOT react-navigation-example.debug.hbc, which is a different, larger build). This number may only move DOWN (a tighter budget after a real improvement), or UP with the owner's explicit approval recorded as a new 'measured' entry below with its own justification -- never edit worstKb/rssKbBudget upward to make a failing test pass; see the test file's own comment for why.",
+  "maxOldSpaceSizeMb": 2048,
+  "bundle": "react-navigation-example.hbc",
+  "rssKbBudget": 1150000,
+  "measured": {
+    "date": "2026-09-29",
+    "host": "remote build node (ssh, 32-core Linux box, idle: load average 0.07-0.69 across the run, node v24.20.0 via nvm)",
+    "provisional": false,
+    "runs_kb": [
+      937028,
+      944256,
+      947688,
+      946136,
+      951788
+    ],
+    "worstKb": 951788,
+    "headroomPct": 20.8,
+    "headroomNote": "rssKbBudget = 1150000 = worstKb (951788) * ~1.208. Chosen so ordinary run-to-run noise (the 5 runs above already span ~15 MB, ~1.6% of worstKb) and cross-machine variation (this box is not the one the gate normally runs on; the Mac workers in this block measured ~910-1220 MB for the same bundle under heavy concurrent load, which is exactly the unreliable-measurement case this file's provenance note warns about, not a second data point for the budget) cannot flake the test, while still catching a real regression (e.g. a doubling).",
+    "loadCaveat": "A failing run on a LOADED box is probably contention, not a regression: the same bundle measured ~1,222,544 kB on the Mac at load average ~46-64 while this idle box measured ~951,788 kB, i.e. a busy box can exceed this budget with no code change at all. The test prints the load average on every run for exactly this triage. Re-measure on an idle box before concluding anything, and never raise the budget from a loaded-box reading."
+  }
+}

@@ -1,0 +1,101 @@
+// src/deps/sigdb-types.ts — the D17/D17b signature-DB file format (schema 2),
+// promoted from the shape `tools/pkgsig/build-db.mjs` wrote by hand
+// (docs/PACKAGE-SIGNATURES.md §5.3). One JSON file per `package@version` x
+// HBC version, `<pkg>@<version>__hbc<N>.json` (`@scope/name` packages use
+// `__` in place of `/`).
+
+export interface SigFunction {
+  readonly index: number;
+  readonly name: string;
+  readonly paramCount: number;
+  readonly instrCount: number;
+  readonly exactHash: string;
+  readonly fuzzyHash: string;
+  readonly stringSetHash: string;
+  readonly stringCount: number;
+  readonly owner?: string | null;
+}
+
+export interface SigModule {
+  readonly factoryFunctionIndex: number;
+  readonly localModuleId: number | null;
+  readonly depCount: number | null;
+  readonly depIds: readonly number[] | null;
+  readonly factoryExactHash: string | null;
+  readonly factoryFuzzyHash: string | null;
+  readonly nestedFunctionCount: number;
+  /** Not persisted to disk (recomputed at fingerprint time); present on the
+   *  in-memory result from `fingerprintModule` for callers (e.g. `guess.ts`)
+   *  that need the actual nested indices, not just a count. */
+  readonly nestedFunctionIndices?: readonly number[];
+  readonly functionSetHash: string;
+  readonly factoryIsBaseline: boolean;
+  /** J4 (docs/DECISIONS.md D17c, dependency-aware subtraction): true when
+   *  this module's factory hash matched a function in one of the package's
+   *  own npm dependencies' (already-subtracted) signature — the dependency
+   *  contamination `tools/pkgsig/bulk/dep-subtract.mjs` fixes, parallel to
+   *  `factoryIsBaseline`. Optional/absent on every pre-J4 (v1) file. */
+  readonly factoryIsDependency?: boolean;
+}
+
+export interface SigProvenance {
+  readonly packageSha256: string | null;
+  readonly metroVersion: string | null;
+  readonly reactNativeVersion: string | null;
+  readonly hermescVersion: number;
+  readonly hermescRnEra: string | null;
+  readonly repoCommit: string | null;
+  readonly builtAt: string;
+}
+
+export interface SigDbFile {
+  readonly schema: 2;
+  readonly package: string;
+  readonly version: string;
+  readonly hbcVersion: number;
+  readonly totalFunctions: number;
+  readonly rawFunctionCount: number;
+  readonly subtractedBaselines: readonly string[];
+  readonly functions: readonly SigFunction[];
+  readonly modules: readonly SigModule[];
+  readonly toolchainBaseline: boolean;
+  readonly provenance: SigProvenance;
+  /** J4 (docs/DECISIONS.md D17c; docs/specs/15-sigdb-schema.md): relative
+   *  paths (sibling sigdb filenames, `<pkg>@<version>__hbc<N>.json`) of
+   *  this package's own direct npm dependencies whose (already
+   *  baseline-and-dependency-subtracted) function hash set was ALSO
+   *  subtracted out of this file, fixing the contamination where a
+   *  package's raw fingerprint contained its dependencies' code too (e.g.
+   *  `@react-navigation/stack`'s raw fingerprint contained
+   *  `@react-navigation/native`'s modules). Present (possibly `[]`, when a
+   *  package has no in-DB dependencies to subtract) on every file written
+   *  by `dep-subtract.mjs` — this is the v2 on-disk marker. **Absent**
+   *  (`undefined`) on every pre-J4 (v1) file — `src/deps/db.ts`'s
+   *  `loadSignatures` uses presence-of-this-field to decide that a v2 file
+   *  for a package supersedes every v1 file for that same package, even at
+   *  a different version, per docs/DECISIONS.md D17c's v1/v2
+   *  compatibility rule (v2 never equals v1 for the same package, so
+   *  loading both would let contaminated v1 entries keep winning
+   *  collisions). */
+  readonly subtractedDependencies?: readonly string[];
+  /** LB1 (docs/DEPS.md "Hash scheme 2"): 2 = exact/fuzzy hashes computed
+   *  with operand-width variants folded (`SIG_HASH_SCHEME`) AND baseline
+   *  subtraction ownership-aware. Absent = scheme 1 (pre-LB1). A package
+   *  with any scheme-2 entry supersedes its scheme-1 entries in
+   *  `loadSignatures`. */
+  readonly hashScheme?: number;
+}
+
+export interface SigDbIndexEntry {
+  readonly package: string;
+  readonly version: string;
+  readonly hbcVersion: number;
+  readonly path: string;
+  readonly totalFunctions: number;
+  readonly isBaseline: boolean;
+}
+
+export interface SigDbIndex {
+  readonly schema: 1;
+  entries: SigDbIndexEntry[];
+}

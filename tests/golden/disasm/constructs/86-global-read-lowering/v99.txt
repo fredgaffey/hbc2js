@@ -1,0 +1,53 @@
+; hbc2js disassembly of 86-global-read-lowering/v99.hbc
+; version=99 layout=E opcodeTable=hbc99-mar2026 functions=3 strings=11 globalCodeIndex=0
+function #0 "global"  params=1 frame=14 env=0 flags=dbg,overflowed  @0x00000138 size=82
+  0000  DeclareGlobalVar     s10 "unshadowed"
+  0005  DeclareGlobalVar     s7 "loopy"
+  000a  GetGlobalObject      r2
+  000c  LoadConstUndefined   r1
+  000e  CreateClosure        r3, r1, f1 "unshadowed"
+  0013  PutByIdLoose         r2, r3, #c0, s10 "unshadowed"
+  0019  CreateClosure        r3, r1, f2 "loopy"
+  001e  PutByIdLoose         r2, r3, #c1, s7 "loopy"
+  0024  TryGetById           r4, r2, #c0, s9 "print"
+  002a  GetByIdShort         r3, r2, #c1, s10 "unshadowed"
+  002f  Call1                r3, r3, r1
+  0033  Call2                r3, r4, r1, r3
+  0038  TryGetById           r3, r2, #c0, s9 "print"
+  003e  GetByIdShort         r2, r2, #c2, s7 "loopy"
+  0043  LoadConstUInt8       r0, 3
+  0046  Call2                r2, r2, r1, r0
+  004b  Call2                r2, r3, r1, r2
+  0050  Ret                  r2
+
+function #1 "unshadowed"  params=1 frame=1 env=0 flags=dbg,overflowed  @0x0000018a size=15
+  0000  GetGlobalObject      r0
+  0002  TryGetById           r0, r0, #c0, s4 "Error"
+  0008  GetByIdShort         r0, r0, #c1, s8 "name"
+  000d  Ret                  r0
+
+function #2 "loopy"  params=2 frame=24 env=0 flags=dbg,overflowed  @0x00000199 size=84
+  0000  LoadParam            r8, 1
+  0003  LoadConstZero        r0
+  0005  Less                 r4, r0, r8
+  0009  LoadConstString      r6, s0 ""
+  000d  GetGlobalObject      r7
+  000f  LoadConstNull        r3
+  0011  LoadConstUInt8       r1, 1
+  0014  Mov                  r5, r6
+  0017  JmpFalse             L2, r4
+L1:
+  001a  TryGetById           r12, r7, #c0, s5 "Reflect"
+  0020  GetByIdShort         r11, r12, #c1, s6 "apply"
+  0025  TryGetById           r10, r7, #c2, s2 "String"
+  002b  NewArray             r9, 1
+  002f  DefineOwnInDenseArray r9, r0, 0
+  0033  Call4                r9, r11, r12, r10, r3, r9
+  003a  Add                  r9, r6, r9
+  003e  GetByIdShort         r10, r9, #c3, s3 "length"
+  0043  Add                  r6, r9, r0
+  0047  AddN                 r0, r0, r1
+  004b  Mov                  r5, r6
+  004e  JLess                L1, r0, r8
+L2:
+  0052  Ret                  r5

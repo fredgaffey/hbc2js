@@ -1,0 +1,112 @@
+; hbc2js disassembly of 87-return-annotations/v96.hbc
+; version=96 layout=C opcodeTable=hbc96 functions=8 strings=13 globalCodeIndex=0
+function #0 "global"  params=1 frame=12 env=0 flags=dbg  @0x000001b4 size=89
+  0000  DeclareGlobalVar     s10 "fetchFoo"
+  0005  DeclareGlobalVar     s9 "callSites"
+  000a  DeclareGlobalVar     s12 "voidFn"
+  000f  CreateEnvironment    r1
+  0011  CreateAsyncClosure   r2, r1, f1 "fetchFoo"
+  0016  GetGlobalObject      r0
+  0018  PutById              r0, r2, #c1, s10 "fetchFoo"
+  001e  CreateAsyncClosure   r2, r1, f4 "callSites"
+  0023  PutById              r0, r2, #c2, s9 "callSites"
+  0029  CreateClosure        r1, r1, f7 "voidFn"
+  002e  PutById              r0, r1, #c3, s12 "voidFn"
+  0034  GetByIdShort         r1, r0, #c1, s9 "callSites"
+  0039  LoadConstUndefined   r2
+  003b  Call1                r1, r1, r2
+  003f  GetByIdShort         r3, r0, #c2, s12 "voidFn"
+  0044  LoadConstTrue        r1
+  0046  Call2                r1, r3, r2, r1
+  004b  GetByIdShort         r1, r0, #c2, s12 "voidFn"
+  0050  LoadConstFalse       r0
+  0052  Call2                r0, r1, r2, r0
+  0057  Ret                  r0
+
+function #1 "fetchFoo"  params=1 frame=15 env=0 flags=dbg,nc  @0x0000020d size=30
+  0000  LoadConstUndefined   r4
+  0002  LoadConstUndefined   r0
+  0004  ReifyArguments       r0
+  0006  Mov                  r3, r0
+  0009  GetBuiltinClosure    r2, b52 "spawnAsync"
+  000c  CreateEnvironment    r0
+  000e  CreateGeneratorClosure r1, r0, f2 "?anon_0_fetchFoo"
+  0013  LoadThisNS           r0
+  0015  Call4                r0, r2, r4, r1, r0, r3
+  001c  Ret                  r0
+
+function #2 "?anon_0_fetchFoo"  params=1 frame=1 env=0 flags=nc  @0x0000022b size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f3 "?anon_0_?anon_0_fetchFoo"
+  0007  Ret                  r0
+
+function #3 "?anon_0_?anon_0_fetchFoo"  params=1 frame=2 env=0 flags=none  @0x00000234 size=16
+  0000  StartGenerator
+  0001  ResumeGenerator      r0, r1
+  0004  JmpTrue              L1, r1
+  0007  LoadConstUInt8       r1, 1
+  000a  CompleteGenerator
+  000b  Ret                  r1
+L1:
+  000d  CompleteGenerator
+  000e  Ret                  r0
+
+function #4 "callSites"  params=1 frame=15 env=0 flags=dbg,nc  @0x00000244 size=30
+  0000  LoadConstUndefined   r4
+  0002  LoadConstUndefined   r0
+  0004  ReifyArguments       r0
+  0006  Mov                  r3, r0
+  0009  GetBuiltinClosure    r2, b52 "spawnAsync"
+  000c  CreateEnvironment    r0
+  000e  CreateGeneratorClosure r1, r0, f5 "?anon_0_callSites"
+  0013  LoadThisNS           r0
+  0015  Call4                r0, r2, r4, r1, r0, r3
+  001c  Ret                  r0
+
+function #5 "?anon_0_callSites"  params=1 frame=1 env=0 flags=nc  @0x00000262 size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f6 "?anon_0_?anon_0_callSites"
+  0007  Ret                  r0
+
+function #6 "?anon_0_?anon_0_callSites"  params=1 frame=14 env=0 flags=dbg  @0x0000026b size=82
+  0000  StartGenerator
+  0001  ResumeGenerator      r0, r1
+  0004  JmpTrue              L3, r1
+  0007  GetGlobalObject      r3
+  0009  GetByIdShort         r1, r3, #c1, s10 "fetchFoo"
+  000e  LoadConstUndefined   r2
+  0010  Call1                r1, r1, r2
+  0014  GetByIdShort         r1, r3, #c1, s10 "fetchFoo"
+  0019  Call1                r1, r1, r2
+  001d  SaveGenerator        L1
+  001f  Ret                  r1
+L1:
+  0021  ResumeGenerator      r1, r4
+  0024  JmpTrue              L2, r4
+  0027  TryGetById           r5, r3, #c2, s11 "print"
+  002d  LoadConstString      r4, s7 "used="
+  0031  Add                  r4, r4, r1
+  0035  Call2                r4, r5, r2, r4
+  003a  TryGetById           r4, r3, #c2, s11 "print"
+  0040  LoadConstString      r3, s5 "done"
+  0044  Call2                r3, r4, r2, r3
+  0049  CompleteGenerator
+  004a  Ret                  r2
+L2:
+  004c  CompleteGenerator
+  004d  Ret                  r1
+L3:
+  004f  CompleteGenerator
+  0050  Ret                  r0
+
+function #7 "voidFn"  params=2 frame=11 env=0 flags=dbg  @0x000002bd size=29
+  0000  LoadConstUndefined   r0
+  0002  LoadParam            r1, 1
+  0005  JmpTrue              L1, r1
+  0008  GetGlobalObject      r1
+  000a  TryGetById           r2, r1, #c1, s11 "print"
+  0010  LoadConstString      r1, s8 "void-fn ran"
+  0014  Call2                r1, r2, r0, r1
+  0019  Ret                  r0
+L1:
+  001b  Ret                  r0

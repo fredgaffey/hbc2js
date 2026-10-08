@@ -1,0 +1,19 @@
+{
+  "L": "annotate.rename",
+  "G": "project.search",
+  ";": "annotate.comment",
+  "Ctrl-Shift-F": "navigate.xrefs",
+  "Ctrl-Alt-S": "navigate.strings",
+  "Ctrl-Alt-T": "navigate.tables",
+  "/": "project.search",
+  ":": "project.commandMode",
+  "Ctrl-Alt-L": "view.themeToggle",
+  "?": "project.shortcuts",
+  "Ctrl-,": "project.settings",
+  "gf": "graph.followToggle",
+  "gz": "graph.lodCycle",
+  "Down": "listing.lineDown",
+  "Up": "listing.lineUp",
+  "Left": "listing.tokenLeft",
+  "Right": "listing.tokenRight"
+}

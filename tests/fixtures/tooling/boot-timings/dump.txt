@@ -1,0 +1,7 @@
+09-20 10:00:00.100  1234  5678 I ReactNativeJS: __HBC_BOOT_TIMING__ {"id":3,"t0":10,"dt":10}
+__HBC_BOOT_TIMING__ {"id":2,"t0":5,"dt":40}
+
+not a boot timing line at all
+{"id":4,"t0":50,"dt":20}
+__HBC_BOOT_TIMING__ {"id":5,"t0":75,"dt":5}
+__HBC_BOOT_TIMING__ {"id":1,"t0":0,"dt":100}

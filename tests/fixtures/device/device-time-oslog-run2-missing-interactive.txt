@@ -1,0 +1,4 @@
+2026-09-20 10:17:00.100301-0700  localhost kernel[0]: process com.example.app launched
+2026-09-20 10:17:00.812456-0700  localhost HostApp[1301:5679]: HBC2JS_DEVICE_MARKER launch 812
+2026-09-20 10:17:01.230112-0700  localhost HostApp[1301:5679]: HBC2JS_DEVICE_MARKER firstContentCommit 1230
+2026-09-20 10:17:03.700998-0700  localhost HostApp[1301:5679]: RCTFatal: JS exception, root view never mounted interactively

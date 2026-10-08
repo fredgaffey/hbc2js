@@ -1,0 +1,5 @@
+key(aes-256)
+missing-foo
+X
+component(Y)
+key(aes-128)

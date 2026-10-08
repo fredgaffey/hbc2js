@@ -1,0 +1,15 @@
+[eval]:23
+const r5 = true && log('i', 10) ?? log('j', 20);
+                                ^^
+
+SyntaxError: Unexpected token '??'
+    at makeContextifyScript (node:internal/vm:194:14)
+    at compileScript (node:internal/process/execution:420:10)
+    at node:internal/process/execution:484:25
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:481:60)
+    at evalFunction (node:internal/process/execution:94:30)
+    at evalScript (node:internal/process/execution:106:3)
+    at node:internal/main/eval_string:71:3
+
+Node.js v25.9.0

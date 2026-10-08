@@ -1,0 +1,99 @@
+; hbc2js disassembly of 85-array-literal-interleaved/v96.hbc
+; version=96 layout=C opcodeTable=hbc96 functions=7 strings=10 globalCodeIndex=0
+function #0 "global"  params=1 frame=18 env=0 flags=dbg  @0x00000184 size=150
+  0000  DeclareGlobalVar     s3 "lookupMerge"
+  0005  DeclareGlobalVar     s5 "hoistable"
+  000a  DeclareGlobalVar     s7 "nonHoistable"
+  000f  CreateEnvironment    r1
+  0011  CreateClosure        r2, r1, f1 "lookupMerge"
+  0016  GetGlobalObject      r0
+  0018  PutById              r0, r2, #c1, s3 "lookupMerge"
+  001e  CreateClosure        r2, r1, f3 "hoistable"
+  0023  PutById              r0, r2, #c2, s5 "hoistable"
+  0029  CreateClosure        r2, r1, f5 "nonHoistable"
+  002e  PutById              r0, r2, #c3, s7 "nonHoistable"
+  0034  TryGetById           r3, r0, #c1, s8 "print"
+  003a  TryGetById           r5, r0, #c2, s4 "JSON"
+  0040  GetByIdShort         r4, r5, #c3, s9 "stringify"
+  0045  GetByIdShort         r7, r0, #c4, s5 "hoistable"
+  004a  LoadConstUndefined   r2
+  004c  CreateClosure        r6, r1, f6 ""
+  0051  LoadConstUInt8       r1, 5
+  0054  Call3                r1, r7, r2, r6, r1
+  005a  Call2                r1, r4, r5, r1
+  005f  Call2                r1, r3, r2, r1
+  0064  TryGetById           r1, r0, #c1, s8 "print"
+  006a  TryGetById           r4, r0, #c2, s4 "JSON"
+  0070  GetByIdShort         r3, r4, #c3, s9 "stringify"
+  0075  GetByIdShort         r7, r0, #c5, s7 "nonHoistable"
+  007a  LoadConstUInt8       r6, 1
+  007d  LoadConstUInt8       r5, 2
+  0080  LoadConstUInt8       r0, 3
+  0083  Call4                r0, r7, r2, r6, r5, r0
+  008a  Call2                r0, r3, r4, r0
+  008f  Call2                r0, r1, r2, r0
+  0094  Ret                  r0
+
+function #1 "lookupMerge"  params=3 frame=2 env=1 flags=none  @0x0000021a size=16
+  0000  CreateEnvironment    r0
+  0002  LoadParam            r1, 2
+  0005  StoreToEnvironment   r0, 0, r1
+  0009  CreateClosure        r0, r0, f2 ""
+  000e  Ret                  r0
+
+function #2 ""  params=2 frame=2 env=0 flags=dbg  @0x0000022a size=21
+  0000  LoadParam            r0, 1
+  0003  GetByIdShort         r1, r0, #c1, s6 "length"
+  0008  GetEnvironment       r0, 0
+  000b  LoadFromEnvironment  r0, r0, 0
+  000f  Add                  r0, r1, r0
+  0013  Ret                  r0
+
+function #3 "hoistable"  params=3 frame=15 env=2 flags=dbg  @0x0000023f size=62
+  0000  CreateEnvironment    r4
+  0002  LoadParam            r3, 2
+  0005  LoadParam            r0, 1
+  0008  StoreToEnvironment   r4, 0, r0
+  000c  StoreToEnvironment   r4, 1, r3
+  0010  GetGlobalObject      r0
+  0012  GetByIdShort         r5, r0, #c1, s3 "lookupMerge"
+  0017  LoadConstUndefined   r2
+  0019  LoadConstString      r1, s2 "setState"
+  001d  LoadConstUInt8       r0, 3
+  0020  Call3                r1, r5, r2, r1, r0
+  0026  NewArray             r0, 2
+  002a  CreateClosure        r4, r4, f4 ""
+  002f  PutOwnByIndex        r0, r4, 0
+  0033  PutOwnByIndex        r0, r3, 1
+  0037  Call2                r0, r1, r2, r0
+  003c  Ret                  r0
+
+function #4 ""  params=3 frame=14 env=0 flags=dbg  @0x0000027d size=31
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r4, r0, 0
+  0007  LoadConstUndefined   r3
+  0009  LoadParam            r2, 1
+  000c  LoadParam            r1, 2
+  000f  Call3                r1, r4, r3, r2, r1
+  0015  LoadFromEnvironment  r0, r0, 1
+  0019  Add                  r0, r1, r0
+  001d  Ret                  r0
+
+function #5 "nonHoistable"  params=4 frame=3 env=0 flags=dbg  @0x0000029c size=38
+  0000  LoadParam            r2, 1
+  0003  LoadConstUInt8       r0, 1
+  0006  Add                  r1, r2, r0
+  000a  NewArray             r0, 4
+  000e  PutOwnByIndex        r0, r2, 0
+  0012  PutOwnByIndex        r0, r1, 1
+  0016  LoadParam            r1, 2
+  0019  PutOwnByIndex        r0, r1, 2
+  001d  LoadParam            r1, 3
+  0020  PutOwnByIndex        r0, r1, 3
+  0024  Ret                  r0
+
+function #6 ""  params=3 frame=2 env=0 flags=dbg  @0x000002c2 size=12
+  0000  LoadParam            r1, 1
+  0003  LoadParam            r0, 2
+  0006  Add                  r0, r1, r0
+  000a  Ret                  r0

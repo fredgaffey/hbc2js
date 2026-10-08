@@ -1,0 +1,19 @@
+{
+  "schema": "device/1",
+  "tool": "device",
+  "subcommand": "status",
+  "platform": "android",
+  "platformSource": "single-adb-device",
+  "ok": true,
+  "reason": null,
+  "locked": false, "lockedSource": "dumpsys-window",
+  "bundleSha": "3f2a9c0011deadbeef", "bundleShaSource": "adb-pull-sha256",
+  "expectedBundleSha": "3f2a9c0011deadbeef", "expectedBundleShaSource": "flag",
+  "bundleMatches": true, "bundleMatchesSource": "compared",
+  "mode": "e2e", "modeSource": "seam-file",
+  "seed": "1234", "seedSource": "seam-file",
+  "env": "staging", "envSource": "seam-file",
+  "pid": 20481, "pidSource": "pidof",
+  "startTime": "2026-09-20T10:15:03Z", "startTimeSource": "proc-stat",
+  "restarting": false, "restartingSource": "pid-stable-8s"
+}
