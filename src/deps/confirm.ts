@@ -14,9 +14,10 @@
 // trusted tooling, set up the same way every other Tier-2 bundle fixture in
 // this repo already is.
 
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { execFile, execFileSync } from "node:child_process";
+import { promisify } from "node:util";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpus, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { decodeFunction } from "../disasm/decode.ts";
 import { parseHbc } from "../parse/module.ts";
@@ -30,6 +31,11 @@ import { isHintEligibleEvidence } from "./guess.ts";
 import { attachModulePaths, MODULE_PATHS_VERSION, modulePathsFromSourceMap } from "./module-paths.ts";
 import type { SourceMapLike } from "./module-paths.ts";
 import type { HbcModule } from "../parse/types.ts";
+
+const execFileAsync = promisify(execFile);
+
+/** Default `--confirm-jobs`: min(4, cpus/2), at least 1. */
+export function defaultConfirmJobs(): number { return Math.max(1, Math.min(4, Math.floor(cpus().length / 2))); }
 
 export interface ConfirmCandidate {
   readonly package: string;
@@ -336,6 +342,12 @@ export interface ConfirmOptions {
    *  see `confirmMinimumEvidence`. */
   readonly ownedTargetFactoryHashes?: ReadonlySet<string>;
   readonly rateLimitMs?: number;
+  /** Worker pool size (CONFPOOL1). Worker 0 uses `scratchProjectDir`; worker
+   *  i>0 uses a sibling `<scratchProjectDir>-w<i>` copied from the scaffold
+   *  once and reused across runs. Each worker has its own Metro temp/cache
+   *  dir. Results are merged in candidate order, identical to `jobs: 1`
+   *  (the default). The rate limit is shared across workers. */
+  readonly jobs?: number;
   /** Raw-fingerprint cache (CONFSPEED1): a built candidate's pre-subtraction
    *  fingerprint is stored here keyed by package@version + hbc + hash scheme
    *  + RN version, so re-confirming it (another target, wiped project DB)
@@ -528,16 +540,16 @@ function ensureScratchProject(dir: string, rnVersion: string): void {
  *  unrelated peer conflict must not block an otherwise-installable
  *  candidate), accepting that fallback may leave a real peer dependency
  *  like `worklets` missing for that one candidate. */
-function installCandidate(candidate: ResolvedCandidate, scratchProjectDir: string): void {
+async function installCandidate(candidate: ResolvedCandidate, scratchProjectDir: string, env: NodeJS.ProcessEnv): Promise<void> {
   const spec = `${candidate.package}@${candidate.version}`;
   try {
-    execFileSync("npm", ["install", "--ignore-scripts", "--no-save", spec], { cwd: scratchProjectDir, stdio: "ignore" });
+    await execFileAsync("npm", ["install", "--ignore-scripts", "--no-save", spec], { cwd: scratchProjectDir, env });
   } catch {
-    execFileSync("npm", ["install", "--ignore-scripts", "--no-save", "--legacy-peer-deps", spec], { cwd: scratchProjectDir, stdio: "ignore" });
+    await execFileAsync("npm", ["install", "--ignore-scripts", "--no-save", "--legacy-peer-deps", spec], { cwd: scratchProjectDir, env });
   }
 }
 
-function bundleAndCompile(pkg: string, scratchProjectDir: string, hermescPath: string, workDir: string): { hbcPath: string; bundlePath: string; mapPath: string } {
+async function bundleAndCompile(pkg: string, scratchProjectDir: string, hermescPath: string, workDir: string, env: NodeJS.ProcessEnv): Promise<{ hbcPath: string; bundlePath: string; mapPath: string }> {
   const entrySlug = pkg.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "");
   const entryFile = join(scratchProjectDir, `__hbc2js_confirm_entry_${entrySlug}__.js`);
   writeFileSync(entryFile, `const X = require(${JSON.stringify(pkg)});\nmodule.exports = X;\n`);
@@ -545,13 +557,13 @@ function bundleAndCompile(pkg: string, scratchProjectDir: string, hermescPath: s
   const mapPath = join(workDir, "out.bundle.map");
   const assetsDir = join(workDir, "assets");
   mkdirSync(assetsDir, { recursive: true });
-  execFileSync(
+  await execFileAsync(
     "npx",
     ["react-native", "bundle", "--platform", "android", "--dev", "false", "--minify", "true", "--entry-file", entryFile, "--bundle-output", bundlePath, "--sourcemap-output", mapPath, "--assets-dest", assetsDir],
-    { cwd: scratchProjectDir, stdio: "ignore" },
+    { cwd: scratchProjectDir, env },
   );
   const hbcPath = join(workDir, "out.hbc");
-  execFileSync(hermescPath, ["-O", "-emit-binary", `-out=${hbcPath}`, bundlePath], { stdio: "ignore" });
+  await execFileAsync(hermescPath, ["-O", "-emit-binary", `-out=${hbcPath}`, bundlePath]);
   return { hbcPath, bundlePath, mapPath };
 }
 
@@ -624,22 +636,49 @@ async function defaultReferenceDate(rnVersion: string, opts: ConfirmOptions): Pr
   return times?.[rnVersion] ?? new Date().toISOString();
 }
 
+/** Create worker scratch `dir` as a copy of the ready scaffold `src` (once;
+ *  reused across runs). Re-validates the RN version via `ensureScratchProject`. */
+function prepareWorkerScratch(src: string, dir: string, rnVersion: string): void {
+  const marker = join(dir, "node_modules", "react-native", "package.json");
+  if (!existsSync(marker)) {
+    rmSync(dir, { recursive: true, force: true });
+    cpSync(src, dir, { recursive: true, verbatimSymlinks: true, filter: (p) => !/__hbc2js_confirm_entry_|\.hbc2js-tmp/.test(p) });
+  }
+  ensureScratchProject(dir, rnVersion);
+}
+
 export async function confirmCandidates(candidates: readonly ConfirmCandidate[], target: ModuleInventory, opts: ConfirmOptions): Promise<ConfirmResult[]> {
   const failureLog = loadFailureLog(opts.failureLogPath);
-  const results: ConfirmResult[] = [];
+  const jobs = Math.max(1, Math.floor(opts.jobs ?? 1));
 
   ensureScratchProject(opts.scratchProjectDir, opts.rnVersion);
+  const scratchDirs = [opts.scratchProjectDir];
+  for (let w = 1; w < Math.min(jobs, Math.max(1, dedupeCandidatesByPackage(candidates).length)); w++) {
+    const dir = `${opts.scratchProjectDir}-w${w}`;
+    prepareWorkerScratch(opts.scratchProjectDir, dir, opts.rnVersion);
+    scratchDirs.push(dir);
+  }
   const referenceDate = opts.referenceDate ?? (await defaultReferenceDate(opts.rnVersion, opts));
   const baseline = computeBaselineHashes(opts.baselineDirs ?? [], opts.hbcVersion);
 
   const corroborated = new Set<string>();
   for (const c of candidates) if (c.evidence?.some((e) => isHintEligibleEvidence(e.kind, c.version)) === true) corroborated.add(c.package);
-  for (const rawCandidate of dedupeCandidatesByPackage(candidates)) {
+  const deduped = dedupeCandidatesByPackage(candidates);
+  const results: ConfirmResult[] = new Array(deduped.length);
+  // Shared rate limit: candidate starts are spaced >= rateLimitMs apart across all workers.
+  let nextSlot = 0;
+  const throttle = async (): Promise<void> => {
+    if (opts.rateLimitMs === undefined || opts.rateLimitMs <= 0) return;
+    const now = Date.now();
+    const at = Math.max(now, nextSlot);
+    nextSlot = at + opts.rateLimitMs;
+    if (at > now) await sleep(at - now);
+  };
+  const processOne = async (rawCandidate: ConfirmCandidate, scratchDir: string, env: NodeJS.ProcessEnv): Promise<ConfirmResult> => {
+    await throttle();
     const resolved = await resolveCandidateVersion(rawCandidate, referenceDate, opts);
     if (resolved.version === null) {
-      results.push({ candidate: { package: rawCandidate.package, version: null }, ok: false, reason: "no version evidenced and no npm registry release found to resolve 'nearest by date' against" });
-      if (opts.rateLimitMs !== undefined && opts.rateLimitMs > 0) await sleep(opts.rateLimitMs);
-      continue;
+      return { candidate: { package: rawCandidate.package, version: null }, ok: false, reason: "no version evidenced and no npm registry release found to resolve 'nearest by date' against" };
     }
     const candidate: ResolvedCandidate = { package: rawCandidate.package, version: resolved.version };
     const usedPrereleaseVersion = resolved.usedPrerelease;
@@ -649,21 +688,21 @@ export async function confirmCandidates(candidates: readonly ConfirmCandidate[],
     const key = `${candidate.package}@${candidate.version}__hbc${opts.hbcVersion}`;
     const cachedFailure = failureLog[key];
     if (cachedFailure !== undefined) {
-      results.push({ candidate, ok: false, reason: `previously failed (${cachedFailure.at}): ${cachedFailure.reason}`, ...(usedPrereleaseVersion ? { usedPrereleaseVersion } : {}) });
-      continue;
+      return { candidate, ok: false, reason: `previously failed (${cachedFailure.at}): ${cachedFailure.reason}`, ...(usedPrereleaseVersion ? { usedPrereleaseVersion } : {}) };
     }
 
     if (usedPrereleaseVersion) opts.onProgress?.(`  ! ${candidate.package} has no stable release near the reference date — resolved to prerelease/nightly ${candidate.version}`);
     opts.onProgress?.(`confirming ${candidate.package}@${candidate.version} (hbc${opts.hbcVersion})...`);
     let workDir: string | null = null;
+    let out: ConfirmResult;
     try {
       const fpPath = fpCachePath(opts, candidate);
       const cached = readFpCache(fpPath);
       let fp: CachedFingerprint;
       if (cached === null) {
-        installCandidate(candidate, opts.scratchProjectDir);
+        await installCandidate(candidate, scratchDir, env);
         workDir = mkdtempSync(join(tmpdir(), "hbc2js-confirm-"));
-        const { hbcPath, bundlePath, mapPath } = bundleAndCompile(candidate.package, opts.scratchProjectDir, opts.hermescPath, workDir);
+        const { hbcPath, bundlePath, mapPath } = await bundleAndCompile(candidate.package, scratchDir, opts.hermescPath, workDir, env);
         const mod = parseHbc(new Uint8Array(readFileSync(hbcPath)));
         const built = fingerprintWithPaths(mod, bundlePath, mapPath);
         fp = { hbcVersion: mod.header.version, functions: built.functions, modules: built.modules, legacyExactHashes: built.legacyExactHashes, ...(built.modulePaths !== undefined ? { modulePaths: built.modulePaths } : {}) };
@@ -706,29 +745,45 @@ export async function confirmCandidates(candidates: readonly ConfirmCandidate[],
       if (score !== undefined && verdict !== null && !verdict.ok && (score.tier === "high" || score.tier === "medium")) {
         // Demoted, not a build failure: target-specific, so never written to
         // the (target-independent) failure log.
-        results.push({ candidate, ok: false, reason: verdict.reason ?? "minimum evidence", score, ...(usedPrereleaseVersion ? { usedPrereleaseVersion } : {}) });
+        out = ({ candidate, ok: false, reason: verdict.reason ?? "minimum evidence", score, ...(usedPrereleaseVersion ? { usedPrereleaseVersion } : {}) });
         opts.onProgress?.(`  -> not confirmed: ${verdict.reason ?? "minimum evidence"} (${elapsed()})`);
       } else if (score !== undefined && verdict !== null && verdict.ok) {
         const written = [writeSignature(opts.projectDbDir, db), ...(opts.userCacheDbDir !== undefined ? [writeSignature(opts.userCacheDbDir, db)] : [])];
-        results.push({ candidate, ok: true, score, writtenTo: written, ...(usedPrereleaseVersion ? { usedPrereleaseVersion } : {}) });
+        out = ({ candidate, ok: true, score, writtenTo: written, ...(usedPrereleaseVersion ? { usedPrereleaseVersion } : {}) });
         opts.onProgress?.(`  -> confirmed ${candidate.package}@${candidate.version} at ${score.tier} (${elapsed()})`);
       } else {
         const reason = score === undefined ? "no eligible functions after fingerprinting" : `confidence tier ${score.tier} too low (exact ${(score.exactCoverage * 100).toFixed(1)}%)`;
         failureLog[key] = { reason, at: new Date().toISOString() };
-        results.push({ candidate, ok: false, reason, ...(score !== undefined ? { score } : {}), ...(usedPrereleaseVersion ? { usedPrereleaseVersion } : {}) });
+        out = ({ candidate, ok: false, reason, ...(score !== undefined ? { score } : {}), ...(usedPrereleaseVersion ? { usedPrereleaseVersion } : {}) });
         opts.onProgress?.(`  -> not confirmed: ${reason} (${elapsed()})`);
       }
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
       failureLog[key] = { reason, at: new Date().toISOString() };
-      results.push({ candidate, ok: false, reason, ...(usedPrereleaseVersion ? { usedPrereleaseVersion } : {}) });
+      out = ({ candidate, ok: false, reason, ...(usedPrereleaseVersion ? { usedPrereleaseVersion } : {}) });
       opts.onProgress?.(`  -> failed: ${reason.split("\n")[0]} (${elapsed()})`);
     } finally {
       if (workDir !== null) rmSync(workDir, { recursive: true, force: true });
     }
+    return out;
+  };
 
-    if (opts.rateLimitMs !== undefined && opts.rateLimitMs > 0) await sleep(opts.rateLimitMs);
-  }
+  let cursor = 0;
+  const worker = async (w: number): Promise<void> => {
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    if (jobs > 1) {
+      // Own Metro temp/cache dir per worker (Metro keys its cache off os.tmpdir()).
+      const tmp = join(scratchDirs[w]!, ".hbc2js-tmp");
+      mkdirSync(tmp, { recursive: true });
+      env.TMPDIR = tmp; env.TEMP = tmp; env.TMP = tmp;
+    }
+    for (;;) {
+      const idx = cursor++;
+      if (idx >= deduped.length) return;
+      results[idx] = await processOne(deduped[idx]!, scratchDirs[w]!, env);
+    }
+  };
+  await Promise.all(scratchDirs.map((_, w) => worker(w)));
 
   saveFailureLog(opts.failureLogPath, failureLog);
   return results;
