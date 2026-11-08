@@ -26,6 +26,15 @@ export interface PackageScore {
   readonly moduleExactHits: number;
   readonly moduleTotal: number;
   readonly tier: ConfidenceTier;
+  /** Set when a precision rule (corpus-precision-forks, docs/DEPS.md
+   *  "Forks, embedded copies and repeated hashes") lowered a would-be
+   *  "high" score to "medium": `few-distinct` (the hits are fewer than
+   *  MIN_DISTINCT_EVIDENCE_HASHES distinct hashes), `container` (the hits
+   *  sit inside target modules far larger than the whole package),
+   *  `embedded` (the hits are a subset of another confirmed, path-bearing
+   *  package's own files), `twin` (the same hits as another confirmed
+   *  package, which was kept). `by` names the other package. */
+  readonly demotion?: { readonly rule: "few-distinct" | "container" | "embedded" | "twin"; readonly by?: string };
 }
 
 export interface ModuleAttribution {
@@ -191,6 +200,23 @@ const MIN_TINY_PACKAGE_EXACT_FUNCTION_INSTR = 150;
 // silently blending it in.
 const MIN_FUZZY_ONLY_FACTORY_INSTR = 24;
 
+// corpus-precision-forks (docs/DEPS.md "Forks, embedded copies and
+// repeated hashes"). A "high" score must rest on at least this many
+// DISTINCT exact hashes: a package that repeats one boilerplate factory
+// dozens of times (core-js, deferred, dfa, asynckit, openai) otherwise
+// collects as many module hits from a single shape the app also has.
+export const MIN_DISTINCT_EVIDENCE_HASHES = 3;
+// A target module holding more than this many times the package's whole
+// function count is a container (another package's pre-built dist file):
+// hits inside it are not the package's own module.
+export const CONTAINER_SIZE_RATIO = 4;
+// Share of a package's evidence that must be explained (by a container,
+// by another confirmed package's own files, or by a twin) to demote it.
+export const EXPLAINED_EVIDENCE_SHARE = 0.9;
+// `embedded`: the explaining package must have at least this many times
+// as many distinct hit hashes (it is the larger file the copy sits in).
+const EMBEDDED_HOST_SIZE_RATIO = 2;
+
 function tierRank(t: ConfidenceTier): number {
   return { high: 3, medium: 2, low: 1, none: 0 }[t];
 }
@@ -207,7 +233,7 @@ function buildIndex<K extends "exactHash" | "fuzzyHash" | "stringSetHash">(funct
   return s;
 }
 
-function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Set<string>, targetFuzzy: Set<string>, targetStringHash: Set<string>, minInstr: number, hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetCopies: ReadonlyMap<string, number>): PackageScore | null {
+function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Set<string>, targetFuzzy: Set<string>, targetStringHash: Set<string>, minInstr: number, hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetCopies: ReadonlyMap<string, number>): { readonly score: PackageScore; readonly hitKeys: ReadonlySet<string> } | null {
   const pkg: SigDbFile = entry.file;
   if (pkg.hbcVersion !== target.hbcVersion) return null;
   // corpus-embedded-copy (module paths v1, docs/PACKAGE-SIGNATURES.md §7):
@@ -259,10 +285,12 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
   let exactHitInstrSum = 0;
   let fuzzyOnlyHits = 0;
   let stringCorroborated = 0;
+  const hitKeys = new Set<string>();
   for (const fn of eligible) {
     const exactKey = schemeKey(pkg, fn.exactHash);
     if (targetExact.has(exactKey)) {
       if (!isUnambiguous(exactKey)) continue; // shared with >=1 other distinct package — not this package's own evidence
+      hitKeys.add(exactKey);
       exactHits++;
       exactHitInstrSum += fn.instrCount;
       continue;
@@ -282,7 +310,10 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
     // into "tiny" ones and unlock the tiny-package path (measured: adds
     // react-shallow-renderer as a false positive on react-navigation-example).
     if (m.factoryIsBaseline || m.factoryIsDependency === true || foreign.factories.has(m.factoryFunctionIndex)) continue;
-    if (m.factoryExactHash !== null && targetExact.has(schemeKey(pkg, m.factoryExactHash)) && isUnambiguous(schemeKey(pkg, m.factoryExactHash))) moduleExactHits++;
+    if (m.factoryExactHash !== null && targetExact.has(schemeKey(pkg, m.factoryExactHash)) && isUnambiguous(schemeKey(pkg, m.factoryExactHash))) {
+      moduleExactHits++;
+      hitKeys.add(schemeKey(pkg, m.factoryExactHash));
+    }
   }
   const moduleTotal = pkg.slim !== undefined ? pkg.slim.moduleTotal : pkg.modules.filter((m) => !m.factoryIsBaseline && m.factoryExactHash !== null && !foreign.factories.has(m.factoryFunctionIndex)).length;
 
@@ -313,8 +344,16 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
   else if (fuzzyCoverage >= 0.5 || moduleExactHits >= 1) tier = "medium";
   else if (exactHits + fuzzyOnlyHits > 0) tier = "low";
   else tier = "none";
+  let demotion: PackageScore["demotion"];
+  // A package whose whole eligible code has fewer distinct hashes needs
+  // them all (a one-function package fully matched stays high).
+  const distinctEligible = pkg.slim?.distinctEligible ?? new Set(eligible.map((f) => f.exactHash)).size;
+  if (tier === "high" && !pkg.toolchainBaseline && hitKeys.size < Math.min(MIN_DISTINCT_EVIDENCE_HASHES, distinctEligible)) {
+    tier = "medium";
+    demotion = { rule: "few-distinct" };
+  }
 
-  return {
+  const score: PackageScore = {
     package: pkg.package,
     version: pkg.version,
     hbcVersion: pkg.hbcVersion,
@@ -329,7 +368,99 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
     moduleExactHits,
     moduleTotal,
     tier,
+    ...(demotion === undefined ? {} : { demotion }),
   };
+  return { score, hitKeys };
+}
+
+interface ScoredEntry {
+  readonly entry: LoadedSig;
+  score: PackageScore;
+  readonly hitKeys: ReadonlySet<string>;
+}
+
+// corpus-precision-forks: demote a "high" package whose evidence another
+// explanation covers (docs/DEPS.md "Forks, embedded copies and repeated
+// hashes"). Rules, in order, each over the packages still "high":
+//  - container: EXPLAINED_EVIDENCE_SHARE of the target functions carrying
+//    its hit hashes sit in target modules with more than
+//    CONTAINER_SIZE_RATIO x the package's whole function count — a copy
+//    inlined in another package's pre-built dist file (process and
+//    stackframe in react-devtools-core's backend.js);
+//  - embedded: that share of its distinct hit hashes are also hits of
+//    another high package's OWN files (path-bearing signature, so those
+//    files really are that package's), which has EMBEDDED_HOST_SIZE_RATIO
+//    x more — oboe in react-native-blob-util, jszip in localforage. A
+//    pathless host is not trusted: its signature may still hold its
+//    dependencies' code (d3-zoom holds d3-ease);
+//  - twin: two packages whose hit sets each cover that share of the
+//    other's (punycode / punycode.js: one source, two names). One is
+//    kept: a declared dependency of another high package, else the
+//    path-bearing one, else the one with more distinct hits, else the
+//    first by name.
+function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInventory, legacyExact: readonly string[]): readonly ScoredEntry[] {
+  const high = (): ScoredEntry[] => scored.filter((s) => s.score.tier === "high" && !s.score.isBaseline && s.hitKeys.size > 0);
+  const demote = (s: ScoredEntry, rule: NonNullable<PackageScore["demotion"]>["rule"], by?: string): void => {
+    s.score = { ...s.score, tier: "medium", demotion: by === undefined ? { rule } : { rule, by } };
+  };
+  if (high().length === 0) return scored;
+  const moduleSize = new Map<number, number>();
+  for (const m of inventory.modules) for (const i of m.functionIndices ?? []) moduleSize.set(i, m.functionIndices.length); // hand-built inventories may omit it
+  const occurrences = new Map<string, number[]>();
+  const addOcc = (k: string, i: number): void => {
+    const a = occurrences.get(k);
+    if (a === undefined) occurrences.set(k, [i]);
+    else a.push(i);
+  };
+  inventory.functions.forEach((f, i) => addOcc(f.exactHash, i));
+  legacyExact.forEach((h, i) => addOcc(LEGACY_PREFIX + h, i));
+
+  for (const s of high()) {
+    const whole = Math.max(s.entry.file.totalFunctions ?? 0, s.entry.file.rawFunctionCount ?? 0, s.score.eligibleFunctions);
+    let all = 0;
+    let inside = 0;
+    for (const k of s.hitKeys) {
+      for (const i of occurrences.get(k) ?? []) {
+        all++;
+        if ((moduleSize.get(i) ?? 0) > CONTAINER_SIZE_RATIO * whole) inside++;
+      }
+    }
+    if (all > 0 && inside >= EXPLAINED_EVIDENCE_SHARE * all) demote(s, "container");
+  }
+  const shared = (a: ReadonlySet<string>, b: ReadonlySet<string>): number => {
+    let n = 0;
+    for (const k of a) if (b.has(k)) n++;
+    return n;
+  };
+  const hosts = high();
+  for (const s of hosts) {
+    const host = hosts.find((q) => q !== s && q.score.tier === "high" && q.score.package !== s.score.package && (q.entry.file.modulePaths ?? 0) >= 1 && q.hitKeys.size >= EMBEDDED_HOST_SIZE_RATIO * s.hitKeys.size && shared(s.hitKeys, q.hitKeys) >= EXPLAINED_EVIDENCE_SHARE * s.hitKeys.size);
+    if (host !== undefined) demote(s, "embedded", host.score.package);
+  }
+  const twins = high();
+  const dependedOn = new Set<string>();
+  for (const s of twins) for (const d of s.entry.file.subtractedDependencies ?? []) dependedOn.add(d.slice(0, d.lastIndexOf("@") > 0 ? d.lastIndexOf("@") : d.length));
+  const rank = (s: ScoredEntry): readonly number[] => [dependedOn.has(s.score.package) ? 1 : 0, (s.entry.file.modulePaths ?? 0) >= 1 ? 1 : 0, s.hitKeys.size];
+  const better = (a: ScoredEntry, b: ScoredEntry): boolean => {
+    const ra = rank(a);
+    const rb = rank(b);
+    for (let i = 0; i < ra.length; i++) if (ra[i] !== rb[i]) return ra[i]! > rb[i]!;
+    return a.score.package < b.score.package;
+  };
+  for (const s of twins) {
+    if (s.score.tier !== "high") continue;
+    for (const q of twins) {
+      if (q === s || q.score.tier !== "high" || q.score.package === s.score.package) continue;
+      const n = shared(s.hitKeys, q.hitKeys);
+      if (n < EXPLAINED_EVIDENCE_SHARE * s.hitKeys.size || n < EXPLAINED_EVIDENCE_SHARE * q.hitKeys.size) continue;
+      if (better(s, q)) demote(q, "twin", s.score.package);
+      else {
+        demote(s, "twin", q.score.package);
+        break;
+      }
+    }
+  }
+  return scored;
 }
 
 export interface MatchOptions {
@@ -432,11 +563,15 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
   // distinct package equally claims (§6.7 above).
   const packages: PackageScore[] = [];
   const scoreByOwner = new Map<string, PackageScore>();
+  const scoredEntries: ScoredEntry[] = [];
   for (const entry of eligibleDbs) {
-    const score = scorePackage(entry, inventory, targetExact, targetFuzzy, targetStringHash, minInstr, hashOwnerNames, targetCopies);
-    if (score === null) continue;
-    packages.push(score);
-    scoreByOwner.set(`${entry.file.package}@${entry.file.version}`, score);
+    const scored = scorePackage(entry, inventory, targetExact, targetFuzzy, targetStringHash, minInstr, hashOwnerNames, targetCopies);
+    if (scored === null) continue;
+    scoredEntries.push({ entry, ...scored });
+  }
+  for (const s of demoteExplained(scoredEntries, inventory, legacyExact)) {
+    packages.push(s.score);
+    scoreByOwner.set(`${s.entry.file.package}@${s.entry.file.version}`, s.score);
   }
   packages.sort((a, b) => tierRank(b.tier) - tierRank(a.tier) || b.exactCoverage - a.exactCoverage);
 
