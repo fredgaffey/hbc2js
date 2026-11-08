@@ -14,6 +14,7 @@ import {
   highConfidenceAccuracy,
   normaliseName,
 } from "../../../src/readability/types.ts";
+import { rateHighConfidence } from "../../../src/readability/rater.ts";
 import { proposalsForLabels, recordedNames, recordingStats } from "../../../src/readability/measure.ts";
 import type { NameableMap } from "../../../src/readability/measure.ts";
 import type { Recording } from "../../../src/workers/backends/replay.ts";
@@ -166,6 +167,10 @@ test("spec 28 section 7 (quality): >= 80% of high-confidence names on the labell
   // The spec bar is reported, not hidden; the floor keeps the join and the
   // recording honest and rises when the recorder improves.
   t.diagnostic(`high-confidence accuracy ${got.rate.toFixed(3)} over ${String(got.n)} names vs spec target ${String(HIGH_CONFIDENCE_ACCURACY_TARGET)}`);
+  const both = rateHighConfidence(s, proposals);
+  t.diagnostic(`lenient rater: high ${String(both.high.lenient)}/${String(both.high.n)} (exact ${String(both.high.exact)}), all ${String(both.all.lenient)}/${String(both.all.n)} (exact ${String(both.all.exact)}); ${String(both.all.excludedSingleLetter)} single-letter labels unrated`);
+  assert.ok(both.high.lenient >= both.high.exact && both.all.lenient >= both.all.exact, "the lenient rater only ever adds accepted names");
+  assert.ok(both.all.n >= 25 && both.all.lenient / both.all.n >= 0.4, `lenient all-confidence accuracy ${String(both.all.lenient)}/${String(both.all.n)} fell below the 0.4 floor (measured 17/33)`);
   assert.ok(got.n >= 5, `only ${String(got.n)} high-confidence names overlap register labels; the measurement needs >= 5`);
   assert.ok(got.rate >= HIGH_CONFIDENCE_ACCURACY_FLOOR, `high-confidence accuracy ${got.rate} over ${got.n} names is below the recorded floor ${HIGH_CONFIDENCE_ACCURACY_FLOOR} (spec target ${HIGH_CONFIDENCE_ACCURACY_TARGET})`);
   assert.equal(got.misleading, 0, "no security-relevant register label is misrepresented");
