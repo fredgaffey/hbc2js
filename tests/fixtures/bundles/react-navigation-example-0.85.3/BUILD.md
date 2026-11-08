@@ -16,9 +16,9 @@ the regenerated artifacts match what this report was written against.
 ## Reproducing
 
 ```sh
-git clone --depth 1 https://github.com/react-navigation/react-navigation.git rn-nav
-cd rn-nav
-git rev-parse HEAD   # expect ab1319d6bbf05eae8dc25e33cbf4dc56494e0f0c (or later — repo moves; pin with a real clone+checkout if exact match matters)
+git init -q rn-nav && cd rn-nav && git remote add origin https://github.com/react-navigation/react-navigation.git
+git fetch -q --depth 1 origin ab1319d6bbf05eae8dc25e33cbf4dc56494e0f0c && git checkout -q FETCH_HEAD
+git rev-parse HEAD   # must be ab1319d6bbf05eae8dc25e33cbf4dc56494e0f0c — fetch.sh enforces the pin
 
 # workspace install (pnpm, monorepo root) — took ~18s, no native build, no secrets
 pnpm install --frozen-lockfile
@@ -90,11 +90,22 @@ generation time); scoring a committed `truth.json` never needs it.
 
 ## Sizes, timing, hashes
 
+Reproduction notes (2026-11-09 repro): fetch.sh used to clone upstream HEAD
+(unpinned) and keep the `//# sourceMappingURL` + random `//# debugId` trailer
+that `--source-maps` appends (+160 bytes). Pinned to the commit above, with
+pnpm 11.13.1 (the repo's `packageManager`), node 25.9, and the trailer stripped,
+the bundle is byte-identical to the hash below. The `.hbc` hashes changed from the
+original report (a8a42a70.../145ae44c..., 4,517,682/5,429,268 bytes): hermesc embeds the
+input *path* it is given, the original path was an unrecorded 27-char one, so
+that exact file is unrecoverable. fetch.sh now compiles with the bare relative
+name `index.android.bundle` from the fixture dir (path-independent, deterministic);
+the hashes below are of that. Only the embedded path string differs.
+
 | Artifact | Size | sha256 |
 |---|---|---|
 | `index.android.bundle` (JS, minified, `--no-bytecode` export) | 3,525,764 bytes (3.36 MB) | `07b00f6da27e57ba54a7d53263036504fbd8c26566b04bd43a9072712f407a21` |
-| `react-navigation-example.hbc` (`-O`, our hermesc v98) | 4,517,682 bytes (4.31 MB) | `a8a42a7037645ee963178522cda078f0a74617a007550a20314b6b0e87803c09` |
-| `react-navigation-example.debug.hbc` (`-O -g`, our hermesc v98) | 5,429,268 bytes (5.18 MB) | `145ae44ca8105fa3bc59df572f60b4e602afe44fa0cd1b5686640d72b6d216fb` |
+| `react-navigation-example.hbc` (`-O`, our hermesc v98) | 4,517,675 bytes (4.31 MB) | `38fdce65fef215eb48e297c0de24ed9dc2422c9e0646ae1f501027a7edc8b009` |
+| `react-navigation-example.debug.hbc` (`-O -g`, our hermesc v98) | 5,429,261 bytes (5.18 MB) | `255c46d86133ce58617873a7dc0158e4c1519df69a870d8fe9e9dc2f615b456a` |
 | Expo's own `.hbc` (`expo export` default, no `--no-bytecode`) | 4,546,018 bytes (4.34 MB) | not recorded — used only as a sanity cross-check that our standalone `hermesc -O` invocation (4,517,682 bytes) is in the same ballpark as Expo's internal one (4,546,018 bytes); the small delta is expected (Expo's Metro/hermesc integration may pass slightly different flags than a bare CLI `-O -emit-binary` call) |
 
 Compile time (Apple Silicon, `tools/hermesc/v98/hermesc`, single run, `time`):
