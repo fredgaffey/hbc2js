@@ -30,6 +30,12 @@ export interface ModuleRegistration {
 const LOAD_CONST_NUMERIC = new Set(["LoadConstZero", "LoadConstUInt8", "LoadConstInt", "LoadConstDouble"]);
 const GET_BY_ID_LIKE = new Set(["TryGetById", "TryGetByIdLong", "GetById", "GetByIdLong", "GetByIdShort"]);
 
+/** `__d`, or Metro's `__METRO_GLOBAL_PREFIX__` form `<prefix>__d`
+ *  (corpus-B4: `__acme_app__d`). */
+export function isDefineGlobalName(name: string | undefined): boolean {
+  return name === "__d" || (name !== undefined && /^[A-Za-z0-9_$]+__d$/.test(name));
+}
+
 type RegState = { readonly kind: "__d" } | { readonly kind: "factory"; readonly index: number } | { readonly kind: "id"; readonly value: number | null } | { readonly kind: "deps"; readonly ids: readonly number[] | null } | undefined;
 
 /**
@@ -46,7 +52,7 @@ export function scanModuleRegistrations(mod: HbcModule, globalFn: DecodedFunctio
     if (GET_BY_ID_LIKE.has(insn.name)) {
       const strOp = ops.find((o) => o.role === "string");
       if (ops[0]?.role === "reg") {
-        const isD = strOp !== undefined && mod.strings.get(strOp.value) === "__d";
+        const isD = strOp !== undefined && isDefineGlobalName(mod.strings.get(strOp.value));
         regState.set(ops[0].value, isD ? { kind: "__d" } : undefined);
       }
       continue;
@@ -86,12 +92,13 @@ export function scanModuleRegistrations(mod: HbcModule, globalFn: DecodedFunctio
       continue;
     }
 
-    if ((insn.name === "Call4" || insn.name === "Call5") && ops.length >= 6) {
+    if (((insn.name === "Call4" || insn.name === "Call5") && ops.length >= 6) || (insn.name === "Call3" && ops.length >= 5)) {
       const callee = regState.get(ops[1]!.value);
       if (callee?.kind === "__d") {
         const factory = regState.get(ops[3]!.value);
         const id = regState.get(ops[4]!.value);
-        const deps = regState.get(ops[5]!.value);
+        // Call3 is the two-argument `__d(factory, id)` form (corpus-B4): no deps array.
+        const deps = insn.name === "Call3" ? undefined : regState.get(ops[5]!.value);
         if (factory?.kind === "factory") {
           modules.push({
             factoryFunctionIndex: factory.index,
@@ -111,4 +118,33 @@ export function scanModuleRegistrations(mod: HbcModule, globalFn: DecodedFunctio
   }
 
   return modules;
+}
+
+/**
+ * Every module registration in the bundle. The global function (index 0) is
+ * scanned first; only when it registers nothing are the functions it creates
+ * directly (one level) scanned too. That covers the two corpus-B4 shapes: a
+ * bundle body wrapped in an IIFE (registrations in function 1) and a lazy
+ * definer `(id) => { switch (id) { case N: __d(factory, N); return; } }`
+ * created by the global function. A normal bundle's children are its module
+ * factories, which are never scanned, so its inventory is unchanged.
+ */
+export function scanBundleRegistrations(mod: HbcModule, decode: (mod: HbcModule, index: number) => DecodedFunction): ModuleRegistration[] {
+  if (mod.functions.length === 0) return [];
+  const globalFn = decode(mod, 0);
+  const top = scanModuleRegistrations(mod, globalFn);
+  if (top.length > 0) return top;
+  const children: number[] = [];
+  const seen = new Set<number>([0]);
+  for (const insn of globalFn.instructions) {
+    for (const op of insn.operands) {
+      if (op.role === "function" && !seen.has(op.value) && op.value < mod.functions.length) {
+        seen.add(op.value);
+        children.push(op.value);
+      }
+    }
+  }
+  const out: ModuleRegistration[] = [];
+  for (const idx of children) out.push(...scanModuleRegistrations(mod, decode(mod, idx)));
+  return out;
 }

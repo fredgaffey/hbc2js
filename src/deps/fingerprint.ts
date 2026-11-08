@@ -10,7 +10,7 @@
 
 import { createHash } from "node:crypto";
 import { foldOperandWidth, hasWidthVariant, normaliseFunctionForSignature, signatureInstructions } from "./sig-normalise.ts";
-import { scanModuleRegistrations } from "./dscan.ts";
+import { scanBundleRegistrations } from "./dscan.ts";
 import type { HbcModule } from "../parse/types.ts";
 import type { DecodedFunction, Instruction } from "../disasm/decode.ts";
 import type { SigFunction, SigModule } from "./sigdb-types.ts";
@@ -99,7 +99,6 @@ export function fingerprintModule(mod: HbcModule, decodeFunction: (mod: HbcModul
 
   let modules: SigModule[] = [];
   if (mod.functions.length > 0) {
-    const globalFn = decodeFunction(mod, 0);
     const byIndex = new Map(functions.map((f) => [f.index, f]));
     const collectNested = (factoryIdx: number, seen: Set<number>): number[] => {
       // Nested closures: any function whose CreateClosure appears lexically
@@ -118,7 +117,7 @@ export function fingerprintModule(mod: HbcModule, decodeFunction: (mod: HbcModul
       return nested;
     };
 
-    modules = scanModuleRegistrations(mod, globalFn).map((reg) => {
+    modules = scanBundleRegistrations(mod, decodeFunction).map((reg) => {
       const seen = new Set([reg.factoryFunctionIndex]);
       const nestedIdx = collectNested(reg.factoryFunctionIndex, seen);
       const factory = byIndex.get(reg.factoryFunctionIndex);
