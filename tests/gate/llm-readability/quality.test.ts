@@ -14,6 +14,7 @@ import {
   highConfidenceAccuracy,
   normaliseName,
 } from "../../../src/readability/types.ts";
+import { rateHighConfidence } from "../../../src/readability/rater.ts";
 import { proposalsForLabels, recordedNames, recordingStats } from "../../../src/readability/measure.ts";
 import type { NameableMap } from "../../../src/readability/measure.ts";
 import type { Recording } from "../../../src/workers/backends/replay.ts";
@@ -166,6 +167,10 @@ test("spec 28 section 7 (quality): >= 80% of high-confidence names on the labell
   // The spec bar is reported, not hidden; the floor keeps the join and the
   // recording honest and rises when the recorder improves.
   t.diagnostic(`high-confidence accuracy ${got.rate.toFixed(3)} over ${String(got.n)} names vs spec target ${String(HIGH_CONFIDENCE_ACCURACY_TARGET)}`);
+  const both = rateHighConfidence(s, proposals);
+  t.diagnostic(`lenient rater: high ${String(both.high.lenient)}/${String(both.high.n)} (exact ${String(both.high.exact)}), all ${String(both.all.lenient)}/${String(both.all.n)} (exact ${String(both.all.exact)}); ${String(both.all.excludedSingleLetter)} single-letter labels unrated`);
+  assert.ok(both.high.lenient >= both.high.exact && both.all.lenient >= both.all.exact, "the lenient rater only ever adds accepted names");
+  assert.ok(both.all.n >= 25 && both.all.lenient / both.all.n >= 0.4, `lenient all-confidence accuracy ${String(both.all.lenient)}/${String(both.all.n)} fell below the 0.4 floor (measured 17/33)`);
   assert.ok(got.n >= 5, `only ${String(got.n)} high-confidence names overlap register labels; the measurement needs >= 5`);
   assert.ok(got.rate >= HIGH_CONFIDENCE_ACCURACY_FLOOR, `high-confidence accuracy ${got.rate} over ${got.n} names is below the recorded floor ${HIGH_CONFIDENCE_ACCURACY_FLOOR} (spec target ${HIGH_CONFIDENCE_ACCURACY_TARGET})`);
   assert.equal(got.misleading, 0, "no security-relevant register label is misrepresented");
@@ -245,4 +250,20 @@ test("spec 28 section 7 (quality): zero name misrepresenting a security-relevant
   assert.ok(after !== undefined);
   assert.equal(after.misleading, 0, "zero misleading names on security-relevant targets must survive the re-check");
   assert.equal(after.n, 2, "the demoted proposal drops out of the high-confidence set entirely");
+});
+
+test("readability-rater: the sonnet comparison recording is well-formed and graded under both raters", (t) => {
+  const p = join(repoRoot(), "tests", "fixtures", "llm-readability", "react-navigation-example-0.85.3.recording.sonnet.json");
+  if (!existsSync(p)) {
+    t.skip("needs react-navigation-example-0.85.3.recording.sonnet.json (HBC2JS_LLM_MODEL=sonnet tools/readability/record.ts ... --labelled)");
+    return;
+  }
+  const rec = JSON.parse(readFileSync(p, "utf8")) as Recording;
+  const s = sample();
+  const both = rateHighConfidence(s, proposalsForLabels(s, recordedNames(rec)));
+  const stats = recordingStats(rec, JSON.parse(readFileSync(HELD_OUT_NAMEABLE, "utf8")) as NameableMap);
+  t.diagnostic(`sonnet (48 fns): high ${String(both.high.lenient)}/${String(both.high.n)} lenient (${String(both.high.exact)} exact), all ${String(both.all.lenient)}/${String(both.all.n)} (${String(both.all.exact)} exact), coverage ${String(stats.coverage)}`);
+  assert.equal(stats.entries, 48);
+  assert.ok(both.all.n >= 20 && both.all.lenient / both.all.n >= 0.5, "sonnet lenient accuracy floor (measured 21/28)");
+  assert.ok(both.all.lenient >= both.all.exact);
 });
