@@ -129,6 +129,8 @@ node tools/readability/record.ts <held-out.hbc> \
     --backend claude-cli --only src --resume
 ```
 
+**Held-out recording (measured 2026-11-09).** `tests/fixtures/llm-readability/react-navigation-example-0.85.3.recording.json` is committed: 327 entries (a `--sample 50 --seed 1` smoke run, then `--sample 300 --seed 1 --resume`; reservoir samples are not prefix-stable so only 23 targets overlapped), `claude-cli` backend, `haiku`, on the plan. Cost: 327 calls, ~3.16M tokens in / ~240k out, ~2370 s wall (about 7-12 s and ~10k input tokens per single-register call). Result: 325/327 replies parse; 2 are truncated JSON. Of 327 requested registers only 126 (38.5%) were named, 204 replies abstained, so coverage over `src/` registers is ~38% against the >= 70% target (a full `--only src` recording would be 4,655 function calls, roughly 9 h and 45M input tokens at this per-call cost). Confidence mix of the 126 names: 23 high, 100 med, 3 low. The quality leg (>= 80% of high-confidence names accurate) is NOT measurable yet: the labelled sample holds 12 module/function targets, whereas the recording names registers, and `quality.test.ts` section 7 is still a skip stub. Next: register-level labels from the debug bundle plus a test feeding the recording's high-confidence names to `highConfidenceAccuracy`; and why 62% abstain (single-register prompts carry ~8k input tokens of function source for one name).
+
 ## What the oracle actually checks (spec 28 section 9.4, REWRITE row)
 
 Two legs, and the weaker one can only ever lower the verdict.
