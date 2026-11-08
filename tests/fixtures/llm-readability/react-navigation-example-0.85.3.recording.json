@@ -1786,5 +1786,521 @@
       "fn": 15527,
       "requested": 8
     }
+  },
+  "6ee5b40aec77232c827b4a53ae962d21ae409b819e8c86001a2bd8368c437a7d": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 7997, \"reg\": 8 },\n      \"name\": \"drawerProps\",\n      \"confidence\": \"med\",\n      \"evidence\": \"parameter a1 copied into r8, then spread into the prop objects obj and obj2 that are passed to DrawerContentScrollView and DrawerItemList\"\n    },\n    {\n      \"bindingId\": { \"fn\": 7997, \"reg\": 6 },\n      \"name\": \"jsxRuntime\",\n      \"confidence\": \"med\",\n      \"evidence\": \"_e1353_21 is read only for its .jsx and .jsxs members, which are the calls used to build the element tree\"\n    },\n    {\n      \"bindingId\": { \"fn\": 7997, \"reg\": 4 },\n      \"name\": \"drawerComponents\",\n      \"confidence\": \"med\",\n      \"evidence\": \"_e1353_4 is read only for its DrawerContentScrollView and DrawerItemList members, the drawer components rendered here\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8193,
+      "tokensOut": 2486,
+      "usd": 0.0023995600000000002
+    },
+    "meta": {
+      "fn": 7997,
+      "requested": 6
+    }
+  },
+  "316165bcd8e90aae4d3e037c3699edb8ee1a1d7a0a5953fb1d9fafa0092e6917": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8345, \"reg\": 5 },\n      \"name\": \"cache\",\n      \"confidence\": \"med\",\n      \"evidence\": \"used as a memo table: `r5.get(r6)` returns early when hit, and `r5.set(r6, apply)` stores the computed result, both keyed by the argument\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8345, \"reg\": 6 },\n      \"name\": \"configPath\",\n      \"confidence\": \"med\",\n      \"evidence\": \"the argument is passed to `_e1481_4.validatePathConfig` and is the cache key; the callee name is the only anchor, with no string literal in the body\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7899,
+      "tokensOut": 1471,
+      "usd": 0.0018332600000000002
+    },
+    "meta": {
+      "fn": 8345,
+      "requested": 4
+    }
+  },
+  "b3ad932cce020d6487781e313d340f7957b7c5fb23179a4d533f2cba32b8b743": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8347, \"reg\": 4 },\n      \"name\": \"options\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r4 is a copy of the parameter a1; it is read with optional chaining (r4?.initialRouteName) before the guard and with a plain read (r4.initialRouteName) only after the guard, so it is the caller-supplied object carrying initialRouteName\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7874,
+      "tokensOut": 2606,
+      "usd": 0.00239576
+    },
+    "meta": {
+      "fn": 8347,
+      "requested": 3
+    }
+  },
+  "731493d3fec3fbc2e0aabdefcd4d00e97b0e4c63a34bacb884303eace75445e0": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8348, \"reg\": 9 },\n      \"name\": \"options\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r9 = arguments[1], replaced by {} when undefined; it is the for-in source and is passed as the second argument to _e1481_24\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8348, \"reg\": 7 },\n      \"name\": \"options\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r7 = r9 copy, used only as the for-in iteration source over the same object\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8348, \"reg\": 22 },\n      \"name\": \"key\",\n      \"confidence\": \"high\",\n      \"evidence\": \"r22 = r5, a single assignment from the for-in loop variable over options; passed as the first argument to _e1481_24\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8348, \"reg\": 6 },\n      \"name\": \"entries\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r6 = [] passed as the fourth argument to _e1481_24 on each key, then each element gets an .order index and the array is sorted with _fn12233\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8348, \"reg\": 1 },\n      \"name\": \"index\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r1 = r0 at the top of the indexed loop body, then assigned to the element's .order property\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8348, \"reg\": 2 },\n      \"name\": \"step\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r2 = 1 is assigned once and only used as the increment in r0 = r1 + r2\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8273,
+      "tokensOut": 4242,
+      "usd": 0.00329356
+    },
+    "meta": {
+      "fn": 8348,
+      "requested": 15
+    }
+  },
+  "c0ce85530f9ee7a965253b13cdd0c9ad39f7c4d8bffadb26eb7804c50a9492b6": {
+    "text": "ent\" call result (`encodeURIComponent`, or the `%XY` string on the ASCII path), which is the second branch of the emitted `(?:X|Y)` group\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 26377,
+      "tokensOut": 8509,
+      "usd": 0.007326630000000001
+    },
+    "meta": {
+      "fn": 8351,
+      "requested": 30
+    }
+  },
+  "f0a77b7299c11bc2ac77a7e8959b1b1b11b31de52dceb6a6499fbbb6771ef1bd": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8352, \"reg\": 0 },\n      \"name\": \"keyIndex\",\n      \"confidence\": \"med\",\n      \"evidence\": \"passed as the cursor `i` into __hbc_nextPName(arr2, r4, r0) and reassigned from __t[1] on each step\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8352, \"reg\": 2 },\n      \"name\": \"nullValue\",\n      \"confidence\": \"med\",\n      \"evidence\": \"holds the literal null (`r2 = null`) and is compared with loose `==` against list[r9], so it tests for null or undefined values\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8352, \"reg\": 8 },\n      \"name\": \"propValue\",\n      \"confidence\": \"med\",\n      \"evidence\": \"first assigned `list[r9]`, the value under the current key, and then tested with `r2 == r8`; later reused for the discarded arr.push result, so the name covers only the first role\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8352, \"reg\": 9 },\n      \"name\": \"propKey\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from __t[0] (the key returned by __hbc_nextPName), used as the lookup `list[r9]`, and pushed into arr by `arr.push(r9)`\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8372,
+      "tokensOut": 2680,
+      "usd": 0.00253236
+    },
+    "meta": {
+      "fn": 8352,
+      "requested": 9
+    }
+  },
+  "c7b28a9faa60f0141b8e138c6e5974c2a23c9c48dcc75b2c95a4c67c8e8cb32b": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":8355,\"reg\":6},\"name\":\"segment\",\"confidence\":\"med\",\"evidence\":\"r6 = a1 is the only assignment, and it is tested against the literal \\\"*\\\" (wildcard) and by \\\"startsWith(\\\\\\\":\\\\\\\")\\\" (parameter segment), which marks it as a route path segment\"},{\"bindingId\":{\"fn\":8355,\"reg\":2},\"name\":\"isMatch\",\"confidence\":\"med\",\"evidence\":\"r2 is the value returned at function end (r2 = r1 at L1 exit), and r1 is true for the wildcard, parameter, or literal-equal cases, so the return is a segment-match predicate\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8104,
+      "tokensOut": 2571,
+      "usd": 0.00242426
+    },
+    "meta": {
+      "fn": 8355,
+      "requested": 7
+    }
+  },
+  "75d2e7e36c8aa3077d9181899de2108dd3f92c3bd821d469cdd6b4cb70a3f595": {
+    "text": "{\"names\": [], \"abstained\": true, \"reason\": \"The targets {8358,0..3} do not appear in the source, which uses only the parameters a1/a2 and a captured slot, and the request gives no mapping from those registers to a1 or a2, so no bindingId can be matched safely.\"}",
+    "cost": {
+      "tokensIn": 9818,
+      "tokensOut": 1209,
+      "usd": 0.00208606
+    },
+    "meta": {
+      "fn": 8358,
+      "requested": 4
+    }
+  },
+  "dcb77d84d10f73c0b8c622fca3ebd7f109c66d5510282568b429bd5ba19a04ae": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8359, \"reg\": 8 },\n      \"name\": \"screenName\",\n      \"confidence\": \"high\",\n      \"evidence\": \"the only assignment is from a1, used as the key in r3[r8] and in the error literal \\\"Screen '${r8}' doesn't specify a 'path'...\\\"\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8359, \"reg\": 16 },\n      \"name\": \"parentScreens\",\n      \"confidence\": \"high\",\n      \"evidence\": \"from a6, pushed with screenName on entry, and stored as the value of the object-literal key parentScreens (r3.parentScreens = r16)\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8359, \"reg\": 15 },\n      \"name\": \"nestedScreens\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned r9.screens only when \\\"screens\\\" in r9 holds, then iterated with for...in over r11 = r15\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8359, \"reg\": 14 },\n      \"name\": \"pattern\",\n      \"confidence\": \"med\",\n      \"evidence\": \"defaults to r6, then set to combinePatternParts(r6, r7, r9.exact) in the path-string branch\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8359, \"reg\": 9 },\n      \"name\": \"screenConfig\",\n      \"confidence\": \"med\",\n      \"evidence\": \"loaded as r3[r8] from the map a2 keyed by screen name, then tested for string or object type and read for .path, .screens, .alias\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8359, \"reg\": 6 },\n      \"name\": \"parentPattern\",\n      \"confidence\": \"med\",\n      \"evidence\": \"from a5 and passed as the base argument to combinePatternParts (r6 = r5(r6, r3)), so it carries the accumulated parent path\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8359, \"reg\": 4 },\n      \"name\": \"configs\",\n      \"confidence\": \"med\",\n      \"evidence\": \"from a4, and every built route entry is appended with r4.push(...) in both the string and object branches\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8359, \"reg\": 2 },\n      \"name\": \"screenStack\",\n      \"confidence\": \"med\",\n      \"evidence\": \"from a7, pushed with screenName on entry, popped on exit, and spread into the argument array ([...r2]) for nested calls\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 11393,
+      "tokensOut": 5910,
+      "usd": 0.00475156
+    },
+    "meta": {
+      "fn": 8359,
+      "requested": 32
+    }
+  },
+  "9061d97586968d9d13632f46326ca1c8a7825513832ba2f538592d29c0383ea2": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8361, \"reg\": 0 },\n      \"name\": \"bestRoute\",\n      \"confidence\": \"med\",\n      \"evidence\": \"initialised from a1, replaced by the candidate r8 only when its score beats r0.order's tie-break, and returned at the end of the function\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8361, \"reg\": 3 },\n      \"name\": \"candidates\",\n      \"confidence\": \"med\",\n      \"evidence\": \"`let r3 = r1` copies a2 immediately before the for-of loop that reads each item's .shared and .routeNames\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8361, \"reg\": 6 },\n      \"name\": \"candidateInitial\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from the scorer result's .initial and compared against bestScore.initial in the tie-break\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8361, \"reg\": 7 },\n      \"name\": \"candidateFocused\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from the scorer result's .focused and compared against bestScore.focused before any other field\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8361, \"reg\": 8 },\n      \"name\": \"candidateRoute\",\n      \"confidence\": \"med\",\n      \"evidence\": \"loop variable copy of each for-of item; its .routeNames is passed to the scorer and its .order is compared to bestRoute.order\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8361, \"reg\": 9 },\n      \"name\": \"bestScore\",\n      \"confidence\": \"med\",\n      \"evidence\": \"initialised to {focused: -1, initial: -1} and reassigned to the new {focused, initial} object when a candidate wins; read as r9.focused and r9.initial in the comparisons\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9552,
+      "tokensOut": 5699,
+      "usd": 0.00427786
+    },
+    "meta": {
+      "fn": 8361,
+      "requested": 14
+    }
+  },
+  "ecf9a48b56b399fd69c08f482ba22f883e1658da99c6918a5cccc5c22dc0322d": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8362, \"reg\": 1 },\n      \"name\": \"resolvedInitialRouteName\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from the entry's .initialRouteName when the parentScreens match, then returned; starts as null and is also compared with == as a sentinel\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8362, \"reg\": 3 },\n      \"name\": \"candidate\",\n      \"confidence\": \"med\",\n      \"evidence\": \"copy of each for-of element from the list in a3; read via .parentScreens and .initialRouteName\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8362, \"reg\": 5 },\n      \"name\": \"currentInitialRouteName\",\n      \"confidence\": \"med\",\n      \"evidence\": \"copy of a1, compared with === against candidate.initialRouteName to decide whether to return undefined or the candidate's initialRouteName\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8362, \"reg\": 7 },\n      \"name\": \"entries\",\n      \"confidence\": \"med\",\n      \"evidence\": \"copy of parameter a3, which is the for-of iterable whose elements expose .parentScreens and .initialRouteName\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8362, \"reg\": 8 },\n      \"name\": \"parentScreenNames\",\n      \"confidence\": \"med\",\n      \"evidence\": \"copy of parameter a2; its length is compared with candidate.parentScreens.length and its elements are compared element-wise via localeCompare\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8362, \"reg\": 9 },\n      \"name\": \"candidateParentScreen\",\n      \"confidence\": \"med\",\n      \"evidence\": \"candidate.parentScreens[index], compared with the current parent screen name via localeCompare\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8362, \"reg\": 10 },\n      \"name\": \"currentParentScreen\",\n      \"confidence\": \"med\",\n      \"evidence\": \"parentScreenNames[index], paired with candidateParentScreen in the same localeCompare comparison\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8362, \"reg\": 11 },\n      \"name\": \"index\",\n      \"confidence\": \"med\",\n      \"evidence\": \"inner-loop counter, incremented each pass and bounded by parentScreenNames.length\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8362, \"reg\": 12 },\n      \"name\": \"parentPathMatches\",\n      \"confidence\": \"med\",\n      \"evidence\": \"boolean set to true before the inner loop and to false on the first mismatch; read to decide whether to take the initialRouteName branch\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8937,
+      "tokensOut": 4287,
+      "usd": 0.00344886
+    },
+    "meta": {
+      "fn": 8362,
+      "requested": 15
+    }
+  },
+  "035995306c6fd185d257db1bed57810f7057eb8196e436ed3b91eb6faeed5f7a": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8364, \"reg\": 15 },\n      \"name\": \"navState\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r15 only ever holds a navigation state object: it is set to the built state r8 at loop entry, read from route.state (`r15 = r14.state`), and read for `.routes` and `.index`. The error text \\\"Couldn't find nested state for route\\\" confirms the nested-state role.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 11328,
+      "tokensOut": 7105,
+      "usd": 0.00533606
+    },
+    "meta": {
+      "fn": 8364,
+      "requested": 23
+    }
+  },
+  "7d09cc76ab9d70305bf40ffd3041ce714f3ea8415af2e77d34ce51da02665c13": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8365, \"reg\": 0 },\n      \"name\": \"queryParams\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r0 is `{}` when no query string, else `_e1481_0[\\\"default\\\"].parse(r7)`, where r7 is the text after `\\\"?\\\"` in a1 (indexOf/slice); r0 is returned as `params` at the end\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8365, \"reg\": 9 },\n      \"name\": \"keyCursor\",\n      \"confidence\": \"med\",\n      \"evidence\": \"initialised to 0, passed as the index `i` to __hbc_nextPName(arr, list2, r9), and updated from __t[1] on each iteration\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8365, \"reg\": 13 },\n      \"name\": \"excludedKeys\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r13 = arguments[2], defaulting to `new Set()` when undefined; later checked with `r13.has(r15)` to skip keys\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8365, \"reg\": 15 },\n      \"name\": \"paramName\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r15 is each key from __hbc_pnames(a2) and is used as `list[r15]`, `r0[r15]` and `r13.has(r15)`, so it is a schema key used as a query parameter name\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10358,
+      "tokensOut": 5456,
+      "usd": 0.00431756
+    },
+    "meta": {
+      "fn": 8365,
+      "requested": 19
+    }
+  },
+  "048aa1e51aa9fc6db98c222eb727dacae235da1beb408089094bf6ea74436e3c": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8438, \"reg\": 10 },\n      \"name\": \"globalObj\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned from the literal `globalThis`; every later `WeakMap` and `Reflect` lookup reads from this register\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8438, \"reg\": 9 },\n      \"name\": \"inputIsArray\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned from `Array.isArray(r0)`; the predicate gates the `r0.keys()` path and the `__hbc_b_arraySpread` call\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8438, \"reg\": 1 },\n      \"name\": \"cachedCopy\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from `arguments[2].get(r0)` and returned early when truthy, which reads as a memoized result lookup\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8438, \"reg\": 14 },\n      \"name\": \"key\",\n      \"confidence\": \"med\",\n      \"evidence\": \"loop variable of `for (let r17 of r7)`; the same value is passed to `Reflect.get(r0, key)` and `Reflect.set(clone, key, ...)`\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8438, \"reg\": 13 },\n      \"name\": \"originalValue\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from `Reflect.get(r0, key)` and compared against the value returned by the `Reflect.apply` call\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8438, \"reg\": 21 },\n      \"name\": \"clone\",\n      \"confidence\": \"med\",\n      \"evidence\": \"stored as the WeakMap value for `r0` via `.set(r0, clone)` and used as the receiver in `Reflect.set(clone, key, ...)`\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8438, \"reg\": 24 },\n      \"name\": \"copyTarget\",\n      \"confidence\": \"med\",\n      \"evidence\": \"fresh `{}` passed as the first argument to `__hbc_b_copyDataProperties(r24, r0)`\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8438, \"reg\": 2 },\n      \"name\": \"result\",\n      \"confidence\": \"low\",\n      \"evidence\": \"returned as `r2 ?? r0` at the end; holds the clone or the fallback input\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8438, \"reg\": 0 },\n      \"name\": \"input\",\n      \"confidence\": \"low\",\n      \"evidence\": \"copied from the sole parameter `a1`; it is the value that is typeof-checked, keys-enumerated, and cloned\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10283,
+      "tokensOut": 4900,
+      "usd": 0.00402456
+    },
+    "meta": {
+      "fn": 8438,
+      "requested": 23
+    }
+  },
+  "1263b9a4c19990fcfecd90571a5ca86dc746d366aeec9bdb84939533237ce1e2": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8490, \"reg\": 3 },\n      \"name\": \"lightness\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from a3 / 100 at entry and used in chroma = (1 - |2*lightness - 1|) * saturation; reused later as the offset lightness - chroma/2 added to each channel\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8490, \"reg\": 5 },\n      \"name\": \"degreesPerTurn\",\n      \"confidence\": \"med\",\n      \"evidence\": \"constant 360 used only as the modulus in ((a1 % r5) + r5) % r5 to normalise the hue, and as the divisor base for the 60-degree sectors\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8490, \"reg\": 6 },\n      \"name\": \"hueSector\",\n      \"confidence\": \"med\",\n      \"evidence\": \"normalised hue divided by 60, then compared against 1, 2, 3, 4 and 5 to select which (chroma, x, 0) channel permutation is returned, the standard HSL sector table\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8490, \"reg\": 7 },\n      \"name\": \"isDone\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r7 = (r10 === undefined) after __hbc_iterNext, then carried through the later destructuring steps as the exhausted flag that gates each further __hbc_iterNext and the final __hbc_iterClose\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9895,
+      "tokensOut": 4546,
+      "usd": 0.00376996
+    },
+    "meta": {
+      "fn": 8490,
+      "requested": 16
+    }
+  },
+  "d82e70d446b3bfc14ad5a5ce5820ac08d957be01a996bdcd061ead80442a1136": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8497, \"reg\": 1 },\n      \"name\": \"element\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r1 is the return value on both paths: it is assigned the result of Reflect.apply(_e1595_7.jsx, undefined, [...]) and then returned. It is also reused earlier as the props {} object in the first branch, so the name applies to the final value.\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8497, \"reg\": 2 },\n      \"name\": \"componentProps\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r2 is set to {} in the second branch, filled by __hbc_b_copyDataProperties(r2, r5), and passed as the props argument of the jsx call with component _e1595_9.\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8497, \"reg\": 3 },\n      \"name\": \"component\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r3 is the first argument to the jsx call: _e1595_10 on the 'screen'/'action' branch and _e1595_9 on the fallback branch. It is a rendered component reference.\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8497, \"reg\": 4 },\n      \"name\": \"jsx\",\n      \"confidence\": \"high\",\n      \"evidence\": \"r4 is loaded from the property literal \\\"jsx\\\" on _e1595_7 and is the callee of every Reflect.apply in the body, matching the JSX runtime call shape.\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8497, \"reg\": 5 },\n      \"name\": \"inputProps\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r5 is initialised from the parameter a1, tested with 'in' for \\\"screen\\\" and \\\"action\\\", and copied from as the source props. On the fallback path it is reassigned to the copy result, which is the same object as r2.\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8497, \"reg\": 7 },\n      \"name\": \"copySource\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r7 is assigned r5 immediately before each __hbc_b_copyDataProperties call and passed as its second argument, the source parameter of the declared helper.\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8497, \"reg\": 8 },\n      \"name\": \"copyTarget\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r8 is assigned r1 or r2 (a fresh {} object) immediately before each __hbc_b_copyDataProperties call and passed as its first argument, the target parameter of the declared helper.\"\n    }\n  ],\n  \"abstained\": false\n}\n```\n\nI left out r0. It holds the result of the `in` test and is then reassigned to `undefined` as the `this` argument of `Reflect.apply`. A single name would mislabel one of those two uses.",
+    "cost": {
+      "tokensIn": 8341,
+      "tokensOut": 3800,
+      "usd": 0.00308616
+    },
+    "meta": {
+      "fn": 8497,
+      "requested": 8
+    }
+  },
+  "7d56d2c5c0ee65bb21d8e4c02e22c4cfa6c4bf09c7cdf9ca1cee63ffbba1c371": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8511, \"reg\": 37 },\n      \"name\": \"headerTitleStyle\",\n      \"confidence\": \"high\",\n      \"evidence\": \"loaded from r0.headerTitleStyle in the L7 block and used only in the title text style array `[r38, r37]`\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8511, \"reg\": 39 },\n      \"name\": \"headerTitleContainerStyle\",\n      \"confidence\": \"high\",\n      \"evidence\": \"loaded from r0.headerTitleContainerStyle in the L7 block and used only as the title container's style child `r24[2] = r39`\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8511, \"reg\": 44 },\n      \"name\": \"headerLeftContainerStyle\",\n      \"confidence\": \"high\",\n      \"evidence\": \"loaded from r0.headerLeftContainerStyle in the L7 block and used only in the left button container style array `[r45, r44]`\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8511, \"reg\": 86 },\n      \"name\": \"flatHeaderStyle\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned from `StyleSheet.flatten(r17)` where r17 is r0.headerStyle, and only that assignment (or `{}` fallback) writes r86 before it is destructured\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8511, \"reg\": 12 },\n      \"name\": \"onClose\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from the declared handler `_fn12428` (overlay name \\\"onClose\\\") and passed only as the `onClose` property of the HeaderSearchBar props\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 61665,
+      "tokensOut": 23923,
+      "usd": 0.02284838
+    },
+    "meta": {
+      "fn": 8511,
+      "requested": 88
+    }
+  },
+  "4594d74af43332e66046c0c34adb168a272b0ecf9b01271e05acfc08275e6893": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8598, \"reg\": 27 },\n      \"name\": \"tintColor\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r27 = r15 (activeTintColor, primary by default) when focused, otherwise r7 (inactiveTintColor, defaulting to \\\"rgba(0, 0, 0, 0.68)\\\"); then used as {color: r27} for the label and as the icon color _e3011_2 = r27\"\n    },\n    {\n      \"bindingId\": { \"fn\": 8598, \"reg\": 29 },\n      \"name\": \"backgroundColor\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r29 starts as inactiveBackgroundColor (default \\\"transparent\\\"), is overwritten with the focused background r6 in the L10 block, and is used as the backgroundColor key in the style object {borderRadius: r18, backgroundColor: r29}\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 11791,
+      "tokensOut": 5846,
+      "usd": 0.00479916
+    },
+    "meta": {
+      "fn": 8598,
+      "requested": 33
+    }
+  },
+  "eb675210ae51b3ececb211e577eb867e7aa15796843032d46fe75e7af864c5ee": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":8825,\"reg\":2},\"name\":\"nextState\",\"confidence\":\"med\",\"evidence\":\"assigned a fresh {} in each branch, given lastTransition and confirmed properties, and returned from the reducer\"},{\"bindingId\":{\"fn\":8825,\"reg\":3},\"name\":\"action\",\"confidence\":\"med\",\"evidence\":\"initialised from a2, and its .type is compared against the literals \\\"TRACK_TRANSITION\\\", \\\"CLEAR_TRANSITION\\\" and \\\"CONFIRM_STATE\\\"\"},{\"bindingId\":{\"fn\":8825,\"reg\":4},\"name\":\"state\",\"confidence\":\"med\",\"evidence\":\"initialised from a1, and read as .lastTransition and .confirmed.routeKey/.provenance, which is state-shaped access\"},{\"bindingId\":{\"fn\":8825,\"reg\":5},\"name\":\"actionType\",\"confidence\":\"high\",\"evidence\":\"initialised from r3.type and compared directly against the literal \\\"TRACK_TRANSITION\\\" and then \\\"CLEAR_TRANSITION\\\"\"},{\"bindingId\":{\"fn\":8825,\"reg\":7},\"name\":\"spreadSource\",\"confidence\":\"med\",\"evidence\":\"set from r4 (state) and passed as the source argument of __hbc_b_copyDataProperties in both the TRACK_TRANSITION and CLEAR_TRANSITION branches\"},{\"bindingId\":{\"fn\":8825,\"reg\":8},\"name\":\"spreadTarget\",\"confidence\":\"med\",\"evidence\":\"set to the fresh {} object (or r2) and passed as the target argument of __hbc_b_copyDataProperties, which copies own enumerable properties\"},{\"bindingId\":{\"fn\":8825,\"reg\":0},\"name\":\"nextLastTransition\",\"confidence\":\"low\",\"evidence\":\"set to null in the CLEAR_TRANSITION branch and written back as .lastTransition on the result object\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8674,
+      "tokensOut": 3038,
+      "usd": 0.00277176
+    },
+    "meta": {
+      "fn": 8825,
+      "requested": 8
+    }
+  },
+  "933b100185332706ea674ea255e41f6ae5059d50d79be583535e87ab6d7998dd": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9070, \"reg\": 1 },\n      \"name\": \"hyphenPattern\",\n      \"confidence\": \"high\",\n      \"evidence\": \"regex literal /-/g is the only pattern passed to slice.replace, and register 1 is reused for the final concatenated result\"\n    },\n    {\n      \"bindingId\": { \"fn\": 9070, \"reg\": 3 },\n      \"name\": \"slug\",\n      \"confidence\": \"med\",\n      \"evidence\": \"the parameter is the input whose hyphens are replaced with spaces and whose first character is capitalized, which fits a hyphen-separated slug; the function's own label \\\"author\\\" supports this only weakly\"\n    }\n  ],\n  \"abstained\": false\n}\n```\n\nI left `{9070,5}` out. The source has two candidate bindings without register suffixes, `toUpperCase` and `slice`, and nothing in the body shows which one register 5 holds. Both names are also decompiler labels that restate the callee, so either could be renamed once the register mapping is confirmed.",
+    "cost": {
+      "tokensIn": 7779,
+      "tokensOut": 2903,
+      "usd": 0.00252526
+    },
+    "meta": {
+      "fn": 9070,
+      "requested": 3
+    }
+  },
+  "d1d1cc4837a0526e8ae02397c1d8a07e91e7a3f85e70770d586837be018b5770": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":9071,\"reg\":1},\"name\":\"whitespacePattern\",\"confidence\":\"high\",\"evidence\":\"regex literal /\\\\s/g is loaded into r1 and used only as the pattern argument of .replace()\"},{\"bindingId\":{\"fn\":9071,\"reg\":2},\"name\":\"separator\",\"confidence\":\"high\",\"evidence\":\"string literal \\\"-\\\" is loaded into r2 and used only as the replacement argument of .replace()\"},{\"bindingId\":{\"fn\":9071,\"reg\":4},\"name\":\"slug\",\"confidence\":\"med\",\"evidence\":\"holds the result of String(a1).toLowerCase().replace(/\\\\s/g, \\\"-\\\") and is returned unchanged; the whitespace-to-hyphen lowercase transform reads as slugification\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7730,
+      "tokensOut": 1576,
+      "usd": 0.0018519599999999997
+    },
+    "meta": {
+      "fn": 9071,
+      "requested": 3
+    }
+  },
+  "b56b682364a7f1451209341bad36a3033b0900607abe94d818177721c1c628d6": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9075, \"reg\": 11 },\n      \"name\": \"jsxRuntime\",\n      \"confidence\": \"high\",\n      \"evidence\": \"r11 = _e1861_9 is its only assignment; the body uses r11.jsx and r11.jsxs as element factories, with jsxs called on children arrays (e.g. r8(r9, r7) with r7.children = r10)\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 20802,
+      "tokensOut": 12719,
+      "usd": 0.00955582
+    },
+    "meta": {
+      "fn": 9075,
+      "requested": 23
+    }
+  },
+  "3324e599ca003bc38357aa17221e0b4eef9cb705a3b760b054cb6fa1e51eea5f": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9113, \"reg\": 0 },\n      \"name\": \"transitionMode\",\n      \"confidence\": \"med\",\n      \"evidence\": \"returned value: it is \\\"front\\\" by default and a1 only when a1 equals one of \\\"back\\\", \\\"slide\\\", \\\"permanent\\\" or \\\"front\\\"; the literal set reads as screen-transition modes\"\n    },\n    {\n      \"bindingId\": { \"fn\": 9113, \"reg\": 1 },\n      \"name\": \"requestedMode\",\n      \"confidence\": \"med\",\n      \"evidence\": \"only assignment is r1 = a1 (the raw parameter), and it is the operand of every comparison against the mode literals\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7891,
+      "tokensOut": 1426,
+      "usd": 0.0018091600000000002
+    },
+    "meta": {
+      "fn": 9113,
+      "requested": 3
+    }
+  },
+  "c93f3892322b66e13a355d64837b7be9850f134c17006a362f52a984918d0573": {
+    "text": "{\"names\": [], \"abstained\": true, \"reason\": \"The source supports candidate names (the parameter is a dinosaur id per the \\\"dino\\\" queryKey and the `a1.id === _e3141_0` comparison; `arr2` is the queryKey; `obj` is the options object), but the render shows named locals rather than the {9235,0}..{9235,5} registers, so I cannot tie any name to a target without guessing the mapping.\"}",
+    "cost": {
+      "tokensIn": 9289,
+      "tokensOut": 1657,
+      "usd": 0.0022042600000000004
+    },
+    "meta": {
+      "fn": 9235,
+      "requested": 6
+    }
+  },
+  "41503f7ee0079013ab308a27477943c5f6f1937281849d5de486080a3f9fd2c1": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9660, \"reg\": 1 },\n      \"name\": \"component\",\n      \"confidence\": \"med\",\n      \"evidence\": \"`r1 = this` is the receiver, then `props = r1.props` and `Reflect.apply(onError, props, ...)`; the enclosing fn is componentDidCatch, so this is the component instance\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7823,
+      "tokensOut": 1938,
+      "usd": 0.00205156
+    },
+    "meta": {
+      "fn": 9660,
+      "requested": 4
+    }
+  },
+  "e5c82a68b234bfda6a7219b3a1c43843c8102d2d46ba7b10efe05ed068702714": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":9757,\"reg\":12},\"name\":\"props\",\"confidence\":\"med\",\"evidence\":\"r12 = a1, the sole parameter; its only uses are the .progress read and the {...r12} spread into the Header element's props, so it is the component's props object\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8547,
+      "tokensOut": 2569,
+      "usd": 0.0025118600000000003
+    },
+    "meta": {
+      "fn": 9757,
+      "requested": 12
+    }
+  },
+  "2a7198953693dad3176e9d19f3f4ed3891e65a36da37c29514e9abf378d75473": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9821, \"reg\": 15 },\n      \"name\": \"drawerProps\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r15 is the function parameter a1; it is captured by onPress as _e3291_0 and read as .navigation, and it is spread into DrawerItemList props ({...r15})\"\n    },\n    {\n      \"bindingId\": { \"fn\": 9821, \"reg\": 5 },\n      \"name\": \"reactNative\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r5 = _e2053_5 is the module the function reads View from, six times (View, View2..View6)\"\n    },\n    {\n      \"bindingId\": { \"fn\": 9821, \"reg\": 6 },\n      \"name\": \"drawerModule\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r6 = _e2053_1 is the module that supplies DrawerContentScrollView and DrawerItemList\"\n    },\n    {\n      \"bindingId\": { \"fn\": 9821, \"reg\": 8 },\n      \"name\": \"navElements\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r8 = _e2053_2 is the module that supplies Text and PlatformPressable, both used as JSX element types\"\n    },\n    {\n      \"bindingId\": { \"fn\": 9821, \"reg\": 9 },\n      \"name\": \"jsxRuntime\",\n      \"confidence\": \"high\",\n      \"evidence\": \"r9 = _e2053_6 is read for .jsx and .jsxs, and those are called as jsx(View, obj) and jsxs(DrawerContentScrollView, obj)\"\n    },\n    {\n      \"bindingId\": { \"fn\": 9821, \"reg\": 10 },\n      \"name\": \"jsx\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r10 = r9.jsx, and it is called as r10(Text5, r8_2) to build the Back button label; same helper as the other jsx bindings\"\n    },\n    {\n      \"bindingId\": { \"fn\": 9821, \"reg\": 11 },\n      \"name\": \"styles\",\n      \"confidence\": \"high\",\n      \"evidence\": \"r11 = _e2053_18 supplies drawerContentContainer, profileSection, avatar, avatarText, bodyText, caption, drawerDivider, drawerFooter, drawerSpacer and backButton as style values\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10393,
+      "tokensOut": 6217,
+      "usd": 0.0047050600000000005
+    },
+    "meta": {
+      "fn": 9821,
+      "requested": 14
+    }
+  },
+  "0878b053963f2f40da9d8c5bf647d01ee797d5326316a7c68096a243338eba8e": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 11977, \"reg\": 3 },\n      \"name\": \"options\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r3 holds parameter a1, and the only use is the property read a1.title as the primary title source. The fallback reads a2.name, which suggests a route-plus-options pairing, but the parameter is not otherwise labelled.\"\n    },\n    {\n      \"bindingId\": { \"fn\": 11977, \"reg\": 4 },\n      \"name\": \"route\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r3_2 is a copy of parameter a2, and its only use is the property read a2.name in the fallback branch, which is consistent with a route object carrying a name.\"\n    },\n    {\n      \"bindingId\": { \"fn\": 11977, \"reg\": 2 },\n      \"name\": \"routeName\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r2 is assigned only from r3_2?.name (a2.name) and is used as the fallback title when a1.title is null or undefined.\"\n    },\n    {\n      \"bindingId\": { \"fn\": 11977, \"reg\": 5 },\n      \"name\": \"title\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r5 is assigned a1.title, or r2 (a2.name) when that is null, and is interpolated as the first part of the template literal `${r5} - React Navigation Example`.\"\n    }\n  ],\n  \"abstained\": false\n}\n```\n\nI left out `{11977,0}`. It only holds the constant `null` used in the `!= null` comparison, so it has no role of its own to name.",
+    "cost": {
+      "tokensIn": 8186,
+      "tokensOut": 1924,
+      "usd": 0.00211716
+    },
+    "meta": {
+      "fn": 11977,
+      "requested": 5
+    }
+  },
+  "3700c9a9f0779a171835a37a0130cce232c789c0ef76740246c99064136c6b8e": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 11983, \"reg\": 9 },\n      \"name\": \"screenName\",\n      \"confidence\": \"high\",\n      \"evidence\": \"copied from a2, used as the key in _e1353_14.SCREENS[r9] and stored as the literal property {name: r9} in the pushed item\"\n    },\n    {\n      \"bindingId\": { \"fn\": 11983, \"reg\": 10 },\n      \"name\": \"group\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned from r7, which defaults to the literal \\\"Misc\\\"; stored in closure _e3929_0 and compared against r3.group in _fn14179; written as the literal property {group: r10, items: null}\"\n    },\n    {\n      \"bindingId\": { \"fn\": 11983, \"reg\": 8 },\n      \"name\": \"title\",\n      \"confidence\": \"med\",\n      \"evidence\": \"holds the screen title fallback (r7 = r6.title) and is stored as the literal property {name: r9, title: r8}; it is also used as an undefined sentinel earlier, which weakens the fit\"\n    },\n    {\n      \"bindingId\": { \"fn\": 11983, \"reg\": 4 },\n      \"name\": \"groups\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from parameter a1 before the filter and grouping step; searched with findIndex, pushed to with {group, items} objects, and returned. Earlier writes to r4 are temporaries that reuse the register\"\n    },\n    {\n      \"bindingId\": { \"fn\": 11983, \"reg\": 6 },\n      \"name\": \"screen\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned _e1353_14.SCREENS[r9] and read for .title in the search filter; later reused for the group object and the findIndex result, so the name fits only the first use\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10072,
+      "tokensOut": 4037,
+      "usd": 0.00355086
+    },
+    "meta": {
+      "fn": 11983,
+      "requested": 13
+    }
+  },
+  "0c6b57d077ee57dce65b3bcdf2d78ae8e2d156d951def7a719a79a3b17a1d8bc": {
+    "text": "{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 11984, \"reg\": 1 },\n      \"name\": \"groupSection\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r1 = a1 is the sole parameter copy; it supplies r1.group as the ListGroupItem title and r1.items.map(_fn14180) as its children, so it is a group record with a title and a list of items\"\n    },\n    {\n      \"bindingId\": { \"fn\": 11984, \"reg\": 4 },\n      \"name\": \"listGroupItemProps\",\n      \"confidence\": \"high\",\n      \"evidence\": \"object literal {title: r1.group, children: r1.items.map(_fn14180)} is the second argument to jsx(ListGroupItem, obj, r1.group), so it is the props bag for that element\"\n    }\n  ],\n  \"abstained\": false\n}",
+    "cost": {
+      "tokensIn": 7768,
+      "tokensOut": 1299,
+      "usd": 0.00172106
+    },
+    "meta": {
+      "fn": 11984,
+      "requested": 2
+    }
+  },
+  "2d32282a412a69469e464e7c6d8bc6882f24d0f29eebcbc02f08dd2acb8aaf1a": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12233, \"reg\": 12 },\n      \"name\": \"leftRoute\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r12 = a1 is the first operand; it is read for .pattern, .segments, .routeNames, .order and .segmentRanks, which are route-descriptor fields. r12 is later overwritten with .order in the L5 branch, so the name covers only its initial role.\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12233, \"reg\": 11 },\n      \"name\": \"rightRoute\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r11 = a2 is the second operand, paired with r12 in every comparison (.pattern, .segments, .routeNames.length, .order). Like r12, it is later reused for .order in the L5 branch.\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12233, \"reg\": 0 },\n      \"name\": \"segmentIndex\",\n      \"confidence\": \"med\",\n      \"evidence\": \"Loop counter: set to 0 at L6, advanced as r0 = r1 + r3 with r1 = r0 and r3 = 1, bounded by max(segments.length), and used to index r12.segmentRanks[r0].\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12233, \"reg\": 2 },\n      \"name\": \"defaultSegmentRank\",\n      \"confidence\": \"med\",\n      \"evidence\": \"Set to the literal 5 at L6 and used only as the nullish fallback in `segmentRanks[r0] ?? r2` and `segmentRanks[r1] ?? r2`, so it is the rank used when a segment has no entry.\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12233, \"reg\": 3 },\n      \"name\": \"loopStep\",\n      \"confidence\": \"low\",\n      \"evidence\": \"Set to the literal 1 at L6 and used only as the increment in r0 = r1 + r3 in the segment loop.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9083,
+      "tokensOut": 4736,
+      "usd": 0.0037025599999999997
+    },
+    "meta": {
+      "fn": 12233,
+      "requested": 16
+    }
+  },
+  "cdf41eee2f927d5edc495d3970e8f4bb93dca89a8cb37247e3c05362e73fc883": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12234, \"reg\": 4 },\n      \"name\": \"patternEntry\",\n      \"confidence\": \"low\",\n      \"evidence\": \"loaded as list[r5.pattern] from module table _e2930_2, then passed as the second argument to Reflect.apply(_e1481_26, ...) alongside r5 and two other module values; no string literal names it\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7892,
+      "tokensOut": 1197,
+      "usd": 0.0016948599999999999
+    },
+    "meta": {
+      "fn": 12234,
+      "requested": 2
+    }
+  },
+  "f731de98961c70f3e312a030105483e04d5541d1f8ed98402d4f80a3ab566cf4": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12238, \"reg\": 5 },\n      \"name\": \"routeParams\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned `r4 = {}` and stored in `_e4019_1`, which `$` writes as `r9[r5.name]`; at L1 end `r5 = r4`, and L5 pushes `{name: r7, params: r5}`\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12238, \"reg\": 9 },\n      \"name\": \"paramDescriptors\",\n      \"confidence\": \"med\",\n      \"evidence\": \"`r9 = r0` where `r0 = r0.params` of the matched route, then `for (let r11 of r9)`; each element is stored in `_e4019_4` and read by `$` as `.screen`, `.index`, `.repeat`, `.name`, `.regex`\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12238, \"reg\": 10 },\n      \"name\": \"matchParam\",\n      \"confidence\": \"med\",\n      \"evidence\": \"`r10 = $` is the only assignment and it is called once per descriptor via `Reflect.apply(r10, r0, [])`; `$` matches the current segment(s) against `_e4019_4` (regex test, decodeURIComponent, split/join on \\\"/\\\") and writes the result into the params map\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 12459,
+      "tokensOut": 5279,
+      "usd": 0.00464926
+    },
+    "meta": {
+      "fn": 12238,
+      "requested": 12
+    }
+  },
+  "f61eb8c0b27f6424e61fa8106b99e863f0a1ce579fd773a3c9381c0313f3dfb1": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12239, \"reg\": 13 },\n      \"name\": \"RegExpCtor\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned from the global RegExp (`r13 = RegExp`) and only used as `new r13(...)`, so PascalCase per the constructed-binding rule\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12239, \"reg\": 11 },\n      \"name\": \"patternRegex\",\n      \"confidence\": \"high\",\n      \"evidence\": \"`r11 = new r13(`^(?:${r9.pattern})$`)`, then stored as `r10.regex = r11`\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12239, \"reg\": 9 },\n      \"name\": \"routeSegment\",\n      \"confidence\": \"med\",\n      \"evidence\": \"`r9 = a1` is the input descriptor; it is read for .segment, .name, .pattern, .optional and .repeat, and the function returns a matcher built from those fields\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12239, \"reg\": 2 },\n      \"name\": \"rank\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned 5 / 8 / 0 and finally `r2 = r0`; the result is copied into the `rank:` property of every emitted param, wildcard and static node\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12239, \"reg\": 0 },\n      \"name\": \"rankTier\",\n      \"confidence\": \"med\",\n      \"evidence\": \"holds the tier (1 or 2 for a plain `:` param, or `r1`) selected by the `endsWith(\\\"+\\\")` / `endsWith(\\\"*\\\")` and `includes(\\\"(\\\")` tests, then copied to `r2`\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12239, \"reg\": 1 },\n      \"name\": \"suffixRank\",\n      \"confidence\": \"med\",\n      \"evidence\": \"values 3/4 are chosen on the `\\\"+\\\"` suffix branch and 6/7 on the `\\\"*\\\"` branch, each split by `includes(\\\"(\\\")`; it is copied into `r0`\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12239, \"reg\": 10 },\n      \"name\": \"segmentText\",\n      \"confidence\": \"med\",\n      \"evidence\": \"initialised from `r9.segment` and tested with `startsWith(\\\":\\\")`, `includes(\\\"(\\\")`, `endsWith(\\\"+\\\")`; the register is reused later for the pattern object, so the name covers only the initial role\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12239, \"reg\": 5 },\n      \"name\": \"segmentNode\",\n      \"confidence\": \"med\",\n      \"evidence\": \"the function's return value (`return r5`), which is one of the `{type: \\\"param\\\" | \\\"wildcard\\\" | \\\"static\\\"}` objects; the register is also reused as a scratch guard and boolean, so this is the dominant role only\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9774,
+      "tokensOut": 5784,
+      "usd": 0.0043647600000000005
+    },
+    "meta": {
+      "fn": 12239,
+      "requested": 14
+    }
+  },
+  "f0193dc9c944b8f6a91472e199a095e2ed40a45dfff042b64d5d7179cfa8aebe": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12400, \"reg\": 0 },\n      \"name\": \"zIndex\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned -1 when !ok and 0 otherwise, then stored as the \\\"zIndex\\\" property of the scene style object (r12.zIndex = r0)\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12400, \"reg\": 7 },\n      \"name\": \"route\",\n      \"confidence\": \"med\",\n      \"evidence\": \"the parameter a1 is read as .key for the descriptor lookup and the render key, and captured by the header closure as _e4086_0.name, which is passed to getHeaderTitle\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12400, \"reg\": 14 },\n      \"name\": \"descriptor\",\n      \"confidence\": \"high\",\n      \"evidence\": \"loaded as _e2970_2[route.key]; the null case throws \\\"Couldn't find a descriptor for route '<key>'.\\\"\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12400, \"reg\": 16 },\n      \"name\": \"headerComponent\",\n      \"confidence\": \"high\",\n      \"evidence\": \"takes options.header (property \\\"header\\\"), defaulting to the local header renderer y, which renders the Header component with the title and headerLeft/headerRight\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12400, \"reg\": 20 },\n      \"name\": \"isInert\",\n      \"confidence\": \"med\",\n      \"evidence\": \"starts as (inactiveBehavior === \\\"none\\\") and accumulates focus and preload checks; when true, the mode becomes \\\"inert\\\" or \\\"paused\\\" instead of \\\"normal\\\"\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 21584,
+      "tokensOut": 15705,
+      "usd": 0.011205219999999998
+    },
+    "meta": {
+      "fn": 12400,
+      "requested": 22
+    }
+  },
+  "0de613fd5fd12098b1b6e34564c9cb7e7aef8878961fb560c70f860075405a92": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12411, \"reg\": 0 },\n      \"name\": \"percentBase\",\n      \"confidence\": \"med\",\n      \"evidence\": \"The outer parameter a1 is stored as the captured _e4092_0, and the inner resolver multiplies the parsed percent (x/100) by that captured value when the input ends with \\\"%\\\". The register mapping (reg 0 to a1) is inferred from the source, not shown directly.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8858,
+      "tokensOut": 1534,
+      "usd": 0.0020565600000000002
+    },
+    "meta": {
+      "fn": 12411,
+      "requested": 2
+    }
+  },
+  "615f14a1a352482061d85dfbc034382004b0e3cf81d5ad2be68a7dbde1b578f8": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12412, \"reg\": 4 },\n      \"name\": \"pressPayload\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from parameter a1, then passed as the sole argument to the captured handler _e2978_0 and stored in _e4093_0, which the inner closure forwards to _e2978_1.onPress\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12412, \"reg\": 3 },\n      \"name\": \"onPressHandler\",\n      \"confidence\": \"med\",\n      \"evidence\": \"loads the captured _e2978_0, null-guards it (r3 == null, break L0), then calls it via Reflect.apply(r3, undefined, [r4]); the optional callee receives the press payload\"\n    }\n  ],\n  \"abstained\": false\n}\n```\n\nI left the other targets unnamed. Register 0 only holds `null` as a sentinel and `undefined` as a call receiver, so it carries no role. Register 2 is assigned `undefined` and never read, and the later `r2_2` is a separate binding, so I can't tie it to reg 2 reliably. Register 1 does not appear in the source. The function is already named `onPress`, so I left it alone.",
+    "cost": {
+      "tokensIn": 7997,
+      "tokensOut": 1921,
+      "usd": 0.00207786
+    },
+    "meta": {
+      "fn": 12412,
+      "requested": 5
+    }
+  },
+  "242c0a6fffd867e6543ef6a7fb57b7c80d252f685f77dbb21368bdd76f84e39a": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12423,\"reg\":4},\"name\":\"dimensions\",\"confidence\":\"med\",\"evidence\":\"the parameter is only read for .width and .height, which feed the landscape key of the object literal passed to getDefaultHeaderHeight; it is a size/layout object, not a header-specific value\"},{\"bindingId\":{\"fn\":12423,\"reg\":2},\"name\":\"modalPresentation\",\"confidence\":\"med\",\"evidence\":\"loaded from the captured slot _e2980_2 and stored as obj.modalPresentation, the same key the object literal declares; the local r4_2 is a register-style name, so it is replaced\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7831,
+      "tokensOut": 2051,
+      "usd": 0.00210966
+    },
+    "meta": {
+      "fn": 12423,
+      "requested": 2
+    }
+  },
+  "7138ea8be67d6929d839ae5a0b8c1ef23c9dac9161a43def29df3566390223b9": {
+    "text": "{\"names\": [], \"abstained\": true, \"reason\": \"No string literals, endpoint paths or named callees anchor either target: r0 is only the null literal used in a `== null` check, and r2 is a2 used only for truthiness while the call goes through the free identifier _e2997_9, so any name would be a guess.\"}",
+    "cost": {
+      "tokensIn": 7843,
+      "tokensOut": 1071,
+      "usd": 0.00162206
+    },
+    "meta": {
+      "fn": 12490,
+      "requested": 2
+    }
+  },
+  "563df1c50f181889855fee735ec8976253d04474a077a518af531472153eaa28": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12503, \"reg\": 1 },\n      \"name\": \"isFocused\",\n      \"confidence\": \"high\",\n      \"evidence\": \"r1 = a2 === _e3010_0.index is a boolean stored as the `focused` property of the props literal and copied to _e4127_1, which the inner onPress/_fn15295 branch reads as the focus flag\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12503, \"reg\": 2 },\n      \"name\": \"descriptor\",\n      \"confidence\": \"high\",\n      \"evidence\": \"loaded as _e3010_2[r3.key], null-checked, and the miss path throws new Error with the message 'Couldn't find a descriptor for route'; later reused for testID and the final render result\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12503, \"reg\": 3 },\n      \"name\": \"route\",\n      \"confidence\": \"high\",\n      \"evidence\": \"let r3 = a1, stored as the `route` key of the props literal and read for .key, .name and .params; the error message also says 'for route'\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12503, \"reg\": 4 },\n      \"name\": \"drawerItemProps\",\n      \"confidence\": \"high\",\n      \"evidence\": \"object literal with route/href/label/icon/focused/activeTintColor/onPress/testID keys is the second argument to the jsx call r6(r5, r4, r3.key); it first holds the options object before being reassigned\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12503, \"reg\": 5 },\n      \"name\": \"DrawerItem\",\n      \"confidence\": \"high\",\n      \"evidence\": \"loaded as r4.DrawerItem from the drawer module and passed as the component (first argument) to the jsx call r6(r5, props, key)\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12503, \"reg\": 6 },\n      \"name\": \"jsxFactory\",\n      \"confidence\": \"med\",\n      \"evidence\": \"loaded as r5.jsx from the jsx runtime module (_e1666_3) and invoked as r6(component, props, r3.key)\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12503, \"reg\": 12 },\n      \"name\": \"drawerIcon\",\n      \"confidence\": \"high\",\n      \"evidence\": \"r12 = r4.drawerIcon from the options object, then assigned to the props literal's icon key via r4.icon = r12\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12503, \"reg\": 13 },\n      \"name\": \"itemLabel\",\n      \"confidence\": \"high\",\n      \"evidence\": \"r13 = r4.drawerLabel from options, falling back to the title (r13 = r14), and assigned to the label key via r4.label = r13\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12503, \"reg\": 14 },\n      \"name\": \"title\",\n      \"confidence\": \"high\",\n      \"evidence\": \"r14 = r4.title read from the options object, used as the label fallback, and falls back to r3.name when empty\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12503, \"reg\": 15 },\n      \"name\": \"href\",\n      \"confidence\": \"high\",\n      \"evidence\": \"r15 = r17(name, r3.params) is assigned directly to the props literal's href key via r4.href = r15\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12503, \"reg\": 17 },\n      \"name\": \"buildHref\",\n      \"confidence\": \"med\",\n      \"evidence\": \"_e3010_3 is called as r17(name, params) and its return value becomes href; the callee is not visible, so the name rests on the (route name, params) call shape\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12503, \"reg\": 20 },\n      \"name\": \"errorMessage\",\n      \"confidence\": \"high\",\n      \"evidence\": \"template literal `Couldn't find a descriptor for route '${r6}'.` is the only argument passed to new Error(r20)\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 28531,
+      "tokensOut": 9690,
+      "usd": 0.0081433
+    },
+    "meta": {
+      "fn": 12503,
+      "requested": 20
+    }
+  },
+  "86b54abc21324de6bd48e032356719ecbb18c8ca08b229a5f6daaa2bfb0471fd": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12714, \"reg\": 10 },\n      \"name\": \"navState\",\n      \"confidence\": \"med\",\n      \"evidence\": \"reads `r10.routes` and `r10.index` to select the active route, then passed as `state: r10` in the object literal that becomes the Reflect.apply argument\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12714, \"reg\": 9 },\n      \"name\": \"descriptors\",\n      \"confidence\": \"high\",\n      \"evidence\": \"indexed by the active route's `.key` (`list[r4]`) and read for `.options`, and passed as `descriptors: list` in the argument object\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12714, \"reg\": 11 },\n      \"name\": \"tabBarPosition\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned from the literal property read `r5?.options.tabBarPosition`, then compared against the literal \\\"top\\\" in L5\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12714, \"reg\": 6 },\n      \"name\": \"layoutArgs\",\n      \"confidence\": \"med\",\n      \"evidence\": \"built as `{state, descriptors, dimensions}` and passed as the sole element of the array given to Reflect.apply\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8548,
+      "tokensOut": 4311,
+      "usd": 0.00338306
+    },
+    "meta": {
+      "fn": 12714,
+      "requested": 10
+    }
+  },
+  "1f0bd7b42d8c84981a47b340609e9ec01da4ca77c37eb4c11a0aaac9eeffcd5d": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12717, \"reg\": 2 },\n      \"name\": \"defaultSidebarWidth\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from Reflect.apply(getDefaultSidebarWidth, undefined, [a1]) and returned as the function's result; the callee name is the only anchor\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7921,
+      "tokensOut": 1356,
+      "usd": 0.00178016
+    },
+    "meta": {
+      "fn": 12717,
+      "requested": 4
+    }
+  },
+  "c3120db3a3b245b8d1856f763d7f0a461eaf06efdc3564747bd89720c4f0be8f": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12718, \"reg\": 3 },\n      \"name\": \"onHeightChange\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r3 = _e3055_14 is null-checked, then called as Reflect.apply(r3, undefined, [height2]) with height2 = a1.nativeEvent.layout.height, an onLayout height being forwarded to a callback\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8089,
+      "tokensOut": 2724,
+      "usd": 0.00249776
+    },
+    "meta": {
+      "fn": 12718,
+      "requested": 5
+    }
   }
 }

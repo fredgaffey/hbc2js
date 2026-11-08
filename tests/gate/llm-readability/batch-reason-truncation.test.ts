@@ -110,6 +110,7 @@ test("section 7 wiring: register labels with a binding are graded against the re
 
 test("label-registers: parseRaDump recovers param and environment-variable register names from hermesc -dump-ra", () => {
   const dump = `function outer(userId: any): object 
+source location: [x.js:1:1 ... x.js:3:2)
 %BB0:
   {r0}      %0 = HBCCreateFunctionEnvironmentInst (:environment) %VS0: any, %parentScope: environment
   {r1}      %4 = LoadParamInst (:any) %userId: any
@@ -122,8 +123,8 @@ function_end
   assert.equal(fns.length, 1);
   assert.equal(fns[0]!.name, "outer");
   assert.deepEqual(
-    fns[0]!.labels.map((l) => `${l.reg}:${l.name}:${l.via}`).sort(),
-    ["1:userId:param", "3:sessionToken:env-store", "5:count:env-load"],
+    fns[0]!.irLabels.map((l) => `${l.cls}${String(l.k)}:${l.name}:${l.via}`).sort(),
+    ["r1:userId:param", "r3:sessionToken:env-store", "r5:count:env-load"],
   );
 });
 
@@ -132,10 +133,10 @@ test("label-registers: live hermesc run on the iife-closures construct fixture l
   const h = requireHermesc(t, 98);
   if (h === null) return;
   const { spawnSync } = await import("node:child_process");
-  const r = spawnSync(h.path, ["-O", "-g", "-dump-ra", join(repoRoot(), "tests", "fixtures", "constructs", "21-iife-closures", "source.js")], {
+  const r = spawnSync(h.path, ["-O", "-g", "-dump-ra", "-dump-source-location=loc", join(repoRoot(), "tests", "fixtures", "constructs", "21-iife-closures", "source.js")], {
     encoding: "utf8",
     maxBuffer: 1 << 26,
   });
-  const names = parseRaDump(r.stdout).flatMap((f) => f.labels.map((l) => l.name));
+  const names = parseRaDump(r.stdout).flatMap((f) => f.irLabels.map((l) => l.name));
   assert.ok(names.includes("n"), `expected the parameter "n" among ${JSON.stringify([...new Set(names)])}`);
 });
