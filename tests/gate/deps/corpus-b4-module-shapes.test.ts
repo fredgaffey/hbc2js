@@ -45,7 +45,9 @@ function compile(version: HbcVersion, dir: string, name: string, source: string)
   const outPath = join(dir, `${name}.hbc`);
   const r = runHermesc(hermesc, ["-O", "-emit-binary", `-out=${outPath}`, `${name}.js`], dir);
   assert.equal(r.status, 0, `hermesc v${version} failed: ${r.stderr}`);
-  return buildInventory(new Uint8Array(readFileSync(outPath))).inventory;
+  // A tiny v98 bundle passes verification under two opcode tables; the local
+  // v98 hermesc emits hbc98-late (as tests/gate/split/orphan-decl-order.test.ts).
+  return buildInventory(new Uint8Array(readFileSync(outPath)), version === 98 ? { opcodeTable: "hbc98-late" } : {}).inventory;
 }
 
 const VERSIONS = ([94, 96, 98, 99] as HbcVersion[]).filter((v) => findHermesc(v) !== null);

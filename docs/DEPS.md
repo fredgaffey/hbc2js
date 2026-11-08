@@ -73,10 +73,22 @@ hbc2js deps <bundle.hbc|app.apk> [--out <dir>] [--confirm] [--confirm-cache] [--
    accepted with unknown deps. When the `global` function registers
    nothing, the functions it creates directly are scanned too (one
    level): this finds bundles whose body is wrapped in an IIFE and lazy
-   definers that switch on a module id (corpus-B4). Re.Pack/webpack chunk
-   bundles (`webpackChunk_*` module objects) and scope-hoisted bundles
-   with no module system are not recognised and still report
-   `totalModules: 0`.
+   definers that switch on a module id (corpus-B4). When `__d` finds
+   nothing and the string table names a `webpackChunk` global, a second
+   scanner (`src/deps/wscan.ts`, docs/specs/32-webpack-inventory.md)
+   reads Re.Pack/webpack module objects: an integer-keyed object literal
+   whose every by-index entry is a closure. Each entry is a module, with
+   the key as its id and the numeric calls through the factory's third
+   parameter (`__webpack_require__`) as its deps. The inventory's
+   `bundleKind` is `metro`, `webpack` or `none`. Scope-hoisted bundles
+   with no module system still report `totalModules: 0`.
+   For an APK, every Hermes bundle is inventoried
+   (`src/deps/bundles.ts`). Webpack bundles of one HBC version (a main
+   bundle and its `*.chunk.bundle` files, which share one module-id
+   space) are merged into one inventory. Metro bundles are kept apart,
+   because each has its own ids. The group with the most modules is
+   analysed (ties go to more bytes). When there is more than one bundle,
+   the report's `bundles` field lists each with its kind and module count.
 2. **Match** (`src/deps/match.ts`, `src/deps/db.ts`): score every signature
    DB entry (across the three layers below) against the target's own
    per-function exact/fuzzy/string-set hashes and per-module factory hashes.
@@ -1279,6 +1291,10 @@ functions flagged, like `factoryIsBaseline`, as matchable evidence. With
 both, 15 of the 16 should carry full exact coverage (promise also needs
 sub-path entries, e.g. every `exports`/file the foundation imports).
 Confidence high for (c)/(d) (reproduced offline); recall movement projected.
+
+#### Literal-buffer strings are evidence, not hash input (2026-11-09)
+
+v98-late/v99 build `{ k: "x" }` with `NewObjectWithBuffer` and no `LoadConstString`, so strings that live only in object/array literal buffers were missing. `functionStringEvidence` (`src/deps/fingerprint.ts`) adds the string keys and values of `NewObjectWithBuffer*` (v<=96 key/value buffers, v>=97 shape table + literal buffer) and `NewArrayWithBuffer*` to a module's `stringConstants` (guess/seams/sizediff evidence). The per-function `stringSetHash`/`stringCount` stored in signature DBs still come from `functionStrings` (`LoadConstString` operands only), so hash scheme 2 is unchanged and no DB needs a re-fingerprint; `tests/gate/deps/bugs-2026-11-08-objlit-strings.test.ts` pins scheme-2 digests on committed fixtures. Folding literal strings into the hash would be scheme 3.
 
 #### Hash scheme 2: width folding + ownership-aware subtraction
 **Design.** (1) `sig-normalise.ts` `foldOperandWidth` drops a `Short` /

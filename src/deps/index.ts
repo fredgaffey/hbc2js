@@ -5,7 +5,9 @@
 
 import { readFileSync } from "node:fs";
 import { extname, join } from "node:path";
-import { analyzeApk, apkHintsFromEvidence, extractBundleFromApk } from "./apk.ts";
+import { analyzeApk, apkHintsFromEvidence, extractBundleFromApk, extractHermesBundlesFromApk } from "./apk.ts";
+import { selectBundleInventory } from "./bundles.ts";
+import type { BundleSummary } from "./bundles.ts";
 import type { ApkEvidence } from "./apk.ts";
 import { deriveCandidatePackages } from "./candidates.ts";
 import { classifyInventory, loadCommonalityIndex, DEFAULT_COMMONALITY_INDEX_PATH } from "./classify.ts";
@@ -72,24 +74,27 @@ export interface DepsRunResult {
   readonly classification: ClassificationReport | null;
 }
 
-function readInputBytes(inputPath: string): { bytes: Uint8Array; apkEvidence: ApkEvidence | null } {
+function readInputInventory(inputPath: string): { inventory: ModuleInventory; apkEvidence: ApkEvidence | null; bundles: readonly BundleSummary[] | null } {
   const ext = extname(inputPath).toLowerCase();
   if (ext === ".apk") {
-    const extracted = extractBundleFromApk(inputPath);
-    if (!extracted.isHermes) {
+    // Every Hermes bundle is inventoried; the group with the most modules
+    // is analysed (docs/specs/32-webpack-inventory.md).
+    const hermes = extractHermesBundlesFromApk(inputPath);
+    if (hermes.length === 0) {
+      const extracted = extractBundleFromApk(inputPath);
       throw new Error(`${inputPath}: bundle at ${extracted.entryPath} is plain JS, not Hermes bytecode — plain-JS module inventory is not implemented yet (see docs/DECISIONS.md D18)`);
     }
-    return { bytes: extracted.bytes, apkEvidence: analyzeApk(inputPath) };
+    const sel = selectBundleInventory(hermes);
+    return { inventory: sel.inventory, apkEvidence: analyzeApk(inputPath), bundles: sel.bundles.length > 1 ? sel.bundles : null };
   }
   if (ext === ".js") {
     throw new Error(`${inputPath}: plain-JS bundle input is not implemented yet for 'hbc2js deps' (see docs/DECISIONS.md D18 — the module inventory/signature DB are Hermes-bytecode-specific for now)`);
   }
-  return { bytes: readFileSync(inputPath), apkEvidence: null };
+  return { inventory: buildInventory(readFileSync(inputPath)).inventory, apkEvidence: null, bundles: null };
 }
 
 export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promise<DepsRunResult> {
-  const { bytes, apkEvidence } = readInputBytes(inputPath);
-  const { inventory } = buildInventory(bytes);
+  const { inventory, apkEvidence, bundles } = readInputInventory(inputPath);
 
   const layers = resolveDbLayers({ ...(opts.out !== undefined ? { outDir: opts.out } : {}), ...(opts.sigdb !== undefined ? { sigdb: opts.sigdb } : {}), noSharedDb: opts.noSharedDb === true });
   const dbs = loadSignatures(layers, opts.exhaustive === true ? {} : { candidates: deriveCandidatePackages(layers, inventory) });
@@ -159,7 +164,8 @@ export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promis
 
   const reportWithoutNativeChannel = buildReport(inputPath, matchReport, guesses, confirmResults, classification);
   const nativeChannel = extname(inputPath).toLowerCase() === ".apk" ? nativeChannelForApk(inputPath, reportWithoutNativeChannel) : null;
-  const report = nativeChannel === null ? reportWithoutNativeChannel : { ...reportWithoutNativeChannel, nativeChannel };
+  const reportWithBundles = bundles === null ? reportWithoutNativeChannel : { ...reportWithoutNativeChannel, bundles };
+  const report = nativeChannel === null ? reportWithBundles : { ...reportWithBundles, nativeChannel };
   return { report, inventory, matchReport, guesses, confirmResults, apkEvidence, classification };
 }
 
@@ -207,8 +213,7 @@ const TIER_RANK: Record<string, number> = { high: 3, medium: 2, low: 1, none: 0 
  *  per candidate. Offline by construction -- no network call anywhere in
  *  this path (unlike `runDeps({confirm: true})`). */
 export function runInformedDeps(inputPath: string, known: readonly KnownPackage[], opts: DepsOptions = {}): InformedRunResult {
-  const { bytes } = readInputBytes(inputPath);
-  const { inventory } = buildInventory(bytes);
+  const { inventory } = readInputInventory(inputPath);
   const layers = resolveDbLayers({ ...(opts.out !== undefined ? { outDir: opts.out } : {}), ...(opts.sigdb !== undefined ? { sigdb: opts.sigdb } : {}), noSharedDb: opts.noSharedDb === true });
   const candidateNames = new Set(known.map((k) => k.name));
   const dbs = loadSignatures(layers, { candidates: candidateNames });
