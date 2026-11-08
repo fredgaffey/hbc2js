@@ -1,0 +1,52 @@
+; hbc2js disassembly of 96-reg-reuse-loop-carried/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=2 strings=6 globalCodeIndex=0
+function #0 "global"  params=1 frame=14 env=0 flags=dbg,overflowed  @0x000000dc size=69
+  0000  DeclareGlobalVar     s5 "sumTo"
+  0005  GetGlobalObject      r2
+  0007  LoadConstUndefined   r1
+  0009  CreateClosure        r3, r1, f1 "sumTo"
+  000e  PutByIdLoose         r2, r3, #c0, s5 "sumTo"
+  0014  TryGetById           r4, r2, #c0, s4 "print"
+  001a  GetByIdShort         r3, r2, #c1, s5 "sumTo"
+  001f  LoadConstUInt8       r0, 5
+  0022  Call2                r3, r3, r1, r0
+  0027  Call2                r3, r4, r1, r3
+  002c  TryGetById           r3, r2, #c0, s4 "print"
+  0032  GetByIdShort         r2, r2, #c1, s5 "sumTo"
+  0037  LoadConstZero        r0
+  0039  Call2                r2, r2, r1, r0
+  003e  Call2                r2, r3, r1, r2
+  0043  Ret                  r2
+
+function #1 "sumTo"  params=2 frame=21 env=0 flags=dbg,overflowed  @0x00000121 size=108
+  0000  LoadParam            r10, 1
+  0003  LoadConstZero        r2
+  0005  Less                 r7, r2, r10
+  0009  LoadConstUInt8       r4, 2
+  000c  LoadConstUInt8       r5, 1
+  000f  LoadConstZero        r0
+  0011  LoadConstZero        r1
+  0013  JmpFalse             L2, r7
+L1:
+  0016  MulN                 r3, r0, r4
+  001a  AddN                 r1, r1, r3
+  001e  AddN                 r0, r0, r5
+  0022  Mov                  r2, r1
+  0025  JLess                L1, r0, r10
+L2:
+  0029  GetGlobalObject      r8
+  002b  TryGetById           r11, r8, #c0, s4 "print"
+  0031  LoadConstUndefined   r7
+  0033  LoadConstString      r9, s0 "acc "
+  0037  Add                  r9, r9, r2
+  003b  Call2                r9, r11, r7, r9
+  0040  LoadConstString      r9, s3 "n="
+  0044  Add                  r10, r9, r10
+  0048  TryGetById           r9, r8, #c0, s4 "print"
+  004e  Call2                r9, r9, r7, r10
+  0053  DivN                 r2, r2, r4
+  0057  TryGetById           r9, r8, #c0, s4 "print"
+  005d  LoadConstString      r8, s2 "half "
+  0061  Add                  r8, r8, r2
+  0065  Call2                r8, r9, r7, r8
+  006a  Ret                  r2
