@@ -196,8 +196,8 @@ function tierRank(t: ConfidenceTier): number {
 }
 
 // LB1: map-key prefix isolating hash-scheme-1 DB files (see matchInventory).
-const LEGACY_PREFIX = "1:";
-function schemeKey(file: SigDbFile, hash: string): string {
+export const LEGACY_PREFIX = "1:";
+export function schemeKey(file: SigDbFile, hash: string): string {
   return (file.hashScheme ?? 1) >= 2 ? hash : LEGACY_PREFIX + hash;
 }
 
@@ -216,8 +216,10 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
   // dependency, @babel/runtime helper) is neither a hit nor in the
   // denominators. Empty for files without paths (scored as before).
   const foreign = foreignSets(pkg);
+  if (pkg.slim !== undefined && pkg.slim.minInstr !== minInstr) throw new Error(`slim signature prefiltered for minInstr ${pkg.slim.minInstr}, matched with ${minInstr}`);
   const eligible = pkg.functions.filter((f) => f.instrCount >= minInstr && !foreign.functions.has(f.index));
-  if (eligible.length === 0) return null;
+  const eligibleCount = pkg.slim !== undefined ? pkg.slim.eligible : eligible.length;
+  if (eligibleCount === 0) return null;
 
   // Calibrated, not guessed: an early cutoff of 3 was tried and measured
   // wrong. `react-navigation-example`'s own real dependency cluster
@@ -282,10 +284,10 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
     if (m.factoryIsBaseline || m.factoryIsDependency === true || foreign.factories.has(m.factoryFunctionIndex)) continue;
     if (m.factoryExactHash !== null && targetExact.has(schemeKey(pkg, m.factoryExactHash)) && isUnambiguous(schemeKey(pkg, m.factoryExactHash))) moduleExactHits++;
   }
-  const moduleTotal = pkg.modules.filter((m) => !m.factoryIsBaseline && m.factoryExactHash !== null && !foreign.factories.has(m.factoryFunctionIndex)).length;
+  const moduleTotal = pkg.slim !== undefined ? pkg.slim.moduleTotal : pkg.modules.filter((m) => !m.factoryIsBaseline && m.factoryExactHash !== null && !foreign.factories.has(m.factoryFunctionIndex)).length;
 
-  const exactCoverage = exactHits / eligible.length;
-  const fuzzyCoverage = (exactHits + fuzzyOnlyHits) / eligible.length;
+  const exactCoverage = exactHits / eligibleCount;
+  const fuzzyCoverage = (exactHits + fuzzyOnlyHits) / eligibleCount;
 
   // A single coincidentally-matching module is not "high" confidence for the
   // whole package — the FLIRT-style single-hash-collision risk
@@ -318,7 +320,7 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
     hbcVersion: pkg.hbcVersion,
     layer: entry.layer,
     isBaseline: pkg.toolchainBaseline,
-    eligibleFunctions: eligible.length,
+    eligibleFunctions: eligibleCount,
     exactHits,
     fuzzyOnlyHits,
     stringCorroborated,

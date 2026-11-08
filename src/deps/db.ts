@@ -18,6 +18,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { packageNameFromSigFilename } from "./candidates.ts";
 import { hexHash, insertFingerprint, newShapeCache, openSigDb, type ShapeCache } from "./sigdb-sql.ts";
 import type { SigDbFile, SigDbIndex, SigDbIndexEntry } from "./sigdb-types.ts";
+import { slimSigFile, type SlimTarget } from "./slim-sigs.ts";
 
 export type DbLayerName = "project" | "user" | "shared";
 
@@ -274,7 +275,27 @@ export interface LoadSignaturesOptions {
    *  existing caller before this task) preserves the exact previous
    *  exhaustive behaviour. */
   readonly candidates?: ReadonlySet<string>;
+  /** Bundle HBC version (corpus-remeasure2-brex-oom): `matchInventory` only
+   *  scores files of this HBC version, so JSON files of any other version
+   *  are parsed transiently and only their supersession metadata (package,
+   *  hash scheme, v2-ness) is kept, never the full signature. The v1/v2 and
+   *  hash-scheme supersession below sees exactly the same sets as before, so
+   *  the returned entries of this version are identical. Omitted: all load. */
+  readonly hbcVersion?: number;
+  /** Filled with the package names of the entries dropped by `hbcVersion`
+   *  (callers that treat "a signature exists for this package" as known). */
+  readonly otherHbcPackages?: Set<string>;
+  /** deps-slim-sigs: project every loaded file to the compact record the
+   *  matcher/scorer/ownership indexes actually read (`slimSigFile`), hashes
+   *  interned across files, and release the parsed JSON. `matchInventory`
+   *  results are identical (tests/gate/deps/slim-sigs-equivalence.test.ts).
+   *  Passing a `SlimTarget` (`slimTargetFor(inventory)`) additionally drops
+   *  every function/module the match against THAT target can never read,
+   *  keeping only precomputed counts (`slim-sigs.ts`).
+   *  Callers that only match and read `file.package` (deps, MCP) set it. */
+  readonly slim?: boolean | SlimTarget;
 }
+
 
 /**
  * Load every signature file across the given layers, in priority order,
@@ -285,6 +306,9 @@ export interface LoadSignaturesOptions {
 export function loadSignatures(layers: readonly DbLayer[], opts: LoadSignaturesOptions = {}): LoadedSig[] {
   const seen = new Set<string>();
   const out: LoadedSig[] = [];
+  const stubs = new Set<LoadedSig>();
+  const intern = new Map<string, string>();
+  const slimTarget = typeof opts.slim === "object" ? opts.slim : undefined;
   for (const layer of layers) {
     // §4 layer detection: a `sigdb.sqlite` in the layer directory (or the
     // layer dir itself naming a `.sqlite` file, for callers that pass one
@@ -299,7 +323,7 @@ export function loadSignatures(layers: readonly DbLayer[], opts: LoadSignaturesO
         const key = keyOf(file);
         if (seen.has(key)) continue;
         seen.add(key);
-        out.push({ file, layer: layer.name, path: sqlitePath });
+        out.push({ file: opts.slim !== undefined && opts.slim !== false ? slimSigFile(file, intern, slimTarget) : file, layer: layer.name, path: sqlitePath });
       }
       continue;
     }
@@ -314,7 +338,15 @@ export function loadSignatures(layers: readonly DbLayer[], opts: LoadSignaturesO
       const key = keyOf(file);
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ file, layer: layer.name, path });
+      if (opts.hbcVersion !== undefined && file.hbcVersion !== opts.hbcVersion && !file.toolchainBaseline) {
+        const stub = { package: file.package, hbcVersion: file.hbcVersion, version: file.version, toolchainBaseline: false, ...(file.hashScheme !== undefined ? { hashScheme: file.hashScheme } : {}), ...(file.subtractedDependencies !== undefined ? { subtractedDependencies: [] } : {}) } as unknown as SigDbFile;
+        const entry = { file: stub, layer: layer.name, path };
+        stubs.add(entry);
+        opts.otherHbcPackages?.add(file.package);
+        out.push(entry);
+        continue;
+      }
+      out.push({ file: opts.slim !== undefined && opts.slim !== false ? slimSigFile(file, intern, slimTarget) : file, layer: layer.name, path });
     }
   }
   // J4 v1/v2 compatibility (docs/DECISIONS.md D17c): a package with at
@@ -339,8 +371,8 @@ export function loadSignatures(layers: readonly DbLayer[], opts: LoadSignaturesO
   const scheme2Packages = new Set(out.filter((l) => (l.file.hashScheme ?? 1) >= 2 && !l.file.toolchainBaseline).map((l) => l.file.package));
   const current = scheme2Packages.size === 0 ? out : out.filter((l) => l.file.toolchainBaseline || (l.file.hashScheme ?? 1) >= 2 || !scheme2Packages.has(l.file.package));
   const v2Packages = new Set(current.filter((l) => l.file.subtractedDependencies !== undefined && !l.file.toolchainBaseline).map((l) => l.file.package));
-  if (v2Packages.size === 0) return current;
-  return current.filter((l) => l.file.toolchainBaseline || l.file.subtractedDependencies !== undefined || !v2Packages.has(l.file.package));
+  const result = v2Packages.size === 0 ? current : current.filter((l) => l.file.toolchainBaseline || l.file.subtractedDependencies !== undefined || !v2Packages.has(l.file.package));
+  return stubs.size === 0 ? result : result.filter((l) => !stubs.has(l));
 }
 
 /** Write (or overwrite) one signature file into `dir` and update its

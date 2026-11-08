@@ -57,24 +57,33 @@ export function listCandidatePackageNamesForLayers(layers: readonly DbLayer[]): 
   return [...names];
 }
 
-/** Every signature file in `dir` whose filename-derived package name is
- *  exactly `pkg` (any version, any hbc version) — reads and JSON-parses
- *  only those files, never the whole directory's contents, since this is
- *  only ever called for the small set of already-evidenced packages
- *  (see `recordedDependencyPackageNames` below). */
-function readSignatureFilesForPackage(dir: string, pkg: string): SigDbFile[] {
-  if (!existsSync(dir)) return [];
-  const out: SigDbFile[] = [];
-  for (const name of readdirSync(dir)) {
-    if (!name.endsWith(".json") || name === "index.json") continue;
-    if (packageNameFromSigFilename(name) !== pkg) continue;
-    try {
-      out.push(JSON.parse(readFileSync(join(dir, name), "utf8")) as SigDbFile);
-    } catch {
-      // malformed signature file — skip, same tolerance as db.ts's loadSignatures
+/** Per-run index over the layers' signature filenames plus a memo of the
+ *  dependency names each file records (corpus-remeasure2-brex-oom). The
+ *  directory is listed ONCE (not once per evidenced package: thousands of
+ *  packages x a 100k-file directory), each file is read at most once, and
+ *  only its dependency NAMES are kept, never the parsed file. */
+export interface DependencyIndex {
+  readonly byPackage: Map<string, { dir: string; name: string }[]>;
+  readonly depsOfFile: Map<string, readonly string[]>;
+  readonly readFile: (path: string) => string;
+}
+
+export function buildDependencyIndex(layers: readonly DbLayer[], readFile: (path: string) => string = (p) => readFileSync(p, "utf8")): DependencyIndex {
+  const byPackage = new Map<string, { dir: string; name: string }[]>();
+  const seenDirs = new Set<string>();
+  for (const layer of layers) {
+    if (seenDirs.has(layer.dir) || !existsSync(layer.dir)) continue;
+    seenDirs.add(layer.dir);
+    for (const name of readdirSync(layer.dir)) {
+      if (!name.endsWith(".json") || name === "index.json") continue;
+      const pkg = packageNameFromSigFilename(name);
+      if (pkg === null) continue;
+      let list = byPackage.get(pkg);
+      if (list === undefined) byPackage.set(pkg, (list = []));
+      list.push({ dir: layer.dir, name });
     }
   }
-  return out;
+  return { byPackage, depsOfFile: new Map(), readFile };
 }
 
 /**
@@ -91,15 +100,26 @@ function readSignatureFilesForPackage(dir: string, pkg: string): SigDbFile[] {
  * `pkg` itself must already be a real finding, this only widens what its
  * OWN recorded dependencies contribute.
  */
-export function recordedDependencyPackageNames(layers: readonly DbLayer[], pkg: string): ReadonlySet<string> {
+export function recordedDependencyPackageNames(layers: readonly DbLayer[], pkg: string, index: DependencyIndex = buildDependencyIndex(layers)): ReadonlySet<string> {
   const names = new Set<string>();
-  for (const layer of layers) {
-    for (const file of readSignatureFilesForPackage(layer.dir, pkg)) {
-      for (const depFilename of file.subtractedDependencies ?? []) {
-        const depPkg = packageNameFromSigFilename(depFilename);
-        if (depPkg !== null) names.add(depPkg);
+  for (const { dir, name } of index.byPackage.get(pkg) ?? []) {
+    const path = join(dir, name);
+    let deps = index.depsOfFile.get(path);
+    if (deps === undefined) {
+      const out: string[] = [];
+      try {
+        const file = JSON.parse(index.readFile(path)) as SigDbFile;
+        for (const depFilename of file.subtractedDependencies ?? []) {
+          const depPkg = packageNameFromSigFilename(depFilename);
+          if (depPkg !== null) out.push(depPkg);
+        }
+      } catch {
+        // malformed signature file — skip, same tolerance as db.ts's loadSignatures
       }
+      deps = out;
+      index.depsOfFile.set(path, deps);
     }
+    for (const d of deps) names.add(d);
   }
   return names;
 }
@@ -196,7 +216,7 @@ export function findCandidatesInText(patterns: readonly string[], haystack: stri
  * — see docs/DEPS.md's evidence-directed-matching section for the measured
  * comparison against `--exhaustive`.
  */
-export function deriveCandidatePackages(layers: readonly DbLayer[], inventory: ModuleInventory): ReadonlySet<string> {
+export function deriveCandidatePackages(layers: readonly DbLayer[], inventory: ModuleInventory, depIndex: DependencyIndex = buildDependencyIndex(layers)): ReadonlySet<string> {
   const universe = listCandidatePackageNamesForLayers(layers);
   const text = evidenceTextFromInventory(inventory);
   const found = new Set(findCandidatesInText(universe, text));
@@ -219,7 +239,7 @@ export function deriveCandidatePackages(layers: readonly DbLayer[], inventory: M
   // confirmed-tier precision this task must not drop; see the same doc
   // section.
   for (const pkg of [...found]) {
-    for (const dep of recordedDependencyPackageNames(layers, pkg)) found.add(dep);
+    for (const dep of recordedDependencyPackageNames(layers, pkg, depIndex)) found.add(dep);
   }
 
   // Scope-prefix corroboration: a scoped package's own full name

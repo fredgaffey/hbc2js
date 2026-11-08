@@ -17,7 +17,7 @@ import { repoRoot } from "../../support/paths.ts";
 import { buildInventory } from "../../../src/deps/inventory.ts";
 import { resolveDbLayers, loadSignatures } from "../../../src/deps/db.ts";
 import { matchInventory } from "../../../src/deps/match.ts";
-import { deriveCandidatePackages, findCandidatesInText, packageNameFromSigFilename } from "../../../src/deps/candidates.ts";
+import { buildDependencyIndex, deriveCandidatePackages, findCandidatesInText, packageNameFromSigFilename } from "../../../src/deps/candidates.ts";
 
 const RN_TEMPLATE = join(repoRoot(), "tests", "fixtures", "bundles", "rn-template-0.72", "index.android.hbc");
 
@@ -143,4 +143,27 @@ test("--exhaustive preserves the exact pre-QUEUE-22a behaviour: loadSignatures(l
   const b = loadSignatures(layers, {});
   assert.equal(a.length, b.length, "omitting opts and passing {} must be equivalent — both exhaustive");
   void inventory;
+});
+
+test("corpus-remeasure2-brex-oom: dependency expansion lists each layer once, reads each signature file at most once, and terminates on cyclic wide fan-out", () => {
+  const dir = mkdtempSync(join(tmpdir(), "hbc2js-oom-test-"));
+  const P = 50, V = 20;
+  const base = { schema: 2, totalFunctions: 0, rawFunctionCount: 0, subtractedBaselines: [], functions: [], modules: [], toolchainBaseline: false, hbcVersion: 96, provenance: { packageSha256: null, metroVersion: null, reactNativeVersion: null, hermescVersion: 96, hermescRnEra: null, repoCommit: null, builtAt: "2026-01-01" } };
+  for (let p = 0; p < P; p++) {
+    for (let v = 0; v < V; v++) {
+      const deps = [];
+      for (let q = 0; q < P; q++) if (q !== p) deps.push(`@scope__pkg${q}@1.0.${v}__hbc96.json`); // every package depends on every other: cycles
+      writeFileSync(join(dir, `@scope__pkg${p}@1.0.${v}__hbc96.json`), JSON.stringify({ ...base, package: `@scope/pkg${p}`, version: `1.0.${v}`, subtractedDependencies: deps }));
+    }
+  }
+  const strings = Array.from({ length: P }, (_, i) => `@scope/pkg${i}`);
+  const inventory = { hbcVersion: 96, totalFunctions: 0, moduledFunctionCount: 0, functions: [], modules: [{ stringConstants: strings }] } as unknown as import("../../../src/deps/inventory.ts").ModuleInventory;
+  // Same dir listed twice through two layers must not double-read either.
+  const layers = [{ name: "shared" as const, dir }, { name: "shared" as const, dir }];
+  const reads = new Map<string, number>();
+  const index = buildDependencyIndex(layers, (path) => { reads.set(path, (reads.get(path) ?? 0) + 1); return readFileSync(path, "utf8"); });
+  const candidates = deriveCandidatePackages(layers, inventory, index);
+  assert.equal(candidates.size, P);
+  assert.equal(reads.size, P * V);
+  assert.ok([...reads.values()].every((n) => n === 1), "each signature file is read at most once per run");
 });
