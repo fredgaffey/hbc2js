@@ -235,9 +235,20 @@ assuming `expected.txt` still matches Hermes, and refuses to guess (HA-06).
 
 The four known Node-vs-Hermes divergences
 (`18-closure-loop-let`, `20-let-const-tdz`, `42-rest-params`,
-`49-arguments-object`) are `KNOWN_DIVERGENT_FIXTURES`, populated for
-84/89/94/99 from a `tools/build-hermes-vm.sh`
-measurement; 96/98 are explicitly left unmeasured (not assumed).
+`49-arguments-object`) are `KNOWN_DIVERGENT_FIXTURES`, measured "diverges" at
+84/89/94/96/98/99. `expected.txt` for these is Node's output by the documented
+capture convention (`tests/fixtures/README.md`) and is *not* regenerated: the
+original `vNN.hbc` under the v94/v96/v98/v99 VMs prints identical text at all
+four versions, differing from Node only in genuine Hermes semantics —
+`for (let ...)` shares one binding across iterations (18), no TDZ
+`ReferenceError` (20), non-strict `arguments` is not aliased to named
+parameters (42, 49). Decompiled output (`--passes=none` and default) matches
+the original under the same VM at every version, so the VM is the reference
+(rule 1) and `expected.txt` only matters where no VM exists. Caveat: v98
+`20-let-const-tdz` needs `--opcode-table=hbc98-late` (the probe reports
+`E_LAYOUT_AMBIGUOUS`, a known v98 layout limitation, not a semantics issue).
+`reference-policy.test.ts` runs the four on every available VM to keep this
+table honest.
 
 Two exclusion tables were added while proving the harness against the real
 corpus (not in spec 06's original text — see "Deviations" below):
