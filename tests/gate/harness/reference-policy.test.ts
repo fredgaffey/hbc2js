@@ -45,15 +45,13 @@ test("rule 3: no VM, known-divergence construct -> expected-txt WITH a caveat, e
   }
 });
 
-test("the four construct-tier known divergences are populated for 84/89/94/99 (spec 06 §4's table, from the AGENT-LOG measurement)", () => {
+test("the four construct-tier known divergences are populated for 84/89/94/96/98/99 (fixtures-expected-vm: 96/98 now measured; spec 06 §4's table, from the AGENT-LOG measurement)", () => {
   const expected = ["18-closure-loop-let", "20-let-const-tdz", "42-rest-params", "49-arguments-object"];
   for (const name of expected) {
     const row = KNOWN_DIVERGENT_FIXTURES[name]!;
-    for (const v of [84, 89, 94, 99]) {
+    for (const v of [84, 89, 94, 96, 98, 99]) {
       assert.equal(row[v], "diverges", `${name} v${v} should be measured "diverges"`);
     }
-    assert.equal(row[96], undefined, `${name} v96 should be explicitly unmeasured, not assumed`);
-    assert.equal(row[98], undefined, `${name} v98 should be explicitly unmeasured, not assumed`);
   }
 });
 
@@ -90,4 +88,26 @@ test("HA-06 counterpart: an unmeasured version does NOT throw for a known-diverg
 
 test("KNOWN_VERSIONS carries the versions D14 has an opinion about", () => {
   assert.deepEqual([...KNOWN_VERSIONS].sort((a, b) => a - b), [84, 89, 94, 96, 98, 99]);
+});
+
+// fixtures-expected-vm: the four known divergences, run for real. Wherever a
+// VM exists, the ORIGINAL .hbc under that VM must (a) still differ from the
+// Node-captured expected.txt (so the table is not stale) and (b) be picked as
+// the reference (knownDivergences is informational only). Skips versions without a VM.
+test("known-divergent construct fixtures: original .hbc under each VM differs from expected.txt, and chooseReference picks the VM", async () => {
+  const fs = await import("node:fs");
+  const { spawnSync } = await import("node:child_process");
+  const root = new URL("../../fixtures/constructs/", import.meta.url).pathname;
+  for (const name of Object.keys(KNOWN_DIVERGENT_FIXTURES).filter((n) => fs.existsSync(`${root}${n}/expected.txt`))) {
+    for (const v of [94, 96, 98, 99]) {
+      const vm = findHermesVm(v);
+      const hbc = `${root}${name}/v${v}.hbc`;
+      if (vm === null || !fs.existsSync(hbc)) continue;
+      const run = spawnSync(vm.path, [hbc], { encoding: "utf8" });
+      assert.notEqual(run.stdout, fs.readFileSync(`${root}${name}/expected.txt`, "utf8"), `${name} v${v}: VM now matches Node; table is stale`);
+      const choice = chooseReference({ name }, v);
+      assert.equal(choice.engine, "hermes-vm", `${name} v${v}`);
+      assert.deepEqual(choice.knownDivergences, [name], `${name} v${v}`);
+    }
+  }
 });
