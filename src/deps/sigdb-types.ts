@@ -105,7 +105,19 @@ export interface SigDbFile {
   /** deps-slim-sigs, in-memory only (`slim-sigs.ts`): this record was
    *  prefiltered against one match target; `eligible`/`moduleTotal` are the
    *  counts `scorePackage` would compute from the full file at `minInstr`. */
-  readonly slim?: { readonly minInstr: number; readonly eligible: number; readonly moduleTotal: number; readonly distinctEligible?: number };
+  readonly slim?: {
+    readonly minInstr: number;
+    readonly eligible: number;
+    readonly moduleTotal: number;
+    readonly distinctEligible?: number;
+    /** corpus-path-recall: distinct eligible exact hashes of the functions
+     *  in own path-bearing modules, and per own module that requires another
+     *  package's module, its distinct eligible fuzzy hashes (by
+     *  localModuleId) — what `promoteViaDependency` needs from the
+     *  functions slimming drops. */
+    readonly ownPathDistinct?: number;
+    readonly ownFuzzy?: Readonly<Record<number, number>>;
+  };
 }
 
 export interface SigDbIndexEntry {

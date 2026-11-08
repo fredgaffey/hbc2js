@@ -87,6 +87,6 @@ describe("deps-slim-sigs", () => {
     assert.equal(f.provenance, undefined);
     assert.equal(f.subtractedBaselines, undefined);
     for (const x of f.functions) for (const k of ["name", "paramCount", "owner"]) assert.equal(k in x, false);
-    for (const m of f.modules) for (const k of ["depIds", "depCount", "functionSetHash", "nestedFunctionCount"]) assert.equal(k in m, false);
+    for (const m of f.modules) for (const k of ["depCount", "functionSetHash", "nestedFunctionCount"]) assert.equal(k in m, false);
   });
 });
