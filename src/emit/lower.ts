@@ -703,7 +703,25 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
       const ctorReg = V(insn, 0);
       const protoReg = V(insn, 1);
       const aliased = protoReg === ctorReg;
-      set(ctorReg, id(f.closureName(fnId, insn.offset)));
+      const closure = id(f.closureName(fnId, insn.offset));
+      const superClobbered = V(insn, 3) === ctorReg || V(insn, 3) === protoReg;
+      if (superClobbered) {
+        // The superclass operand is also a destination
+        // (`CreateDerivedClass r4, r3, r2, r4, 3`, fixture 89): the VM reads
+        // it before writing either result, so both links are made here,
+        // through the closure's own binding, before any register is
+        // written. `class-recover` recognises this pre-head pair
+        // (docs/specs/passes/24-class-recover.md section 8).
+        out.push({ k: "expr", expr: call(prop(id("Object"), "setPrototypeOf"), [closure, superReg]) });
+        out.push({
+          k: "expr",
+          expr: call(prop(id("Object"), "setPrototypeOf"), [prop(closure, "prototype"), { k: "cond", test: bin("===", superReg, lit("null")), then: lit("null"), else: prop(superReg, "prototype") }]),
+        });
+        set(ctorReg, closure);
+        if (!aliased) set(protoReg, prop(R(ctorReg), "prototype"));
+        return;
+      }
+      set(ctorReg, closure);
       out.push({ k: "expr", expr: call(prop(id("Object"), "setPrototypeOf"), [R(ctorReg), superReg]) });
       if (!aliased) set(protoReg, prop(R(ctorReg), "prototype"));
       const protoTarget = aliased ? prop(R(ctorReg), "prototype") : R(protoReg);
