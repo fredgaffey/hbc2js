@@ -436,3 +436,16 @@ surfaces-API change, not a worker change.
 `HBC2JS_READABILITY_INPROCESS=1` forces the old path. It exists so a test can
 run both and prove they produce the same job result and the same overlay
 sidecar; it is not a supported production switch.
+
+**Follow-up (P-65): the two transaction kinds go off-thread as compute/commit.**
+`readability-rewrite-function` and `readability-combine-files` end in
+`recordTransaction`, so the worker cannot run them whole (a second writer could
+fork the hash-chained log). `src/readability/surfaces.ts` therefore splits each
+into a compute half (`computeRewriteFunction`, `computeFileOp`: backend call,
+equivalence gates, no DB, no tree write) returning a structured-clone-safe plan,
+and a commit half (`commitRewriteFunction`, `commitFileOp`) that `WorkerRunner`
+runs on the main thread. The worker has no project connection, so the log
+origins `traceFile` would read are resolved on the main thread and handed over
+as `tracedOrigins`. A context with a live `oracle`/`functionOracle`/`evaluator`
+stays in-process, as before. The in-process path is compute-then-commit, so
+`rewriteFunction`/`fileOp` behave identically for the UI, MCP and CLI callers.
