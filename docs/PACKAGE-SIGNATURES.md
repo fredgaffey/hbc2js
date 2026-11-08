@@ -802,3 +802,5 @@ locally instead, scoped to `tools/pkgsig/bulk/**`.
   named `sigdb-<date>-fixed.tar.zst` / `index-fixed.json` (a plain run keeps
   `-partial.tar.zst` / `index-partial.json`) so the two archive kinds are
   never confused.
+
+Note (2026-11-09): `stringSetHash` covers `LoadConstString` operands only; object/array literal-buffer strings feed module string evidence but are not hashed (docs/DEPS.md "Literal-buffer strings are evidence, not hash input"), so scheme-2 DB files remain valid.

@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { decodeFunction } from "../disasm/decode.ts";
 import { parseHbc } from "../parse/module.ts";
 import type { HbcModule, ParseOptions } from "../parse/types.ts";
-import { fingerprintModule, functionStrings } from "./fingerprint.ts";
+import { fingerprintModule, functionStringEvidence } from "./fingerprint.ts";
 import type { SigFunction } from "./sigdb-types.ts";
 import type { BundleKind } from "./wscan.ts";
 
@@ -111,7 +111,7 @@ export function buildInventoryFromModule(mod: HbcModule): ModuleInventory {
       if (f !== undefined) instrCount += f.instrCount;
       if (f?.fuzzyHash !== undefined) fuzzyHashes.push(f.fuzzyHash);
       const decoded = decodeFunction(mod, idx);
-      const idxStrings = functionStrings(mod, decoded);
+      const idxStrings = functionStringEvidence(mod, decoded);
       for (const s of idxStrings) strings.add(s);
       if (idx !== m.factoryFunctionIndex) {
         if (f?.exactHash !== undefined) nestedExactHashes.push(f.exactHash);

@@ -76,9 +76,7 @@ test("corpus-B4: lazy switch of two-argument __d(factory, id) calls is a module 
       assert.deepEqual(inv.modules.map((m) => m.localModuleId).sort((a, b) => a! - b!), [0, 1, 7], `v${v}`);
       for (const m of inv.modules) {
         assert.equal(m.depIds, null, `v${v}: two-argument __d carries no deps array`);
-        // v98-late/v99 put object-literal strings in a buffer that
-        // functionStrings does not read yet (docs/BUGS.md, open row 2026-11-08).
-        if (v < 98) assert.ok(m.stringConstants.some((s) => s.startsWith("corpus-b4-lazy")), `v${v}: module ${m.localModuleId} strings`);
+        assert.ok(m.stringConstants.some((s) => s.startsWith("corpus-b4-lazy")), `v${v}: module ${m.localModuleId} strings`);
       }
     }
   } finally {
