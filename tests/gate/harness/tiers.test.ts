@@ -12,7 +12,7 @@ import type { DecompilerFn } from "../../../src/harness/tiers.ts";
 import { mutants } from "../../../src/harness/mutate.ts";
 import { repoRoot } from "../../support/paths.ts";
 import { findHermesc } from "../../support/hermesc.ts";
-import { requireOracles, timeScale } from "../../support/tiers.ts";
+import { requireOracles, timeScale, tooBusyForTiming, loadTag } from "../../support/tiers.ts";
 import { KNOWN_AMBIGUOUS_V98 } from "../../support/known-issues.ts";
 
 // A subset chosen for speed and for being outside every documented gap
@@ -94,7 +94,13 @@ test("full gate tier, identity decompiler: DIVERGENT count is zero (perf budget:
   await t.test("timing", () => {
     console.log(`full gate identity run: ${elapsed}ms for ${report.results.length} checks (budget ${budgetMs}ms)`);
   });
-  assert.ok(elapsed < budgetMs, `gate identity run took ${elapsed}ms, over the ${budgetMs}ms budget`);
+  // The wall-clock budget is a perf claim: enforce it only on a quiet box
+  // (docs/PERF-TESTS.md mechanism 3). Under the parallel gate the same run
+  // measured 165s vs 67s alone, pure contention. Correctness checks below
+  // stay unconditional.
+  const busy = tooBusyForTiming();
+  if (busy) console.log(`gate identity budget not enforced (${busy}; ${loadTag()}): ${elapsed}ms vs ${budgetMs}ms`);
+  else assert.ok(elapsed < budgetMs, `gate identity run took ${elapsed}ms, over the ${budgetMs}ms budget (${loadTag()})`);
 
   const divergent = report.results.filter((r) => r.verdict === VERDICT.DIVERGENT);
   assert.equal(divergent.length, 0, `identity must never DIVERGE: ${JSON.stringify(divergent.map((r) => r.fixture.name))}`);
