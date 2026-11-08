@@ -88,5 +88,6 @@ test("ship-hash-index: finalize.sh dry run builds the index into staging, tarbal
     assert.match(readFileSync(join(stage, "dist", "SHA256SUMS"), "utf8"), new RegExp(n.replace(/\./g, "\\.")));
     const ls = spawnSync("sh", ["-c", `tar -tzf ${stage}/dist/sigdb-*.tar.gz 2>/dev/null || tar --zstd -tf ${stage}/dist/sigdb-*.tar.zst`], { encoding: "utf8" });
     assert.match(ls.stdout, /candidate-hash-index__hbc99\.tsv/);
+    assert.match(ls.stdout, /a@1\.0\.0__hbc99\.json/, "tarball keeps the signature files too (bsdtar portability)");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

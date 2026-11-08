@@ -1013,6 +1013,26 @@ sqlite copy now scores identically to the JSON copy, and `import-json.mjs
 default whenever verify passes (`SQLITE_RELEASE=1` forces it). Test:
 `tests/gate/deps/sigdb-sqlite-lossless.test.ts`.
 
+**The candidate hash index ships with the DB** (docs/DEPS.md "Hash-index
+candidate proposal"). `finalize.sh` runs `tools/deps/build-candidate-hash-index.mjs`
+for every HBC version in the staged DB into `$STAGE/db`, re-validates, and
+adds the `candidate-hash-index__hbc<N>.tsv` files to the tarball and as
+standalone assets (listed in `SHA256SUMS` and the owner command). Choice for
+the sqlite asset: a **sidecar** beside `sigdb.sqlite`, not a table, because
+the runtime already reads the index from the layer's directory (a layer `dir`
+naming a `.sqlite` file uses that file's directory via `hashIndexDir`); a
+sqlite fetched without its `.tsv` sidecars simply proposes nothing from the
+index (same as no index file). `fetch-db.sh` extracts the tarball whole, so the
+`.tsv` files land beside the signatures. `validate-path-db.mjs` checks each
+index parses, its header hbc matches the filename, and every package it names
+exists in the DB at that hbc (errors), and warns when an index is older than
+the newest signature file (stale). When a DB has no index for the target's HBC
+version, `runDeps` returns a one-line `hints` entry on how to build it; the
+CLI prints it to stderr only with `HBC2JS_VERBOSE=1`. Never an error. Also
+fixed here: `finalize.sh`/`assemble.sh` now work on macOS (bash 3.2 empty
+array, bsdtar without `--ignore-failed-read`). Test:
+`tests/gate/deps/ship-hash-index.test.ts`.
+
 Validator (`tools/pkgsig/ship/validate-path-db.mjs <dir> [--src <dir>]
 [--list-pathless]`) reads only. Tests: `tests/gate/deps/validate-path-db.test.ts`,
 `tests/gate/tools/fetch-db-sha.test.ts`.
