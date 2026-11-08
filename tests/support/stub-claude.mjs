@@ -161,6 +161,23 @@ async function runEnvVarModes() {
     return;
   }
 
+  // Truncation mode: reply with stop_reason max_tokens and cut-off JSON unless
+  // the caller raised CLAUDE_CODE_MAX_OUTPUT_TOKENS to at least the threshold.
+  const truncBelow = process.env["STUB_CLAUDE_TRUNCATE_BELOW"];
+  if (truncBelow !== undefined) {
+    const cap = Number(process.env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] ?? "0");
+    const full = JSON.stringify({ names: [{ bindingId: { fn: 1, reg: 2 }, name: "userId", confidence: "high", evidence: "param" }], abstained: false });
+    const truncated = cap < Number(truncBelow);
+    await write(JSON.stringify({
+      result: truncated ? full.slice(0, 40) : full,
+      is_error: false,
+      stop_reason: truncated ? "max_tokens" : "end_turn",
+      usage: { input_tokens: 10, output_tokens: truncated ? cap : 30 },
+    }));
+    process.exitCode = 0;
+    return;
+  }
+
   if (process.env["STUB_CLAUDE_ECHO_ARGV"] === "1") {
     const echoed = { model: flag("--model"), systemPrompt: flag("--system-prompt"), prompt: stdinPrompt };
     const response = {
