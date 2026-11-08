@@ -220,6 +220,7 @@ Options (gate, sweep):
 Options (deps):
   --out <dir>               decompile-project output dir (project-local DB lives at <dir>/.hbc2js/sigdb)
   --confirm                 run the npm confirm stage (network; never executes package code)
+  --confirm-cache           also write confirm-built signatures to the user cache (read by later runs)
   --offline                 skip npm registry search + the confirm stage entirely
   --sigdb <dir>             override the project-local signature-DB directory
   --no-shared-db            don't consult tools/pkgsig/db (this repo's starter set)
@@ -1255,6 +1256,7 @@ interface DepsArgs {
   readonly input: string | undefined;
   readonly out: string | undefined;
   readonly confirm: boolean;
+  readonly confirmCache: boolean;
   readonly offline: boolean;
   readonly sigdb: string | undefined;
   readonly noSharedDb: boolean;
@@ -1269,6 +1271,7 @@ function parseDepsArgs(argv: readonly string[]): DepsArgs {
   let input: string | undefined;
   let out: string | undefined;
   let confirm = false;
+  let confirmCache = false;
   let offline = false;
   let sigdb: string | undefined;
   let noSharedDb = false;
@@ -1281,6 +1284,7 @@ function parseDepsArgs(argv: readonly string[]): DepsArgs {
     if (a === "--help" || a === "-h") help = true;
     else if (a === "--out") out = argv[++i];
     else if (a === "--confirm") confirm = true;
+    else if (a === "--confirm-cache") confirmCache = true;
     else if (a === "--offline") offline = true;
     else if (a === "--sigdb") sigdb = argv[++i];
     else if (a === "--no-shared-db") noSharedDb = true;
@@ -1290,7 +1294,7 @@ function parseDepsArgs(argv: readonly string[]): DepsArgs {
     else if (a === "--known") known = argv[++i];
     else if (input === undefined && !a.startsWith("-")) input = a;
   }
-  return { help, input, out, confirm, offline, sigdb, noSharedDb, minInstr, json, exhaustive, known };
+  return { help, input, out, confirm, confirmCache, offline, sigdb, noSharedDb, minInstr, json, exhaustive, known };
 }
 
 /** J7's `--known` path: informed confirm, offline by construction (see
@@ -1344,6 +1348,7 @@ async function runDepsCmd(argv: readonly string[]): Promise<number> {
     const result = await runDeps(args.input, {
       ...(args.out !== undefined ? { out: args.out } : {}),
       confirm: args.confirm,
+      confirmCache: args.confirmCache,
       offline: args.offline,
       ...(args.sigdb !== undefined ? { sigdb: args.sigdb } : {}),
       noSharedDb: args.noSharedDb,
