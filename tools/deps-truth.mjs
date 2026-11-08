@@ -27,13 +27,26 @@ const BASELINE_ALIAS = { "react-foundation": "react", "react-native-foundation":
 // decodeVlq / sourcePerLine / flattenIndexMap: shared with the signature
 // builder (module paths v1), src/deps/module-paths.ts.
 
+// pnpm virtual store: `.../node_modules/.pnpm/<name>@<ver>[_<peers>]/node_modules/<name>/...`
+// (scoped names use `+` for `/`). The directory name carries the exact
+// version even when no node_modules tree is on disk. Returns null when the
+// package is not under a pnpm store dir or the segment names another package.
+function pnpmVersionBefore(prefix, name) {
+  const m = /\/\.pnpm\/([^/]+)\/$/.exec(prefix);
+  if (m === null) return null;
+  const want = name.replace("/", "+") + "@";
+  if (!m[1].startsWith(want)) return null;
+  const v = /^[^_(]+/.exec(m[1].slice(want.length));
+  return v === null || v[0].length === 0 ? null : v[0];
+}
+
 function packageFromSource(source) {
   const idx = source.lastIndexOf("node_modules/");
   if (idx < 0) return null;
   const rest = source.slice(idx + "node_modules/".length).split("/");
   const name = rest[0].startsWith("@") ? `${rest[0]}/${rest[1]}` : rest[0];
   const root = source.slice(0, idx + "node_modules/".length) + name;
-  return { name, root };
+  return { name, root, pnpmVersion: pnpmVersionBefore(source.slice(0, idx), name) };
 }
 
 // A pnpm/yarn/npm/lerna workspace monorepo's own sibling packages (e.g. this
@@ -70,6 +83,7 @@ export function truthFromMap(hbcPaths, mapPath, bundleJsPath, opts = {}) {
   const modules = {};
   const versions = new Map();
   const rootByPackageName = new Map();
+  const nullReasons = {};
   // A module is usually one line, but the minifier can keep newlines inside
   // one (RN 0.87's react.production.js spans 12): it runs from its `__d(`
   // line to the first line ending in `},<id>,[deps]);`, and its source is
@@ -95,12 +109,14 @@ export function truthFromMap(hbcPaths, mapPath, bundleJsPath, opts = {}) {
           versions.set(pkg.root, null);
         }
       }
-      version = versions.get(pkg.root);
+      version = versions.get(pkg.root) ?? pkg.pnpmVersion ?? null;
+      if (version === null) nullReasons[pkg.name] = `no package.json at ${pkg.root} and no pnpm version segment in the source path`;
       if (!rootByPackageName.has(pkg.name)) rootByPackageName.set(pkg.name, pkg.root);
     }
     modules[m[1]] = { package: pkg?.name ?? null, version, source: source === null ? null : source.slice(source.lastIndexOf("node_modules/") >= 0 ? source.lastIndexOf("node_modules/") : Math.max(0, dirname(bundleJsPath).length + 1)) };
   });
   const packages = {};
+  const versionNullReasons = {};
   // Keyed off `rootByPackageName` (recorded at insertion time above) rather
   // than re-derived by matching `node_modules/<name>` against `versions`'
   // keys — that suffix match can never find a workspace package's root
@@ -109,6 +125,7 @@ export function truthFromMap(hbcPaths, mapPath, bundleJsPath, opts = {}) {
   for (const m of Object.values(modules)) {
     if (m.package === null || m.package in packages) continue;
     packages[m.package] = m.version;
+    if (m.version === null) versionNullReasons[m.package] = nullReasons[m.package] ?? "no version source available";
     roots.set(m.package, rootByPackageName.get(m.package));
   }
   // A truth package that some other truth package declares as a dependency
@@ -142,7 +159,7 @@ export function truthFromMap(hbcPaths, mapPath, bundleJsPath, opts = {}) {
   }
   const hbcSha256s = {};
   for (const h of hbcPaths) hbcSha256s[h.slice(h.lastIndexOf("/") + 1)] = sha256File(h);
-  return { hbcSha256s, moduleCount: Object.keys(modules).length, packages, direct, transitiveOf, modules };
+  return { hbcSha256s, moduleCount: Object.keys(modules).length, packages, versionNullReasons, direct, transitiveOf, modules };
 }
 
 // --- scoring -------------------------------------------------------------
