@@ -1877,8 +1877,8 @@ it in other packages' pre-built dist files.
 | mechanism | FPs | examples | status |
 |---|---|---|---|
 | generic code: an exact hash the target holds three or more times (ES-module boilerplate factories, 2-instruction empty modules, transpiler helpers inlined into single-file dist bundles) | 20 | `uuid`, `d3-geo`, `d3-hierarchy`, `dagre`, `victory`, `victory-core`, `core-js`, `asynckit`; `axios`, `ai`, `keyv`, `ocache`, `meros`, `react-plaid-link` (helpers in 17-28 target modules). Most of the hits of `lodash-es` (146 of 273; factories the target holds 1,241 times), `culori` and `swiper` are this too, but those three stay FPs on the rows below | fixed (17 of 20; `ai`, `ky`, `d3-fetch` remain) |
-| copy inlined in another package's pre-built dist file (one module, so module paths cannot split it) | 4 | `process`, `stackframe` (inside `react-devtools-core/dist/backend.js`), `oboe` (`react-native-blob-util/lib/oboe-browser.min.js`), `jszip` (`localforage/dist/localforage.js`) | open (BUGS) |
-| fork or generated-from package with identical code | 4 | `source-map-js` (= `source-map`), `whatwg-url` (= `whatwg-url-without-unicode`), `mdn-data` (`css-tree`), `lodash-es` (`lodash/lodash.js`) | open (BUGS) |
+| copy inlined in another package's pre-built dist file (one module, so module paths cannot split it) | 4 | `process`, `stackframe` (inside `react-devtools-core/dist/backend.js`), `oboe` (`react-native-blob-util/lib/oboe-browser.min.js`), `jszip` (`localforage/dist/localforage.js`) | partly fixed: see "Forks, embedded copies and repeated hashes" |
+| fork or generated-from package with identical code | 4 | `source-map-js` (= `source-map`), `whatwg-url` (= `whatwg-url-without-unicode`), `mdn-data` (`css-tree`), `lodash-es` (`lodash/lodash.js`) | partly fixed: see "Forks, embedded copies and repeated hashes" |
 | small functions matching app code at one or two copies | 2 | `culori`, `swiper` (after the fix) | open |
 | react-native code left in the signature | 0 | `@react-native-firebase/auth`, `/firestore` reach high in the raw match but are no longer confirmed on this branch | not reproduced |
 
@@ -1937,6 +1937,117 @@ like the embedded copies above.
 | Expensify J3, db-v3-clean | 134 / 89 / 45, 30.9% (35.2%) | 135 / 89 / 46, 30.9% (35.2%) |
 | react-navigation-example, db-v4-paths-partial | 10 / 10 / 0, 13.2% (15.0%) | unchanged |
 | react-navigation-example, db-v3-clean | 14 / 14 / 0, 18.4% (21.7%) | unchanged |
+
+**Forks, embedded copies and repeated hashes (corpus-precision-forks,
+2026-11-09).** The false positives left after the generic-hash rule were
+traced on all five truth apps (Expensify J3, react-navigation-example,
+and the bluesky, rainbow and metamask own builds), by where each FP's hit
+hashes sit in the target (closure-owned modules) and which other
+confirmed package matches the same hashes:
+
+| mechanism | FPs (partial DB) | examples | status |
+|---|---|---|---|
+| one factory hash the package repeats many times; the app holds that shape 2-18 times, under the generic rule's "twice its own count" clause | bluesky 6, Expensify 2 | `core-js`, `deferred`, `dfa`, `asynckit`, `ent`, `openai` (1-2 distinct hashes, 5-62 module hits); `mdn-data`, `d3-fetch` | fixed (`few-distinct`) except `core-js`@3.35 on the partial DB |
+| copy inlined in a much larger module of another package's pre-built dist file | Expensify 2 | `process`, `stackframe` (all hits in `react-devtools-core/dist/backend.js`, 886 functions; the packages have about 70) | fixed (`container`) |
+| copy inside another confirmed package's own, path-bearing file | Expensify 2 | `oboe` (21 of 21 hashes in `react-native-blob-util`), `jszip` (27 of 28 in `localforage`) | fixed on path-bearing hosts (`embedded`); still FPs on pathless DBs (rainbow, metamask) |
+| one source under two names, both loaded | Expensify 1 | `punycode.js` = `punycode` | fixed when one is path-bearing (`twin`) |
+| fork whose original is not a candidate | Expensify 2, metamask 2 | `source-map-js` (`source-map`), `whatwg-url` (`whatwg-url-without-unicode`) | open: the originals (`source-map`@0.6.1, `whatwg-url-without-unicode`@8.0.0-3) are in none of `db-v3-clean`, `db-v4-paths-partial`, `db-v4-paths`, so no index derived from the DB can name them; once fingerprinted, `twin` applies (both path-bearing) |
+| part generic, part another package's single file | Expensify 1 | `lodash-es` (41 of 93 hashes in `lodash/lodash.js`, the rest generic factories) | open: the 41 no longer anchor (`scattered`), but tiny-module shapes the package repeats over its 450 files still match whole 2-function app modules |
+| small helper functions spread over many app modules | Expensify 4 | `ai`, `ky`, `culori`, `swiper` (3-8 distinct hashes) | fixed (`scattered`) |
+| pathless signature holding its dependencies' code (the es-shim chain, `victory*`, `wagmi`, `typeorm`...) | rainbow ~20, metamask ~30 | `reflect.getprototypeof`, `is-regex`, `globalthis`, `define-properties` | open: needs path-bearing signatures (the full `db-v4-paths`) |
+
+Four rules (five with `scattered`, below) now lower a would-be "high" package to "medium", recorded as
+`PackageScore.demotion` (`src/deps/match.ts`):
+
+- `few-distinct`: its counted hits must be at least
+  `MIN_DISTINCT_EVIDENCE_HASHES` (3) distinct exact hashes, or all of its
+  own distinct eligible hashes when it has fewer (a one-function package
+  fully matched stays high: `cross-fetch`, `isomorphic-ws`). Module
+  factories under `minInstr` instructions (empty and re-export modules)
+  still count as module hits but not as distinct evidence.
+- `container`: 90% (`EXPLAINED_EVIDENCE_SHARE`) of the target functions
+  carrying its hit hashes sit in target modules with more than
+  `CONTAINER_SIZE_RATIO` (4) times the package's whole function count.
+  A real copy of the package is its own module, about its own size.
+- `embedded`: 90% of its distinct hit hashes are also hits in another
+  high package's own files (path-bearing signature), and that package has
+  at least twice as many. A pathless host is not trusted: its signature may
+  still hold its dependencies' code (`d3-zoom` holds all of `d3-ease`, a
+  true dependency).
+- `scattered` (corpus-precision-residual, below): fewer than 3 of its
+  distinct hit hashes sit in a target module made mostly of its functions.
+- `twin`: two high packages whose hit sets each cover 90% of the other's,
+  at least one of them path-bearing. The path-bearing one is kept, else a
+  declared dependency (`subtractedDependencies`) of another high package,
+  else the one with more distinct hits, else the first by name.
+
+Rejected: the twin rule on two pathless files. It removed 14 Expensify
+FPs on `db-v3-clean` and 4-5 on rainbow and metamask, but cost 6 TPs: on a
+pathless DB, "same hits" is as often a package and a dependent whose
+signature still holds its code (`event-target-shim` / `abort-controller` on
+react-navigation and bluesky; `which-typed-array`, `is-typed-array`,
+`typed-array-buffer`, `es-define-property` on metamask) as a fork. A higher
+distinct-hash minimum (5) would also remove `culori` and `swiper`, but
+`prop-types` (a TP on Expensify and metamask) has 3-4.
+
+| holdout (DB) | before: confirmed / TP / FP, precision | after | TP lost |
+|---|---|---|---|
+| Expensify J3, db-v4-paths-partial | 101 / 87 / 14, 86.1% | 94 / 87 / 7, 92.6% | 0 |
+| Expensify J3, db-v3-clean | 135 / 89 / 46, 65.9% | 131 / 89 / 42, 67.9% | 0 |
+| react-navigation-example, db-v4-paths-partial | 10 / 10 / 0, 100% | unchanged | 0 |
+| react-navigation-example, db-v3-clean | 14 / 14 / 0, 100% | unchanged | 0 |
+| bluesky own build, db-v4-paths-partial | 37 / 29 / 8, 78.4% | 32 / 29 / 3, 90.6% | 0 |
+| bluesky own build, db-v3-clean | 46 / 34 / 12, 73.9% | 43 / 34 / 9, 79.1% | 0 |
+| rainbow own build, both DBs | 107 / 82 / 25, 76.6% | 106 / 82 / 24, 77.4% | 0 |
+| metamask own build, both DBs | 169 / 132 / 37, 78.1% | unchanged | 0 |
+
+Recall is unchanged everywhere (Expensify 30.2% / 30.9%, react-navigation
+13.2% / 18.4%, bluesky 14.6% / 17.2%, rainbow 15.8%, metamask 17.6%). The
+partial DB carries paths only for the two holdouts' packages, so rainbow
+and metamask score the same on both DBs; their FPs are mostly the pathless
+mechanism in the last table row and wait for the full path-bearing DB.
+Test: `tests/gate/deps/corpus-precision-forks.test.ts`.
+
+**Residual: scattered evidence (corpus-precision-residual, 2026-11-09).**
+Traced against Expensify's source map, the hit hashes of `ai` (8, all in
+`ai/dist/index.js`) sit in 17 target modules of `react-native-pdf`,
+`expo-image`, `@rnmapbox/maps` and `react-native-nitro-sqlite`, two or
+three among 50-70 functions each; `ky`'s 6 in 9 modules of
+`react-native-share`, `@sentry/*`, `expo` and app code; `culori`'s 3 and
+`swiper`'s 4 are tiny factory shapes (14-51 instructions) matching app
+modules of 1-3 functions. A real copy is a module made mostly of the
+package's functions, so a fifth rule, `scattered`, runs after `container`:
+a hit hash is anchored when a target module holding it holds at least 2 of
+the package's distinct hit hashes making up `ANCHOR_DENSITY` (10%) of the
+module, or all of the module (one-function modules), or at least 5
+(`MIN_TINY_PACKAGE_EXACT_FUNCTION_HITS`) from one of the package's own
+files; fewer than 3 anchored hashes demotes, unless every distinct
+eligible hash is hit. The last two clauses came from the first
+measurement, which lost three TPs: `tslib` on metamask (7 of 70 helpers,
+all in the 87-function `tslib.js` module: 8%), `define-properties` on
+Expensify/db-v3-clean (its pathless signature holds `gopd` and
+`es-define-property`, one-function modules) and `url` on rainbow
+(`querystring-es3`'s one-function index). Rejected: a candidate route
+rule (a package that is a candidate only as a recorded dependency of an
+unconfirmed package): it removes `source-map-js` (via `css-tree`) but 12
+Expensify TPs arrive the same way (`d3-*` via `d3`, `object-keys` via
+`globalthis`, `ua-parser-js` via `fbjs`, `web-streams-polyfill` via
+`openai`). Measured on deb (`meas.sh` / `sig-paths-work/meas2.mjs`,
+offline, before = corpus-precision-forks):
+
+| holdout (DB) | before: confirmed / TP / FP, precision | after | FPs removed | TP lost |
+|---|---|---|---|---|
+| Expensify J3, db-v4-paths-partial | 94 / 87 / 7, 92.6% | 90 / 87 / 3, 96.7% | `ai`, `ky`, `culori`, `swiper` | 0 |
+| Expensify J3, db-v3-clean | 131 / 89 / 42, 67.9% | 128 / 89 / 39, 69.5% | `culori`, `ky`, `swiper` | 0 |
+| react-navigation-example, either DB | 10 / 10 / 0; 14 / 14 / 0 | unchanged | none | 0 |
+| bluesky own build, db-v4-paths-partial | 32 / 29 / 3, 90.6% | 29 / 29 / 0, 100% | `core-js`, `mammoth`, `web-streams-polyfill` | 0 |
+| bluesky own build, db-v3-clean | 43 / 34 / 9, 79.1% | 42 / 34 / 8, 81.0% | `web-streams-polyfill` | 0 |
+| rainbow own build, either DB | 106 / 82 / 24, 77.4% | 104 / 82 / 22, 78.8% | `define-properties`, `roarr` | 0 |
+| metamask own build, either DB | 169 / 132 / 37, 78.1% | unchanged | none | 0 |
+
+Recall is unchanged everywhere. Still open on Expensify's partial DB:
+`source-map-js`, `whatwg-url` (originals not in any DB, see the table
+above) and `lodash-es`. Test: `tests/gate/deps/corpus-precision-residual.test.ts`.
 
 **Shipping.** Per D17c, the DB itself is never committed — the v2 build
 lives on a build host in `db-v2` (dependency-subtracted,
@@ -2065,3 +2176,117 @@ newly surfaced as FP); react-navigation-example 5 / 4 TP / 1 FP became
 ### Matching loads slim signature records (deps-slim-sigs)
 
 `loadSignatures(layers, { slim: true })` (used by `runDeps`, `runInformedDeps` and the MCP deps resource) parses each signature file and immediately projects it with `slimSigFile` to the fields the matcher reads, then drops the parsed JSON. Kept per function: `index, instrCount, exactHash, fuzzyHash, stringSetHash, stringCount, moduleId`; per module: `factoryFunctionIndex, localModuleId, factoryExactHash, factoryFuzzyHash, factoryIsBaseline, factoryIsDependency, path`; per file: `package, version, hbcVersion, toolchainBaseline, hashScheme, modulePaths` and the presence of `subtractedDependencies` (supersession). Dropped: names, param counts, owners, dep ids, nested counts, function-set hashes, provenance, subtractedBaselines, totalFunctions. Hash strings are interned across files, so the many shared hashes of a package's versions cost one string. `matchInventory` results are deep-equal to the full-load path (`tests/gate/deps/slim-sigs-equivalence.test.ts`); slim records are match-only and must never be written back to a sigdb. The default (`slim` unset) still returns the full parsed file for confirm/rebuild callers.
+
+### The no-signature bucket (deps-recall-nosig, 2026-11-09)
+
+Recall on Expensify was 30.9% with 145 of 288 truth packages having no
+hbc98 signature under that NAME in db-v3-clean. Per truth package@version
+(probe: a one-off script over db-v3-clean filenames, the bulk build's
+`log/results.jsonl` and its four job lists; react-navigation versions from
+the pinned commit's `pnpm-lock.yaml`, because its truth file has `null`
+for 64 of 76):
+
+| reason (db-v3-clean, hbc98) | Expensify (288) | react-navigation (76) |
+|---|---|---|
+| signature at the exact version | 75 | 3 |
+| other versions only (same major.minor / same major / other major) | 68 (22 / 26 / 20) | 41 (truth version unknown) |
+| never queued by the bulk build (not in its popularity population) | 108 | 13 |
+| built at other versions / HBC versions only, none at hbc98 | 24 | 17 |
+| queued, never built | 6 | 2 |
+| build failed (peer import unresolved 5, bundle 1) | 6 | 0 |
+| built, subtracted to nothing (`nullthrows`) | 1 | 0 |
+
+The open-source truth apps look the same: never queued is 80 of 198
+(bluesky), 270 of 518 (rainbow), 438 of 749 (MetaMask). No missing
+Expensify package was types-only, JSON-only or app-local (react-navigation's
+`@react-navigation/*` are workspace packages of the checkout, but their
+alpha versions are published); they are ordinary
+published JS (Sentry, `@formatjs/*`, `@turf/*`, the es-shim chain,
+`domutils`, expo modules). So the bucket is a population choice, not an
+unfingerprintable package type.
+
+**Build.** The 286 missing exact versions of the two holdouts (minus
+`react`, `react-native`: they are the scaffold) were built with
+`build-one.mjs` (path-bearing, hbc98, RN 0.87 scaffold, 4 slots) and run
+through `dep-subtract.mjs` against db-v3-clean, into an overlay
+(`db-overlay-recall`, 264 files, 41 MB). The overlay files must carry
+`subtractedDependencies`: `loadSignatures` drops every v1 file of a
+package that has a v2 file in any layer, so an unsubtracted overlay file
+of a package db-v3-clean already has is silently ignored. Two builder bugs
+found on the way, fixed with tests in
+`tests/gate/deps/deps-recall-nosig-entry.test.ts`:
+- **Entry.** Only `require(<pkg>)` was bundled, so `@babel/runtime` (no
+  root entry) failed every build, and packages the app reaches by sub-path
+  (`nanoid/non-secure`, `semver/functions/*`) got signatures of other files.
+  `entryPlan` (`install-plan.mjs`) adds every `exports` sub-path whose file
+  exists (`*` patterns expanded on disk), with root-only as the fallback
+  attempt. Packages without `exports` are unchanged.
+- **Slot poisoning.** Building a package the scaffold already has
+  (`@react-native/assets-registry`) ended with `npm uninstall`, which removed
+  the slot's own copy; every later job in that slot then failed. A
+  pre-existing package is now copied aside and restored
+  (`snapshotScaffoldPackage`).
+
+Remaining build failures (23 of 286: peer dependencies under the
+`--legacy-peer-deps` fallback, exports-less packages without a main) are
+in docs/BUGS.md.
+
+**Measured** (deb, offline `scoreAgainstTruth`, sha pins matched, code at
+main after the corpus-precision-forks merge, overlay symlinked beside every
+file of the base DB; ceiling = signature present AND candidate):
+
+| bundle, DB | confirmed / TP / FP | recall all (direct) | signature present | ceiling | bar losses |
+|---|---|---|---|---|---|
+| Expensify, db-v3-clean | 131 / 89 / 42 | 30.9% (35.2%) | 143 | 125 | 36 |
+| Expensify, db-v3-clean + overlay | 207 / 167 / 40 | 58.0% (80.2%) | 280 | 224 | 57 |
+| Expensify, db-v4-paths-partial | 94 / 87 / 7 | 30.2% (37.4%) | 143 | 125 | 38 |
+| Expensify, db-v4-paths-partial + overlay | 170 / 164 / 6 | 56.9% (82.4%) | 280 | 224 | 60 |
+| react-navigation, db-v3-clean | 14 / 14 / 0 | 18.4% (21.7%) | 44 | 33 | 19 |
+| react-navigation, db-v3-clean + overlay | 18 / 18 / 0 | 23.7% (25.0%) | 65 | 47 | 29 |
+| react-navigation, db-v4-paths-partial | 10 / 10 / 0 | 13.2% (15.0%) | 44 | 33 | 23 |
+| react-navigation, db-v4-paths-partial + overlay | 15 / 15 / 0 | 19.7% (20.0%) | 65 | 47 | 32 |
+
+No new false positive on either DB (before the merge, `eventemitter3` was
+one; the precision rules removed it). Expensify on db-v3-clean gains 78
+true positives (mostly never-queued packages and packages built before only
+at other versions) and loses `hoist-non-react-statics`. react-navigation
+stays at 0 FP and gains `@react-navigation/core`, `/elements`,
+`/bottom-tabs`, `@react-native/normalize-colors`, `semver` (db-v3-clean
+also `@react-navigation/...` one fewer than before the merge: 18, not 19).
+After the overlay the bottleneck moves: the Expensify ceiling is 224/288
+(77.8%), with 56 signatures never proposed as candidates and 57-60 lost at
+the bar; only 8 truth packages lack a signature. react-navigation's
+ceiling is 47/76.
+
+**Fork originals (orchestrator check).** The overlay includes
+`source-map@0.6.1` and `whatwg-url-without-unicode@8.0.0-3`, the originals of
+the Expensify false positives `source-map-js` and `whatwg-url`. Both
+originals become true positives on both DBs. With the overlay,
+`whatwg-url` is no longer confirmed on db-v4-paths-partial (FPs 7 -> 6:
+`source-map-js`, `lodash-es`, `ky`, `ai`, `culori`, `swiper`) but stays on
+db-v3-clean, whose `whatwg-url` file is pathless. `source-map-js` stays a
+false positive on both, although its db-v4-paths-partial file
+(`1.2.1`, hbc98) has paths. Its matched functions were not traced, so it is
+unknown why the twin rule does not demote it.
+
+**Version tolerance is not the lever.** Matching is already by package name
+across every loaded version, so other-version signatures were already
+scoring: of the 68 Expensify packages with other versions only, building the
+exact version recovered 9. A nearest-version rule would add nothing the
+overlay did not, so it was not built.
+
+**Caveat: the population came from the truth files.** The overlay was chosen
+by reading both holdouts' truth, which J4's acceptance rules forbid for a
+generalising result. The numbers above measure the coverage ceiling (what
+the shared DB gives when it has these packages), not a heuristic. The
+general fix is the bulk population: it was taken from a react-native
+keyword search plus popularity, which skips ordinary JS dependencies of RN
+apps. Next: expand the population from the dependency closure of popular RN
+apps' package.json files (no holdout consulted), then re-measure all five
+apps.
+
+Reproduce (deb): `~/_hbc2js/recall/{genjobs.mjs,drive.sh,subtract.sh,measure.mjs,runmeasure.sh}`;
+jobs come from the diagnosis rows; `xargs -a jobs2.tsv -d '\n' -P4 -n1 ./drive.sh`
+(`HBC2JS_BULK_DIR` = a work dir holding 4 `slots/87-N` copies of
+`ScaffoldRN87` and `db/_baselines` with the three hbc98 baselines), then
+`subtract.sh`, then `runmeasure.sh <tag> <merged dir>`.

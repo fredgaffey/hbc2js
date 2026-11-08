@@ -101,7 +101,7 @@ export interface SigDbFile {
   /** deps-slim-sigs, in-memory only (`slim-sigs.ts`): this record was
    *  prefiltered against one match target; `eligible`/`moduleTotal` are the
    *  counts `scorePackage` would compute from the full file at `minInstr`. */
-  readonly slim?: { readonly minInstr: number; readonly eligible: number; readonly moduleTotal: number };
+  readonly slim?: { readonly minInstr: number; readonly eligible: number; readonly moduleTotal: number; readonly distinctEligible?: number };
 }
 
 export interface SigDbIndexEntry {

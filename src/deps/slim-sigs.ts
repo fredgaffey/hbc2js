@@ -64,12 +64,17 @@ export function slimSigFile(f: SigDbFile, intern: Map<string, string>, target?: 
   const head = (): Record<string, unknown> => {
     const o: Record<string, unknown> = { package: s(f.package), version: f.version, hbcVersion: f.hbcVersion, toolchainBaseline: f.toolchainBaseline };
     if (f.hashScheme !== undefined) o.hashScheme = f.hashScheme;
-    if (f.subtractedDependencies !== undefined) o.subtractedDependencies = [];
+    // corpus-precision-forks: the twin rule reads declared dependencies,
+    // the container rule the package's whole function count, the
+    // embedded rule whether the file has module paths.
+    if (f.subtractedDependencies !== undefined) o.subtractedDependencies = f.subtractedDependencies.map(s);
+    o.totalFunctions = f.totalFunctions;
+    o.rawFunctionCount = f.rawFunctionCount;
+    if (f.modulePaths !== undefined) o.modulePaths = f.modulePaths;
     return o;
   };
   const plain = (): SigDbFile => {
     const o = head();
-    if (f.modulePaths !== undefined) o.modulePaths = f.modulePaths;
     o.functions = f.functions.map(fnRec);
     o.modules = f.modules.map(modRec);
     return o as unknown as SigDbFile;
@@ -79,7 +84,12 @@ export function slimSigFile(f: SigDbFile, intern: Map<string, string>, target?: 
   const foreign = foreignSets(f);
   const keep = (hash: string | null, set: ReadonlySet<string>): boolean => hash !== null && set.has(schemeKey(f, hash));
   let eligible = 0;
-  for (const fn of f.functions) if (fn.instrCount >= target.minInstr && !foreign.functions.has(fn.index)) eligible++;
+  const distinct = new Set<string>();
+  for (const fn of f.functions) {
+    if (fn.instrCount < target.minInstr || foreign.functions.has(fn.index)) continue;
+    eligible++;
+    distinct.add(fn.exactHash);
+  }
   const fnByIndex = new Map(f.functions.map((fn) => [fn.index, fn]));
   const keptFn = new Set<number>();
   for (const fn of f.functions) {
@@ -102,6 +112,6 @@ export function slimSigFile(f: SigDbFile, intern: Map<string, string>, target?: 
   const o = head();
   o.functions = f.functions.filter((fn) => keptFn.has(fn.index)).map(fnRec);
   o.modules = keptModules.map(modRec);
-  o.slim = { minInstr: target.minInstr, eligible, moduleTotal };
+  o.slim = { minInstr: target.minInstr, eligible, moduleTotal, distinctEligible: distinct.size };
   return o as unknown as SigDbFile;
 }
