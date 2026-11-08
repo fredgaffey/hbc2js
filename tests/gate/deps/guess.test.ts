@@ -240,7 +240,7 @@ test("corpus-guess-generic: npm-search lead requires a package-shaped (separator
   const mod = invModule({ factoryFunctionIndex: 1, localModuleId: 1, stringConstants: ["regex", "sections"] });
   const { inventory, matchReport } = makeInventoryAndReport([mod], [attribution({ factoryFunctionIndex: 1, localModuleId: 1 })]);
   const queries: string[] = [];
-  const search = async (q: string) => { queries.push(q); return [{ name: q, version: "1.0.0" }]; };
+  const search = async (q: string) => { queries.push(q); return [{ name: q, version: "1.0.0", description: "" }]; };
   const guesses = await guessModules(inventory, matchReport, { search });
   assert.equal(guesses.length, 0);
   assert.deepEqual(queries, []);
