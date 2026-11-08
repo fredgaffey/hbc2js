@@ -137,7 +137,7 @@ export function truthFromMap(hbcPaths, mapPath, bundleJsPath, opts = {}) {
   jsLines.forEach((text, i) => {
     if (text.startsWith("__d(")) start = i;
     if (start < 0) return;
-    const m = /\},(\d+),\[[\d,]*\]\);\s*$/.exec(text);
+    const m = /\}\)?,(\d+),\[[\d,]*\]\);\s*$/.exec(text);
     if (m === null) return;
     let srcIdx = null;
     for (let j = start; j <= i && srcIdx === null; j++) srcIdx = srcPerLine[j] ?? null;
