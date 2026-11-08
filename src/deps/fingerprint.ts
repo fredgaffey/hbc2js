@@ -10,7 +10,8 @@
 
 import { createHash } from "node:crypto";
 import { foldOperandWidth, hasWidthVariant, normaliseFunctionForSignature, signatureInstructions } from "./sig-normalise.ts";
-import { scanBundleRegistrations } from "./dscan.ts";
+import { scanBundle } from "./wscan.ts";
+import type { BundleKind } from "./wscan.ts";
 import type { HbcModule } from "../parse/types.ts";
 import type { DecodedFunction, Instruction } from "../disasm/decode.ts";
 import type { SigFunction, SigModule } from "./sigdb-types.ts";
@@ -67,6 +68,8 @@ export interface FingerprintResult {
    *  baselines, so the two schemes are never compared to each other. */
   readonly legacyExactHashes: readonly string[];
   readonly legacyFuzzyHashes: readonly string[];
+  /** Module system the registrations came from (docs/specs/32). */
+  readonly bundleKind?: BundleKind;
 }
 
 /**
@@ -98,6 +101,7 @@ export function fingerprintModule(mod: HbcModule, decodeFunction: (mod: HbcModul
   }
 
   let modules: SigModule[] = [];
+  let bundleKind: BundleKind = "none";
   if (mod.functions.length > 0) {
     const byIndex = new Map(functions.map((f) => [f.index, f]));
     const collectNested = (factoryIdx: number, seen: Set<number>): number[] => {
@@ -117,7 +121,9 @@ export function fingerprintModule(mod: HbcModule, decodeFunction: (mod: HbcModul
       return nested;
     };
 
-    modules = scanBundleRegistrations(mod, decodeFunction).map((reg) => {
+    const scanned = scanBundle(mod, decodeFunction);
+    bundleKind = scanned.kind;
+    modules = scanned.registrations.map((reg) => {
       const seen = new Set([reg.factoryFunctionIndex]);
       const nestedIdx = collectNested(reg.factoryFunctionIndex, seen);
       const factory = byIndex.get(reg.factoryFunctionIndex);
@@ -138,5 +144,5 @@ export function fingerprintModule(mod: HbcModule, decodeFunction: (mod: HbcModul
     });
   }
 
-  return { functions, modules, legacyExactHashes, legacyFuzzyHashes };
+  return { functions, modules, legacyExactHashes, legacyFuzzyHashes, bundleKind };
 }

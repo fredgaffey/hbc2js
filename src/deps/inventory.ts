@@ -9,6 +9,7 @@ import { parseHbc } from "../parse/module.ts";
 import type { HbcModule, ParseOptions } from "../parse/types.ts";
 import { fingerprintModule, functionStrings } from "./fingerprint.ts";
 import type { SigFunction } from "./sigdb-types.ts";
+import type { BundleKind } from "./wscan.ts";
 
 // Same truncated-sha256 convention as fingerprint.ts's own `sha256` (96
 // bits, docs/PACKAGE-SIGNATURES.md §5.3) — kept as a private copy here
@@ -83,10 +84,14 @@ export interface ModuleInventory {
    *  ones. Optional: hand-built inventories omit them. */
   readonly legacyExactHashes?: readonly string[];
   readonly legacyFuzzyHashes?: readonly string[];
+  /** `metro` (`__d`), `webpack` (Re.Pack module objects) or `none`
+   *  (docs/specs/32-webpack-inventory.md). Optional: hand-built
+   *  inventories omit it. */
+  readonly bundleKind?: BundleKind;
 }
 
 export function buildInventoryFromModule(mod: HbcModule): ModuleInventory {
-  const { functions, modules, legacyExactHashes, legacyFuzzyHashes } = fingerprintModule(mod, decodeFunction);
+  const { functions, modules, legacyExactHashes, legacyFuzzyHashes, bundleKind } = fingerprintModule(mod, decodeFunction);
   const byIndex = new Map(functions.map((f) => [f.index, f]));
 
   const moduled = new Set<number>();
@@ -147,6 +152,7 @@ export function buildInventoryFromModule(mod: HbcModule): ModuleInventory {
     functions,
     legacyExactHashes,
     legacyFuzzyHashes,
+    bundleKind: bundleKind ?? "none",
   };
 }
 

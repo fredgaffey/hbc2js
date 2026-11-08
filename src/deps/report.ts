@@ -2,6 +2,7 @@
 // from the match/guess/confirm stages, and the `package.json` a decompile
 // project gets when at least one dependency is confirmed with confidence.
 
+import type { BundleSummary } from "./bundles.ts";
 import type { ConfidenceTier, MatchReport } from "./match.ts";
 import type { Evidence, ModuleGuess } from "./guess.ts";
 import { isHintEligibleEvidence } from "./guess.ts";
@@ -77,6 +78,10 @@ export interface ModuleOwnership {
 
 export interface DepsReport {
   readonly input: string;
+  /** Present only when the input held more than one Hermes bundle: each
+   *  bundle's kind and module count, and which were analysed
+   *  (docs/specs/32-webpack-inventory.md). */
+  readonly bundles?: readonly BundleSummary[];
   readonly hbcVersion: number;
   readonly totalFunctions: number;
   readonly totalModules: number;
@@ -501,6 +506,11 @@ export function formatReportText(report: DepsReport): string {
   const lines: string[] = [];
   lines.push(`hbc2js deps: ${report.input}`);
   lines.push(`  hbc version: ${report.hbcVersion}, functions: ${report.totalFunctions}, modules: ${report.totalModules}`);
+  // A Re.Pack app can ship hundreds of chunk bundles: list the first few,
+  // then a count (`--json` keeps the full list).
+  const bundles = report.bundles ?? [];
+  for (const b of bundles.slice(0, 8)) lines.push(`  bundle ${b.entryPath}: ${b.kind}, ${b.totalModules} modules${b.analysed ? " (analysed)" : ""}`);
+  if (bundles.length > 8) lines.push(`  ... ${bundles.length - 8} more bundles (${bundles.filter((b) => b.analysed).length} of ${bundles.length} analysed)`);
   if (report.reactNativeVersion !== null) {
     let rnLine = `  react-native: ${report.reactNativeVersion} (detected from matched module signatures)`;
     if (report.reactNativeVersionConsistentWithHbc === false) {

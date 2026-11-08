@@ -11,7 +11,7 @@
 // modules with different owners, or from none (the global function,
 // polyfills), gets `null`: subtraction treats `null` as "someone else's".
 
-import { scanBundleRegistrations } from "./dscan.ts";
+import { scanBundle } from "./wscan.ts";
 import type { HbcModule } from "../parse/types.ts";
 import type { DecodedFunction } from "../disasm/decode.ts";
 
@@ -19,7 +19,7 @@ export function computeFunctionOwners(mod: HbcModule, decodeFunction: (mod: HbcM
   const owners: (string | null | undefined)[] = new Array(mod.functions.length).fill(undefined);
   const CONFLICT = null;
   if (mod.functions.length === 0) return [];
-  const regs = scanBundleRegistrations(mod, decodeFunction);
+  const regs = scanBundle(mod, decodeFunction).registrations;
   for (const reg of regs) {
     const owner = reg.moduleId === null ? null : ownerOfModuleId(reg.moduleId);
     const seen = new Set<number>([reg.factoryFunctionIndex]);

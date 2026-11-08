@@ -154,6 +154,8 @@ export function pickApkBundleCandidates(entries: readonly string[], namedCandida
   // Custom-named Metro bundles (e.g. assets/kernel.android.bundle); the
   // Hermes-magic check in extractBundleFromApk disambiguates.
   for (const e of entries) if (/^assets\/[^/]*\.bundle$/i.test(e) && !out.includes(e)) out.push(e);
+  // Re.Pack chunk bundles may sit in a subdirectory (docs/specs/32).
+  for (const e of entries) if (/^assets\/.+\.chunk\.bundle$/i.test(e) && !out.includes(e)) out.push(e);
   return out;
 }
 
@@ -195,6 +197,23 @@ export function extractBundleFromApk(apkPath: string): ExtractedBundle {
   const isHermes = isHermesMagic(chosenBytes);
   const hbcVersion = isHermes ? new DataView(chosenBytes.buffer, chosenBytes.byteOffset, chosenBytes.byteLength).getUint32(8, true) : null;
   return { bytes: chosenBytes, entryPath: chosenPath, isHermes, hbcVersion };
+}
+
+/** Every Hermes bundle in the APK, in candidate order (docs/specs/32:
+ *  `deps` inventories all of them and analyses the group with the most
+ *  modules). Non-Hermes candidates are left out. */
+export function extractHermesBundlesFromApk(apkPath: string): ExtractedBundle[] {
+  if (!which("unzip")) {
+    throw new Error("`unzip` not found on PATH; cannot extract a bundle from an .apk");
+  }
+  const out: ExtractedBundle[] = [];
+  for (const entryPath of pickApkBundleCandidates(listZipEntries(apkPath))) {
+    const bytes = readZipEntry(apkPath, entryPath);
+    if (bytes === null || !isHermesMagic(bytes)) continue;
+    const hbcVersion = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(8, true);
+    out.push({ bytes, entryPath, isHermes: true, hbcVersion });
+  }
+  return out;
 }
 
 // Android permission -> npm-package hint, for guess.ts's `apkHints` (D17a

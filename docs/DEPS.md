@@ -73,10 +73,22 @@ hbc2js deps <bundle.hbc|app.apk> [--out <dir>] [--confirm] [--confirm-cache] [--
    accepted with unknown deps. When the `global` function registers
    nothing, the functions it creates directly are scanned too (one
    level): this finds bundles whose body is wrapped in an IIFE and lazy
-   definers that switch on a module id (corpus-B4). Re.Pack/webpack chunk
-   bundles (`webpackChunk_*` module objects) and scope-hoisted bundles
-   with no module system are not recognised and still report
-   `totalModules: 0`.
+   definers that switch on a module id (corpus-B4). When `__d` finds
+   nothing and the string table names a `webpackChunk` global, a second
+   scanner (`src/deps/wscan.ts`, docs/specs/32-webpack-inventory.md)
+   reads Re.Pack/webpack module objects: an integer-keyed object literal
+   whose every by-index entry is a closure. Each entry is a module, with
+   the key as its id and the numeric calls through the factory's third
+   parameter (`__webpack_require__`) as its deps. The inventory's
+   `bundleKind` is `metro`, `webpack` or `none`. Scope-hoisted bundles
+   with no module system still report `totalModules: 0`.
+   For an APK, every Hermes bundle is inventoried
+   (`src/deps/bundles.ts`). Webpack bundles of one HBC version (a main
+   bundle and its `*.chunk.bundle` files, which share one module-id
+   space) are merged into one inventory. Metro bundles are kept apart,
+   because each has its own ids. The group with the most modules is
+   analysed (ties go to more bytes). When there is more than one bundle,
+   the report's `bundles` field lists each with its kind and module count.
 2. **Match** (`src/deps/match.ts`, `src/deps/db.ts`): score every signature
    DB entry (across the three layers below) against the target's own
    per-function exact/fuzzy/string-set hashes and per-module factory hashes.
