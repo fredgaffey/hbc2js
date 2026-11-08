@@ -60,3 +60,29 @@ test("deps-recall-nosig: a non-string main (math-intrinsics) does not throw", ()
   const d = pkgDir({ "package.json": JSON.stringify({ name: "mi", main: false, exports: { "./abs": "./abs.js" } }), "abs.js": "", "index.js": "" });
   try { assert.deepEqual(entryPlan("mi", d).attempts, [["mi", "mi/abs"], ["mi"]]); } finally { rmSync(d, { recursive: true, force: true }); }
 });
+
+// deps-recall-nosig (slot poisoning): building a package the scaffold already
+// has (`@react-native/assets-registry`, a react-native dependency) ran
+// `npm uninstall` afterwards and removed it from the shared slot, so every
+// later job in that slot failed ("Unable to resolve module
+// @react-native/assets-registry/registry"). A pre-existing package is now
+// snapshotted before install and restored instead of uninstalled.
+// @ts-expect-error untyped .mjs
+import { snapshotScaffoldPackage } from "../../../tools/pkgsig/bulk/install-plan.mjs";
+
+test("deps-recall-nosig: a scaffold-owned package is restored, not uninstalled", () => {
+  const d = pkgDir({ "node_modules/@rn/reg/package.json": '{"version":"0.87.1"}', "node_modules/@rn/reg/registry.js": "orig" });
+  try {
+    const restore = snapshotScaffoldPackage(d, "@rn/reg");
+    assert.equal(typeof restore, "function");
+    rmSync(join(d, "node_modules/@rn/reg"), { recursive: true });
+    mkdirSync(join(d, "node_modules/@rn/reg"));
+    writeFileSync(join(d, "node_modules/@rn/reg/package.json"), '{"version":"0.86.0"}');
+    restore();
+    assert.equal(readFileSync(join(d, "node_modules/@rn/reg/package.json"), "utf8"), '{"version":"0.87.1"}');
+    assert.equal(readFileSync(join(d, "node_modules/@rn/reg/registry.js"), "utf8"), "orig");
+    assert.equal(snapshotScaffoldPackage(d, "absent-pkg"), null, "absent package: caller uninstalls as before");
+  } finally { rmSync(d, { recursive: true, force: true }); }
+  const src = readFileSync(new URL("../../../tools/pkgsig/bulk/build-one.mjs", import.meta.url), "utf8");
+  assert.ok(/snapshotScaffoldPackage\(/.test(src));
+});

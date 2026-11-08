@@ -61,7 +61,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, rmdirSync, wr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { entryPlan, entrySource, pipedOpts, runInstall } from "./install-plan.mjs";
+import { entryPlan, entrySource, pipedOpts, runInstall, snapshotScaffoldPackage } from "./install-plan.mjs";
 import { computeBaselineUnion, hasCompleteBaselineSet, subtractBaseline } from "./baseline-subtract.mjs";
 
 // src/deps/db.ts's writeSignature() does a read-modify-write of a shared
@@ -203,6 +203,7 @@ async function main() {
 
   let workDir = null;
   let installed = false;
+  let restoreScaffold = null; // deps-recall-nosig: slot already had pkg
   try {
     const cachePath = hbcCachePath();
     let bytes;
@@ -216,6 +217,7 @@ async function main() {
       if (existsSync(pathsCache)) modulePaths = JSON.parse(readFileSync(pathsCache, "utf8"));
       fromCache = true;
     } else {
+      restoreScaffold = snapshotScaffoldPackage(scaffoldDir, pkg);
       installPackage();
       installed = true;
       workDir = mkdtempSync(join(tmpdir(), "hbc2js-bulk-"));
@@ -279,7 +281,8 @@ async function main() {
     process.exitCode = 1;
   } finally {
     if (workDir !== null) rmSync(workDir, { recursive: true, force: true });
-    if (installed) uninstallPackage();
+    if (restoreScaffold !== null) restoreScaffold();
+    else if (installed) uninstallPackage();
   }
 }
 

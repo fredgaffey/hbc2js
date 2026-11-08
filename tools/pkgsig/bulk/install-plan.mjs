@@ -125,3 +125,24 @@ export function entryPlan(name, pkgDir, fs = createRequire(import.meta.url)("nod
 export function entrySource(specs) {
   return `module.exports = [${specs.map((s) => `require(${JSON.stringify(s)})`).join(", ")}];\n`;
 }
+
+/**
+ * deps-recall-nosig (slot poisoning): when `pkg` already exists in the
+ * scaffold slot (a react-native dependency such as
+ * @react-native/assets-registry), copy it aside and return a function that
+ * puts that copy back; the caller runs it instead of `npm uninstall`, which
+ * would remove the slot's own copy and break every later job in the slot.
+ * Returns null when the slot does not have the package.
+ */
+export function snapshotScaffoldPackage(scaffoldDir, pkg, fs = createRequire(import.meta.url)("node:fs")) {
+  const dir = `${scaffoldDir}/node_modules/${pkg}`;
+  if (!fs.existsSync(`${dir}/package.json`)) return null;
+  const snap = `${scaffoldDir}/.hbc2js-slot-snapshot/${pkg.replace(/\//g, "__")}`;
+  fs.rmSync(snap, { recursive: true, force: true });
+  fs.mkdirSync(`${scaffoldDir}/.hbc2js-slot-snapshot`, { recursive: true });
+  fs.cpSync(dir, snap, { recursive: true, verbatimSymlinks: true });
+  return () => {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.renameSync(snap, dir);
+  };
+}
