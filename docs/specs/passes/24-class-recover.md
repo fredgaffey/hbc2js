@@ -707,3 +707,36 @@ rn-template output hash unchanged.
   fixtures decompile at v98; 32/33/34 are byte-identical to v99 below the
   header, 36 differs at exactly the three accessor-name comments, 35 only in
   register allocation. Row 20's `verified` grade stands.
+
+## 8. Aliased superclass register (2026-11-09)
+
+hermesc may give `CreateDerivedClass` the same register as a destination and
+as the superclass operand -- `CreateDerivedClass r4, r3, r2, r4, 3` at v98
+and v99 once the superclass value is dead after the class exists (fixture
+89-derived-class-super-register-alias; fixture 88's `Cond`). The VM reads every
+operand before writing either result. The lowering used to write the
+constructor into the register first and then read the superclass out of it
+(`r4 = _fn3; Object.setPrototypeOf(r4, r4)`), which throws `Cyclic __proto__
+value` at `--passes=none`. That was a decompilation bug, not a pass bug. Now,
+when the superclass register is also `op0` or `op1`, `src/emit/lower.ts` makes
+both links first, through the closure's own binding, and writes the registers
+after that:
+
+```js
+Object.setPrototypeOf(_fn12, r2);
+Object.setPrototypeOf(_fn12.prototype, r2 === null ? null : r2.prototype);
+r2 = _fn12;
+```
+
+The non-aliased spelling is unchanged byte for byte. `buildGroup` treats that
+exact pair as the group's ctor and prototype links. It must sit immediately
+before the head, both statements must carry this site's own origin stamp, the
+targets must be the head's closure name and its `.prototype`, the second
+link's `cond` must test the same superclass expression, and that expression
+must be pure and must not mention the closure. The pair is then deleted, and
+its superclass expression becomes the class's `extends`. That is sound
+because `r2 = class extends r2 {...}` evaluates `extends r2` before the
+assignment: an AssignmentExpression evaluates its right-hand side, the class
+heritage included, before `PutValue` (ES2024 13.15.2), and no statement
+between the pair and the head writes a register. Pinned by
+`tests/gate/passes/derived-ctor.test.ts`.

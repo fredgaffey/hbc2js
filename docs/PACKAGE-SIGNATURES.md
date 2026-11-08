@@ -913,3 +913,13 @@ pauses below `MIN_FREE_GB` (default 8). Results go to `$OUT.log`
 no paths are listed in `$OUT.failed.txt` for hard-linking in pathless.
 The 71,222-file db-v3 is 36,274 jobs. Linux (needs `flock`). Tests:
 `tests/gate/deps/rebuild-paths-plan.test.ts`.
+
+Temp dirs: each job's Metro/hermesc scratch lives in one `sigpaths-<pid>-*`
+dir under `os.tmpdir()`, owned by `withWorkDir` / `runBundleJob`
+(`transplant-lib.mjs`): removed on success, on any throw, with rm retries so a
+lingering Metro worker cannot make cleanup throw and skip the rest. A job
+killed outright (SIGKILL, OOM, a `timeout` wrapper) skips every `finally`, so
+each new job first sweeps `sigpaths-<pid>-*` dirs whose pid is dead; live
+pids' dirs and legacy unnumbered `sigpaths-XXXXXX` dirs are never touched
+(a live rebuild once leaked 6,977 dirs / 20 GB this way). Test:
+`tests/gate/deps/bugs-2026-11-09-sigpaths-tmp-leak.test.ts`.

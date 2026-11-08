@@ -16,9 +16,9 @@
 // slot must be the scaffold of that hbc version's RN family (worker.sh).
 // Prints one JSON line (ok, modules, modMiss, functions, fnMiss).
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { withWorkDir } from "./transplant-lib.mjs";
 const R = process.env.R;
 const { pipedOpts, runInstall } = await import(R + "/tools/pkgsig/bulk/install-plan.mjs");
 const { decodeFunction } = await import(R + "/src/disasm/decode.ts");
@@ -31,9 +31,10 @@ const base = file.slice(0, file.lastIndexOf("__hbc"));
 const at = base.lastIndexOf("@");
 const pkg = base.slice(0, at).replace(/^(@[^/]*?)__/, "$1/"), version = base.slice(at + 1);
 const res = { file, ok: false };
-const work = mkdtempSync(join(tmpdir(), "sigpaths-")); process.env.TMPDIR = work;
 const entry = join(slot, `__sigpaths_entry__.js`);
 try {
+  withWorkDir((work) => {
+  process.env.TMPDIR = work;
   runInstall(`${pkg}@${version}`, (cmd, argv) => execFileSync(cmd, argv, pipedOpts({ cwd: slot, timeout: 240_000 })));
   writeFileSync(entry, `const X = require(${JSON.stringify(pkg)});\nmodule.exports = X;\n`);
   const js = join(work, "out.bundle"), map = join(work, "out.bundle.map"), hbc = join(work, "out.hbc");
@@ -71,10 +72,10 @@ try {
     writeFileSync(join(outDir, file), JSON.stringify({ ...old, modulePaths: MODULE_PATHS_VERSION, functions, modules }));
     res.ok = true;
   } else res.reason = "too many unmatched modules";
+  });
 } catch (e) {
   res.reason = (String(e?.message ?? e).slice(0, 200) + " :: " + String(e?.stderr ?? "").slice(-400));
 } finally {
-  rmSync(work, { recursive: true, force: true });
   rmSync(entry, { force: true });
   try { execFileSync("npm", ["uninstall", pkg, "--ignore-scripts", "--no-save", "--no-audit", "--no-fund"], { cwd: slot, stdio: "ignore", timeout: 120_000 }); } catch {}
 }

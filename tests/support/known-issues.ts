@@ -32,6 +32,12 @@ export const KNOWN_AMBIGUOUS_V98: readonly string[] = [
   // with it. Its syntax, trace and fuzz oracles all PASS at v98 -- only the
   // roundtrip oracle, which re-parses, hits the ambiguity.
   "83-try-finally-trailing-code",
+  // Added 2026-11-09 with the fixture itself (the CreateDerivedClass
+  // aliased-superclass-register fix). Its v98 build hits the same
+  // hbc98-late/hbc99-mar2026 function-id disagreement as
+  // 33-class-inheritance-super, and `--opcode-table=hbc98-late` resolves it the
+  // same way. The fixture's own construct has nothing to do with it.
+  "89-derived-class-super-register-alias",
   // Added 2026-09-05 with the fixture itself (F24-3 regression, two aliased
   // class-creation opcodes): same v98 hbc98-late/hbc99-mar2026 function-id
   // disagreement as 34-class-static-members above, resolved the same way by
