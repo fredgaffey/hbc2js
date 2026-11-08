@@ -503,6 +503,19 @@ thread's emit byte-for-byte, the same mechanism `decompileParallel` uses.
   file's path, size and mtime, so a session that calls `suggest_names` and
   then `promote_change` analyses the bundle once.
 
+### Unresolved environment accesses (strict vs lenient)
+
+A real app can contain environment accesses the analysis cannot resolve
+statically (react-navigation-example: 182). `NameService`, `rawFrameBodies`
+and `analyseModule` default to `strictEnv: true`, which throws
+`E_ENV_UNRESOLVED` for the whole module, so every surface in
+`src/readability/surfaces.ts` used to fail on such an app. The surfaces now run
+lenient (`LENIENT_ENV`): an unresolved site renders as a
+`__hbc_unresolved_env` marker with a `W_ENV_UNRESOLVED` diagnostic, the same
+convention as `name llm-fill --only src`. `ReadabilityContext.analysis` lets a
+caller (or a test) supply a pre-built analysis. Test:
+`tests/gate/llm-readability/bugs-2026-11-09-surfaces-strictenv.test.ts`.
+
 ## How a readability job runs under the ui-server (D34)
 
 The three `readability-*` job kinds are enqueued by `POST
