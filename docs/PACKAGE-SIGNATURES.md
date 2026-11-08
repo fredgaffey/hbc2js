@@ -953,15 +953,19 @@ here publishes; the owner runs the printed command.
    tools/pkgsig/fetch-db.sh [dest]` (no default tag; the current default is
    unchanged until the owner flips it).
 
-**Known gap: the sqlite asset.** The sqlite layer stores neither
-`module.factoryIsDependency`, `nestedFunctionIndices`,
-`subtractedDependencies` nor `bulkBuildFixVersion`, so `import-json.mjs
---verify` reports round-trip mismatches on any db-v3-style file, and
-`match.ts` (which reads `factoryIsDependency` and `subtractedDependencies`)
-would score a sqlite copy differently from the JSON. `finalize.sh` therefore
-builds the sqlite, reports the verify result, and attaches it to the release
-command only when verify passes (`SQLITE_RELEASE=1` forces it). Ship the JSON
-tarball; making the sqlite lossless is a separate item.
+**The sqlite asset (schema rev 3, lossless).** Rev 3 stores every
+`SigDbFile` field: `modules.factory_is_dependency`,
+`fingerprints.subtracted_dependencies` (JSON; NULL = absent, `[]` = empty),
+`fingerprint_functions.owner_json`, the already-present
+`modules.nested_function_indices` (kept when a file carries it) and
+`bulk_build_fix_version` (now taken from the file's `bulkBuildFixVersion`).
+Absent fields stay NULL and read back absent, so a rev-1/2 DB is migrated in
+place by `openSigDb` (columns added, rows untouched) and scores as before.
+`match.ts` reads `factoryIsDependency` and `subtractedDependencies`, so a
+sqlite copy now scores identically to the JSON copy, and `import-json.mjs
+--verify` passes. `finalize.sh` attaches the sqlite to the owner command by
+default whenever verify passes (`SQLITE_RELEASE=1` forces it). Test:
+`tests/gate/deps/sigdb-sqlite-lossless.test.ts`.
 
 Validator (`tools/pkgsig/ship/validate-path-db.mjs <dir> [--src <dir>]
 [--list-pathless]`) reads only. Tests: `tests/gate/deps/validate-path-db.test.ts`,
