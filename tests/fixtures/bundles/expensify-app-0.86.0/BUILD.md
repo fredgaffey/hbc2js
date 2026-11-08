@@ -146,3 +146,48 @@ Header fields of note (`hbc-file-parser`):
   react-navigation's 36, useful for stress-testing jump-table recovery at
   scale (`ObjShapeTableCount` 20,155 and `StringCount` 219,182 are also an
   order of magnitude beyond anything in `tests/fixtures/constructs/`).
+
+## J3 ground truth (`deps-truth.json`, committed)
+
+Second held-out app for `hbc2js deps` (owner ruling: no deps threshold change
+is done until measured on a held-out app other than react-navigation).
+Same pinned commit as above (`12a92bd39f31ddabf5a425552930cbb055536555`);
+built on deb (Ubuntu 24.04, node 22.18.0) 2026-11-08.
+
+```sh
+git clone https://github.com/Expensify/App.git expensify && cd expensify
+git checkout 12a92bd39f31ddabf5a425552930cbb055536555      # pin; lockfile = the commit's package-lock.json
+# node 22's bundled npm 10 rejects the lockfile ("Missing: react@19.2.0 from
+# lock file"); use npm 11 and override engine-strict (node 26.5.0 pinned):
+npm_config_engine_strict=false npx -y npm@11.12.1 ci --ignore-scripts
+# No watchman on deb: the react-native-worklets/.worklets race ("Failed to get
+# the SHA-1") fails the first 1-2 runs; each run leaves more .worklets files
+# on disk, and the 3rd run succeeded. Loop until it exits 0:
+for n in 1 2 3 4 5 6; do
+  npx react-native bundle --platform android --dev false --entry-file index.js \
+    --bundle-output ../index.android.bundle --sourcemap-output ../index.android.bundle.map \
+    --assets-dest ../release-assets --max-workers 1 && break
+done
+# hermesc matching the app's own pin (node_modules/hermes-compiler 250829098.0.14, HBC 98):
+node_modules/hermes-compiler/hermesc/linux64-bin/hermesc -O -emit-binary -out=../expensify-app.hbc ../index.android.bundle
+# truth, run from the app root so the map's relative sources resolve:
+node <hbc2js>/tools/deps-truth.mjs ../expensify-app.hbc ../index.android.bundle.map \
+  --bundle-js ../index.android.bundle --write-truth ../deps-truth.json
+```
+
+| Artifact (deb build) | Size | sha256 |
+|---|---|---|
+| `index.android.bundle` | 38,610,703 bytes | `7ac18b3d55698806ac8574385fb036f221237c238d47247ce972bf51cf0febc5` |
+| `expensify-app.hbc` (`-O`, linux64 hermesc .14) | 45,613,654 bytes | `48ff06dd4e2f75914114862518112b199ee6f1a286a269411a6dd065fbb9da7c` |
+
+Truth: 12,371 modules, 288 packages (91 direct, 197 transitive), file ~2 MB.
+`deps-truth.json` pins that `.hbc` by sha256; scoring against any other build
+reports a sha mismatch (`shaGuardMessage`).
+
+**Reproducibility caveat.** The Mac build recorded above (bundle 38,610,608
+bytes) and this deb build (38,610,703 bytes) differ by 95 bytes at the same
+commit; the react-native-worklets babel plugin emits per-worklet files whose
+count grew between retries (1,196 -> 1,213). So the bundle is not
+byte-reproducible across runs; the committed truth is valid for the pinned
+`.hbc` sha only. The package set is expected to be stable (same lockfile).
+No secrets or `.env` needed. The built bundle/map/hbc are not committed.

@@ -68,6 +68,7 @@ Over all 18 apps with a module inventory (including the 3 large-bundle apps, mea
 | bluesky-social/social-app | 198 (198) | 44 / 68.2% / 15.2% | 37 / 67.6% / 12.6% |
 | rainbow-me/rainbow | 518 (211) | 136 / 64.7% / 17.0% | 121 / 64.5% / 15.1% |
 | MetaMask/metamask-mobile | 749 (306) | 172 / 72.7% / 16.7% | 144 / 70.8% / 13.6% |
+| Expensify/App 12a92bd (J3, deb build, db-v3 offline) | 288 (91) | 155 / 53.5% / 28.8% (direct 27.5%; ceiling 97/288) | n/a (no store bundle) |
 
 ## What is partial
 
