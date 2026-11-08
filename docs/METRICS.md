@@ -70,6 +70,8 @@ Over all 18 apps with a module inventory (including the 3 large-bundle apps, mea
 | MetaMask/metamask-mobile | 749 (306) | 172 / 72.7% / 16.7% | 144 / 70.8% / 13.6% |
 | Expensify/App 12a92bd (J3, deb build, db-v3 offline) | 288 (91) | 139 / 58.3% / 28.1% (direct 27.5%), branch deps-offline-precision 94d71c2; was 155 / 53.5% / 28.8% before corpus-offline-precision | n/a (no store bundle) |
 | react-navigation-example 0.85.3 (held out, db-v3 offline) | 76 (60) | 17 / 100% / 22.4% (direct 26.7%), 94d71c2; unchanged by corpus-offline-precision | n/a |
+| Expensify/App 12a92bd (J3, db-v4-paths-partial offline) | 288 (91) | 119 / 74.8% / 30.9% (direct 38.5%), branch deps-sig-module-paths; 144 / 62.5% / 31.2% on db-v3-clean at the same commit | n/a |
+| react-navigation-example 0.85.3 (held out, db-v4-paths-partial offline) | 76 (60) | 11 / 100% / 14.5% (direct 16.7%), deps-sig-module-paths; 15 / 100% / 19.7% on db-v3-clean at the same commit | n/a |
 
 ## What is partial
 

@@ -804,3 +804,56 @@ locally instead, scoped to `tools/pkgsig/bulk/**`.
   never confused.
 
 Note (2026-11-09): `stringSetHash` covers `LoadConstString` operands only; object/array literal-buffer strings feed module string evidence but are not hashed (docs/DEPS.md "Literal-buffer strings are evidence, not hash input"), so scheme-2 DB files remain valid.
+
+## 7. Module paths v1 (embedded copies)
+
+**Problem.** A signature is built by bundling `require(<pkg>)`, so it holds
+every module Metro pulled in. Dependency subtraction (J4) removes a
+package's declared, in-DB dependencies, but not an undeclared dependency,
+a Node built-in polyfill (`buffer` + `ieee754` inside `safe-buffer`, `sax`,
+`obuf`), a hoisted transitive dependency (the es-shim chain inside
+`assert`, `url`), or `@babel/runtime` helpers. When the copied package is
+also in the app, the real owner and the impostor match the same hashes:
+46 of the 72 Expensify offline false positives, and the generic-word
+db-match false positives on bluesky/rainbow/metamask (docs/DEPS.md
+"Offline false positives on J3, by mechanism").
+
+**Choice.** The builder asks Metro for a source map (`--sourcemap-output`)
+and records, per module, its file below the build project's
+`node_modules/` (`SigModule.path`: `safe-buffer/index.js`;
+`buffer/index.js` for a hoisted copy; `safe-buffer/node_modules/buffer/index.js`
+for a nested one; null outside node_modules), and per function the
+`localModuleId` of the module whose factory transitively creates it
+(`SigFunction.moduleId`). The file says `modulePaths: 1`
+(`src/deps/module-paths.ts`). A module is package P's OWN file when its
+path is under `P/` with no further `node_modules/`; a null path is
+neutral. At match time a path-bearing file is scored on its own files
+only: another package's modules and their functions are neither hits nor
+in `eligibleFunctions` / `moduleTotal`, and they do not claim hashes in the
+ownership indexes (`hashOwnerNames`, `hashOwners`, the fuzzy indexes), so
+a hash that is one package's own file and another's copy is attributed
+to its owner. No list of shared-helper paths is needed: a helper module
+lives under its own package's directory (`@babel/runtime/helpers/...`),
+which is foreign to everyone else. Helpers Babel inlines into a package's
+own file are not modules and stay that package's code.
+
+**Back-compat.** The field is optional. A file without `modulePaths` is
+scored exactly as before (`corpus-embedded-copy` back-compat test). The
+sqlite layer (`sigdb-sql.ts`) does not store paths yet, so a file read
+through it is pathless and scored as before. `build-one.mjs` caches the
+`[id, path]` pairs beside the `.hbc` (`.paths.json`) so `--refingerprint`
+keeps them; the confirm fingerprint cache key gains `__p1`.
+
+**Rejected.** (1) A lower ambiguity cutoff (`AMBIGUOUS_OWNER_THRESHOLD`
+4): Expensify 20 FP but 74 TP, react-navigation recall 22.4% to 18.4%. The
+copy and the original share one hash with only two owners, so any cutoff
+low enough to drop it also drops real dependency chains. (2) Requiring the
+package's entry module to match: drops 27 of 83 Expensify TPs and 12 of 17
+react-navigation TPs. (3) Persisting each module's one-level
+`nestedFunctionIndices` instead of `moduleId`: misses closures nested
+deeper than one level. (4) Deciding own/foreign at build time and storing
+a boolean: the rule could not change without a DB rebuild.
+
+Tests: `tests/gate/deps/corpus-embedded-copy.test.ts` (synthetic owner and
+impostor packages through the real compile/fingerprint path and through
+`confirmCandidates` with a stubbed npm/npx that writes a source map).
