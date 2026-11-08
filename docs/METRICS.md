@@ -77,7 +77,8 @@ Own build scored against the package lockfile truth. Offline and `--confirm` giv
 | bluesky-social/social-app | 198 (198) | 44 / 68.2% / 15.2% | 47 / 63.8% / 15.2% | 47 / 63.8% / 15.2% | 504 s |
 | rainbow-me/rainbow | 518 (211) | 136 / 64.7% / 17.0% | 141 / 60.3% / 16.4% | 141 / 60.3% / 16.4% | 570 s |
 | MetaMask/metamask-mobile | 749 (306) | 172 / 72.7% / 16.7% | 186 / 67.7% / 16.8% | 187 / 67.9% / 17.0% | 800 s |
-| Expensify/App 12a92bd (J3, deb build, db-v3 offline) | 288 (91) | n/a (first measured in J3) | 155 / 53.5% / 28.8% (direct 27.5%; ceiling 97/288) | not run | n/a |
+| Expensify/App 12a92bd (J3, deb build, db-v3 offline) | 288 (91) | 155 / 53.5% / 28.8% (J3) | 139 / 58.3% / 28.1% (direct 27.5%; after corpus-offline-precision) | not run | n/a |
+| react-navigation-example 0.85.3 (held out, db-v3 offline) | 76 (60) | 17 / 100% / 22.4% | 17 / 100% / 22.4% (direct 26.7%; unchanged by corpus-offline-precision) | not run | n/a |
 
 Store-bundle scoring was not repeated in this measurement.
 
