@@ -12,7 +12,8 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 echo "==> cloning Expensify/App into $WORK/expensify"
-git clone --depth 1 https://github.com/Expensify/App.git "$WORK/expensify"
+git clone https://github.com/Expensify/App.git "$WORK/expensify"
+git -C "$WORK/expensify" checkout -q 12a92bd39f31ddabf5a425552930cbb055536555
 cd "$WORK/expensify"
 echo "==> HEAD: $(git rev-parse HEAD)"
 
