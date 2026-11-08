@@ -188,6 +188,39 @@ function buildGroup(list: readonly Stmt[], headIndex: number, ctorName: string, 
     else regValues.delete(store.name);
   }
 
+  // Section 6.7: when hermesc gives `CreateDerivedClass` the same register as
+  // destination and superclass, the emitter makes both links BEFORE the head,
+  // through the closure's own binding (`Object.setPrototypeOf(_fnN, r4);
+  // Object.setPrototypeOf(_fnN.prototype, r4 === null ? null : r4.prototype);
+  // r4 = _fnN;`). Only that exact pair, stamped with this site's own origin,
+  // immediately before the head: the superclass expression is then read at
+  // the head (`r4 = class extends r4 {...}` reads r4 before assigning it), and
+  // nothing between the two positions writes a register.
+  if (site.derived && headIndex >= 2) {
+    const headValue = simpleStore(list[headIndex]!)?.value;
+    const closureName = headValue === undefined ? null : identName(headValue);
+    const a = list[headIndex - 2]!;
+    const b = list[headIndex - 1]!;
+    const linkA = a.k === "expr" ? objectCall(a.expr, "setPrototypeOf") : null;
+    const linkB = b.k === "expr" ? objectCall(b.expr, "setPrototypeOf") : null;
+    const sameSite = (x: Stmt): boolean => {
+      const o = originOf(x);
+      return o !== undefined && o.fn === ctx.functionIndex && o.start === site.offset;
+    };
+    if (
+      closureName !== null && linkA !== null && linkA.length === 2 && linkB !== null && linkB.length === 2 &&
+      sameSite(a) && sameSite(b) && identName(linkA[0]!) === closureName &&
+      isAliasedPrototype(linkB[0]!, new Set([closureName])) &&
+      linkB[1]!.k === "cond" && linkB[1]!.test.k === "bin" && JSON.stringify(linkB[1]!.test.left) === JSON.stringify(linkA[1]) &&
+      isPure(linkA[1]!) && !mentions(linkA[1]!, new Set([closureName]))
+    ) {
+      superClass = linkA[1]!;
+      sawCtorLink = true;
+      sawProtoLink = true;
+      deleted.push(headIndex - 2, headIndex - 1);
+    }
+  }
+
   for (let j = headIndex + 1; j < list.length; j++) {
     const s = list[j]!;
     const store = simpleStore(s);
