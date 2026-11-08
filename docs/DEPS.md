@@ -1751,6 +1751,40 @@ shared with a differently-named truth package). Version mismatches: 251
 3 correct. The bundle is not byte-reproducible (95-byte delta between
 builds), so truth is pinned to one `.hbc` sha.
 
+**Offline false positives on J3, by mechanism (corpus-offline-precision,
+2026-11-08).** For each of the 72 false positives above, the target modules
+its signature matched were looked up in the J3 truth (source map), to see
+which package really owns them:
+
+| mechanism | FPs | examples | status |
+|---|---|---|---|
+| module hits on J4 dependency-flagged modules (`factoryIsDependency`) counted as the package's own | 14 | `victory-stack` (130 module hits, 0 function hits, all lodash/d3), `victory-chart/-pie/-shared-events`, `d3`, `d3-contour`, `util`, `bl` | fixed |
+| signature embeds a copy of another package that is in the app, not removed by dependency subtraction (undeclared dependency, Node built-in polyfill, or a transitive dependency) | 46 | `buffer`+`ieee754` copy: `safe-buffer`, `sax`, `obuf`, `encoding`; es-shim chain (`es-errors`, `call-bind`...): `assert`, `is-typed-array`, `url`; `@babel/runtime` helpers: `bucket`, `plaid`, `vaul`; lodash: `dagre`, `victory-core`, `cubic` | open (BUGS) |
+| react-native code left in the signature (baseline gap) | 2 | `@react-native-firebase/auth`, `/firestore` | open |
+| matched code the truth places in app code or in another package's generated code | 10 | `uuid`, `process`, `stackframe`, `swiper`, `culori` | open |
+
+The fix: `scorePackage` (`src/deps/match.ts`) no longer counts a module
+flagged `factoryIsDependency` as a module hit, and the two fuzzy module
+indexes skip it as well. `dep-subtract.mjs` already removes such a
+module's factory function and keeps the module only so the module graph
+stays complete. The module still counts in `moduleTotal`. Removing it
+there too was measured and rejected: some packages then dropped below
+three modules and qualified for the tiny-package path, which added
+`react-shallow-renderer` as a false positive on react-navigation-example.
+Result: Expensify 155 confirmed / 72 FP / recall 28.8% became 139 / 58 /
+28.1% (precision 53.5% to 58.3%). Three true packages were lost (`css-tree`,
+`htmlparser2`, `d3-time`): their only module evidence was on modules that
+were flagged as dependency code. react-navigation-example stayed at
+17 confirmed, 0 FP, recall 22.4%. The 46 remaining embedded copies can't
+be told apart from the real package by hash ownership: `buffer` (true) and
+`safe-buffer` (false) match the same 72 functions. Two other rules were
+measured and rejected because they cost recall: a lower ambiguity cutoff
+(`AMBIGUOUS_OWNER_THRESHOLD` 4: Expensify 20 FP but 74 TP; react-navigation
+recall 22.4% to 18.4%) and requiring the package's entry module to match
+(drops 27 of 83 Expensify TPs and 12 of 17 react-navigation TPs). Per-module
+file paths in signatures (extraction plan step 1) are the fix for that
+mechanism.
+
 **Shipping.** Per D17c, the DB itself is never committed — the v2 build
 lives on a build host in `db-v2` (dependency-subtracted,
 353-file-quarantined) and is packaged the same way round 1's first archive
