@@ -2359,3 +2359,24 @@ jobs come from the diagnosis rows; `xargs -a jobs2.tsv -d '\n' -P4 -n1 ./drive.s
 (`HBC2JS_BULK_DIR` = a work dir holding 4 `slots/87-N` copies of
 `ScaffoldRN87` and `db/_baselines` with the three hbc98 baselines), then
 `subtract.sh`, then `runmeasure.sh <tag> <merged dir>`.
+
+### Hash-index candidate proposal (corpus-recall-candidates)
+
+**Problem.** Candidate pre-selection only proposes a package whose name is in the bundle's strings, or a recorded dependency of such a package. On five truth apps against `db-v3-clean`, 150 truth packages had a signature at the target's HBC version and were never proposed (`tools/deps/candidate-coverage-probe.mjs`-style split, per app: Expensify 18, react-navigation-example 11, bluesky 5, rainbow 71, metamask 40):
+
+| reason never proposed | count | would be confirmed if forced (all five apps) |
+|---|---|---|
+| own function hashes present in the target, nothing names it | 89 | most of the rainbow/metamask gain below |
+| hop two: recorded dependency of a candidate that is not itself string-evidenced (ruled out without own evidence) | 35 | a few (`is-regex`, `is-date-object`, `lodash.debounce` on Expensify) |
+| few or no of its hashes in the target (version drift, tiny package) | 19 | none |
+| hashes present, bare unscoped name in strings | 2 | `@notifee/react-native` |
+
+Forcing exactly those 150 as candidates (diagnostic, truth-informed, not a mode) added confirmed TPs with no new FP: Expensify +11, react-navigation 0, bluesky +1, rainbow +37, metamask +22. That is the ceiling a better proposal can reach here.
+
+**Choice.** `tools/deps/build-candidate-hash-index.mjs <sigdir>` writes one `candidate-hash-index__hbc<N>.tsv` per HBC version beside the signature files (`src/deps/hash-index.ts`): every own function hash (instrCount >= 8, not owned by another package, non-baseline, hash scheme 2) that exactly ONE package name owns across the whole DB, mapped to that package. `deriveCandidatePackages` scans the file once as a Buffer, keeping only lines whose hash is in the target, and proposes a package when at least 3 of its unique hashes are present AND they are at least a third of all its unique hashes. A hash-proposed package's recorded dependencies are not expanded. No index file, or one for another HBC version, changes nothing. On `db-v3-clean` (28 GB, 71,222 files) the hbc96/hbc98 files are 8.9 / 15.3 MB, built in 2 min 15 s at 344 MB RSS.
+
+**Rejected: proposal on hit count alone.** Two or more hashes owned by at most two packages proposed 106 extra packages on Expensify and the match stage confirmed most of them: Expensify 131 -> 175 confirmed with 42 -> 83 FP, react-navigation 0 -> 3 FP, plus TPs lost to new hash-ownership ambiguity. Those FPs are signatures that still carry someone else's code (an unsubtracted dependency, an inlined helper library: `jwk-to-pem`, `json-schema-compare`, `react-intl`); they hit on that copy, a small share of their own unique code, while a package that is really present hits on most of it. The coverage floor of one third was read off the distribution on these same five apps (confirmed FPs at coverage <= 0.31 apart from `digest-fetch` 0.66 and `react-base16-styling` 0.45), so it is tuned on the measuring stick; react-navigation-example is not an independent check of it.
+
+**Measured** (main 87ec7b8 before, this branch after, offline; `db-v3-clean` and `db-v4-paths-partial` each with their own index; commands: `tools/deps/build-candidate-hash-index.mjs <db> --hbc 96,98`, then `scoreAgainstTruth` per app): Expensify 128 -> 130 confirmed on `db-v3-clean` and 90 -> 92 on the partial DB (+`js-base64`, `react-native-uuid`, no FP added); react-navigation-example unchanged at 0 FP; bluesky unchanged; rainbow 104 -> 127 (+22 TP, +1 FP `digest-fetch`, recall 15.8% -> 20.1%, direct 20.4% -> 26.5%); metamask 169 -> 178 (+10 TP, `bs58` lost, `react-base16-styling` in and `eventid` out as FP, recall 17.6% -> 18.8%). Both DBs give the same deltas. Of the forced ceiling (+71 TP), 34 are recovered; the rest are hop-two packages (ruled out without own evidence), packages with under 3 unique hashes, and packages under the coverage floor (`asn1.js` 0.22, `bignumber.js` 0.23, `react-redux` 0.09, `styled-components` 0.13, `react-devtools-core` 0.17, `@notifee/react-native` 0.27). Tests: `tests/gate/deps/corpus-recall-candidates.test.ts`. Remaining gaps are rows in `docs/BUGS.md`.
+
+Corpus scale: `com.brex.mobile` (hbc98, `hbc2js deps --offline`, default heap) completes before and after with the same peak RSS (3.38 GB vs 3.37 GB) and 324 -> 328 confirmed (no truth file). Wall time went 10 min 13 s -> 21 min 39 s, but the two runs shared deb with other workers at load average 45 and 70 respectively, so that ratio is not a measurement of this change; the index scan itself reads one 15 MB file. Re-time on an idle host.
