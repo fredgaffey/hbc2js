@@ -61,7 +61,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, rmdirSync, wr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { pipedOpts, runInstall } from "./install-plan.mjs";
+import { entryPlan, entrySource, pipedOpts, runInstall } from "./install-plan.mjs";
 import { computeBaselineUnion, hasCompleteBaselineSet, subtractBaseline } from "./baseline-subtract.mjs";
 
 // src/deps/db.ts's writeSignature() does a read-modify-write of a shared
@@ -160,20 +160,32 @@ function uninstallPackage() {
 function bundleAndCompile(workDir) {
   const slug = `${safeName(pkg)}-${version}-${hbcVersion}`.replace(/[^a-zA-Z0-9._-]/g, "-");
   const entryFile = join(scaffoldDir, `__bulk_entry_${slug}__.js`);
-  writeFileSync(entryFile, `const X = require(${JSON.stringify(pkg)});\nmodule.exports = X;\n`);
   const bundlePath = join(workDir, "out.bundle");
   const mapPath = join(workDir, "out.bundle.map");
   const assetsDir = join(workDir, "assets");
   mkdirSync(assetsDir, { recursive: true });
-  try {
-    execFileSync(
-      "npx",
-      ["react-native", "bundle", "--platform", "android", "--dev", "false", "--minify", "true", "--max-workers", "1", "--reset-cache", "--entry-file", entryFile, "--bundle-output", bundlePath, "--sourcemap-output", mapPath, "--assets-dest", assetsDir],
-      pipedOpts({ cwd: scaffoldDir, timeout: 120_000 }),
-    );
-  } finally {
-    rmSync(entryFile, { force: true });
+  // deps-recall-nosig: root + `exports` sub-paths first, root alone as the
+  // fallback (install-plan.mjs entryPlan).
+  const pkgDir = join(scaffoldDir, "node_modules", pkg);
+  const { attempts } = existsSync(join(pkgDir, "package.json")) ? entryPlan(pkg, pkgDir) : { attempts: [[pkg]] };
+  let lastErr;
+  for (const specs of attempts) {
+    writeFileSync(entryFile, entrySource(specs));
+    try {
+      execFileSync(
+        "npx",
+        ["react-native", "bundle", "--platform", "android", "--dev", "false", "--minify", "true", "--max-workers", "1", "--reset-cache", "--entry-file", entryFile, "--bundle-output", bundlePath, "--sourcemap-output", mapPath, "--assets-dest", assetsDir],
+        pipedOpts({ cwd: scaffoldDir, timeout: 120_000 }),
+      );
+      lastErr = undefined;
+      break;
+    } catch (e) {
+      lastErr = e;
+    } finally {
+      rmSync(entryFile, { force: true });
+    }
   }
+  if (lastErr !== undefined) throw lastErr;
   const hbcPath = join(workDir, "out.hbc");
   execFileSync(hermescPath, ["-O", "-emit-binary", `-out=${hbcPath}`, bundlePath], pipedOpts({ timeout: 60_000 }));
   // Module paths v1 (docs/PACKAGE-SIGNATURES.md §7): module id -> path
