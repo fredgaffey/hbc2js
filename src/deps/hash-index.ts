@@ -8,12 +8,19 @@
 // This module adds one more evidence source: a precomputed reverse index,
 // one file per HBC version stored beside the signature files
 // (`candidate-hash-index__hbc<N>.tsv`), mapping each DISTINCTIVE function
-// hash (own function, instrCount >= minInstr, owned by at most `maxOwners`
-// package names) to the packages that own it. At run time the file is
+// hash (own function, instrCount >= minInstr, owned by exactly one package
+// name across every version in the DB) to the package that owns it. At run time the file is
 // scanned once as a Buffer and only the lines whose hash occurs in the target
 // are kept, so no signature file is parsed and memory stays flat no matter
 // how large the DB is. A package becomes a candidate when at least `minHits`
-// of its indexed hashes appear in the target. Proposal only loads the
+// of its unique hashes appear in the target AND they are at least
+// `minCoverage` of all its unique hashes in the index. The coverage clause is
+// what keeps precision: a signature that still carries a copy of another
+// package's code (an unsubtracted dependency, an inlined helper library)
+// hits on that copy, which is a small part of its own unique code, while a
+// package that is really in the bundle hits on most of it. Measured on five
+// truth apps (docs/DEPS.md): confirmed false positives proposed this way sat
+// at coverage <= 0.31 except two, true positives mostly above 0.4. Proposal only loads the
 // package's signatures for scoring; the match stage's own bar still decides
 // whether anything is confirmed.
 //
@@ -28,8 +35,9 @@ import type { SigDbFile } from "./sigdb-types.ts";
 
 export const HASH_INDEX_MAGIC = "#hbc2js-candidate-hash-index 1 ";
 export const DEFAULT_INDEX_MIN_INSTR = 8;
-export const DEFAULT_INDEX_MAX_OWNERS = 2;
-export const DEFAULT_MIN_HITS = 2;
+export const DEFAULT_INDEX_MAX_OWNERS = 1;
+export const DEFAULT_MIN_HITS = 3;
+export const DEFAULT_MIN_COVERAGE = 1 / 3;
 
 export function hashIndexFileName(hbcVersion: number): string {
   return `candidate-hash-index__hbc${hbcVersion}.tsv`;
@@ -99,13 +107,17 @@ export function writeCandidateHashIndex(sigDir: string, outDir: string, hbcVersi
 
 export interface ProposeOptions {
   readonly minHits?: number;
+  readonly minCoverage?: number;
 }
 
-/** Packages with at least `minHits` indexed distinctive hashes present in the
- *  target, across every layer that carries an index for the target's HBC
- *  version. Layers without one contribute nothing. */
+/** Packages with at least `minHits` of their unique indexed hashes present in
+ *  the target, covering at least `minCoverage` of their unique hashes, per
+ *  layer that carries an index for the target's HBC version. Layers without
+ *  one contribute nothing. Lines naming several packages (an index built
+ *  with maxOwners > 1) are not evidence for any of them. */
 export function proposeFromHashIndex(layers: readonly DbLayer[], inventory: ModuleInventory, opts: ProposeOptions = {}): ReadonlySet<string> {
   const minHits = opts.minHits ?? DEFAULT_MIN_HITS;
+  const minCoverage = opts.minCoverage ?? DEFAULT_MIN_COVERAGE;
   const out = new Set<string>();
   for (const layer of layers) {
     const path = join(layer.dir, hashIndexFileName(inventory.hbcVersion));
@@ -120,20 +132,26 @@ export function proposeFromHashIndex(layers: readonly DbLayer[], inventory: Modu
     const target = new Set<string>();
     for (const fn of inventory.functions) if (fn.instrCount >= header.minInstr) target.add(fn.exactHash);
     const hits = new Map<number, number>();
+    const unique = new Map<number, number>();
     let start = nl + 1;
     while (start < buf.length) {
       let end = buf.indexOf(10, start);
       if (end < 0) end = buf.length;
       const tab = buf.indexOf(9, start);
-      if (tab > start && tab < end && target.has(buf.toString("latin1", start, tab))) {
-        for (const id of buf.toString("latin1", tab + 1, end).split(",")) {
-          const n = Number(id);
-          hits.set(n, (hits.get(n) ?? 0) + 1);
+      if (tab > start && tab < end) {
+        const comma = buf.indexOf(44, tab);
+        if (comma < 0 || comma >= end) {
+          const id = Number(buf.toString("latin1", tab + 1, end));
+          unique.set(id, (unique.get(id) ?? 0) + 1);
+          if (target.has(buf.toString("latin1", start, tab))) hits.set(id, (hits.get(id) ?? 0) + 1);
         }
       }
       start = end + 1;
     }
-    for (const [id, n] of hits) if (n >= minHits && header.packages[id] !== undefined) out.add(header.packages[id]);
+    for (const [id, n] of hits) {
+      const name = header.packages[id];
+      if (name !== undefined && n >= minHits && n >= minCoverage * (unique.get(id) ?? 0)) out.add(name);
+    }
   }
   return new Set([...out].sort());
 }
