@@ -182,7 +182,12 @@ export interface SplitRequest {
 export type FileOpRequest = MakeRequest | RenameRequest | CombineRequest | SplitRequest;
 
 export interface FileOpOptions {
-  readonly db: DatabaseSync;
+  /** Read by `originsOf` (via `traceFile`) and by the commit half. A compute
+   *  that runs off-thread has no connection and passes `tracedOrigins`. */
+  readonly db?: DatabaseSync;
+  /** Pre-resolved `traceFile` origins per path (the main thread reads them
+   *  from the log so a worker need not open the DB). Wins over `db`. */
+  readonly tracedOrigins?: ReadonlyMap<string, readonly BindingOrigin[]>;
   /** The project root holding `project.hbcproj`, `analysis/` and `log/`. */
   readonly projectDir: string;
   /** The readable tree the op reshapes. */
@@ -223,8 +228,9 @@ interface Proposal {
 }
 
 function originsOf(opts: FileOpOptions, snapshot: TreeSnapshot, path: string): readonly BindingOrigin[] {
-  const traced = traceFile(opts.db, path);
-  if (traced.origins.length > 0) return traced.origins;
+  const pre = opts.tracedOrigins?.get(path);
+  const tracedOrigins = pre ?? (opts.db !== undefined ? traceFile(opts.db, path).origins : []);
+  if (tracedOrigins.length > 0) return tracedOrigins;
   const base = opts.baseOrigins?.get(path);
   if (base !== undefined && base.length > 0) return base;
   const index = readModulesIndex(snapshot);
@@ -333,6 +339,39 @@ function materialise(snapshot: TreeSnapshot, dir: string): void {
  *  apply to the real tree and record the transaction. On any rejection the
  *  tree is byte-for-byte untouched and nothing is written to the DB. */
 export function runFileOp(req: FileOpRequest, opts: FileOpOptions): FileOpAttempt {
+  if (opts.db === undefined) throw new FileOpError("runFileOp: opts.db is required");
+  const planned = planFileOp(req, opts);
+  if (planned.commit === undefined) return planned.attempt;
+  commitFileOpPlan(opts.db, opts.projectDir, opts.treeDir, planned.commit);
+  return planned.attempt;
+}
+
+/** Everything the commit half needs, as plain data (structured-clone-safe),
+ *  so the compute can run in a worker thread. */
+export interface FileOpCommit {
+  readonly tx: ReadabilityTransaction;
+  readonly priorContents: readonly (readonly [string, string])[];
+  /** Paths in the old tree absent from the new one. */
+  readonly removes: readonly string[];
+  /** The whole next tree, written as the in-process path always did. */
+  readonly next: readonly (readonly [string, string])[];
+}
+
+export interface PlannedFileOp {
+  readonly attempt: FileOpAttempt;
+  readonly commit?: FileOpCommit;
+}
+
+/** DB-first commit of a planned op (spec 18 section 6): record, then touch the tree. */
+export function commitFileOpPlan(db: DatabaseSync, projectDir: string, treeDir: string, commit: FileOpCommit): void {
+  recordTransaction(db, projectDir, commit.tx, { priorContents: new Map(commit.priorContents) });
+  for (const p of commit.removes) rmSync(join(treeDir, p), { force: true });
+  materialise(new Map(commit.next), treeDir);
+}
+
+/** The compute half of `runFileOp`: reads the tree, runs both legs, and on a
+ *  pass returns the commit as data. Writes nothing. */
+export function planFileOp(req: FileOpRequest, opts: FileOpOptions): PlannedFileOp {
   const before = readTree(opts.treeDir);
   const priorTreeHash = treeHash(before);
   const entry = opts.entry ?? "index.js";
@@ -374,7 +413,7 @@ export function runFileOp(req: FileOpRequest, opts: FileOpOptions): FileOpAttemp
     ts,
   };
   if (oracleResult.verdict !== "PASS") {
-    return { op: req.op, accepted: false, proof, detail: oracleResult.why, priorTreeHash };
+    return { attempt: { op: req.op, accepted: false, proof, detail: oracleResult.why, priorTreeHash } };
   }
 
   const inputs: BindingOrigin[] = [];
@@ -396,15 +435,13 @@ export function runFileOp(req: FileOpRequest, opts: FileOpOptions): FileOpAttemp
     prior: { files: priorFiles },
   };
 
-  // DB first (spec 18 section 6). A refusal here -- a zero-origin output, a
-  // missing prior -- must leave the tree untouched, so it happens before any
-  // write to `treeDir`.
-  recordTransaction(opts.db, opts.projectDir, tx, { priorContents });
-
-  for (const p of before.keys()) if (!proposal.next.has(p)) rmSync(join(opts.treeDir, p), { force: true });
-  materialise(proposal.next, opts.treeDir);
-
-  return { op: req.op, accepted: true, proof, detail: oracleResult.why, txId: tx.id, priorTreeHash };
+  // The caller commits DB-first (spec 18 section 6); a refusal there -- a
+  // zero-origin output, a missing prior -- leaves the tree untouched.
+  const removes = [...before.keys()].filter((p) => !proposal.next.has(p));
+  return {
+    attempt: { op: req.op, accepted: true, proof, detail: oracleResult.why, txId: tx.id, priorTreeHash },
+    commit: { tx, priorContents: [...priorContents], removes, next: [...proposal.next] },
+  };
 }
 
 /** Copies a tree (used by callers that want a pristine baseline to compare a

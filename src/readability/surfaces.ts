@@ -48,8 +48,8 @@ import { runNamePass } from "./name-pass.ts";
 import type { NamePassTarget } from "./name-pass.ts";
 import { gateRewrite, rewriteRecordToTransaction } from "./rewrite.ts";
 import type { FunctionEquivOracle } from "./rewrite.ts";
-import { runFileOp } from "./file-ops.ts";
-import type { FileOpRequest, TreeEquivOracle } from "./file-ops.ts";
+import { commitFileOpPlan, planFileOp } from "./file-ops.ts";
+import type { FileOpCommit, FileOpOptions, FileOpRequest, TreeEquivOracle } from "./file-ops.ts";
 import {
   getTransaction,
   listTransactions,
@@ -57,10 +57,12 @@ import {
   recordTransaction,
   revertTransaction,
   sha256,
+  traceFile,
 } from "./transactions.ts";
 import { TransactionRefused } from "./transactions.ts";
 import { evaluationModeFor as evaluationModeForBase, MODULE_ROLES, parseReadabilityResult } from "./types.ts";
 import type {
+  BindingOrigin,
   CallSurface,
   EquivProof,
   EvaluationItem,
@@ -333,7 +335,23 @@ const NO_PROPOSAL_PROOF: EquivProof = { scope: "function", verdict: "INCONCLUSIV
  *  the identical gate a model's own output does (the file header's "same
  *  gate" rule) because `gateRewrite` never distinguishes where `code` came
  *  from. */
-export async function rewriteFunction(ctx: ReadabilityContext, args: RewriteFunctionArgs): Promise<RewriteFunctionResult> {
+export interface RewritePlan {
+  readonly args: RewriteFunctionArgs;
+  /** The result for every outcome except an accepted one (which needs `txId`). */
+  readonly result: RewriteFunctionResult;
+  readonly commit?: {
+    readonly tx: ReadabilityTransaction;
+    readonly priorContents: readonly (readonly [string, string])[];
+    readonly code: string;
+    readonly proposal: RewriteProposal;
+  };
+}
+
+/** Compute half of `rewriteFunction` (PUSHBACK P-65): the backend call and the
+ *  equivalence gate, no DB, no tree write. Returns plain data, so it runs in
+ *  `src/workers/readability-worker.ts`; `commitRewriteFunction` is the main
+ *  thread's half. */
+export async function computeRewriteFunction(ctx: ReadabilityContext, args: RewriteFunctionArgs): Promise<RewritePlan> {
   if (ctx.hbcPath === undefined) throw new ReadabilitySurfaceError("rewrite_function: ctx.hbcPath is required");
   const analysis = await loadAnalysis(ctx, ctx.hbcPath);
   const service = new NameService(analysis, new OverlayStore());
@@ -342,7 +360,7 @@ export async function rewriteFunction(ctx: ReadabilityContext, args: RewriteFunc
   const parsed = parseReadabilityResult(res.text);
   const proposal = parsed.ok ? parsed.result.rewrite : undefined;
   if (proposal === undefined) {
-    return { equiv: NO_PROPOSAL_PROOF, accepted: false, evaluation: undefined };
+    return { args, result: { equiv: NO_PROPOSAL_PROOF, accepted: false, evaluation: undefined } };
   }
   const attempt = await gateRewrite(proposal, {
     faithfulCode,
@@ -351,25 +369,40 @@ export async function rewriteFunction(ctx: ReadabilityContext, args: RewriteFunc
     ...(ctx.functionOracle !== undefined ? { oracle: ctx.functionOracle } : {}),
   });
   if (!attempt.accepted || attempt.proof === undefined || attempt.record === undefined) {
-    return { rewrite: proposal, equiv: attempt.proof ?? NO_PROPOSAL_PROOF, accepted: false, evaluation: undefined };
+    return { args, result: { rewrite: proposal, equiv: attempt.proof ?? NO_PROPOSAL_PROOF, accepted: false, evaluation: undefined } };
   }
   const tx: ReadabilityTransaction = rewriteRecordToTransaction(attempt.record);
-  const priorContents = new Map(tx.prior.files.map((f) => [f.path, faithfulCode]));
-  const { id } = recordTransaction(ctx.db, ctx.projectDir, tx, { priorContents });
+  const priorContents = tx.prior.files.map((f) => [f.path, faithfulCode] as const);
+  return {
+    args,
+    result: { rewrite: proposal, equiv: attempt.proof, accepted: true },
+    commit: { tx, priorContents, code: attempt.code, proposal },
+  };
+}
+
+/** Commit half: `recordTransaction`, then land the accepted output on the tree. */
+export async function commitRewriteFunction(ctx: ReadabilityContext, plan: RewritePlan): Promise<RewriteFunctionResult> {
+  const c = plan.commit;
+  if (c === undefined) return plan.result;
+  const { id } = recordTransaction(ctx.db, ctx.projectDir, c.tx, { priorContents: new Map(c.priorContents) });
   // Keep `treeDir` in sync with what the log now says, the same way
   // `runFileOp` does: the transaction's own `prior` is only reversible if a
   // later revert can read CURRENT bytes back off disk (spec 28 section 9.5's
   // `revert-of-a-revert` case), which means the accepted output has to
   // actually land on the tree, not just in the DB.
-  for (const output of tx.outputs) {
+  for (const output of c.tx.outputs) {
     const abs = join(ctx.treeDir, output.path);
     mkdirSync(dirname(abs), { recursive: true });
-    writeFileSync(abs, attempt.code, "utf8");
+    writeFileSync(abs, c.code, "utf8");
   }
-  const evaluation = await maybeEvaluate(ctx, args.evaluate, [
-    { targetId: `fn:${String(args.fn)}`, proposedName: proposal.code.slice(0, 80), confidence: proposal.confidence, evidence: proposal.evidence },
+  const evaluation = await maybeEvaluate(ctx, plan.args.evaluate, [
+    { targetId: `fn:${String(plan.args.fn)}`, proposedName: c.proposal.code.slice(0, 80), confidence: c.proposal.confidence, evidence: c.proposal.evidence },
   ]);
-  return { rewrite: proposal, equiv: attempt.proof, accepted: true, txId: id, evaluation };
+  return { ...plan.result, txId: id, evaluation };
+}
+
+export async function rewriteFunction(ctx: ReadabilityContext, args: RewriteFunctionArgs): Promise<RewriteFunctionResult> {
+  return commitRewriteFunction(ctx, await computeRewriteFunction(ctx, args));
 }
 
 // ---------------------------------------------------------------------------
@@ -382,21 +415,49 @@ export interface FileOpResult {
   readonly accepted: boolean;
 }
 
-/** Section 9.7's `file_op`: a thin pass-through to `runFileOp` (which already
- *  validates the tree-level equiv gate and commits the transaction) --
- *  argument validation is `runFileOp`'s own (an unknown `op` is a TypeScript
- *  compile error for a caller in this repo; an external MCP caller's JSON is
- *  validated by `src/mcp/tools.ts`'s schema, section 9.7). */
-export function fileOp(ctx: ReadabilityContext, req: FileOpRequest): FileOpResult {
-  const attempt = runFileOp(req, {
+export interface FileOpPlan {
+  readonly result: FileOpResult;
+  readonly commit?: FileOpCommit;
+}
+
+function fileOpOptions(ctx: ReadabilityContext, tracedOrigins?: ReadonlyMap<string, readonly BindingOrigin[]>): FileOpOptions {
+  return {
     db: ctx.db,
     projectDir: ctx.projectDir,
     treeDir: ctx.treeDir,
     who: ctx.who ?? "worker:haiku",
     ...(ctx.hbcPath !== undefined ? { hbcPath: ctx.hbcPath } : {}),
     ...(ctx.oracle !== undefined ? { oracle: ctx.oracle } : {}),
-  });
-  return { equiv: attempt.proof, accepted: attempt.accepted, ...(attempt.txId !== undefined ? { txId: attempt.txId } : {}) };
+    ...(tracedOrigins !== undefined ? { tracedOrigins } : {}),
+  };
+}
+
+/** The log origins `planFileOp` would read through `ctx.db` for `req`, as data
+ *  a worker (which has no project connection) can be handed. */
+export function tracedOriginsFor(ctx: ReadabilityContext, req: FileOpRequest): readonly (readonly [string, readonly BindingOrigin[]])[] {
+  const paths = req.op === "combine" ? req.from : req.op === "rename" || req.op === "split" ? [req.from] : [];
+  return paths.map((p) => [p, traceFile(ctx.db, p).origins] as const);
+}
+
+/** Compute half of `fileOp` (P-65): validates and gates the op, writes nothing. */
+export function computeFileOp(ctx: ReadabilityContext, req: FileOpRequest, tracedOrigins?: readonly (readonly [string, readonly BindingOrigin[]])[]): FileOpPlan {
+  const planned = planFileOp(req, fileOpOptions(ctx, tracedOrigins === undefined ? undefined : new Map(tracedOrigins)));
+  const a = planned.attempt;
+  return {
+    result: { equiv: a.proof, accepted: a.accepted, ...(a.txId !== undefined ? { txId: a.txId } : {}) },
+    ...(planned.commit !== undefined ? { commit: planned.commit } : {}),
+  };
+}
+
+/** Commit half: DB first, then the tree. */
+export function commitFileOp(ctx: ReadabilityContext, plan: FileOpPlan): FileOpResult {
+  if (plan.commit !== undefined) commitFileOpPlan(ctx.db, ctx.projectDir, ctx.treeDir, plan.commit);
+  return plan.result;
+}
+
+/** Section 9.7's `file_op`: compute then commit in-process. */
+export function fileOp(ctx: ReadabilityContext, req: FileOpRequest): FileOpResult {
+  return commitFileOp(ctx, computeFileOp(ctx, req));
 }
 
 // ---------------------------------------------------------------------------
