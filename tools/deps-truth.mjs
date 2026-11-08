@@ -18,73 +18,14 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { runDeps } from "../src/deps/index.ts";
+import { flattenIndexMap, sourcePerLine } from "../src/deps/module-paths.ts";
 
 const BASELINE_ALIAS = { "react-foundation": "react", "react-native-foundation": "react-native", "metro-toolchain-empty": null };
 
 // --- source map ----------------------------------------------------------
 
-const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-function decodeVlq(seg) {
-  const out = [];
-  let value = 0;
-  let shift = 0;
-  for (const ch of seg) {
-    const digit = B64.indexOf(ch);
-    if (digit < 0) throw new Error(`bad VLQ char ${ch}`);
-    value += (digit & 31) << shift;
-    if (digit & 32) {
-      shift += 5;
-    } else {
-      out.push(value & 1 ? -(value >> 1) : value >> 1);
-      value = 0;
-      shift = 0;
-    }
-  }
-  return out;
-}
-
-/** Dominant source index per generated line (null when a line has no mapping). */
-function sourcePerLine(map) {
-  if (map.perLine !== undefined) return Array.from(map.perLine, (x) => x ?? null); // flattenIndexMap output
-  const lines = map.mappings.split(";");
-  let src = 0;
-  return lines.map((line) => {
-    if (line === "") return null;
-    const counts = new Map();
-    for (const seg of line.split(",")) {
-      if (seg === "") continue;
-      const f = decodeVlq(seg);
-      if (f.length >= 4) {
-        src += f[1];
-        counts.set(src, (counts.get(src) ?? 0) + 1);
-      }
-    }
-    let best = null;
-    let bestN = 0;
-    for (const [s, n] of counts) if (n > bestN) [best, bestN] = [s, n];
-    return best;
-  });
-}
-
-/** Metro >= 0.8x (RN 0.87) may emit an INDEX source map (`sections`, one
- *  per module, each with its own `sources` / `mappings`). Flatten it to the
- *  per-line shape `sourcePerLine` reads: every section starts at column 0 of
- *  its own generated line, so its lines are simply re-based by
- *  `offset.line` and its source indices by the running `sources` length. */
-function flattenIndexMap(map) {
-  if (!Array.isArray(map.sections)) return map;
-  const sources = [];
-  const lines = [];
-  for (const sec of map.sections) {
-    const sub = flattenIndexMap(sec.map);
-    const perLine = sourcePerLine(sub);
-    perLine.forEach((src, i) => {
-      if (src !== null) lines[sec.offset.line + i] = src + sources.length;
-    });
-    sources.push(...sub.sources);
-  }
-  return { sources, perLine: lines };
-}
+// decodeVlq / sourcePerLine / flattenIndexMap: shared with the signature
+// builder (module paths v1), src/deps/module-paths.ts.
 
 function packageFromSource(source) {
   const idx = source.lastIndexOf("node_modules/");

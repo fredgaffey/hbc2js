@@ -1,6 +1,7 @@
 {
  "hbcSha256s": {
-  "expensify-app.hbc": "48ff06dd4e2f75914114862518112b199ee6f1a286a269411a6dd065fbb9da7c"
+  "expensify-app.hbc": "48ff06dd4e2f75914114862518112b199ee6f1a286a269411a6dd065fbb9da7c",
+  "expensify-app.hbc (macOS hermesc .14)": "1e7be038aba327e5ad1f33e23594804601505e92d1ecef3f7436d15a16c201d6"
  },
  "moduleCount": 12371,
  "packages": {

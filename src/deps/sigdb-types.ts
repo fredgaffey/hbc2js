@@ -14,6 +14,10 @@ export interface SigFunction {
   readonly stringSetHash: string;
   readonly stringCount: number;
   readonly owner?: string | null;
+  /** Module paths v1 (src/deps/module-paths.ts): `localModuleId` of the
+   *  module whose factory (transitively) creates this function. Absent on
+   *  files without `modulePaths` and on functions outside every module. */
+  readonly moduleId?: number;
 }
 
 export interface SigModule {
@@ -36,6 +40,11 @@ export interface SigModule {
    *  contamination `tools/pkgsig/bulk/dep-subtract.mjs` fixes, parallel to
    *  `factoryIsBaseline`. Optional/absent on every pre-J4 (v1) file. */
   readonly factoryIsDependency?: boolean;
+  /** Module paths v1: this module's source file below the build project's
+   *  `node_modules/` (`safe-buffer/index.js`; a nested copy keeps its
+   *  parent's prefix, `safe-buffer/node_modules/buffer/index.js`), or null
+   *  when outside node_modules / unknown. Only on `modulePaths` files. */
+  readonly path?: string | null;
 }
 
 export interface SigProvenance {
@@ -84,6 +93,11 @@ export interface SigDbFile {
    *  with any scheme-2 entry supersedes its scheme-1 entries in
    *  `loadSignatures`. */
   readonly hashScheme?: number;
+  /** Module paths v1 (docs/PACKAGE-SIGNATURES.md §7): present (= 1) when
+   *  every module carries `path` and functions carry `moduleId`. Matching
+   *  then scores the package on its OWN files only. Absent = no paths:
+   *  scored exactly as before. */
+  readonly modulePaths?: number;
 }
 
 export interface SigDbIndexEntry {

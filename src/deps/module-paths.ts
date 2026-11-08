@@ -1,0 +1,213 @@
+// src/deps/module-paths.ts — per-module file paths in package signatures
+// (docs/PACKAGE-SIGNATURES.md §7, "module paths v1").
+//
+// A signature is built by bundling `require(<pkg>)` with Metro, so it holds
+// every module Metro pulled in: the package's own files AND copies of other
+// packages (undeclared dependencies, Node built-in polyfills such as
+// `buffer`, `@babel/runtime` helpers, a transitive dependency not in the
+// DB). Hash ownership can't separate the real owner from a package that
+// embeds a copy: both match the same hashes. The file path can. Metro's
+// source map records the source file of every generated line, and each
+// minified `__d(...)` registration is one line ending in `},<id>,[deps]);`,
+// so module id -> source file -> path below `node_modules/`.
+//
+// Build side: `modulePathsFromSourceMap` + `attachModulePaths` give each
+// SigModule a `path` and each SigFunction the `moduleId` of the module
+// whose factory (transitively) creates it. Match side: `foreignSets`
+// (via `isOwnModulePath`) says which of a path-bearing file's modules and
+// functions belong to another package. A file without `modulePaths` is
+// never touched (back-compat: scores exactly as before).
+
+import type { HbcModule } from "../parse/types.ts";
+import type { DecodedFunction } from "../disasm/decode.ts";
+import type { SigDbFile, SigFunction, SigModule } from "./sigdb-types.ts";
+
+/** `SigDbFile.modulePaths` value this code writes and understands. */
+export const MODULE_PATHS_VERSION = 1;
+
+// --- source map ----------------------------------------------------------
+
+const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+export function decodeVlq(seg: string): number[] {
+  const out: number[] = [];
+  let value = 0;
+  let shift = 0;
+  for (const ch of seg) {
+    const digit = B64.indexOf(ch);
+    if (digit < 0) throw new Error(`bad VLQ char ${ch}`);
+    value += (digit & 31) << shift;
+    if (digit & 32) {
+      shift += 5;
+    } else {
+      out.push(value & 1 ? -(value >> 1) : value >> 1);
+      value = 0;
+      shift = 0;
+    }
+  }
+  return out;
+}
+
+export interface SourceMapLike {
+  readonly sources: readonly string[];
+  readonly mappings?: string;
+  readonly perLine?: readonly (number | null | undefined)[];
+  readonly sections?: readonly { readonly offset: { readonly line: number }; readonly map: SourceMapLike }[];
+}
+
+/** Dominant source index per generated line (null when a line has no mapping). */
+export function sourcePerLine(map: SourceMapLike): (number | null)[] {
+  if (map.perLine !== undefined) return Array.from(map.perLine, (x) => x ?? null);
+  const lines = (map.mappings ?? "").split(";");
+  let src = 0;
+  return lines.map((line) => {
+    if (line === "") return null;
+    const counts = new Map<number, number>();
+    for (const seg of line.split(",")) {
+      if (seg === "") continue;
+      const f = decodeVlq(seg);
+      if (f.length >= 4) {
+        src += f[1]!;
+        counts.set(src, (counts.get(src) ?? 0) + 1);
+      }
+    }
+    let best: number | null = null;
+    let bestN = 0;
+    for (const [s, n] of counts) if (n > bestN) [best, bestN] = [s, n];
+    return best;
+  });
+}
+
+/** Metro >= 0.8x may emit an INDEX source map (`sections`, one per module).
+ *  Flatten it to the per-line shape `sourcePerLine` reads: each section
+ *  starts at column 0 of its own generated line. */
+export function flattenIndexMap(map: SourceMapLike): SourceMapLike {
+  if (!Array.isArray(map.sections)) return map;
+  const sources: string[] = [];
+  const lines: (number | null)[] = [];
+  for (const sec of map.sections) {
+    const sub = flattenIndexMap(sec.map);
+    const perLine = sourcePerLine(sub);
+    perLine.forEach((src, i) => {
+      if (src !== null) lines[sec.offset.line + i] = src + sources.length;
+    });
+    sources.push(...sub.sources);
+  }
+  return { sources, perLine: lines };
+}
+
+/** Module id -> raw source path (as the map records it), for every
+ *  minified `__d(...)` registration in `bundleJs`. A module usually is one
+ *  line but may span several; its source is the first mapped line's. */
+export function moduleSourcesFromMap(rawMap: SourceMapLike, bundleJs: string): Map<number, string | null> {
+  const map = flattenIndexMap(rawMap);
+  const srcPerLine = sourcePerLine(map);
+  const out = new Map<number, string | null>();
+  let start = -1;
+  bundleJs.split("\n").forEach((text, i) => {
+    if (text.startsWith("__d(")) start = i;
+    if (start < 0) return;
+    const m = /\}\)?,(\d+),\[[\d,]*\]\);\s*$/.exec(text);
+    if (m === null) return;
+    let srcIdx: number | null = null;
+    for (let j = start; j <= i && srcIdx === null; j++) srcIdx = srcPerLine[j] ?? null;
+    start = -1;
+    out.set(Number(m[1]), srcIdx === null ? null : (map.sources[srcIdx] ?? null));
+  });
+  return out;
+}
+
+/** Path below the project's `node_modules/` (`safe-buffer/index.js`,
+ *  `safe-buffer/node_modules/buffer/index.js`), or null for a file outside
+ *  `node_modules` (the build's own entry file). The FIRST `node_modules/`
+ *  is the project's, so a nested copy keeps its parent's prefix. */
+export function nodeModulesRelativePath(source: string | null): string | null {
+  if (source === null) return null;
+  const s = source.replace(/\\/g, "/");
+  const idx = s.indexOf("node_modules/");
+  return idx < 0 ? null : s.slice(idx + "node_modules/".length);
+}
+
+export function modulePathsFromSourceMap(rawMap: SourceMapLike, bundleJs: string): Map<number, string | null> {
+  const out = new Map<number, string | null>();
+  for (const [id, src] of moduleSourcesFromMap(rawMap, bundleJs)) out.set(id, nodeModulesRelativePath(src));
+  return out;
+}
+
+// --- build side ----------------------------------------------------------
+
+/** Give each module its `path` and each function the `moduleId` of the
+ *  module whose factory creates it (transitively, through CreateClosure
+ *  operands; the first factory to reach a function claims it). Modules
+ *  the map doesn't name get `path: null`. */
+export function attachModulePaths(
+  mod: HbcModule,
+  decodeFunction: (mod: HbcModule, index: number) => DecodedFunction,
+  functions: readonly SigFunction[],
+  modules: readonly SigModule[],
+  paths: ReadonlyMap<number, string | null>,
+): { functions: SigFunction[]; modules: SigModule[] } {
+  const moduleOf = new Map<number, number>();
+  const factories = new Set(modules.map((m) => m.factoryFunctionIndex));
+  for (const m of modules) {
+    if (m.localModuleId === null) continue;
+    const stack = [m.factoryFunctionIndex];
+    while (stack.length > 0) {
+      const idx = stack.pop()!;
+      if (moduleOf.has(idx)) continue;
+      if (idx !== m.factoryFunctionIndex && factories.has(idx)) continue;
+      moduleOf.set(idx, m.localModuleId);
+      for (const insn of decodeFunction(mod, idx).instructions) {
+        for (const op of insn.operands) if (op.role === "function" && !moduleOf.has(op.value)) stack.push(op.value);
+      }
+    }
+  }
+  return {
+    functions: functions.map((f) => {
+      const id = moduleOf.get(f.index);
+      return id === undefined ? { ...f } : { ...f, moduleId: id };
+    }),
+    modules: modules.map((m) => ({ ...m, path: m.localModuleId === null ? null : (paths.get(m.localModuleId) ?? null) })),
+  };
+}
+
+// --- match side ----------------------------------------------------------
+
+/** True when `path` is `pkg`'s own file: directly under `<pkg>/`, not under
+ *  a nested `node_modules/` and not under another package's directory.
+ *  A null path (outside node_modules, or unknown) is neutral: own. */
+export function isOwnModulePath(pkg: string, path: string | null | undefined): boolean {
+  if (path === null || path === undefined) return true;
+  if (!path.startsWith(`${pkg}/`)) return false;
+  return !path.slice(pkg.length + 1).includes("node_modules/");
+}
+
+export interface ForeignSets {
+  /** Function indices whose module is another package's file. */
+  readonly functions: ReadonlySet<number>;
+  /** Factory function indices of modules that are another package's file. */
+  readonly factories: ReadonlySet<number>;
+}
+
+const EMPTY: ForeignSets = { functions: new Set(), factories: new Set() };
+const cache = new WeakMap<SigDbFile, ForeignSets>();
+
+/** Foreign modules/functions of a path-bearing file; empty for a file
+ *  without `modulePaths` (old files score exactly as before). */
+export function foreignSets(file: SigDbFile): ForeignSets {
+  if (file.modulePaths === undefined || file.modulePaths < 1) return EMPTY;
+  const hit = cache.get(file);
+  if (hit !== undefined) return hit;
+  const foreignIds = new Set<number>();
+  const factories = new Set<number>();
+  for (const m of file.modules) {
+    if (isOwnModulePath(file.package, m.path)) continue;
+    factories.add(m.factoryFunctionIndex);
+    if (m.localModuleId !== null) foreignIds.add(m.localModuleId);
+  }
+  const functions = new Set<number>();
+  for (const f of file.functions) if ((f.moduleId !== undefined && foreignIds.has(f.moduleId)) || factories.has(f.index)) functions.add(f.index);
+  const out = { functions, factories };
+  cache.set(file, out);
+  return out;
+}

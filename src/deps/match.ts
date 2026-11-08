@@ -7,6 +7,7 @@
 import type { LoadedSig } from "./db.ts";
 import type { ModuleInventory } from "./inventory.ts";
 import type { SigDbFile } from "./sigdb-types.ts";
+import { foreignSets } from "./module-paths.ts";
 
 export type ConfidenceTier = "high" | "medium" | "low" | "none";
 
@@ -194,7 +195,13 @@ function buildIndex<K extends "exactHash" | "fuzzyHash" | "stringSetHash">(funct
 function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Set<string>, targetFuzzy: Set<string>, targetStringHash: Set<string>, minInstr: number, hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>): PackageScore | null {
   const pkg: SigDbFile = entry.file;
   if (pkg.hbcVersion !== target.hbcVersion) return null;
-  const eligible = pkg.functions.filter((f) => f.instrCount >= minInstr);
+  // corpus-embedded-copy (module paths v1, docs/PACKAGE-SIGNATURES.md §7):
+  // a path-bearing file is scored on its OWN files only — a module whose
+  // path is another package's file (nested copy, hoisted undeclared
+  // dependency, @babel/runtime helper) is neither a hit nor in the
+  // denominators. Empty for files without paths (scored as before).
+  const foreign = foreignSets(pkg);
+  const eligible = pkg.functions.filter((f) => f.instrCount >= minInstr && !foreign.functions.has(f.index));
   if (eligible.length === 0) return null;
 
   // Calibrated, not guessed: an early cutoff of 3 was tried and measured
@@ -243,10 +250,16 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
 
   let moduleExactHits = 0;
   for (const m of pkg.modules) {
-    if (m.factoryIsBaseline) continue;
+    // corpus-offline-precision: a J4 dependency-flagged module is the
+    // dependency's code (dep-subtract.mjs keeps the module only for graph
+    // anchoring), never this package's own module hit. It stays in
+    // `moduleTotal` below: dropping it there too would turn some packages
+    // into "tiny" ones and unlock the tiny-package path (measured: adds
+    // react-shallow-renderer as a false positive on react-navigation-example).
+    if (m.factoryIsBaseline || m.factoryIsDependency === true || foreign.factories.has(m.factoryFunctionIndex)) continue;
     if (m.factoryExactHash !== null && targetExact.has(schemeKey(pkg, m.factoryExactHash)) && isUnambiguous(schemeKey(pkg, m.factoryExactHash))) moduleExactHits++;
   }
-  const moduleTotal = pkg.modules.filter((m) => !m.factoryIsBaseline && m.factoryExactHash !== null).length;
+  const moduleTotal = pkg.modules.filter((m) => !m.factoryIsBaseline && m.factoryExactHash !== null && !foreign.factories.has(m.factoryFunctionIndex)).length;
 
   const exactCoverage = exactHits / eligible.length;
   const fuzzyCoverage = (exactHits + fuzzyOnlyHits) / eligible.length;
@@ -350,7 +363,11 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
     const owner = `${entry.file.package}@${entry.file.version}`;
     const fnByIndex = new Map(entry.file.functions.map((f) => [f.index, f]));
     fnByIndexByEntry.set(entry, fnByIndex);
+    // Module paths v1: a path-bearing file never claims another package's
+    // file, so a hash both own and copied is attributed to its owner.
+    const foreign = foreignSets(entry.file);
     for (const fn of entry.file.functions) {
+      if (foreign.functions.has(fn.index)) continue;
       const exactKey = schemeKey(entry.file, fn.exactHash);
       let owners = hashOwners.get(exactKey);
       if (owners === undefined) {
@@ -368,7 +385,7 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
       }
     }
     for (const m of entry.file.modules) {
-      if (m.factoryIsBaseline || m.factoryFuzzyHash === null) continue;
+      if (m.factoryIsBaseline || m.factoryIsDependency === true || m.factoryFuzzyHash === null || foreignSets(entry.file).factories.has(m.factoryFunctionIndex)) continue;
       const factory = fnByIndex.get(m.factoryFunctionIndex);
       if (factory === undefined || !fallbackEligible(factory.instrCount, factory.stringCount)) continue;
       const key = `${schemeKey(entry.file, m.factoryFuzzyHash)}|${factory.stringSetHash}`;
@@ -404,7 +421,7 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
     if (score === undefined || score.isBaseline || (score.tier !== "high" && score.tier !== "medium")) continue;
     const fnByIndex = fnByIndexByEntry.get(entry)!;
     for (const m of entry.file.modules) {
-      if (m.factoryIsBaseline || m.factoryFuzzyHash === null) continue;
+      if (m.factoryIsBaseline || m.factoryIsDependency === true || m.factoryFuzzyHash === null || foreignSets(entry.file).factories.has(m.factoryFunctionIndex)) continue;
       const factory = fnByIndex.get(m.factoryFunctionIndex);
       if (factory === undefined || factory.instrCount < MIN_FUZZY_ONLY_FACTORY_INSTR) continue;
       const fuzzyKey = schemeKey(entry.file, m.factoryFuzzyHash);
