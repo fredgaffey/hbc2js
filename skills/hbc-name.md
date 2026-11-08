@@ -1,7 +1,7 @@
 ---
 id: hbc-name
 kind: suggest-name
-version: 3
+version: 4
 ---
 
 # hbc-name -- naming registers and functions in decompiled Hermes bytecode
@@ -74,6 +74,13 @@ Reply with one JSON object and nothing else:
 }
 ```
 
+An abstention MUST carry a `reason` (one short sentence saying what evidence
+was missing); an answer that abstains without one is rejected:
+
+```json
+{ "names": [], "abstained": true, "reason": "no string literals, callees or property names to anchor a role" }
+```
+
 - `bindingId` is echoed back from the request, unchanged -- when `targets` is
   present, one that matches exactly one entry of it. A `bindingId` that is
   not in `targets` is dropped by the caller and never written, so do not
@@ -90,7 +97,7 @@ Reply with one JSON object and nothing else:
 
 ## Abstain
 
-Emit `{"names": [], "abstained": true}` when:
+Emit `{"names": [], "abstained": true, "reason": "<why>"}` (the `reason` is required) when:
 
 - there is no evidence at all (no literals, no named callees, no meaningful
   structure), or

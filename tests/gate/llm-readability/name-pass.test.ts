@@ -58,7 +58,7 @@ test("runNamePass: abstention and malformed output are recorded, never thrown, a
   const service = svc();
   const backend = new FakeBackend({
     replies: {
-      "suggest-name": (req) => (req.context["reg"] === 9 ? JSON.stringify({ names: [], abstained: true }) : "not json"),
+      "suggest-name": (req) => (req.context["reg"] === 9 ? JSON.stringify({ names: [], abstained: true, reason: "no evidence" }) : "not json"),
     },
   });
   const targets = [target(0, 9, "s1"), target(0, 12, "s2")];

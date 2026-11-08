@@ -126,3 +126,16 @@ function_end
     ["1:userId:param", "3:sessionToken:env-store", "5:count:env-load"],
   );
 });
+
+test("label-registers: live hermesc run on the iife-closures construct fixture labels the parameter of the named function expression", async (t) => {
+  const { requireHermesc } = await import("../../support/hermesc.ts");
+  const h = requireHermesc(t, 98);
+  if (h === null) return;
+  const { spawnSync } = await import("node:child_process");
+  const r = spawnSync(h.path, ["-O", "-g", "-dump-ra", join(repoRoot(), "tests", "fixtures", "constructs", "21-iife-closures", "source.js")], {
+    encoding: "utf8",
+    maxBuffer: 1 << 26,
+  });
+  const names = parseRaDump(r.stdout).flatMap((f) => f.labels.map((l) => l.name));
+  assert.ok(names.includes("n"), `expected the parameter "n" among ${JSON.stringify([...new Set(names)])}`);
+});

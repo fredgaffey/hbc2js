@@ -19,6 +19,10 @@ import { bodyFromContext, canonicaliseContext } from "./haiku.ts";
 export interface RecordingEntry {
   readonly text: string;
   readonly cost?: { readonly tokensIn?: number; readonly tokensOut?: number };
+  /** What the request asked for (written by tools/readability/record.ts in
+   *  function mode): lets coverage = named/requested be computed from the
+   *  recording alone. Ignored by replay. */
+  readonly meta?: { readonly fn: number; readonly requested: number };
 }
 
 export type Recording = Readonly<Record<string, RecordingEntry>>;

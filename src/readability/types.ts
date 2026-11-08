@@ -74,7 +74,7 @@ export interface HaikuBackendConfig {
 }
 
 export const DEFAULT_BUDGET_TOKENS = 2000000;
-export const DEFAULT_MAX_OUTPUT_TOKENS = 2048;
+export const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 
 export interface ConfigOverrides {
   readonly model?: string;
@@ -270,6 +270,10 @@ export interface ReadabilityResult {
   /** True when the model deliberately produced nothing (no signal, or the
    *  original is already clear). Abstention is a valid answer, not a failure. */
   readonly abstained: boolean;
+  /** Why the model produced nothing. REQUIRED when `abstained` (an abstention
+   *  without a reason is a rejected reply: a silent 62% abstain rate is
+   *  undiagnosable). */
+  readonly reason?: string;
 }
 
 export type ParseOutcome =
@@ -327,7 +331,12 @@ export function parseReadabilityResult(text: string): ParseOutcome {
     }
   }
   const abstained = abstainedRaw ?? (names.length === 0 && rewrite === undefined);
-  return { ok: true, result: { names, abstained, ...(rewrite !== undefined ? { rewrite } : {}) } };
+  const reasonRaw = obj["reason"];
+  const reason = typeof reasonRaw === "string" && reasonRaw.trim() !== "" ? reasonRaw.trim() : undefined;
+  if (abstained && reason === undefined) {
+    return { ok: false, error: "an abstention requires a non-empty `reason`" };
+  }
+  return { ok: true, result: { names, abstained, ...(reason !== undefined ? { reason } : {}), ...(rewrite !== undefined ? { rewrite } : {}) } };
 }
 
 function parseRewriteProposal(r: unknown): RewriteProposal | undefined {
@@ -505,6 +514,9 @@ export interface LabelledTarget {
    *  index at run time (landing 1) so the sample survives a rebuild. */
   readonly source: string;
   readonly referenceName: string;
+  /** Register-kind labels: the `{fn,reg}` the reference name belongs to, in
+   *  the numbering of the bundle the recording was made against. */
+  readonly binding?: { readonly fn: number; readonly reg: number };
   /** Other names a rater must accept as correct. */
   readonly alsoAccept: readonly string[];
   readonly role?: ModuleRole;

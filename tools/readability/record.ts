@@ -166,6 +166,15 @@ export function seededSample<T>(items: readonly T[], n: number, seed: number): T
   return reservoir;
 }
 
+/** Function-mode `--sample N`: sample N FUNCTIONS (not N registers, which
+ *  scatters the sample to ~1 register per function and spends a whole
+ *  function-source prompt per register) and keep every register of each. */
+export function sampleTargetsByFunction(targets: readonly Target[], n: number, seed: number): Target[] {
+  const fns = [...new Set(targets.map((t) => t.fn))];
+  const keep = new Set(seededSample(fns, n, seed));
+  return targets.filter((t) => keep.has(t.fn));
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const hbc = argv[0];
@@ -242,7 +251,7 @@ async function main(): Promise<void> {
   );
 
   if (sample !== null) {
-    allTargets = seededSample(allTargets, sample, seed);
+    allTargets = perRegister ? seededSample(allTargets, sample, seed) : sampleTargetsByFunction(allTargets, sample, seed);
     process.stderr.write(`record: --sample ${String(sample)} --seed ${String(seed)} -> ${String(allTargets.length)} target(s)\n`);
   }
 
@@ -348,7 +357,7 @@ async function main(): Promise<void> {
       // eslint-disable-next-line no-await-in-loop -- sequential by design: one model call at a time, budget-visible.
       const res = await backend.run({ kind: "suggest-name", prompt: "", context });
       const callSeconds = (Date.now() - callStart) / 1000;
-      recording[key] = { text: res.text, ...(res.cost !== undefined ? { cost: res.cost } : {}) };
+      recording[key] = { text: res.text, ...(res.cost !== undefined ? { cost: res.cost } : {}), meta: { fn, requested: regs.length } };
       calls += 1;
       const tokensIn = res.cost?.tokensIn ?? 0;
       const tokensOut = res.cost?.tokensOut ?? 0;
