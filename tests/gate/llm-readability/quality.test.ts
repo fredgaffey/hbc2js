@@ -251,3 +251,19 @@ test("spec 28 section 7 (quality): zero name misrepresenting a security-relevant
   assert.equal(after.misleading, 0, "zero misleading names on security-relevant targets must survive the re-check");
   assert.equal(after.n, 2, "the demoted proposal drops out of the high-confidence set entirely");
 });
+
+test("readability-rater: the sonnet comparison recording is well-formed and graded under both raters", (t) => {
+  const p = join(repoRoot(), "tests", "fixtures", "llm-readability", "react-navigation-example-0.85.3.recording.sonnet.json");
+  if (!existsSync(p)) {
+    t.skip("needs react-navigation-example-0.85.3.recording.sonnet.json (HBC2JS_LLM_MODEL=sonnet tools/readability/record.ts ... --labelled)");
+    return;
+  }
+  const rec = JSON.parse(readFileSync(p, "utf8")) as Recording;
+  const s = sample();
+  const both = rateHighConfidence(s, proposalsForLabels(s, recordedNames(rec)));
+  const stats = recordingStats(rec, JSON.parse(readFileSync(HELD_OUT_NAMEABLE, "utf8")) as NameableMap);
+  t.diagnostic(`sonnet (48 fns): high ${String(both.high.lenient)}/${String(both.high.n)} lenient (${String(both.high.exact)} exact), all ${String(both.all.lenient)}/${String(both.all.n)} (${String(both.all.exact)} exact), coverage ${String(stats.coverage)}`);
+  assert.equal(stats.entries, 48);
+  assert.ok(both.all.n >= 20 && both.all.lenient / both.all.n >= 0.5, "sonnet lenient accuracy floor (measured 21/28)");
+  assert.ok(both.all.lenient >= both.all.exact);
+});
