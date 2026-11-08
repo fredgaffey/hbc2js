@@ -205,6 +205,13 @@ const MIN_FUZZY_ONLY_FACTORY_INSTR = 24;
 // DISTINCT exact hashes: a package that repeats one boilerplate factory
 // dozens of times (core-js, deferred, dfa, asynckit, openai) otherwise
 // collects as many module hits from a single shape the app also has.
+// corpus-recall-bar (docs/DEPS.md "Bar losses: tiny packages"): a tiny
+// package whose own module factory exact-matches (a factory of at least
+// minInstr instructions, not an empty re-export) and at least this share
+// of whose eligible functions exact-match is high, below the 5-function
+// floor. Measured: 20+ true tiny packages on Expensify sit at 0.5-0.86
+// with a factory hit; the closest false one with a factory hit is 0.25.
+export const TINY_PACKAGE_MIN_EXACT_COVERAGE = 0.5;
 export const MIN_DISTINCT_EVIDENCE_HASHES = 3;
 // A target module holding more than this many times the package's whole
 // function count is a container (another package's pre-built dist file):
@@ -309,6 +316,7 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
   }
 
   let moduleExactHits = 0;
+  let substantiveModuleHits = 0;
   const factoryInstr = new Map(pkg.functions.map((f) => [f.index, f.instrCount]));
   for (const m of pkg.modules) {
     // corpus-offline-precision: a J4 dependency-flagged module is the
@@ -322,7 +330,10 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
       moduleExactHits++;
       // An empty or re-export factory (under minInstr) is a module hit but
       // not distinct evidence for the precision rules below.
-      if ((factoryInstr.get(m.factoryFunctionIndex) ?? 0) >= minInstr) hitKeys.add(schemeKey(pkg, m.factoryExactHash));
+      if ((factoryInstr.get(m.factoryFunctionIndex) ?? 0) >= minInstr) {
+        hitKeys.add(schemeKey(pkg, m.factoryExactHash));
+        substantiveModuleHits++;
+      }
     }
   }
   const moduleTotal = pkg.slim !== undefined ? pkg.slim.moduleTotal : pkg.modules.filter((m) => !m.factoryIsBaseline && m.factoryExactHash !== null && !foreign.factories.has(m.factoryFunctionIndex)).length;
@@ -347,7 +358,8 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
       exactCoverage >= MIN_EXACT_FUNCTION_COVERAGE_FOR_COVERAGE_PATH);
   const strongFunctionSignal =
     exactCoverage >= HIGH_EXACT_FUNCTION_COVERAGE ||
-    (isTinyPackage && exactHits >= MIN_TINY_PACKAGE_EXACT_FUNCTION_HITS && exactHitInstrSum >= MIN_TINY_PACKAGE_EXACT_FUNCTION_INSTR);
+    (isTinyPackage && exactHits >= MIN_TINY_PACKAGE_EXACT_FUNCTION_HITS && exactHitInstrSum >= MIN_TINY_PACKAGE_EXACT_FUNCTION_INSTR) ||
+    (isTinyPackage && substantiveModuleHits >= 1 && exactCoverage >= TINY_PACKAGE_MIN_EXACT_COVERAGE);
 
   let tier: ConfidenceTier;
   if (strongModuleSignal || strongFunctionSignal) tier = "high";
