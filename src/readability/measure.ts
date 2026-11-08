@@ -18,8 +18,13 @@ export function recordedNames(recording: Recording): Map<string, RecordedName> {
     const parsed = parseReadabilityResult(entry.text);
     if (!parsed.ok) continue;
     for (const n of parsed.result.names) {
-      if (!("reg" in n.bindingId)) continue;
-      out.set(`${String(n.bindingId.fn)},${String(n.bindingId.reg)}`, { name: n.name, confidence: n.confidence });
+      if (n.bindingId.kind !== "reg") continue;
+      // A live range keys as "fn,reg,web"; web 1 (the range holding the
+      // register's first def, e.g. a parameter's LoadParam) also answers for
+      // the whole register "fn,reg", which is how register labels join.
+      const w = n.bindingId.web;
+      const key = w === undefined || w === 1 ? `${String(n.bindingId.fn)},${String(n.bindingId.reg)}` : `${String(n.bindingId.fn)},${String(n.bindingId.reg)},${String(w)}`;
+      out.set(key, { name: n.name, confidence: n.confidence });
     }
   }
   return out;
@@ -40,9 +45,15 @@ export interface RecordingStats {
   readonly tokensOut: number;
 }
 
-/** `{fn -> nameable registers}` (src/readability/nameable.ts), as committed in
- *  `<app>.nameable.json`. */
-export type NameableMap = Readonly<Record<string, readonly number[]>>;
+/** `{fn -> nameable bindings}` (src/readability/nameable.ts), as committed in
+ *  `<app>.nameable.json`: a number is a whole register, a `"R:W"` string one
+ *  reg-split live range of register R (docs/RENAME.md). */
+export type NameableMap = Readonly<Record<string, readonly (number | string)[]>>;
+
+/** The `NameableMap` member a register binding id is counted under. */
+export function nameableMember(id: { readonly reg: number; readonly web?: number }): string {
+  return id.web === undefined ? String(id.reg) : `${String(id.reg)}:${String(id.web)}`;
+}
 
 export function recordingStats(recording: Recording, nameable?: NameableMap): RecordingStats {
   let legacy = 0, requested = 0, named = 0, abstain = 0, noReason = 0, bad = 0, tin = 0, tout = 0;
@@ -81,9 +92,9 @@ export function recordingStats(recording: Recording, nameable?: NameableMap): Re
     if (parsed.ok) {
       const asked = new Set<string>();
       for (const n of parsed.result.names) {
-        if ("reg" in n.bindingId && n.bindingId.fn === e.meta.fn && (universe === undefined || universe.has(String(n.bindingId.reg)))) {
-          asked.add(String(n.bindingId.reg));
-        }
+        if (n.bindingId.kind !== "reg" || n.bindingId.fn !== e.meta.fn) continue;
+        const member = nameableMember(n.bindingId);
+        if (universe === undefined || universe.has(member)) asked.add(member);
       }
       named += universe === undefined ? Math.min(asked.size, e.meta.requested) : asked.size;
     }
