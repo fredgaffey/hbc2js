@@ -506,7 +506,11 @@ export function formatReportText(report: DepsReport): string {
   const lines: string[] = [];
   lines.push(`hbc2js deps: ${report.input}`);
   lines.push(`  hbc version: ${report.hbcVersion}, functions: ${report.totalFunctions}, modules: ${report.totalModules}`);
-  for (const b of report.bundles ?? []) lines.push(`  bundle ${b.entryPath}: ${b.kind}, ${b.totalModules} modules${b.analysed ? " (analysed)" : ""}`);
+  // A Re.Pack app can ship hundreds of chunk bundles: list the first few,
+  // then a count (`--json` keeps the full list).
+  const bundles = report.bundles ?? [];
+  for (const b of bundles.slice(0, 8)) lines.push(`  bundle ${b.entryPath}: ${b.kind}, ${b.totalModules} modules${b.analysed ? " (analysed)" : ""}`);
+  if (bundles.length > 8) lines.push(`  ... ${bundles.length - 8} more bundles (${bundles.filter((b) => b.analysed).length} of ${bundles.length} analysed)`);
   if (report.reactNativeVersion !== null) {
     let rnLine = `  react-native: ${report.reactNativeVersion} (detected from matched module signatures)`;
     if (report.reactNativeVersionConsistentWithHbc === false) {
