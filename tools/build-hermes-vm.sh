@@ -47,12 +47,14 @@
 #         tarball's `osx-bin/`), which is why this project's harness could
 #         already run v96 fixtures against a VM on macOS — but nothing
 #         portable ships for Linux, hence this source build.
-#   98 -> 639e5d6afb16ce5018afe5005427a4a85f9bf28b   ("v98-late", the default 98)
-#         "static_h", parent of the v99 bump; BYTECODE_VERSION==98, 210 opcode
-#         defs (third_party/hermes/hbc98-late), class-E header layout and
-#         f74f6bbe37's NumCacheNewObject (37-byte large header). This is the
-#         layout every publicly shipped hermes-compiler@250829098.0.x emits,
-#         hence the RN 0.85/0.86 held-out bundles. Output dir tools/hermes-vm/v98.
+#   98 -> 09373fc61ba3f8735a40a15065f9fb55b1223df8   ("v98-late", the default 98)
+#         "static_h", 2025-08-28 (hermes-compiler@250829098.0.x is the next-day
+#         release). BYTECODE_VERSION==98, class-E header layout, and the
+#         CacheNewObject opcode still present (removed 2026-01-21 by 7193d4485).
+#         NOT 639e5d6afb16 (Feb 2026, third_party/hermes/hbc98-late's nominal
+#         commit): that one has the same opcode table as hbc99-feb2026 and its
+#         output differs from the public hermesc's and mis-runs public .hbc.
+#         Output dir tools/hermes-vm/v98.
 #   98-early -> c00cc57595b3ef504a323360ba77e7b2e0ac26ce  (third_party/hermes/hbc98-2024)
 #         v97-shaped class-D layout; no known public producer. Output dir
 #         tools/hermes-vm/v98-early (src-98-early, build-98-early).
@@ -83,7 +85,7 @@ REPO_URL="${HERMES_REPO_URL:-https://github.com/facebook/hermes.git}"
 
 version_94_sha="3815fec63d1a6667ca3195160d6e12fee6a0d8d5"
 version_96_sha="644c8be78af1eae7c138fa4093fb87f0f4f8db85"
-version_98_sha="639e5d6afb16ce5018afe5005427a4a85f9bf28b"
+version_98_sha="09373fc61ba3f8735a40a15065f9fb55b1223df8"
 version_98_early_sha="c00cc57595b3ef504a323360ba77e7b2e0ac26ce"
 version_99_sha="913d31acd10aff31e0856657c9c566c3e72bd24a"
 
