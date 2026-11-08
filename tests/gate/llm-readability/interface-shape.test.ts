@@ -13,7 +13,7 @@ import {
   BUDGET_ENV,
   CACHE_DIR_ENV,
   DEFAULT_BUDGET_TOKENS,
-  DEFAULT_HAIKU_MODEL,
+  DEFAULT_SONNET_MODEL,
   DEFAULT_MAX_OUTPUT_TOKENS,
   MODEL_ENV,
   ReadabilityConfigError,
@@ -27,7 +27,7 @@ const readabilityDir = join(repoRoot(), "src", "readability");
 
 test("spec 28: HaikuBackend config resolves to the documented defaults", () => {
   const cfg = resolveHaikuConfig({}, {}, "/tmp/proj");
-  assert.equal(cfg.model, DEFAULT_HAIKU_MODEL);
+  assert.equal(cfg.model, DEFAULT_SONNET_MODEL);
   assert.equal(cfg.budgetTokens, DEFAULT_BUDGET_TOKENS);
   assert.equal(cfg.maxOutputTokens, DEFAULT_MAX_OUTPUT_TOKENS);
   assert.equal(cfg.skillsDir, "skills");

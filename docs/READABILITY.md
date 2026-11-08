@@ -580,3 +580,18 @@ Over the whole 192-entry haiku recording: high 2/5 exact, 4/5 lenient; all 9/33 
 
 
 **Id match (measured 2026-11-09, same 60-function recipe, `claude-cli`/`haiku`, skill `hbc-name` v5 unchanged).** The remaining "requested ids cannot be matched to identifiers in the body" abstentions were real. Reconstructing each prompt body exactly as `record.ts` does (`decompileFunction`), 161 of the 1,002 requested bindings (16%, 32 of 60 functions) were not literal identifiers of the body. Two causes: a binding var-naming prints under a heuristic name (`r4_2` shown as `DrawerItemList`; it already has a good name, rule 4) and a binding collected from a nested closure, whose `rN` are other registers (the scoped render embeds closures). `nameableIndex` now counts a binding only if its literal `rN`/`rN_W` survives in the final render of the function's own scope (nested bodies are emptied first), so the nameable set equals the requestable identifiers of the body (`tests/gate/llm-readability/id-match.test.ts`; `web-identity.test.ts` no longer expects the `apply`-rendered web). `record.ts` also checkpoints the recording after every call. Re-record (`--only src --labelled ... --limit 60`, timeout raised to 420 s because of machine load; 60 calls, 690k in / 266k out tokens, committed as `<app>.recording.idmatch.json` + `<app>.nameable.idmatch.json`): the denominator is 850 bindings (was 1,002), coverage 35.4% (301/850) against 29.6% (297/1,002); tokens per named binding 3,178 against 3,657. Accuracy against parameter labels, all confidences: 25/46 lenient, 15/46 exact (was 22/46, 15/46); high confidence 7/8 lenient, 4/8 exact (was 8/8, 4/8; the high-confidence n is 8, one flipped). Still short of the 70% coverage target.
+
+**Default naming model is Sonnet (2026-11-09).** `DEFAULT_MODEL_ALIAS` in `src/readability/types.ts` is the one source of truth; `--model haiku` / `HBC2JS_LLM_MODEL=haiku` still select Haiku. Same 60-function id-match recipe re-recorded with the new default (`claude-cli`/`sonnet`, committed as `<app>.recording.idmatch.sonnet.json`; the nameable denominator is identical to the haiku one, so `<app>.nameable.idmatch.json` serves both). Measured:
+
+| id-match, 60 fns, 850 bindings | haiku | sonnet |
+| --- | --- | --- |
+| coverage | 35.4% (301) | 35.1% (298) |
+| lenient, all confidence | 25/46 (54%) | 29/45 (64%) |
+| exact, all confidence | 15/46 | 18/45 |
+| lenient, high confidence | 7/8 | 15/18 |
+| exact, high confidence | 4/8 | 11/18 |
+| tokens in / out | 690k / 266k | 595k / 57k |
+| tokens per named binding | 3,178 | 2,190 |
+| wall | (loaded machine) | 600 s of model time, 14 min total |
+
+Coverage is unchanged (the abstentions are skill/prompt-bound, not model-bound); accuracy is higher, high-confidence volume is more than doubled (18 vs 8 graded names) and tokens per name are 31% lower, mostly because Sonnet's replies are about a fifth the size. `quality.test.ts` now grades the sonnet id-match recording by default (floors: lenient all-confidence >= 50% with n >= 30, coverage >= 0.25, high-confidence exact >= 0.25 with n >= 5).

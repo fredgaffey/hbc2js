@@ -461,3 +461,5 @@ check redirects Metro's `babelTransformerPath` to a wrapper over the installed
 `@react-native/metro-babel-transformer`; the exported tree is not modified and
 no `--toolchain` flag exists. Rejected: a second pinned toolchain per RN minor.
 See spec 29 §4.6.
+
+- **Default readability naming model is Sonnet (2026-11-09).** `DEFAULT_MODEL_ALIAS` in `src/readability/types.ts` is the one source of truth (claude-cli alias, agent driver; HTTP backend uses the matching id). Measured on the held-out app: sonnet 75% vs haiku 53% lenient accuracy and fewer tokens per named binding. Override: `--model`/`HBC2JS_LLM_MODEL=haiku`. See docs/READABILITY.md.

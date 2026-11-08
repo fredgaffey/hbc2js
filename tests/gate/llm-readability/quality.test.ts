@@ -145,16 +145,16 @@ const HELD_OUT_RECORDING = join(
   "tests",
   "fixtures",
   "llm-readability",
-  "react-navigation-example-0.85.3.recording.json",
+  "react-navigation-example-0.85.3.recording.idmatch.sonnet.json", // the default model's (sonnet) 60-function id-match recording
 );
 
-const HELD_OUT_NAMEABLE = join(repoRoot(), "tests", "fixtures", "llm-readability", "react-navigation-example-0.85.3.nameable.json");
+const HELD_OUT_NAMEABLE = join(repoRoot(), "tests", "fixtures", "llm-readability", "react-navigation-example-0.85.3.nameable.idmatch.json");
 
 test("spec 28 section 7 (quality): >= 80% of high-confidence names on the labelled sample are accurate", (t) => {
   const s: LabelledSample = sample();
   assert.ok(existsSync(HAIKU_BACKEND_PATH), "spec 28 landing 1 (HaikuBackend) has landed -- this leg no longer needs the path check");
   if (!existsSync(HELD_OUT_RECORDING)) {
-    t.skip("needs tests/fixtures/llm-readability/react-navigation-example-0.85.3.recording.json (tools/readability/record.ts)");
+    t.skip("needs tests/fixtures/llm-readability/react-navigation-example-0.85.3.recording.idmatch.sonnet.json (tools/readability/record.ts)");
     return;
   }
   const proposals = proposalsForLabels(s, recordedNames(JSON.parse(readFileSync(HELD_OUT_RECORDING, "utf8")) as Recording));
@@ -170,7 +170,7 @@ test("spec 28 section 7 (quality): >= 80% of high-confidence names on the labell
   const both = rateHighConfidence(s, proposals);
   t.diagnostic(`lenient rater: high ${String(both.high.lenient)}/${String(both.high.n)} (exact ${String(both.high.exact)}), all ${String(both.all.lenient)}/${String(both.all.n)} (exact ${String(both.all.exact)}); ${String(both.all.excludedSingleLetter)} single-letter labels unrated`);
   assert.ok(both.high.lenient >= both.high.exact && both.all.lenient >= both.all.exact, "the lenient rater only ever adds accepted names");
-  assert.ok(both.all.n >= 25 && both.all.lenient / both.all.n >= 0.4, `lenient all-confidence accuracy ${String(both.all.lenient)}/${String(both.all.n)} fell below the 0.4 floor (measured 17/33)`);
+  assert.ok(both.all.n >= 30 && both.all.lenient / both.all.n >= 0.5, `lenient all-confidence accuracy ${String(both.all.lenient)}/${String(both.all.n)} fell below the 0.5 floor (sonnet id-match measured 29/45)`);
   assert.ok(got.n >= 5, `only ${String(got.n)} high-confidence names overlap register labels; the measurement needs >= 5`);
   assert.ok(got.rate >= HIGH_CONFIDENCE_ACCURACY_FLOOR, `high-confidence accuracy ${got.rate} over ${got.n} names is below the recorded floor ${HIGH_CONFIDENCE_ACCURACY_FLOOR} (spec target ${HIGH_CONFIDENCE_ACCURACY_TARGET})`);
   assert.equal(got.misleading, 0, "no security-relevant register label is misrepresented");
