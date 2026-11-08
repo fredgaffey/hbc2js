@@ -301,6 +301,11 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
         }
         const hasOwnArgs = hasOwnCall(n);
         if (hasOwnArgs !== null && isIdent(hasOwnArgs[1]!) && aliases.has((hasOwnArgs[1] as Ident).name)) {
+          // A brand test on `this` in the constructor ahead of the install
+          // (and not the double-init guard `fold` drops with it) would read
+          // `#x in this` after the field declaration already added the field:
+          // a different answer. Refuse the name.
+          if (allowInstall && installs === 0 && isThisArg(hasOwnArgs[0]!, regs)) escaped = true;
           consumed.add(hasOwnArgs[1]!);
           return;
         }
@@ -423,7 +428,17 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
       // install and goes with it -- left behind it would read `#x in this`
       // AFTER the field already exists and always throw (fixtures 90, 94).
       // Only when the install it guards follows (`guardsNextInstall`).
-      if (allowInstall && isDoubleInitGuard(s, stmts[i - 1], aliases, regs) && guardsNextInstall(stmts, i + 1, aliases, regs)) continue;
+      if (allowInstall && s.k === "if" && !isIdent(s.test) && isDoubleInitGuard(s, undefined, aliases, regs) && guardsNextInstall(stmts, i + 1, aliases, regs)) continue;
+      // The v98 spelling: `rT = hasOwnProperty.call(this, sym); if (rT) {...}`.
+      // The store goes with the guard, but only when `rT` is dead after it
+      // (its first later mention is a plain overwrite, or there is none), so
+      // nothing can observe that the brand test no longer ran.
+      const next = stmts[i + 1];
+      if (allowInstall && next !== undefined && next.k === "if" && isIdent(next.test) && isDoubleInitGuard(next, s, aliases, regs) && guardsNextInstall(stmts, i + 2, aliases, regs) && deadAfter(stmts, i + 2, next.test.name)) {
+        if (s.k === "init") droppedInits.push(s.name); // re-declared if still used (`redeclare`)
+        i++;
+        continue;
+      }
       if (s.k === "labeled") {
         const inner = fold(s.body, aliases, regs);
         aliases = inner.aliasesOut;
@@ -432,11 +447,6 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
         continue;
       }
       if (s.k === "if") {
-        // A brand test on `this` ahead of the install that is NOT the guard
-        // above would read `#x in this` after the field declaration already
-        // added it -- a different answer. Refuse rather than fold.
-        const brand = hasOwnCall(s.test);
-        if (allowInstall && installs === 0 && brand !== null && isIdent(brand[1]!) && aliases.has(brand[1].name) && isThisArg(brand[0]!, regs)) escaped = true;
         const test = processExpr(s.test, aliases, regs, null);
         const thenOut = fold(s.then, aliases, regs);
         const elseOut = fold(s.else, aliases, regs);
@@ -485,6 +495,17 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
       else if (!helperOk(store.value)) return false;
     }
     return helperWithMsg && s.then[s.then.length - 1]!.k === "throw";
+  }
+  /** `reg`'s first mention in `stmts[from..]` is a plain overwrite that does
+   *  not read it (or there is none): the value before `from` is dead. */
+  function deadAfter(stmts: readonly Stmt[], from: number, reg: string): boolean {
+    for (let j = from; j < stmts.length; j++) {
+      const u = identUses([stmts[j]!], reg);
+      if (u.reads + u.writes + u.nested === 0) continue;
+      const store = simpleStore(stmts[j]!);
+      return store !== null && store.name === reg && u.reads === 0;
+    }
+    return true;
   }
   /** The guarded install follows, past nothing but silent stores (an
    *  identifier or literal copied into a register that is not an alias: no
