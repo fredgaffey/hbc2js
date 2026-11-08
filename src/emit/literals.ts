@@ -189,6 +189,11 @@ export function objectBufferValues(mod: HbcModule, valueOffset: number, count: n
   return readValuesTolerant(buffer, valueOffset, count, mod.header.version);
 }
 
+/** Raw serialized values of a `NewArrayWithBuffer*` literal (tolerant, like `objectBufferValues`). */
+export function arrayBufferValues(mod: HbcModule, offset: number, count: number): readonly (SerializedLiteral | null)[] {
+  return readValuesTolerant(mod.literalValueBuffer, offset, count, mod.header.version);
+}
+
 /**
  * `objectKeys` without the throw: `null` when the key buffer does not hold
  * `numProps` decodable property names. A bundle-wide inventory scans literals

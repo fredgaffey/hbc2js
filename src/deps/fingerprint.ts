@@ -14,6 +14,8 @@ import { scanBundle } from "./wscan.ts";
 import type { BundleKind } from "./wscan.ts";
 import type { HbcModule } from "../parse/types.ts";
 import type { DecodedFunction, Instruction } from "../disasm/decode.ts";
+import { arrayBufferValues, objectBufferValues, objectKeysTolerant } from "../emit/literals.ts";
+import type { SerializedLiteral } from "../parse/types.ts";
 import type { SigFunction, SigModule } from "./sigdb-types.ts";
 
 // Truncated to 96 bits (24 hex chars): signature DBs must stay compact and a
@@ -48,6 +50,50 @@ export function functionStrings(mod: HbcModule, fn: DecodedFunction): string[] {
   for (const insn of fn.instructions as readonly Instruction[]) {
     for (const op of insn.operands) {
       if (op.role === "string") set.add(mod.strings.get(op.value));
+    }
+  }
+  return [...set].sort();
+}
+
+/**
+ * Strings a function contributes as module EVIDENCE: `functionStrings` plus
+ * the string keys/values of its `NewObjectWithBuffer*` / `NewArrayWithBuffer*`
+ * literals (v98-late/v99 emit `{k: "x"}` with no `LoadConstString`, so
+ * `functionStrings` alone misses them; docs/BUGS.md 2026-11-08). Evidence only
+ * -- never hashed: `stringSetHash` stays on `functionStrings` so scheme-2
+ * signature DBs remain valid (docs/PACKAGE-SIGNATURES.md "Literal-buffer strings").
+ */
+export function functionStringEvidence(mod: HbcModule, fn: DecodedFunction): string[] {
+  const set = new Set<string>(functionStrings(mod, fn));
+  const addValues = (vals: readonly (SerializedLiteral | null)[]): void => {
+    for (const v of vals) {
+      if (v?.kind !== "string") continue;
+      try {
+        set.add(mod.strings.get(v.stringId));
+      } catch {
+        // out-of-range id in a malformed buffer: skip, evidence is best-effort
+      }
+    }
+  };
+  const legacy = mod.header.version < 97;
+  for (const insn of fn.instructions as readonly Instruction[]) {
+    const n = insn.name;
+    const o = insn.operands;
+    if (n.startsWith("NewObjectWithBuffer")) {
+      if (legacy && o.length === 5) {
+        const count = o[2]!.value;
+        const keys = objectKeysTolerant(mod, o[3]!.value, count);
+        if (keys) for (const k of keys) set.add(k);
+        addValues(objectBufferValues(mod, o[4]!.value, count));
+      } else if (!legacy && (o.length === 3 || o.length === 4)) {
+        const shape = mod.shapes[o[o.length - 2]!.value];
+        if (shape === undefined) continue;
+        const keys = objectKeysTolerant(mod, shape.keyBufferOffset, shape.numProps);
+        if (keys) for (const k of keys) set.add(k);
+        addValues(objectBufferValues(mod, o[o.length - 1]!.value, shape.numProps));
+      }
+    } else if (n.startsWith("NewArrayWithBuffer") && o.length === 4) {
+      addValues(arrayBufferValues(mod, o[3]!.value, o[2]!.value));
     }
   }
   return [...set].sort();
