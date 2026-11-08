@@ -2049,6 +2049,56 @@ Recall is unchanged everywhere. Still open on Expensify's partial DB:
 `source-map-js`, `whatwg-url` (originals not in any DB, see the table
 above) and `lodash-es`. Test: `tests/gate/deps/corpus-precision-residual.test.ts`.
 
+**Path recall (corpus-path-recall, 2026-11-09).** Layering the
+path-bearing `db-v4-paths` over `db-v3-clean` lost true packages that were
+confirmed, on the pathless DB, by their dependencies' code inside their
+signature. Traced on deb (`trace-recall.mjs`, `cmp.mjs`):
+
+| lost TP (app) | own file in the app | where the v3 evidence was | recovered by |
+|---|---|---|---|
+| `abort-controller` (nav, bsky, Expensify) | `dist/abort-controller.mjs`; the signature built `dist/abort-controller.js`: 0-5 of 6 own functions exact, 3 by mnemonic shape, factory differs | `event-target-shim` (33 hits on nav), confirmed | fuzzy edge to `event-target-shim` |
+| `define-properties` (Expensify) | `index.js`, all 3 own functions exact (under the tiny bar of 5) | `es-define-property`, `define-data-property`, `gopd` copies | exact edge (`has-property-descriptors`) |
+| `hoist-non-react-statics` (all three) | 3 own functions; exact on bsky/Expensify, other build on nav | its nested `react-is` copy (15 hits) | not recovered: the app's `react-is` is a hoisted module of another version, so the edge is not the signature's |
+| `es-define-property`, `hasown` (Expensify) | one own function each | `get-intrinsic` / `function-bind` copies | not recovered: one hash plus one edge judged too little |
+| `@react-navigation/native` (nav, bsky) | 2-6 of 48 own modules exact (nav: a workspace build of the example) | `@react-navigation/core` / `routers` copies (157 hits on nav) | fuzzy edge to `react-native` |
+
+The rule (`promoteViaDependency`, docs/PACKAGE-SIGNATURES.md §7 "Recovery
+through the module graph") confirms a path-bearing package that is not
+high and was not demoted when an app module shaped like one of its own
+files requires that file's dependency: exact form (all own code present
+by exact hash, the required module has the dependency's exact factory) or
+fuzzy form (3+ distinct mnemonic shapes, half of the own file and half of
+the app module, and the required module holds 3+ hit hashes of a
+confirmed dependency). Slimmed records now keep module `depIds`, the own
+files that require another package (with their dependencies' module
+records) and the two counts the rule reads (`slim.ownPathDistinct`,
+`slim.ownFuzzy`), so the real pipeline judges as the full files do
+(the tests match both). Most promotions on react-navigation-example and
+bluesky name `react-native` as the dependency (`react-native-screens`,
+`-gesture-handler`, `-safe-area-context`, `-worklets`,
+`-is-edge-to-edge`, `@react-navigation/native`): `react-native` is required
+by nearly every module, so for these the edge adds little and the
+evidence is the mnemonic shape of a whole own file. All were true; a hub
+dependency is the first place to look if this rule adds a false positive.
+Measured on deb (`meas.sh`, offline, v4 = `db-v4-paths` over
+`db-v3-clean` as the user layer; before = corpus-precision-residual):
+
+| holdout | db-v3-clean: confirmed / TP / FP, recall | v4 before | v4 after | TPs recovered | FPs added |
+|---|---|---|---|---|---|
+| Expensify J3 | 128 / 89 / 39, 30.9% | 95 / 88 / 7, 92.6%, 30.6% | 98 / 91 / 7, 92.9%, 31.6% | `abort-controller`, `define-properties`, `htmlparser2` | 0 |
+| react-navigation-example | 14 / 14 / 0, 18.4% | 11 / 11 / 0, 100%, 14.5% | 18 / 18 / 0, 100%, 23.7% | `abort-controller`, `@react-navigation/native`, `react-native-gesture-handler`, `-safe-area-context`, `-screens`, `-worklets`, `-is-edge-to-edge` | 0 |
+| bluesky own build | 42 / 34 / 8, 17.2% | 33 / 32 / 1, 97.0%, 16.2% | 42 / 41 / 1, 97.6%, 20.7% | `abort-controller`, `@react-navigation/core`, `@react-navigation/native`, `react-native-date-picker`, `-is-edge-to-edge`, `-pager-view`, `-safe-area-context`, `-screens`, `-webview` | 0 |
+| rainbow own build | 104 / 82 / 22, 15.8% | same as v3 | unchanged | none | 0 |
+| metamask own build | 169 / 132 / 37, 17.6% | same as v3 | unchanged | none | 0 |
+
+`db-v3-clean` alone is pathless, so the rule never fires there (numbers
+unchanged by construction). v4 recall now exceeds v3 recall on all three
+apps it covers, with v4's precision. Still lost against `db-v3-clean`:
+`hoist-non-react-statics` (all three), `es-define-property` and `hasown`
+(Expensify), for the reasons in the table above.
+
+Test: `tests/gate/deps/corpus-path-recall.test.ts`.
+
 **Shipping.** Per D17c, the DB itself is never committed — the v2 build
 lives on a build host in `db-v2` (dependency-subtracted,
 353-file-quarantined) and is packaged the same way round 1's first archive
