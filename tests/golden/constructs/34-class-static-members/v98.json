@@ -7,9 +7,9 @@
   },
   "diagnostics": [
     {
-      "code": "W_OPCODE_TABLE_FORCED",
+      "code": "W_LAYOUT_ASSUMED",
       "context": {},
-      "message": "opcode table forced to hbc98-late",
+      "message": "opcode tables [hbc98-late, hbc99-mar2026] all verify but disagree on function id(s) [1]; assuming hbc98-late (the only known public v98 producer). Pass --opcode-table=hbc98-late (or another id) to choose explicitly, or --strict-layout (strictLayout: true) to refuse instead",
       "severity": "warn"
     }
   ],
@@ -202,10 +202,10 @@
       "chosen": "E/hbc98-late",
       "decidedBy": [
         "D1",
-        "P3"
+        "P3-assumed"
       ],
       "exhaustive": true,
-      "forced": true
+      "forced": false
     },
     "version": 98
   },

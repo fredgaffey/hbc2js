@@ -30,6 +30,9 @@ Total algorithm (no irreducibility test), emits labelled blocks + `while(true)` 
 ## D8 — Parser probes the layout; it never trusts the version field alone
 Verified from bytes: v98 exists in two header layouts and v99 in two opcode tables without a version bump. Opcode/layout tables are generated per Hermes commit SHA from MIT sources, and the parser selects them by structural probing plus version. Silent misdecode is risk R1.
 
+## D8a — An undecidable v98 opcode table defaults to `hbc98-late` (warned), `strictLayout` refuses
+Small v98 files can decode and verify under both `hbc98-late` and a `hbc99-*` table while disagreeing on some functions (below the first distinguishing opcode the tables coincide). The probe is already exhaustive (full-file structural verification), so no further static check separates them. Choice: when `version === 98`, `hbc98-late` is among the verified survivors and the disagreement is not provably immaterial, assume `hbc98-late` (the only public v98 producer is hermes-compiler 250829098.x, used by RN 0.85/0.86; the other survivors are v99 tables, which contradict the declared version) and emit `W_LAYOUT_ASSUMED` naming the assumption and the overrides: `--opcode-table=<id>` (explicit, no warning) or `--strict-layout` / `strictLayout: true` (restores the D8 `E_LAYOUT_AMBIGUOUS` refusal). Rejected: keep throwing by default (callers had to special-case a growing fixture list, `KNOWN_AMBIGUOUS_V98`, now empty); silently picking (violates D8). `--force-v98-table` is now a no-op kept for compatibility.
+
 ## D9 — v97+ generators/async get a runtime shim first
 Static Hermes removed the generator opcodes; bodies are compiler-lowered state machines. v1 emits `__hbc_makeGenerator(body, env)` as the provably-correct floor; `yield` recovery is v2. Pre-v97 keeps opcode-driven generator recovery.
 

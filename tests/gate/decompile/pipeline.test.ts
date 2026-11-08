@@ -55,16 +55,16 @@ test("the existing subcommands still work (the decompile command is additive)", 
   assert.match(disasm.stdout, /^; hbc2js disassembly/);
 });
 
-test("--force-v98-table resolves the eight documented E_LAYOUT_AMBIGUOUS fixtures", () => {
+test("ambiguous v98 fixture decompiles by default (W_LAYOUT_ASSUMED); strictLayout refuses", () => {
   const path = fixture("20-let-const-tdz", "v98.hbc");
+  const r = decompile(new Uint8Array(readFileSync(path)));
+  assert.equal(r.forcedOpcodeTable, false);
+  assert.ok(r.diagnostics.some((d) => d.code === "W_LAYOUT_ASSUMED"));
+  assert.equal(nodeCheck(r.code).ok, true);
   assert.throws(
-    () => parseForDecompile(new Uint8Array(readFileSync(path))),
+    () => parseForDecompile(new Uint8Array(readFileSync(path)), { strictLayout: true }),
     (e: unknown) => e instanceof Hbc2jsError && e.code === ErrorCode.E_LAYOUT_AMBIGUOUS,
   );
-  const forced = decompile(new Uint8Array(readFileSync(path)), { resolveV98Ambiguity: true });
-  assert.equal(forced.forcedOpcodeTable, true);
-  assert.ok(forced.diagnostics.some((d) => d.code === "W_FORCED_OPCODE_TABLE"));
-  assert.equal(nodeCheck(forced.code).ok, true);
 });
 
 test("every gate binary decompiles with strictEnv and reports no error diagnostics", () => {
@@ -91,7 +91,7 @@ test("every gate binary decompiles with strictEnv and reports no error diagnosti
       // environments a guard left flat (with the reason counts). Refusing is
       // the designed outcome of every guard in that spec's refusal table and
       // changes nothing about the output.
-      const unexpected = r.diagnostics.filter((d) => d.code !== "W_NO_CAPTURE_HOSTED" && d.code !== "W_FORCED_OPCODE_TABLE" && d.code !== "W_ORPHAN_FUNCTION" && d.code !== "W_UNUSED_LABEL" && d.code !== "W_EXPANSION_CAP" && d.code !== "W_UNREACHABLE_BLOCK" && d.code !== "W_LOOP_LOCAL_ENV" && d.code !== "W_PASS_ABANDONED" && d.code !== "W_PASS_VERSION_SKIP" && d.code !== "W_PASS_REFUSED" && d.code !== "W_IIFE_RECONSTRUCTED" && d.code !== "W_IIFE_REFUSED");
+      const unexpected = r.diagnostics.filter((d) => d.code !== "W_NO_CAPTURE_HOSTED" && d.code !== "W_FORCED_OPCODE_TABLE" && d.code !== "W_LAYOUT_ASSUMED" && d.code !== "W_ORPHAN_FUNCTION" && d.code !== "W_UNUSED_LABEL" && d.code !== "W_EXPANSION_CAP" && d.code !== "W_UNREACHABLE_BLOCK" && d.code !== "W_LOOP_LOCAL_ENV" && d.code !== "W_PASS_ABANDONED" && d.code !== "W_PASS_VERSION_SKIP" && d.code !== "W_PASS_REFUSED" && d.code !== "W_IIFE_RECONSTRUCTED" && d.code !== "W_IIFE_REFUSED");
       // W_UNPAIRED_NEW is EXPECTED on exactly the two inlined-construction
       // fixtures: their nested functions keep hermesc's dead
       // `CreateThisForNew` ahead of the inlined `new` (lowered directly,
