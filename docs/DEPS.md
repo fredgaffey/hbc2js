@@ -1951,7 +1951,7 @@ confirmed package matches the same hashes:
 | copy inlined in a much larger module of another package's pre-built dist file | Expensify 2 | `process`, `stackframe` (all hits in `react-devtools-core/dist/backend.js`, 886 functions; the packages have about 70) | fixed (`container`) |
 | copy inside another confirmed package's own, path-bearing file | Expensify 2 | `oboe` (21 of 21 hashes in `react-native-blob-util`), `jszip` (27 of 28 in `localforage`) | fixed on path-bearing hosts (`embedded`); still FPs on pathless DBs (rainbow, metamask) |
 | one source under two names, both loaded | Expensify 1 | `punycode.js` = `punycode` | fixed when one is path-bearing (`twin`) |
-| fork whose original is not a candidate | Expensify 2, metamask 2 | `source-map-js` (`source-map`), `whatwg-url` (`whatwg-url-without-unicode`) | open: the originals (`source-map`@0.6.1, `whatwg-url-without-unicode`@8.0.0-3) are in none of `db-v3-clean`, `db-v4-paths-partial`, `db-v4-paths`, so no index derived from the DB can name them; once fingerprinted, `twin` applies (both path-bearing) |
+| fork whose original is not a candidate | Expensify 2, metamask 2 | `source-map-js` (`source-map`), `whatwg-url` (`whatwg-url-without-unicode`) | open: the originals (`source-map`@0.6.1, `whatwg-url-without-unicode`@8.0.0-3) are in none of `db-v3-clean`, `db-v4-paths-partial`, `db-v4-paths`, so no index derived from the DB can name them; with the exact-version overlay `source-map-js` is demoted by the one-sided `twin` (corpus-twin-sourcemap) and `whatwg-url` by `embedded` on db-v4-paths-partial |
 | part generic, part another package's single file | Expensify 1 | `lodash-es` (41 of 93 hashes in `lodash/lodash.js`, the rest generic factories) | open: the 41 no longer anchor (`scattered`), but tiny-module shapes the package repeats over its 450 files still match whole 2-function app modules |
 | small helper functions spread over many app modules | Expensify 4 | `ai`, `ky`, `culori`, `swiper` (3-8 distinct hashes) | fixed (`scattered`) |
 | pathless signature holding its dependencies' code (the es-shim chain, `victory*`, `wagmi`, `typeorm`...) | rainbow ~20, metamask ~30 | `reflect.getprototypeof`, `is-regex`, `globalthis`, `define-properties` | open: needs path-bearing signatures (the full `db-v4-paths`) |
@@ -1980,6 +1980,12 @@ Four rules (five with `scattered`, below) now lower a would-be "high" package to
   at least one of them path-bearing. The path-bearing one is kept, else a
   declared dependency (`subtractedDependencies`) of another high package,
   else the one with more distinct hits, else the first by name.
+  One-sided twins too (corpus-twin-sourcemap): a package whose hits are
+  90% inside a path-bearing package with more hits is demoted when that
+  package outranks it by the same order. A fork that changed some functions
+  hits a strict subset of the original: `source-map-js` 40 hashes, all
+  among `source-map`@0.6.1's 46, so 87% of the original's set (no mutual
+  cover) and under the 2x `embedded` ratio.
 
 Rejected: the twin rule on two pathless files. It removed 14 Expensify
 FPs on `db-v3-clean` and 4-5 on rainbow and metamask, but cost 6 TPs: on a
@@ -2266,8 +2272,21 @@ originals become true positives on both DBs. With the overlay,
 `source-map-js`, `lodash-es`, `ky`, `ai`, `culori`, `swiper`) but stays on
 db-v3-clean, whose `whatwg-url` file is pathless. `source-map-js` stays a
 false positive on both, although its db-v4-paths-partial file
-(`1.2.1`, hbc98) has paths. Its matched functions were not traced, so it is
-unknown why the twin rule does not demote it.
+(`1.2.1`, hbc98) has paths. Traced (corpus-twin-sourcemap): every
+`source-map-js` version has 38-40 hits, all of them among `source-map`'s
+46, in six `source-map/lib/*` target modules. That is 100% of the fork's
+set but 87% of the original's, so the mutual 90% twin test failed, and
+46 < 2 x 40 kept `embedded` off. The one-sided twin rule above demotes it.
+
+| holdout (DB) | before: confirmed / TP / FP, precision | after | removed |
+|---|---|---|---|
+| Expensify, db-v4-paths-partial + overlay | 166 / 164 / 2, 98.8% | 165 / 164 / 1, 99.4% | `source-map-js` |
+| Expensify, db-v3-clean + overlay | 204 / 167 / 37, 81.9% | 201 / 167 / 34, 83.1% | `source-map-js`, `punycode.js`, `cssstyle` |
+
+The other 18 runs (react-navigation, bluesky, rainbow, metamask on all four
+DB setups; Expensify without the overlay) are unchanged; 0 TP lost and
+react-navigation stays at 0 FP. On metamask `source-map-js` stays a false
+positive: the overlay holds no `source-map` for it, so no original competes.
 
 **Version tolerance is not the lever.** Matching is already by package name
 across every loaded version, so other-version signatures were already
