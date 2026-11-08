@@ -267,3 +267,22 @@ test("readability-rater: the sonnet comparison recording is well-formed and grad
   assert.ok(both.all.n >= 20 && both.all.lenient / both.all.n >= 0.5, "sonnet lenient accuracy floor (measured 21/28)");
   assert.ok(both.all.lenient >= both.all.exact);
 });
+
+test("live-range identity: the web-target re-recording is graded per binding (docs/READABILITY.md, 2026-11-09)", (t) => {
+  const base = join(repoRoot(), "tests", "fixtures", "llm-readability", "react-navigation-example-0.85.3");
+  if (!existsSync(`${base}.recording.webs.json`)) {
+    t.skip("needs react-navigation-example-0.85.3.recording.webs.json (tools/readability/record.ts ... --labelled)");
+    return;
+  }
+  const rec = JSON.parse(readFileSync(`${base}.recording.webs.json`, "utf8")) as Recording;
+  const nameable = JSON.parse(readFileSync(`${base}.nameable.webs.json`, "utf8")) as NameableMap;
+  const stats = recordingStats(rec, nameable);
+  const s = sample();
+  const both = rateHighConfidence(s, proposalsForLabels(s, recordedNames(rec)));
+  const webMembers = Object.values(nameable).flat().filter((m) => typeof m === "string").length;
+  t.diagnostic(`webs (60 fns): coverage ${String(stats.named)}/${String(stats.requested)}, ${String(webMembers)} web bindings; high ${String(both.high.lenient)}/${String(both.high.n)} lenient (${String(both.high.exact)} exact), all ${String(both.all.lenient)}/${String(both.all.n)} (${String(both.all.exact)} exact)`);
+  assert.equal(stats.entries, 60);
+  assert.ok(webMembers > 0, "the denominator must carry reg-split webs");
+  assert.ok(stats.coverage !== undefined && stats.coverage >= 0.25, "coverage floor over nameable bindings (measured 297/1002)");
+  assert.ok(both.all.n >= 20 && both.all.lenient >= both.all.exact);
+});
