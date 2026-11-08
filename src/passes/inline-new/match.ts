@@ -107,7 +107,7 @@ export interface FoldResult { readonly after: readonly Stmt[]; readonly folded: 
 /** Section 9: rebuild every provable inlined construction in `root` (the
  *  frame that defines the classes) and in the functions declared directly in
  *  it. Pure: `check` re-runs it on `before` and requires the same answer. */
-export function foldAll(root: readonly Stmt[], onRefuse?: (r: Refusal) => void): FoldResult {
+export function foldAll(root: readonly Stmt[], onRefuse?: (r: Refusal) => void, onSkip?: (why: string) => void): FoldResult {
   const toks = new Tokens();
   const classes = new Map<string, ClassInfo>();
   const keepSlots = new Set<string>();
@@ -147,7 +147,7 @@ export function foldAll(root: readonly Stmt[], onRefuse?: (r: Refusal) => void):
   straight(root, new Map());
   let folded = 0;
   const run = (frame: Frame, env0: Env): readonly Stmt[] => {
-    if (hasKind(frame.body, new Set(["try"]), false)) return frame.body; // R-IN6, silent: no candidate is examined
+    if (hasKind(frame.body, new Set(["try"]), false)) { onSkip?.("R-IN6 frame has try"); return frame.body; } // R-IN6, silent: no candidate is examined
     const scan = (list: readonly Stmt[], env: Env, chain: readonly Level[]): readonly Stmt[] => {
       const out: Stmt[] = [];
       let i = 0;
@@ -222,23 +222,26 @@ export function foldAll(root: readonly Stmt[], onRefuse?: (r: Refusal) => void):
       if (proto.k === "member" && !proto.computed && proto.prop.k === "lit" && proto.prop.text === "prototype" && proto.obj.k === "ident") {
         // Base header (section 9.1, H-B).
         const t = tokOf(env, proto.obj);
-        if (t === null || !classes.has(t) || classes.get(t)!.cls.superClass !== null) return null;
-        if (!isObjectCreateOf(list[i + 1], h0.name)) return null;
+        const hdr = isObjectCreateOf(list[i + 1], h0.name);
+        if (t === null || !classes.has(t)) { if (hdr) onSkip?.(`H-B class operand is not a class token (${t ?? "null"})`); return null; }
+        if (classes.get(t)!.cls.superClass !== null) return null;
+        if (!hdr) return null;
         clsTok = t; cExpr = proto.obj; x = h0.name; j = i + 2; info = classes.get(t)!;
         toks.write(env, x, OBJ); written.add(x);
       } else if (proto.k === "call" && isMemberCall(proto.callee, "Object", "getPrototypeOf") && proto.args.length === 1 && isIdent(proto.args[0])) {
         // Derived header (section 9.1, H-D).
         const t = tokOf(env, proto.args[0]!);
-        if (t === null || !classes.has(t) || classes.get(t)!.cls.superClass === null) return null;
+        if (t === null || !classes.has(t)) { onSkip?.(`H-D class operand is not a class token (${t ?? "null"})`); return null; }
+        if (classes.get(t)!.cls.superClass === null) return null;
         info = classes.get(t)!; clsTok = t; cExpr = proto.args[0]!;
         const pTok = toks.fresh();
         toks.write(env, h0.name, pTok); written.add(h0.name);
         j = i + 1;
         while (j < list.length && silent(list[j]!)) j = applyCaller(list[j]!, env, j);
         const rc = store(list[j]);
-        if (rc === null || rc.decl || rc.value.k !== "call" || !isMemberCall(rc.value.callee, "Reflect", "construct")) return null;
+        if (rc === null || rc.decl || rc.value.k !== "call" || !isMemberCall(rc.value.callee, "Reflect", "construct")) { onSkip?.("H-D no Reflect.construct after the getPrototypeOf store"); return null; }
         const [p, arr, nt] = rc.value.args;
-        if (rc.value.args.length !== 3 || p === undefined || arr === undefined || arr.k !== "array" || nt === undefined || tokOf(env, p) !== pTok || tokOf(env, nt) !== clsTok) return null;
+        if (rc.value.args.length !== 3 || p === undefined || arr === undefined || arr.k !== "array" || nt === undefined || tokOf(env, p) !== pTok || tokOf(env, nt) !== clsTok) { onSkip?.(`H-D Reflect.construct operands differ (args ${rc.value.args.length}, arr ${arr?.k}, p ${tokOf(env, p!) === pTok}, nt ${nt === undefined ? "-" : tokOf(env, nt) === clsTok ? "ok" : nt.k})`); return null; }
         // The template, up to its own super(...): silent stores only.
         checkTemplate(body());
         while (ti < body().length && (skippable(body()[ti]!) || silent(body()[ti]!))) { if (!skippable(body()[ti]!)) applyTemplate(body()[ti]!); ti++; }
