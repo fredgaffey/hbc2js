@@ -483,7 +483,7 @@ Webs are not split further when a merge or loop joins them (section 4.2), and
 env slots, which is where a closure-observed variable lives, are never
 registers, so neither case gains an identity. Legacy `{fn, reg}` names keep
 their old meaning (docs/RENAME.md). Tests: `tests/gate/name-overlay/
-web-identity.test.ts` (construct fixtures 94-97: straight-line reuse, if/else
+web-identity.test.ts` (construct fixtures 96-99: straight-line reuse, if/else
 merge, loop-carried, closure-observed; VM equivalence of web-named renders at
 every version).
 

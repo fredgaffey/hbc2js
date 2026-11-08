@@ -7,7 +7,7 @@
 // tests pin the web-keyed identity `{fn, reg, web}` (key `reg:F:R:W`) and that
 // legacy `{fn, reg}` overlays still apply exactly as before.
 //
-// Fixtures 94-97 (constructs/9[4-7]-reg-reuse-*) are the construct fixtures for
+// Fixtures 96-99 (constructs/9[6-9]-reg-reuse-*) are the construct fixtures for
 // this item; the structural guards run at every compiled version.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -30,11 +30,11 @@ import { TRACE_VERDICT } from "../../../src/harness/compare.ts";
 
 const DIR = join(repoRoot(), "tests", "fixtures", "constructs");
 const VERSIONS = ["v84", "v94", "v96", "v98", "v99"] as const;
-// Fixture 94 at v99: fn 3 (`setup`) gives r1 to three unrelated values:
+// Fixture 96 at v99: fn 3 (`setup`) gives r1 to three unrelated values:
 // `load("styles")` (web 1, `r1`), the `makeSheet(...)` result (web 2, `r1_2`,
 // which var-naming renders `apply`) and `sheet.width + sheet.height` (web 3,
 // `r1_3`). Under the whole-register identity all three had to share a name.
-const F94 = join(DIR, "94-reg-reuse-straight", "v99.hbc");
+const F96 = join(DIR, "96-reg-reuse-straight", "v99.hbc");
 const SETUP = 3;
 
 function analysisOf(path: string): ReturnType<typeof analyseModule> {
@@ -42,7 +42,7 @@ function analysisOf(path: string): ReturnType<typeof analyseModule> {
 }
 
 function renderSetup(webNames: ReadonlyMap<string, { name: string }>, names: ReadonlyMap<number, { name: string }> = new Map()): string {
-  const analysis = analysisOf(F94);
+  const analysis = analysisOf(F96);
   const frame = rawFrames(analysis, { strictEnv: false }).get(SETUP)!;
   return renderFrame(astPassHook(analysis), frame.node, frame.cfg, names, { webNames }).code;
 }
@@ -61,7 +61,7 @@ test("web identity: reg:F:R:W key, parse round trip, short form, rendered ident"
 });
 
 test("web identity: nameable bindings list each bound web of a split register, not the register", () => {
-  const idx = nameableIndex(analysisOf(F94), { strictEnv: false });
+  const idx = nameableIndex(analysisOf(F96), { strictEnv: false });
   const keys = idx.bindings(SETUP).map((b) => bindingKey(b));
   assert.ok(keys.includes("reg:3:1:1"), keys.join(" "));
   assert.ok(keys.includes("reg:3:1:3"), keys.join(" "));
@@ -89,7 +89,7 @@ test("web identity: legacy {fn,reg} overlays still name the whole register", () 
 });
 
 test("web identity: readability targets are per web for a split register", () => {
-  const analysis = analysisOf(F94);
+  const analysis = analysisOf(F96);
   const frames = rawFrameBodies(analysis, { strictEnv: false });
   const targets = collectTargets(analysis, frames, new OverlayStore(), new Set([SETUP]), nameableIndex(analysis, { strictEnv: false }));
   const keys = targets.map((t) => bindingKey(regId(t.fn, t.reg, t.web)));
@@ -104,7 +104,7 @@ test("web identity: the wire bindingId may carry a web", () => {
 });
 
 test("web identity: NameService sets, gates and renders a web-keyed name", () => {
-  const svc = new NameService(analysisOf(F94), new OverlayStore());
+  const svc = new NameService(analysisOf(F96), new OverlayStore());
   const ok = svc.setName(regId(SETUP, 1, 3), "total", { confidence: "med", evidence: "sum of sides", source: "human" });
   assert.ok(ok.ok, JSON.stringify(ok));
   const missing = svc.setName(regId(SETUP, 1, 7), "gone", { confidence: "med", evidence: "x", source: "human" });
@@ -126,9 +126,9 @@ function fnSource(dir: string, v: string, name: string): string | null {
   return code.slice(start, end < 0 ? undefined : end);
 }
 
-test("web identity guard: an if/else merge keeps both arm defs in ONE binding (fixture 95)", () => {
+test("web identity guard: an if/else merge keeps both arm defs in ONE binding (fixture 97)", () => {
   for (const v of VERSIONS) {
-    const src = fnSource("95-reg-reuse-if-merge", v, "pick");
+    const src = fnSource("97-reg-reuse-if-merge", v, "pick");
     if (src === null) continue;
     const m = /"v=" \+ (\w+)/.exec(src);
     assert.ok(m !== null, `${v}: no "v=" print`);
@@ -138,9 +138,9 @@ test("web identity guard: an if/else merge keeps both arm defs in ONE binding (f
   }
 });
 
-test("web identity guard: a loop-carried value stays one binding (fixture 96)", () => {
+test("web identity guard: a loop-carried value stays one binding (fixture 98)", () => {
   for (const v of VERSIONS) {
-    const src = fnSource("96-reg-reuse-loop-carried", v, "sumTo");
+    const src = fnSource("98-reg-reuse-loop-carried", v, "sumTo");
     if (src === null) continue;
     const m = /"acc " \+ (\w+)/.exec(src);
     assert.ok(m !== null, `${v}: no "acc" print`);
@@ -150,19 +150,19 @@ test("web identity guard: a loop-carried value stays one binding (fixture 96)", 
   }
 });
 
-test("web identity guard: a closure-observed variable is never split (fixture 97)", () => {
+test("web identity guard: a closure-observed variable is never split (fixture 99)", () => {
   for (const v of VERSIONS) {
-    const src = fnSource("97-reg-reuse-closure-captured", v, "counter");
+    const src = fnSource("99-reg-reuse-closure-captured", v, "counter");
     if (src === null) continue;
     assert.doesNotMatch(src, /\b_e\d+_\d+_\d+\b/, `${v}: an environment slot was split`);
   }
 });
 
-test("web identity: naming every web keeps fixtures 94-97 equivalent under the real VM, every version", (t) => {
+test("web identity: naming every web keeps fixtures 96-99 equivalent under the real VM, every version", (t) => {
   const tmp = mkdtempSync(join(tmpdir(), "hbc2js-web-"));
   let checked = 0, named = 0;
   try {
-    for (const dir of ["94-reg-reuse-straight", "95-reg-reuse-if-merge", "96-reg-reuse-loop-carried", "97-reg-reuse-closure-captured"]) {
+    for (const dir of ["96-reg-reuse-straight", "97-reg-reuse-if-merge", "98-reg-reuse-loop-carried", "99-reg-reuse-closure-captured"]) {
       for (const v of VERSIONS) {
         const hbc = join(DIR, dir, `${v}.hbc`);
         if (!existsSync(hbc)) continue;
