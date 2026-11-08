@@ -1,0 +1,130 @@
+; hbc2js disassembly of 95-private-field-inlined-escape/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=4 strings=11 globalCodeIndex=0
+function #0 "global"  params=1 frame=32 env=0 flags=dbg,overflowed  @0x0000014c size=274
+  0000  CreateFunctionEnvironment r10, 1
+  0003  CreatePrivateName    r12, s5 "#open"
+  0009  StoreToEnvironment   r10, 0, r12
+  000d  CreateBaseClass      r11, r13, r10, 1
+  0013  Mov                  r14, r13
+  0016  LoadConstString      r15, s6 "open"
+  001a  LoadConstUndefined   r8
+  001c  CreateClosure        r13, r10, f2 "open"
+  0021  DefineOwnGetterSetterByVal r14, r15, r13, r8, 0
+  0027  LoadConstString      r13, s8 "toggle"
+  002b  CreateClosure        r10, r10, f3 "toggle"
+  0030  DefineOwnByVal       r14, r10, r13, 0
+  0035  GetByIdShort         r10, r11, #c0, s9 "prototype"
+  003a  NewObjectWithParent  r13, r10
+  003d  PrivateIsIn          r7, r12, r13, r0
+  0042  JmpTrueLong          L6, r7
+  0048  LoadConstFalse       r7
+  004a  AddOwnPrivateBySym   r13, r7, r12
+  004e  LoadConstUInt8       r4, 1
+  0051  LoadConstUInt8       r5, 4
+  0054  LoadConstZero        r0
+  0056  LoadConstZero        r2
+L1:
+  0058  AddN                 r1, r2, r0
+  005c  AddN                 r0, r0, r4
+  0060  Mov                  r2, r1
+  0063  JLessN               L1, r0, r5
+  0067  LoadConstUInt8       r2, 3
+  006a  JNotLessN            L2, r2, r1
+  006e  LoadConstTrue        r9
+  0070  PutOwnPrivateBySym   r13, r9, 1, r12
+L2:
+  0075  PutByIdStrict        r13, r1, #c0, s10 "sum"
+  007b  GetGlobalObject      r10
+  007d  TryGetById           r18, r10, #c1, s7 "print"
+  0083  GetByIdShort         r22, r13, #c2, s10 "sum"
+  0088  GetByIdShort         r21, r13, #c3, s6 "open"
+  008d  GetByIdShort         r14, r13, #c4, s8 "toggle"
+  0092  Call1                r20, r14, r13
+  0096  GetByIdShort         r19, r13, #c3, s6 "open"
+  009b  LoadConstString      r23, s2 "g:"
+  009f  LoadConstUndefined   r24
+  00a1  Call                 r13, r18, 6
+  00a5  GetByIdShort         r11, r11, #c0, s9 "prototype"
+  00aa  NewObjectWithParent  r11, r11
+  00ad  PrivateIsIn          r9, r12, r11, r2
+  00b2  JmpTrue              L5, r9
+  00b5  AddOwnPrivateBySym   r11, r7, r12
+  00b9  LoadConstZero        r0
+  00bb  LoadConstZero        r1
+L3:
+  00bd  AddN                 r3, r1, r0
+  00c1  AddN                 r0, r0, r4
+  00c5  Mov                  r1, r3
+  00c8  JLessN               L3, r0, r4
+  00cc  JNotLessN            L4, r2, r3
+  00d0  LoadConstTrue        r7
+  00d2  PutOwnPrivateBySym   r11, r7, 1, r12
+L4:
+  00d7  PutByIdStrict        r11, r3, #c0, s10 "sum"
+  00dd  TryGetById           r14, r10, #c1, s7 "print"
+  00e3  GetByIdShort         r22, r11, #c2, s10 "sum"
+  00e8  GetByIdShort         r21, r11, #c3, s6 "open"
+  00ed  GetByIdShort         r10, r11, #c4, s8 "toggle"
+  00f2  Call1                r20, r10, r11
+  00f6  LoadConstString      r23, s4 "h:"
+  00fa  LoadConstUndefined   r24
+  00fc  Call                 r10, r14, 5
+  0100  Ret                  r10
+L5:
+  0102  LoadConstString      r23, s0 "Cannot initialize private field …"
+  0106  CallBuiltin          r10, b44 "throwTypeError", 2
+L6:
+  010a  LoadConstString      r23, s0 "Cannot initialize private field …"
+  010e  CallBuiltin          r10, b44 "throwTypeError", 2
+
+function #1 "Gate"  params=2 frame=20 env=0 flags=strict,dbg,overflowed,ctor  @0x0000025e size=99
+  0000  GetParentEnvironment r8, 0
+  0003  GetNewTarget         r7
+  0005  GetByIdShort         r7, r7, #c0, s9 "prototype"
+  000a  NewObjectWithParent  r7, r7
+  000d  LoadFromEnvironment  r10, r8, 0
+  0011  PrivateIsIn          r6, r10, r7, r0
+  0016  JmpTrue              L4, r6
+  0019  LoadParam            r9, 1
+  001c  LoadConstFalse       r6
+  001e  AddOwnPrivateBySym   r7, r6, r10
+  0022  LoadConstZero        r2
+  0024  Less                 r6, r2, r9
+  0028  LoadConstUInt8       r3, 1
+  002b  LoadConstZero        r1
+  002d  LoadConstZero        r0
+  002f  JmpFalse             L2, r6
+L1:
+  0032  AddN                 r0, r0, r1
+  0036  AddN                 r1, r1, r3
+  003a  Mov                  r2, r0
+  003d  JLess                L1, r1, r9
+L2:
+  0041  LoadConstUInt8       r0, 3
+  0044  JNotLessN            L3, r0, r2
+  0048  LoadFromEnvironment  r8, r8, 0
+  004c  LoadConstTrue        r6
+  004e  PutOwnPrivateBySym   r7, r6, 1, r8
+L3:
+  0053  PutByIdStrict        r7, r2, #c0, s10 "sum"
+  0059  Ret                  r7
+L4:
+  005b  LoadConstString      r11, s0 "Cannot initialize private field …"
+  005f  CallBuiltin          r7, b44 "throwTypeError", 2
+
+function #2 "open"  params=1 frame=2 env=0 flags=strict,dbg,overflowed,nc  @0x000002c1 size=17
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r1, r0, 0
+  0007  LoadParam            r0, 0
+  000a  GetOwnPrivateBySym   r0, r0, 0, r1
+  000f  Ret                  r0
+
+function #3 "toggle"  params=1 frame=4 env=0 flags=strict,dbg,overflowed,nc  @0x000002d2 size=30
+  0000  LoadParam            r2, 0
+  0003  GetParentEnvironment r1, 0
+  0006  LoadFromEnvironment  r1, r1, 0
+  000a  GetOwnPrivateBySym   r3, r2, 0, r1
+  000f  Not                  r0, r3
+  0012  PutOwnPrivateBySym   r2, r0, 0, r1
+  0017  GetOwnPrivateBySym   r1, r2, 0, r1
+  001c  Ret                  r1
