@@ -61,6 +61,12 @@ function compileBytes(version: HbcVersion, dir: string, name: string, source: st
   return new Uint8Array(readFileSync(outPath));
 }
 
+// A tiny v98 bundle passes verification under two opcode tables; the local
+// v98 hermesc emits hbc98-late (as tests/gate/split/orphan-decl-order.test.ts).
+function inventoryOf(version: HbcVersion, bytes: Uint8Array) {
+  return buildInventory(bytes, version === 98 ? { opcodeTable: "hbc98-late" } : {}).inventory;
+}
+
 function withDir(fn: (dir: string) => void | Promise<void>): Promise<void> | void {
   const dir = mkdtempSync(join(tmpdir(), "hbc2js-webpack-inv-"));
   const done = () => rmSync(dir, { recursive: true, force: true });
@@ -82,7 +88,7 @@ test("spec 32: webpack chunk bundle push([[ids], {id: factory}]) is a module inv
   if (VERSIONS.length === 0) return t.skip("no hermesc found (run tools/get-hermesc.sh)");
   withDir((dir) => {
     for (const v of VERSIONS) {
-      const inv = buildInventory(compileBytes(v, dir, `chunk-${v}`, CHUNK)).inventory;
+      const inv = inventoryOf(v, compileBytes(v, dir, `chunk-${v}`, CHUNK));
       assert.equal(inv.bundleKind, "webpack", `v${v}`);
       const byId = new Map(inv.modules.map((m) => [m.localModuleId, m]));
       assert.deepEqual([...byId.keys()].sort((a, b) => a! - b!), [7, 1001, 300000], `v${v}`);
@@ -98,7 +104,7 @@ test("spec 32: webpack main runtime's __webpack_modules__ object is a module inv
   if (VERSIONS.length === 0) return t.skip("no hermesc found (run tools/get-hermesc.sh)");
   withDir((dir) => {
     for (const v of VERSIONS) {
-      const inv = buildInventory(compileBytes(v, dir, `main-${v}`, MAIN)).inventory;
+      const inv = inventoryOf(v, compileBytes(v, dir, `main-${v}`, MAIN));
       assert.equal(inv.bundleKind, "webpack", `v${v}`);
       assert.deepEqual(inv.modules.map((m) => m.localModuleId), [10, 11], `v${v}`);
       assert.deepEqual(inv.modules.map((m) => m.depIds), [[11], []], `v${v}`);
@@ -110,7 +116,7 @@ test("spec 32: a handler-map object in a Metro bundle does not become modules", 
   if (VERSIONS.length === 0) return t.skip("no hermesc found (run tools/get-hermesc.sh)");
   withDir((dir) => {
     for (const v of VERSIONS) {
-      const inv = buildInventory(compileBytes(v, dir, `metro-${v}`, METRO_WITH_HANDLER_MAP)).inventory;
+      const inv = inventoryOf(v, compileBytes(v, dir, `metro-${v}`, METRO_WITH_HANDLER_MAP));
       assert.equal(inv.bundleKind, "metro", `v${v}`);
       assert.deepEqual(inv.modules.map((m) => m.localModuleId), [0, 1], `v${v}`);
       assert.deepEqual(inv.modules.map((m) => m.depIds), [[], [0]], `v${v}`);
@@ -122,7 +128,7 @@ test("spec 32: a handler map in a bundle with no module system and no webpackChu
   if (VERSIONS.length === 0) return t.skip("no hermesc found (run tools/get-hermesc.sh)");
   withDir((dir) => {
     for (const v of VERSIONS) {
-      const inv = buildInventory(compileBytes(v, dir, `hoisted-${v}`, SCOPE_HOISTED)).inventory;
+      const inv = inventoryOf(v, compileBytes(v, dir, `hoisted-${v}`, SCOPE_HOISTED));
       assert.equal(inv.bundleKind, "none", `v${v}`);
       assert.equal(inv.modules.length, 0, `v${v}`);
     }
