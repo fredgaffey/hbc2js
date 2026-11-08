@@ -105,6 +105,7 @@ const { decodeFunction } = await import(join(REPO_ROOT, "src/disasm/decode.ts"))
 const { parseHbc } = await import(join(REPO_ROOT, "src/parse/module.ts"));
 const { fingerprintModule, SIG_HASH_SCHEME } = await import(join(REPO_ROOT, "src/deps/fingerprint.ts"));
 const { writeSignature } = await import(join(REPO_ROOT, "src/deps/db.ts"));
+const { attachModulePaths, MODULE_PATHS_VERSION, modulePathsFromSourceMap } = await import(join(REPO_ROOT, "src/deps/module-paths.ts"));
 
 const rawArgs = process.argv.slice(2);
 const REFINGERPRINT = rawArgs.includes("--refingerprint");
@@ -161,12 +162,13 @@ function bundleAndCompile(workDir) {
   const entryFile = join(scaffoldDir, `__bulk_entry_${slug}__.js`);
   writeFileSync(entryFile, `const X = require(${JSON.stringify(pkg)});\nmodule.exports = X;\n`);
   const bundlePath = join(workDir, "out.bundle");
+  const mapPath = join(workDir, "out.bundle.map");
   const assetsDir = join(workDir, "assets");
   mkdirSync(assetsDir, { recursive: true });
   try {
     execFileSync(
       "npx",
-      ["react-native", "bundle", "--platform", "android", "--dev", "false", "--minify", "true", "--max-workers", "1", "--reset-cache", "--entry-file", entryFile, "--bundle-output", bundlePath, "--assets-dest", assetsDir],
+      ["react-native", "bundle", "--platform", "android", "--dev", "false", "--minify", "true", "--max-workers", "1", "--reset-cache", "--entry-file", entryFile, "--bundle-output", bundlePath, "--sourcemap-output", mapPath, "--assets-dest", assetsDir],
       pipedOpts({ cwd: scaffoldDir, timeout: 120_000 }),
     );
   } finally {
@@ -174,7 +176,11 @@ function bundleAndCompile(workDir) {
   }
   const hbcPath = join(workDir, "out.hbc");
   execFileSync(hermescPath, ["-O", "-emit-binary", `-out=${hbcPath}`, bundlePath], pipedOpts({ timeout: 60_000 }));
-  return hbcPath;
+  // Module paths v1 (docs/PACKAGE-SIGNATURES.md §7): module id -> path
+  // below node_modules, from Metro's source map. Null when no map.
+  let paths = null;
+  if (existsSync(mapPath)) paths = [...modulePathsFromSourceMap(JSON.parse(readFileSync(mapPath, "utf8")), readFileSync(bundlePath, "utf8"))];
+  return { hbcPath, paths };
 }
 
 async function main() {
@@ -189,26 +195,36 @@ async function main() {
     const cachePath = hbcCachePath();
     let bytes;
     let fromCache = false;
+    // Module paths v1: cached beside the .hbc (`.paths.json`, [id, path]
+    // pairs) so --refingerprint keeps them; absent = pathless, as before.
+    const pathsCache = `${cachePath}.paths.json`;
+    let modulePaths = null;
     if (REFINGERPRINT && existsSync(cachePath)) {
       bytes = new Uint8Array(readFileSync(cachePath));
+      if (existsSync(pathsCache)) modulePaths = JSON.parse(readFileSync(pathsCache, "utf8"));
       fromCache = true;
     } else {
       installPackage();
       installed = true;
       workDir = mkdtempSync(join(tmpdir(), "hbc2js-bulk-"));
-      const hbcPath = bundleAndCompile(workDir);
+      const built = bundleAndCompile(workDir);
+      const hbcPath = built.hbcPath;
+      modulePaths = built.paths;
       bytes = new Uint8Array(readFileSync(hbcPath));
       // Populate the cache for next time (fresh builds too, not just
       // refingerprint runs - cheap, .hbc files are small).
       mkdirSync(hbcCacheDir, { recursive: true });
       writeFileSync(cachePath, bytes);
+      if (modulePaths !== null) writeFileSync(pathsCache, JSON.stringify(modulePaths));
     }
 
     const mod = parseHbc(bytes);
     if (mod.header.version !== hbcVersion) {
       throw new Error(`hermesc produced HBC version ${mod.header.version}, expected ${hbcVersion} (hermescPath=${hermescPath})`);
     }
-    const { functions: rawFunctions, modules: rawModules, legacyExactHashes } = fingerprintModule(mod, decodeFunction);
+    const fp = fingerprintModule(mod, decodeFunction);
+    const legacyExactHashes = fp.legacyExactHashes;
+    const { functions: rawFunctions, modules: rawModules } = modulePaths === null ? fp : attachModulePaths(mod, decodeFunction, fp.functions, fp.modules, new Map(modulePaths));
 
     const { hashes: baselineHashes, paths: subtractedBaselines, owners: baselineOwners } = computeBaselineUnion(outDbDir, hbcVersion);
     if (!hasCompleteBaselineSet(subtractedBaselines)) {
@@ -221,6 +237,7 @@ async function main() {
     const db = {
       schema: 2,
       hashScheme: SIG_HASH_SCHEME,
+      ...(modulePaths !== null ? { modulePaths: MODULE_PATHS_VERSION } : {}),
       package: pkg,
       version,
       hbcVersion: mod.header.version,
