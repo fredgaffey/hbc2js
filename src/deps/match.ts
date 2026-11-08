@@ -218,8 +218,10 @@ export const EXPLAINED_EVIDENCE_SHARE = 0.9;
 const EMBEDDED_HOST_SIZE_RATIO = 2;
 // corpus-precision-residual (`scattered`): a hit hash is anchored when a
 // target module holding it holds at least 2 of the package's distinct hit
-// hashes and they are at least this share of that module's functions. A
-// real copy is a module made mostly of the package's own functions.
+// hashes and they are at least this share of that module's functions (or
+// the module is all hits, or holds 5 hits of one own file; see
+// demoteExplained). A real copy is a module made mostly of the package's
+// own functions.
 export const ANCHOR_DENSITY = 0.1;
 
 function tierRank(t: ConfidenceTier): number {
@@ -399,7 +401,10 @@ interface ScoredEntry {
 //  - scattered (corpus-precision-residual): fewer than
 //    MIN_DISTINCT_EVIDENCE_HASHES of its distinct hit hashes are anchored —
 //    held by a target module that holds at least 2 of them, at least
-//    ANCHOR_DENSITY of that module's functions. Small helpers each alone
+//    ANCHOR_DENSITY of that module's functions, or all of its functions
+//    (one-function modules: gopd inside define-properties), or at least
+//    MIN_TINY_PACKAGE_EXACT_FUNCTION_HITS from one of the package's own
+//    files (tslib: 7 of tslib.js in its 87-function module). Small helpers each alone
 //    in an unrelated app module (ai, ky), tiny factory shapes matching app
 //    modules of 1-3 functions (culori, swiper), or a few dozen among the
 //    500 functions of another package's single file (lodash-es inside
@@ -466,9 +471,26 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
       }
     }
     if (keysIn.size === 0) continue; // hand-built inventory without modules: nothing to judge
+    // The package's own file(s) each hit hash comes from (pathless files
+    // carry no module ids: one file).
+    const filesOf = new Map<string, Set<number>>();
+    for (const fn of s.entry.file.functions) {
+      const k = schemeKey(s.entry.file, fn.exactHash);
+      if (!s.hitKeys.has(k)) continue;
+      let set = filesOf.get(k);
+      if (set === undefined) filesOf.set(k, (set = new Set()));
+      set.add(fn.moduleId ?? -1);
+    }
     const anchored = new Set<string>();
     for (const [m, set] of keysIn) {
-      if (set.size >= 2 && set.size >= ANCHOR_DENSITY * (inventory.modules[m]!.functionIndices.length || 1)) for (const k of set) anchored.add(k);
+      const size = inventory.modules[m]!.functionIndices.length || 1;
+      let anchors = (set.size >= 2 && set.size >= ANCHOR_DENSITY * size) || set.size >= size;
+      if (!anchors && set.size >= MIN_TINY_PACKAGE_EXACT_FUNCTION_HITS) {
+        const perFile = new Map<number, number>();
+        for (const k of set) for (const f of filesOf.get(k) ?? []) perFile.set(f, (perFile.get(f) ?? 0) + 1);
+        anchors = Math.max(0, ...perFile.values()) >= MIN_TINY_PACKAGE_EXACT_FUNCTION_HITS;
+      }
+      if (anchors) for (const k of set) anchored.add(k);
     }
     if (anchored.size < MIN_DISTINCT_EVIDENCE_HASHES) demote(s, "scattered");
   }

@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { requireHermesc } from "../../support/hermesc.ts";
 import { buildInventory } from "../../../src/deps/inventory.ts";
-import { matchInventory, ANCHOR_DENSITY, CONTAINER_SIZE_RATIO } from "../../../src/deps/match.ts";
+import { matchInventory, ANCHOR_DENSITY } from "../../../src/deps/match.ts";
 import { fingerprintModule, SIG_HASH_SCHEME } from "../../../src/deps/fingerprint.ts";
 import { decodeFunction } from "../../../src/disasm/decode.ts";
 import { parseHbc } from "../../../src/parse/module.ts";
@@ -80,18 +80,32 @@ test("corpus-precision-residual: helpers each alone in an unrelated app module a
   assert.equal(tierOf(own, "spread-lib")?.demotion, undefined);
 });
 
-test("corpus-precision-residual: a few hits among hundreds of another module's functions are not the package (scattered, low density)", (t) => {
+test("corpus-precision-residual: part of the package's one file, in one large module, stays high (tslib)", (t) => {
   const h = requireHermesc(t, 96);
   if (h === null) return;
-  // Like lodash-es inside lodash/lodash.js: the hits share one target module,
-  // but are a small share of it; the module is not CONTAINER_SIZE_RATIO x
-  // the package, so `container` does not apply.
-  const pkg = signature(h.path, "thin-lib", [moduleOf("th", 60, 31)], { paths: ["thin-lib/dist/index.js"] });
+  // tslib on metamask: 7 of its 70 helpers hash-match, all in the one
+  // 87-function target module that is tslib.js — under ANCHOR_DENSITY, but
+  // MIN_TINY_PACKAGE_EXACT_FUNCTION_HITS (5) of one own file in one module.
+  const pkg = signature(h.path, "one-file", [moduleOf("tl", 60, 41)], { paths: ["one-file/tslib.js"] });
   const fillerCount = Math.ceil(6 / ANCHOR_DENSITY) + 10;
-  assert.ok(fillerCount + 6 < CONTAINER_SIZE_RATIO * 60, "test shape: below the container ratio");
-  const target = buildInventory(compile(h.path, bundle([APP, appModule("fl", fillerCount, 5000, helpers("th", 6, 31))]))).inventory;
+  const target = buildInventory(compile(h.path, bundle([APP, appModule("tf", fillerCount, 7000, helpers("tl", 6, 41))]))).inventory;
   const report = matchInventory(target, loaded([pkg]));
-  assert.deepEqual(tierOf(report, "thin-lib")?.demotion, { rule: "scattered" }, JSON.stringify(tierOf(report, "thin-lib")));
+  assert.equal(tierOf(report, "one-file")?.tier, "high", JSON.stringify(tierOf(report, "one-file")));
+  assert.equal(tierOf(report, "one-file")?.demotion, undefined);
+});
+
+test("corpus-precision-residual: whole one-function modules anchor their hash (define-properties)", (t) => {
+  const h = requireHermesc(t, 96);
+  if (h === null) return;
+  // define-properties on Expensify (db-v3-clean): its signature's modules
+  // gopd and es-define-property are one-function modules, each its own
+  // target module, fully matched.
+  const solo = (seed: number): string => `var c = ${seed}; for (var w = 0; w < ${11 + seed % 7}; w++) { c = (c * ${29 + seed} + w) % 1000033; } module.exports = c;`;
+  const pkg = signature(h.path, "solo-mods", [solo(3), solo(5), solo(8), solo(13)]);
+  const target = buildInventory(compile(h.path, bundle([APP, solo(3), solo(5), solo(8)]))).inventory;
+  const report = matchInventory(target, loaded([pkg]));
+  assert.equal(tierOf(report, "solo-mods")?.tier, "high", JSON.stringify(tierOf(report, "solo-mods")));
+  assert.equal(tierOf(report, "solo-mods")?.demotion, undefined);
 });
 
 test("corpus-precision-residual: a fully matched one-function package stays high (scattered exemption)", (t) => {
