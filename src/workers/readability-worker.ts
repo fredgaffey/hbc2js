@@ -32,7 +32,17 @@
 import { parentPort, workerData } from "node:worker_threads";
 import { DatabaseSync } from "node:sqlite";
 import { backendForId, resolveBackendId } from "../readability/backends.ts";
-import { suggestNames, ReadabilitySurfaceError, type ReadabilityContext, type SuggestNamesArgs } from "../readability/surfaces.ts";
+import {
+  computeFileOp,
+  computeRewriteFunction,
+  suggestNames,
+  ReadabilitySurfaceError,
+  type ReadabilityContext,
+  type RewriteFunctionArgs,
+  type SuggestNamesArgs,
+} from "../readability/surfaces.ts";
+import type { FileOpRequest } from "../readability/file-ops.ts";
+import type { BindingOrigin } from "../readability/types.ts";
 import { TransactionRefused } from "../readability/transactions.ts";
 import { TransientBackendError } from "./backend.ts";
 import type { CallSurface } from "../readability/types.ts";
@@ -51,7 +61,14 @@ export interface ReadabilityWorkerInput {
   readonly overlayPath?: string;
   readonly who?: string;
   readonly surface?: CallSurface;
-  readonly args: SuggestNamesArgs;
+  /** Which surface to compute; absent means `suggest-names`. The two
+   *  transaction kinds return a PLAN (plain data) the main thread commits --
+   *  this worker still never writes the DB or the tree (PUSHBACK P-65). */
+  readonly job?: "suggest-names" | "rewrite-function" | "combine-files";
+  readonly args: SuggestNamesArgs | RewriteFunctionArgs;
+  readonly fileOp?: FileOpRequest;
+  /** `traceFile` origins resolved on the main thread for `fileOp`'s paths. */
+  readonly tracedOrigins?: readonly (readonly [string, readonly BindingOrigin[]])[];
 }
 
 /** `transient` is computed HERE because only the worker still has the error
@@ -83,7 +100,14 @@ export async function runSuggestNamesInWorker(input: ReadabilityWorkerInput): Pr
       ...(input.who !== undefined ? { who: input.who } : {}),
       ...(input.surface !== undefined ? { surface: input.surface } : {}),
     };
-    const result = await suggestNames(ctx, input.args);
+    if (input.job === "rewrite-function") {
+      return { ok: true, result: await computeRewriteFunction(ctx, input.args as RewriteFunctionArgs) };
+    }
+    if (input.job === "combine-files") {
+      if (input.fileOp === undefined) throw new ReadabilitySurfaceError("combine-files: fileOp is required");
+      return { ok: true, result: computeFileOp(ctx, input.fileOp, input.tracedOrigins ?? []) };
+    }
+    const result = await suggestNames(ctx, input.args as SuggestNamesArgs);
     return { ok: true, result };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err), transient: isTransient(err) };
