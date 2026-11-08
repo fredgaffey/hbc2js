@@ -857,3 +857,29 @@ a boolean: the rule could not change without a DB rebuild.
 Tests: `tests/gate/deps/corpus-embedded-copy.test.ts` (synthetic owner and
 impostor packages through the real compile/fingerprint path and through
 `confirmCandidates` with a stubbed npm/npx that writes a source map).
+
+### Rebuilding a DB with paths
+
+An existing pathless DB gets paths without re-fingerprinting: for each
+package@version, `tools/pkgsig/bulk/transplant-multi.mjs` installs it in a
+scaffold slot, Metro-bundles it once with a source map, compiles that
+bundle with the hermesc of each of its signature files (hbc98/99 from
+`ScaffoldRN87`, hbc94/96 from `ScaffoldRN72`), and copies each module's
+path and each function's module id onto the old file (same id and factory
+hash, else a unique factory hash; `transplantPaths` in
+`transplant-lib.mjs`). A file is written only when at most half its
+modules match; the rest keep `path: null`. `rebuild-paths.sh` drives the
+whole DB in parallel, resumably:
+
+```sh
+SRC=~/db-v3 OUT=~/db-v4-paths SCAFFOLDS=~/bulk \
+  tools/pkgsig/bulk/rebuild-paths.sh 26   # slots; re-run to resume
+```
+
+`SCAFFOLDS` holds the two scaffold projects `worker.sh` uses. One slot is
+one scaffold copy (about 330 MB), recopied every 150 jobs; the driver
+pauses below `MIN_FREE_GB` (default 8). Results go to `$OUT.log`
+(`RESULT {file, ok, modules, modMiss, functions, fnMiss}`); files that got
+no paths are listed in `$OUT.failed.txt` for hard-linking in pathless.
+The 71,222-file db-v3 is 36,274 jobs. Linux (needs `flock`). Tests:
+`tests/gate/deps/rebuild-paths-plan.test.ts`.

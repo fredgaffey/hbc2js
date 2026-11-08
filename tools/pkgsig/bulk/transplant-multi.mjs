@@ -1,0 +1,79 @@
+#!/usr/bin/env node
+// tools/pkgsig/bulk/transplant-multi.mjs — the batched form of
+// transplant-paths.mjs (docs/PACKAGE-SIGNATURES.md §7 "Rebuilding a DB with
+// paths"): install and Metro-bundle ONE package@version in a scaffold slot
+// (with a source map), then for each of its signature files compile that
+// bundle with the file's hermesc, fingerprint, and transplant module paths
+// v1 onto the old file (transplant-lib.mjs `transplantPaths`). A file is
+// written only when at most half its modules are unmatched.
+//
+//   R=<repo> node --experimental-strip-types transplant-multi.mjs <slotDir> <srcDb> <outDir> <file>...
+//   R=<repo> node transplant-multi.mjs --plan <srcDb> <outDir>
+//
+// Every <file> must be the same package@version and the slot the scaffold
+// of their RN family (FAMILY_OF_HBC). Prints one JSON line per file (ok,
+// modules, modMiss, functions, fnMiss | reason). --plan prints one job per
+// line, `<family> <pkg@ver> <file>...`, for the files of <srcDb> not yet in
+// <outDir> (rebuild-paths.sh feeds these to xargs).
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { planJobs, transplantPaths } from "./transplant-lib.mjs";
+
+if (process.argv[2] === "--plan") {
+  const [srcDb, outDir] = process.argv.slice(3);
+  const done = new Set(existsSync(outDir) ? readdirSync(outDir) : []);
+  for (const j of planJobs(readdirSync(srcDb), done)) console.log(`${j.family} ${j.pkgVer} ${j.files.join(" ")}`);
+  process.exit(0);
+}
+
+const R = resolve(process.env.R ?? join(import.meta.dirname, "../../.."));
+const { pipedOpts, runInstall } = await import(join(R, "tools/pkgsig/bulk/install-plan.mjs"));
+const { decodeFunction } = await import(join(R, "src/disasm/decode.ts"));
+const { parseHbc } = await import(join(R, "src/parse/module.ts"));
+const { fingerprintModule } = await import(join(R, "src/deps/fingerprint.ts"));
+const { attachModulePaths, modulePathsFromSourceMap, MODULE_PATHS_VERSION } = await import(join(R, "src/deps/module-paths.ts"));
+const [slotArg, srcDb, outDir, ...files] = process.argv.slice(2);
+const slot = resolve(slotArg);
+const base = files[0].slice(0, files[0].lastIndexOf("__hbc"));
+const at = base.lastIndexOf("@");
+const pkg = base.slice(0, at).replace(/^(@[^/]*?)__/, "$1/"), version = base.slice(at + 1);
+const results = [];
+const work = mkdtempSync(join(tmpdir(), "sigpaths-"));
+process.env.TMPDIR = work;
+const entry = join(slot, "__sigpaths_entry__.js");
+const why = (e) => String(e?.message ?? e).slice(0, 200) + " :: " + String(e?.stderr ?? "").slice(-400);
+try {
+  runInstall(`${pkg}@${version}`, (cmd, argv) => execFileSync(cmd, argv, pipedOpts({ cwd: slot, timeout: 240_000 })));
+  writeFileSync(entry, `const X = require(${JSON.stringify(pkg)});\nmodule.exports = X;\n`);
+  const js = join(work, "out.bundle"), map = join(work, "out.bundle.map");
+  execFileSync("npx", ["react-native", "bundle", "--platform", "android", "--dev", "false", "--minify", "true", "--max-workers", "1", "--reset-cache", "--entry-file", entry, "--bundle-output", js, "--sourcemap-output", map, "--assets-dest", join(work, "assets")], pipedOpts({ cwd: slot, timeout: 240_000 }));
+  const sourceMap = JSON.parse(readFileSync(map, "utf8")), jsText = readFileSync(js, "utf8");
+  for (const file of files) {
+    const res = { file, ok: false };
+    results.push(res);
+    try {
+      const hbcVersion = /__hbc(\d+)\.json$/.exec(file)[1];
+      const hbc = join(work, `out${hbcVersion}.hbc`);
+      execFileSync(join(R, `tools/hermesc/v${hbcVersion}/hermesc`), ["-O", "-emit-binary", `-out=${hbc}`, js], pipedOpts({ timeout: 120_000 }));
+      const mod = parseHbc(new Uint8Array(readFileSync(hbc)));
+      const fp = fingerprintModule(mod, decodeFunction);
+      const fresh = attachModulePaths(mod, decodeFunction, fp.functions, fp.modules, modulePathsFromSourceMap(sourceMap, jsText));
+      const old = JSON.parse(readFileSync(join(srcDb, file), "utf8"));
+      const t = transplantPaths(old, fresh);
+      Object.assign(res, { modules: old.modules.length, modMiss: t.modMiss, functions: old.functions.length, fnMiss: t.fnMiss });
+      if (t.ok) {
+        writeFileSync(join(outDir, file), JSON.stringify({ ...old, modulePaths: MODULE_PATHS_VERSION, functions: t.functions, modules: t.modules }));
+        res.ok = true;
+      } else res.reason = "too many unmatched modules";
+    } catch (e) { res.reason = why(e); }
+  }
+} catch (e) {
+  for (const f of files) results.push({ file: f, ok: false, reason: "bundle: " + why(e) });
+} finally {
+  rmSync(work, { recursive: true, force: true });
+  rmSync(entry, { force: true });
+  try { execFileSync("npm", ["uninstall", pkg, "--ignore-scripts", "--no-save", "--no-audit", "--no-fund"], { cwd: slot, stdio: "ignore", timeout: 120_000 }); } catch {}
+}
+for (const r of results) console.log(JSON.stringify(r));
