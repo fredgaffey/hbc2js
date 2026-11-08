@@ -923,3 +923,46 @@ each new job first sweeps `sigpaths-<pid>-*` dirs whose pid is dead; live
 pids' dirs and legacy unnumbered `sigpaths-XXXXXX` dirs are never touched
 (a live rebuild once leaked 6,977 dirs / 20 GB this way). Test:
 `tests/gate/deps/bugs-2026-11-09-sigpaths-tmp-leak.test.ts`.
+
+### Shipping db-v4-paths
+
+The v4 DB is the db-v3 files with module paths transplanted (above). Nothing
+here publishes; the owner runs the printed command.
+
+1. **Wait for DONE.** `~/_hbc2js/db-v4-paths.log` ends with a `DONE` line;
+   `db-v4-paths.failed.txt` lists the files that got no paths.
+2. **Finalize** (on the build host, same filesystem as SRC and OUT):
+   ```sh
+   SRC=~/_hbc2js/db-v3-clean OUT=~/_hbc2js/db-v4-paths STAGE=~/_hbc2js/db-v4-final \
+     TAG=sigdb-v4-$(date -u +%Y%m%d) tools/pkgsig/ship/finalize.sh
+   ```
+   `tools/pkgsig/ship/finalize.sh` refuses while the log has no DONE; it
+   hard-links OUT into `$STAGE/db`, hard-links the pathless originals from
+   the failed list (never in place), runs `validate-path-db.mjs --src SRC`
+   (fails on an unparseable file, header/filename mismatch, duplicate,
+   dangling `moduleId`, absolute or `..` path, file not in the source DB),
+   imports into `$STAGE/sigdb.sqlite` with `--verify`, builds the tarball and
+   index through `assemble.sh` (same index format as sigdb-20260830), and
+   writes `$STAGE/dist/SHA256SUMS`. `SAMPLE=200` is a dry run (never
+   publishable; delete STAGE after).
+3. **Publish** (owner): the script ends with
+   `gh release create <tag> --repo fredgaffey/hbc2js --title ... --notes-file
+   SHA256SUMS <tag>.tar.zst index-<tag>.json`. The repo is private until
+   release, so the asset URL is only fetchable with credentials.
+4. **Consume**: `HBC2JS_SIGDB_TAG=<tag> [HBC2JS_SIGDB_SHA256=<hex>]
+   tools/pkgsig/fetch-db.sh [dest]` (no default tag; the current default is
+   unchanged until the owner flips it).
+
+**Known gap: the sqlite asset.** The sqlite layer stores neither
+`module.factoryIsDependency`, `nestedFunctionIndices`,
+`subtractedDependencies` nor `bulkBuildFixVersion`, so `import-json.mjs
+--verify` reports round-trip mismatches on any db-v3-style file, and
+`match.ts` (which reads `factoryIsDependency` and `subtractedDependencies`)
+would score a sqlite copy differently from the JSON. `finalize.sh` therefore
+builds the sqlite, reports the verify result, and attaches it to the release
+command only when verify passes (`SQLITE_RELEASE=1` forces it). Ship the JSON
+tarball; making the sqlite lossless is a separate item.
+
+Validator (`tools/pkgsig/ship/validate-path-db.mjs <dir> [--src <dir>]
+[--list-pathless]`) reads only. Tests: `tests/gate/deps/validate-path-db.test.ts`,
+`tests/gate/tools/fetch-db-sha.test.ts`.
