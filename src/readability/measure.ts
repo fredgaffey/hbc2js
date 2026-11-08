@@ -40,7 +40,11 @@ export interface RecordingStats {
   readonly tokensOut: number;
 }
 
-export function recordingStats(recording: Recording): RecordingStats {
+/** `{fn -> nameable registers}` (src/readability/nameable.ts), as committed in
+ *  `<app>.nameable.json`. */
+export type NameableMap = Readonly<Record<string, readonly number[]>>;
+
+export function recordingStats(recording: Recording, nameable?: NameableMap): RecordingStats {
   let legacy = 0, requested = 0, named = 0, abstain = 0, noReason = 0, bad = 0, tin = 0, tout = 0;
   const entries = Object.values(recording);
   for (const e of entries) {
@@ -69,13 +73,19 @@ export function recordingStats(recording: Recording): RecordingStats {
       legacy += 1;
       continue;
     }
-    requested += e.meta.requested;
+    // With a nameable map the denominator is the registers the rendered
+    // source binds to a local identifier; without one, the recorded request.
+    const nm = nameable?.[String(e.meta.fn)];
+    const universe = nm === undefined ? undefined : new Set(nm.map(String));
+    requested += universe === undefined ? e.meta.requested : universe.size;
     if (parsed.ok) {
       const asked = new Set<string>();
       for (const n of parsed.result.names) {
-        if ("reg" in n.bindingId && n.bindingId.fn === e.meta.fn) asked.add(String(n.bindingId.reg));
+        if ("reg" in n.bindingId && n.bindingId.fn === e.meta.fn && (universe === undefined || universe.has(String(n.bindingId.reg)))) {
+          asked.add(String(n.bindingId.reg));
+        }
       }
-      named += Math.min(asked.size, e.meta.requested);
+      named += universe === undefined ? Math.min(asked.size, e.meta.requested) : asked.size;
     }
   }
   return {
