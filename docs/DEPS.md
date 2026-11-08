@@ -2176,3 +2176,117 @@ newly surfaced as FP); react-navigation-example 5 / 4 TP / 1 FP became
 ### Matching loads slim signature records (deps-slim-sigs)
 
 `loadSignatures(layers, { slim: true })` (used by `runDeps`, `runInformedDeps` and the MCP deps resource) parses each signature file and immediately projects it with `slimSigFile` to the fields the matcher reads, then drops the parsed JSON. Kept per function: `index, instrCount, exactHash, fuzzyHash, stringSetHash, stringCount, moduleId`; per module: `factoryFunctionIndex, localModuleId, factoryExactHash, factoryFuzzyHash, factoryIsBaseline, factoryIsDependency, path`; per file: `package, version, hbcVersion, toolchainBaseline, hashScheme, modulePaths` and the presence of `subtractedDependencies` (supersession). Dropped: names, param counts, owners, dep ids, nested counts, function-set hashes, provenance, subtractedBaselines, totalFunctions. Hash strings are interned across files, so the many shared hashes of a package's versions cost one string. `matchInventory` results are deep-equal to the full-load path (`tests/gate/deps/slim-sigs-equivalence.test.ts`); slim records are match-only and must never be written back to a sigdb. The default (`slim` unset) still returns the full parsed file for confirm/rebuild callers.
+
+### The no-signature bucket (deps-recall-nosig, 2026-11-09)
+
+Recall on Expensify was 30.9% with 145 of 288 truth packages having no
+hbc98 signature under that NAME in db-v3-clean. Per truth package@version
+(probe: a one-off script over db-v3-clean filenames, the bulk build's
+`log/results.jsonl` and its four job lists; react-navigation versions from
+the pinned commit's `pnpm-lock.yaml`, because its truth file has `null`
+for 64 of 76):
+
+| reason (db-v3-clean, hbc98) | Expensify (288) | react-navigation (76) |
+|---|---|---|
+| signature at the exact version | 75 | 3 |
+| other versions only (same major.minor / same major / other major) | 68 (22 / 26 / 20) | 41 (truth version unknown) |
+| never queued by the bulk build (not in its popularity population) | 108 | 13 |
+| built at other versions / HBC versions only, none at hbc98 | 24 | 17 |
+| queued, never built | 6 | 2 |
+| build failed (peer import unresolved 5, bundle 1) | 6 | 0 |
+| built, subtracted to nothing (`nullthrows`) | 1 | 0 |
+
+The open-source truth apps look the same: never queued is 80 of 198
+(bluesky), 270 of 518 (rainbow), 438 of 749 (MetaMask). No missing
+Expensify package was types-only, JSON-only or app-local (react-navigation's
+`@react-navigation/*` are workspace packages of the checkout, but their
+alpha versions are published); they are ordinary
+published JS (Sentry, `@formatjs/*`, `@turf/*`, the es-shim chain,
+`domutils`, expo modules). So the bucket is a population choice, not an
+unfingerprintable package type.
+
+**Build.** The 286 missing exact versions of the two holdouts (minus
+`react`, `react-native`: they are the scaffold) were built with
+`build-one.mjs` (path-bearing, hbc98, RN 0.87 scaffold, 4 slots) and run
+through `dep-subtract.mjs` against db-v3-clean, into an overlay
+(`db-overlay-recall`, 264 files, 41 MB). The overlay files must carry
+`subtractedDependencies`: `loadSignatures` drops every v1 file of a
+package that has a v2 file in any layer, so an unsubtracted overlay file
+of a package db-v3-clean already has is silently ignored. Two builder bugs
+found on the way, fixed with tests in
+`tests/gate/deps/deps-recall-nosig-entry.test.ts`:
+- **Entry.** Only `require(<pkg>)` was bundled, so `@babel/runtime` (no
+  root entry) failed every build, and packages the app reaches by sub-path
+  (`nanoid/non-secure`, `semver/functions/*`) got signatures of other files.
+  `entryPlan` (`install-plan.mjs`) adds every `exports` sub-path whose file
+  exists (`*` patterns expanded on disk), with root-only as the fallback
+  attempt. Packages without `exports` are unchanged.
+- **Slot poisoning.** Building a package the scaffold already has
+  (`@react-native/assets-registry`) ended with `npm uninstall`, which removed
+  the slot's own copy; every later job in that slot then failed. A
+  pre-existing package is now copied aside and restored
+  (`snapshotScaffoldPackage`).
+
+Remaining build failures (23 of 286: peer dependencies under the
+`--legacy-peer-deps` fallback, exports-less packages without a main) are
+in docs/BUGS.md.
+
+**Measured** (deb, offline `scoreAgainstTruth`, sha pins matched, code at
+main after the corpus-precision-forks merge, overlay symlinked beside every
+file of the base DB; ceiling = signature present AND candidate):
+
+| bundle, DB | confirmed / TP / FP | recall all (direct) | signature present | ceiling | bar losses |
+|---|---|---|---|---|---|
+| Expensify, db-v3-clean | 131 / 89 / 42 | 30.9% (35.2%) | 143 | 125 | 36 |
+| Expensify, db-v3-clean + overlay | 207 / 167 / 40 | 58.0% (80.2%) | 280 | 224 | 57 |
+| Expensify, db-v4-paths-partial | 94 / 87 / 7 | 30.2% (37.4%) | 143 | 125 | 38 |
+| Expensify, db-v4-paths-partial + overlay | 170 / 164 / 6 | 56.9% (82.4%) | 280 | 224 | 60 |
+| react-navigation, db-v3-clean | 14 / 14 / 0 | 18.4% (21.7%) | 44 | 33 | 19 |
+| react-navigation, db-v3-clean + overlay | 18 / 18 / 0 | 23.7% (25.0%) | 65 | 47 | 29 |
+| react-navigation, db-v4-paths-partial | 10 / 10 / 0 | 13.2% (15.0%) | 44 | 33 | 23 |
+| react-navigation, db-v4-paths-partial + overlay | 15 / 15 / 0 | 19.7% (20.0%) | 65 | 47 | 32 |
+
+No new false positive on either DB (before the merge, `eventemitter3` was
+one; the precision rules removed it). Expensify on db-v3-clean gains 78
+true positives (mostly never-queued packages and packages built before only
+at other versions) and loses `hoist-non-react-statics`. react-navigation
+stays at 0 FP and gains `@react-navigation/core`, `/elements`,
+`/bottom-tabs`, `@react-native/normalize-colors`, `semver` (db-v3-clean
+also `@react-navigation/...` one fewer than before the merge: 18, not 19).
+After the overlay the bottleneck moves: the Expensify ceiling is 224/288
+(77.8%), with 56 signatures never proposed as candidates and 57-60 lost at
+the bar; only 8 truth packages lack a signature. react-navigation's
+ceiling is 47/76.
+
+**Fork originals (orchestrator check).** The overlay includes
+`source-map@0.6.1` and `whatwg-url-without-unicode@8.0.0-3`, the originals of
+the Expensify false positives `source-map-js` and `whatwg-url`. Both
+originals become true positives on both DBs. With the overlay,
+`whatwg-url` is no longer confirmed on db-v4-paths-partial (FPs 7 -> 6:
+`source-map-js`, `lodash-es`, `ky`, `ai`, `culori`, `swiper`) but stays on
+db-v3-clean, whose `whatwg-url` file is pathless. `source-map-js` stays a
+false positive on both, although its db-v4-paths-partial file
+(`1.2.1`, hbc98) has paths. Its matched functions were not traced, so it is
+unknown why the twin rule does not demote it.
+
+**Version tolerance is not the lever.** Matching is already by package name
+across every loaded version, so other-version signatures were already
+scoring: of the 68 Expensify packages with other versions only, building the
+exact version recovered 9. A nearest-version rule would add nothing the
+overlay did not, so it was not built.
+
+**Caveat: the population came from the truth files.** The overlay was chosen
+by reading both holdouts' truth, which J4's acceptance rules forbid for a
+generalising result. The numbers above measure the coverage ceiling (what
+the shared DB gives when it has these packages), not a heuristic. The
+general fix is the bulk population: it was taken from a react-native
+keyword search plus popularity, which skips ordinary JS dependencies of RN
+apps. Next: expand the population from the dependency closure of popular RN
+apps' package.json files (no holdout consulted), then re-measure all five
+apps.
+
+Reproduce (deb): `~/_hbc2js/recall/{genjobs.mjs,drive.sh,subtract.sh,measure.mjs,runmeasure.sh}`;
+jobs come from the diagnosis rows; `xargs -a jobs2.tsv -d '\n' -P4 -n1 ./drive.sh`
+(`HBC2JS_BULK_DIR` = a work dir holding 4 `slots/87-N` copies of
+`ScaffoldRN87` and `db/_baselines` with the three hbc98 baselines), then
+`subtract.sh`, then `runmeasure.sh <tag> <merged dir>`.
