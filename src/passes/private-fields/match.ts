@@ -405,6 +405,27 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
       const arg = processExpr(s.arg, aliases, regs, null);
       return { stmt: arg === s.arg ? s : { ...s, arg }, aliasesOut: nextAliases, regsOut: nextRegs };
     }
+    // A function DECLARED in this body (spec 24 section 1.7, "nested
+    // functions"): it is lexically inside the class, so `#name` is in scope
+    // there, and it is a separate Hermes frame with its own registers -- the
+    // only way it can see this body's aliases is through an env slot, so it
+    // is folded as its own body starting from the symbol's slot alone, and
+    // refuses the name when it names any other live alias (a slot copy this
+    // fold would delete) or contains an install. `sameFrame` closures are
+    // expressions, never statements; refused anyway for safety.
+    if (s.k === "func" && identUses(s.body, envName).reads + identUses(s.body, envName).writes + identUses(s.body, envName).nested > 0) {
+      const others = [...aliases].filter((n) => n !== envName);
+      if ((s as { sameFrame?: true }).sameFrame === true || others.some((n) => { const u = identUses(s.body, n); return u.reads + u.writes + u.nested > 0; })) {
+        escaped = true;
+        return { stmt: s, aliasesOut: nextAliases, regsOut: nextRegs };
+      }
+      const inner = foldInBody(s.body, envName, displayName, false);
+      if (inner === null) {
+        escaped = true;
+        return { stmt: s, aliasesOut: nextAliases, regsOut: nextRegs };
+      }
+      return { stmt: inner.body === s.body ? s : { ...s, body: inner.body }, aliasesOut: nextAliases, regsOut: nextRegs };
+    }
     // Anything else this fixture's shapes never produce here (`decl`,
     // `break`/`continue`, a nested `func`, ...): no expression of its own to
     // scan (a `func`'s own body is a separate frame, out of reach of a
@@ -675,7 +696,24 @@ function registerReadReached(before: readonly Stmt[], reg: string, isCreation: (
     return u.reads + u.writes + u.nested > 0;
   };
   for (let i = 0; i < at; i++) if (before[i]!.k !== "decl" && mentions(before[i]!)) return true;
-  if (scope?.fnBody !== undefined && scope.list !== undefined && scope.fnBody !== scope.list) {
+  // The list is the body of a labelled block sitting directly in the
+  // function body (class-recover F1): that block runs once per call, so the
+  // statements before it run before the creation and cannot observe it, and
+  // every exit of the block (its end, a `break` out of it) continues with the
+  // statements after it -- which must kill `reg` before reading it, by the
+  // same top-level rule as below (spec 24 section 1.7).
+  const host = scope?.fnBody !== undefined && scope.list !== undefined && scope.fnBody !== scope.list
+    ? scope.fnBody.findIndex((s) => s.k === "labeled" && s.body === scope.list) : -1;
+  if (host >= 0) {
+    const fb = scope!.fnBody!;
+    let killed = false;
+    for (let i = host + 1; i < fb.length && !killed; i++) {
+      if (!mentions(fb[i]!)) continue;
+      const store = simpleStore(fb[i]!);
+      if (store !== null && store.name === reg && identUses([fb[i]!], reg).reads === 0) { killed = true; continue; }
+      return true;
+    }
+  } else if (scope?.fnBody !== undefined && scope.list !== undefined && scope.fnBody !== scope.list) {
     const whole = identUses(scope.fnBody, reg);
     const here = identUses(scope.list, reg);
     if (whole.reads + whole.writes !== here.reads + here.writes) return true;

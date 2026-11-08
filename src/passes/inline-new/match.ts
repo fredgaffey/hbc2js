@@ -221,12 +221,18 @@ export function foldAll(root: readonly Stmt[], onRefuse?: (r: Refusal) => void, 
       const proto = h0.value;
       if (proto.k === "member" && !proto.computed && proto.prop.k === "lit" && proto.prop.text === "prototype" && proto.obj.k === "ident") {
         // Base header (section 9.1, H-B).
+        // The receiver register X is usually the prototype's own register P,
+        // but hermesc may allocate a second one (`P = C.prototype; X =
+        // Object.create(P ...)`); then P is one more register the region
+        // wrote, holding C.prototype, and section 9.2 (5) proves it dead or
+        // re-stores it like any other.
         const t = tokOf(env, proto.obj);
-        const hdr = isObjectCreateOf(list[i + 1], h0.name);
-        if (t === null || !classes.has(t)) { if (hdr) onSkip?.(`H-B class operand is not a class token (${t ?? "null"})`); return null; }
+        const hdr = createdFrom(list[i + 1], h0.name);
+        if (t === null || !classes.has(t)) { if (hdr !== null) onSkip?.(`H-B class operand is not a class token (${t ?? "null"})`); return null; }
         if (classes.get(t)!.cls.superClass !== null) return null;
-        if (!hdr) return null;
-        clsTok = t; cExpr = proto.obj; x = h0.name; j = i + 2; info = classes.get(t)!;
+        if (hdr === null) return null;
+        clsTok = t; cExpr = proto.obj; x = hdr; j = i + 2; info = classes.get(t)!;
+        if (hdr !== h0.name) { toks.write(env, h0.name); written.add(h0.name); }
         toks.write(env, x, OBJ); written.add(x);
       } else if (proto.k === "call" && isMemberCall(proto.callee, "Object", "getPrototypeOf") && proto.args.length === 1 && isIdent(proto.args[0])) {
         // Derived header (section 9.1, H-D).
@@ -413,11 +419,13 @@ export function foldAll(root: readonly Stmt[], onRefuse?: (r: Refusal) => void, 
 function isMemberCall(callee: Expr, obj: string, prop: string): boolean {
   return callee.k === "member" && !callee.computed && isIdent(callee.obj, obj) && callee.prop.k === "lit" && callee.prop.text === prop;
 }
-/** `X = Object.create(X === null ? null : typeof X === "object" ? X : Object.prototype);` */
-function isObjectCreateOf(s: Stmt | undefined, x: string): boolean {
+/** `X = Object.create(P === null ? null : typeof P === "object" ? P : Object.prototype);`
+ *  (X and P the same register or not): the receiver register X, or `null`. */
+function createdFrom(s: Stmt | undefined, p: string): string | null {
   const st = store(s);
-  if (st === null || st.decl || st.name !== x) return false;
-  const v = st.value;
+  return st !== null && !st.decl && isObjectCreateOf(st.value, p) ? st.name : null;
+}
+function isObjectCreateOf(v: Expr, x: string): boolean {
   if (v.k !== "call" || !isMemberCall(v.callee, "Object", "create") || v.args.length !== 1) return false;
   const want: Expr = { k: "cond", test: { k: "bin", op: "===", left: ident(x), right: { k: "lit", text: "null" } } as Expr, then: { k: "lit", text: "null" }, else: { k: "cond", test: { k: "bin", op: "===", left: { k: "unary", op: "typeof ", arg: ident(x) }, right: { k: "lit", text: '"object"' } } as Expr, then: ident(x), else: { k: "member", obj: ident("Object"), prop: { k: "lit", text: "prototype" }, computed: false } } };
   return sameShape(v.args[0]!, want);
