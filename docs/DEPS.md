@@ -1292,6 +1292,10 @@ both, 15 of the 16 should carry full exact coverage (promise also needs
 sub-path entries, e.g. every `exports`/file the foundation imports).
 Confidence high for (c)/(d) (reproduced offline); recall movement projected.
 
+#### Literal-buffer strings are evidence, not hash input (2026-11-09)
+
+v98-late/v99 build `{ k: "x" }` with `NewObjectWithBuffer` and no `LoadConstString`, so strings that live only in object/array literal buffers were missing. `functionStringEvidence` (`src/deps/fingerprint.ts`) adds the string keys and values of `NewObjectWithBuffer*` (v<=96 key/value buffers, v>=97 shape table + literal buffer) and `NewArrayWithBuffer*` to a module's `stringConstants` (guess/seams/sizediff evidence). The per-function `stringSetHash`/`stringCount` stored in signature DBs still come from `functionStrings` (`LoadConstString` operands only), so hash scheme 2 is unchanged and no DB needs a re-fingerprint; `tests/gate/deps/bugs-2026-11-08-objlit-strings.test.ts` pins scheme-2 digests on committed fixtures. Folding literal strings into the hash would be scheme 3.
+
 #### Hash scheme 2: width folding + ownership-aware subtraction
 **Design.** (1) `sig-normalise.ts` `foldOperandWidth` drops a `Short` /
 `Long` / `LongIndex` suffix (Hermes' own MIT `BytecodeList.def` naming) from
