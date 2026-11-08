@@ -1816,6 +1816,46 @@ not cover them. The generic words in the guessed tier (`focus`, `reject`,
 `round`, `event`...) are a separate mechanism in `guess.ts` and were not
 examined here.
 
+**Module paths v1 (corpus-embedded-copy, 2026-11-09).** Signatures can
+now record each module's file below `node_modules/` and each function's
+module (docs/PACKAGE-SIGNATURES.md §7). A path-bearing signature is scored
+on its own files only, and only its own files claim hashes, so a hash
+that is one package's file and another's embedded copy goes to its owner.
+Files without paths score as before. Measured on a partial overlay DB
+(`db-v4-paths-partial`: `db-v3-clean` with paths transplanted onto the 834
+hbc98 files of the truth and confirmed packages of both holdouts; 823
+transplanted, 11 left pathless, module-path miss 0.2%):
+
+| holdout (DB) | confirmed / TP / FP | precision | recall (direct) |
+|---|---|---|---|
+| Expensify J3, db-v3-clean | 144 / 90 / 54 | 62.5% | 31.2% (35.2%) |
+| Expensify J3, db-v4-paths-partial | 119 / 89 / 30 | 74.8% | 30.9% (38.5%) |
+| react-navigation-example 0.85.3, db-v3-clean | 15 / 15 / 0 | 100% | 19.7% (23.3%) |
+| react-navigation-example 0.85.3, db-v4-paths-partial | 11 / 11 / 0 | 100% | 14.5% (16.7%) |
+
+(`db-v3-clean` numbers are on this branch, after the main merges, so they
+differ from the 121 / 41 above.) Gone from the Expensify FPs: `assert`,
+`url`, `globalthis`, `safe-buffer`, `sax`, `obuf`, `encoding`,
+`readable-stream`, `sha.js`, `is-typed-array`, `which-typed-array`,
+`deep-equal` (26 in all). Two new FPs appear (`dfa`,
+`react-native-worklets-core`), and five TPs are gained (`color-convert`,
+`react-native-fs`, `react-native-image-picker`, `react-native-localize`,
+`react-native-collapsible`): their hashes were shared with a package that
+held a copy. The recall cost is packages that were confirmed only on their
+dependencies' code: `abort-controller` (all 33 hits were on
+`event-target-shim`, 0 on its own file), `hoist-non-react-statics`
+(`react-is`), the es-shim siblings `define-properties` /
+`es-define-property` / `hasown`, and on react-navigation-example the
+workspace-built `@react-navigation/native` (module hits on its own files
+15 to 2) and `material-top-tabs`. The fixture builds them from workspace
+source, so their own files likely don't hash-match the npm dist (not
+verified). This is the same evidence that made
+`safe-buffer` a false positive. J4 dependency subtraction already treats
+it as not the package's own code. Remaining Expensify FPs: lodash-es,
+d3-*, victory*, `uuid`, `process`, `stackframe`... (the d3 files are among
+the 11 whose transplant failed: their dependencies drifted between the
+original build and the rebuild).
+
 **Shipping.** Per D17c, the DB itself is never committed — the v2 build
 lives on a build host in `db-v2` (dependency-subtracted,
 353-file-quarantined) and is packaged the same way round 1's first archive

@@ -79,6 +79,8 @@ Own build scored against the package lockfile truth. Offline and `--confirm` giv
 | MetaMask/metamask-mobile | 749 (306) | 172 / 72.7% / 16.7% | 186 / 67.7% / 16.8% | 187 / 67.9% / 17.0% | 800 s |
 | Expensify/App 12a92bd (J3, deb build, db-v3 offline) | 288 (91) | 155 / 53.5% / 28.8% (J3) | 139 / 58.3% / 28.1% (direct 27.5%; after corpus-offline-precision) | not run | n/a |
 | react-navigation-example 0.85.3 (held out, db-v3 offline) | 76 (60) | 17 / 100% / 22.4% | 17 / 100% / 22.4% (direct 26.7%; unchanged by corpus-offline-precision) | not run | n/a |
+| Expensify/App 12a92bd (J3, module paths: db-v3-clean before, db-v4-paths-partial offline) | 288 (91) | 144 / 62.5% / 31.2% (branch deps-sig-module-paths, after the main merges) | 119 / 74.8% / 30.9% (direct 38.5%) | not run | n/a |
+| react-navigation-example 0.85.3 (held out, module paths: db-v3-clean before, db-v4-paths-partial offline) | 76 (60) | 15 / 100% / 19.7% (same branch) | 11 / 100% / 14.5% (direct 16.7%) | not run | n/a |
 
 Store-bundle scoring was not repeated in this measurement.
 

@@ -27,6 +27,9 @@ import type { PackageScore } from "./match.ts";
 import { userCacheDbDir, writeSignature } from "./db.ts";
 import type { SigDbFile, SigFunction, SigModule } from "./sigdb-types.ts";
 import { isHintEligibleEvidence } from "./guess.ts";
+import { attachModulePaths, MODULE_PATHS_VERSION, modulePathsFromSourceMap } from "./module-paths.ts";
+import type { SourceMapLike } from "./module-paths.ts";
+import type { HbcModule } from "../parse/types.ts";
 
 export interface ConfirmCandidate {
   readonly package: string;
@@ -534,21 +537,38 @@ function installCandidate(candidate: ResolvedCandidate, scratchProjectDir: strin
   }
 }
 
-function bundleAndCompile(pkg: string, scratchProjectDir: string, hermescPath: string, workDir: string): string {
+function bundleAndCompile(pkg: string, scratchProjectDir: string, hermescPath: string, workDir: string): { hbcPath: string; bundlePath: string; mapPath: string } {
   const entrySlug = pkg.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "");
   const entryFile = join(scratchProjectDir, `__hbc2js_confirm_entry_${entrySlug}__.js`);
   writeFileSync(entryFile, `const X = require(${JSON.stringify(pkg)});\nmodule.exports = X;\n`);
   const bundlePath = join(workDir, "out.bundle");
+  const mapPath = join(workDir, "out.bundle.map");
   const assetsDir = join(workDir, "assets");
   mkdirSync(assetsDir, { recursive: true });
   execFileSync(
     "npx",
-    ["react-native", "bundle", "--platform", "android", "--dev", "false", "--minify", "true", "--entry-file", entryFile, "--bundle-output", bundlePath, "--assets-dest", assetsDir],
+    ["react-native", "bundle", "--platform", "android", "--dev", "false", "--minify", "true", "--entry-file", entryFile, "--bundle-output", bundlePath, "--sourcemap-output", mapPath, "--assets-dest", assetsDir],
     { cwd: scratchProjectDir, stdio: "ignore" },
   );
   const hbcPath = join(workDir, "out.hbc");
   execFileSync(hermescPath, ["-O", "-emit-binary", `-out=${hbcPath}`, bundlePath], { stdio: "ignore" });
-  return hbcPath;
+  return { hbcPath, bundlePath, mapPath };
+}
+
+/** Module paths v1 (src/deps/module-paths.ts): fingerprint, then attach
+ *  each module's node_modules path from Metro's source map. No map (or an
+ *  unreadable one) leaves the fingerprint pathless, as before. */
+export function fingerprintWithPaths(mod: HbcModule, bundlePath: string, mapPath: string): { functions: readonly SigFunction[]; modules: readonly SigModule[]; legacyExactHashes: readonly string[]; modulePaths: number | undefined } {
+  const built = fingerprintModule(mod, decodeFunction);
+  const modules = built.modules;
+  if (!existsSync(mapPath)) return { functions: built.functions, modules, legacyExactHashes: built.legacyExactHashes, modulePaths: undefined };
+  try {
+    const paths = modulePathsFromSourceMap(JSON.parse(readFileSync(mapPath, "utf8")) as SourceMapLike, readFileSync(bundlePath, "utf8"));
+    const withPaths = attachModulePaths(mod, decodeFunction, built.functions, modules, paths);
+    return { ...withPaths, legacyExactHashes: built.legacyExactHashes, modulePaths: MODULE_PATHS_VERSION };
+  } catch {
+    return { functions: built.functions, modules, legacyExactHashes: built.legacyExactHashes, modulePaths: undefined };
+  }
 }
 
 interface CachedFingerprint {
@@ -556,11 +576,12 @@ interface CachedFingerprint {
   readonly functions: readonly SigFunction[];
   readonly modules: readonly SigModule[];
   readonly legacyExactHashes: readonly string[];
+  readonly modulePaths?: number;
 }
 
 function fpCachePath(opts: ConfirmOptions, c: ResolvedCandidate): string {
   const dir = opts.fingerprintCacheDir ?? join(dirname(opts.userCacheDbDir ?? userCacheDbDir()), "confirm-fp");
-  const name = `${c.package}@${c.version}__hbc${opts.hbcVersion}__s${SIG_HASH_SCHEME}__rn${opts.rnVersion}`.replace(/[^a-zA-Z0-9@._-]+/g, "_");
+  const name = `${c.package}@${c.version}__hbc${opts.hbcVersion}__s${SIG_HASH_SCHEME}__p${MODULE_PATHS_VERSION}__rn${opts.rnVersion}`.replace(/[^a-zA-Z0-9@._-]+/g, "_");
   return join(dir, `${name}.json`);
 }
 
@@ -642,10 +663,10 @@ export async function confirmCandidates(candidates: readonly ConfirmCandidate[],
       if (cached === null) {
         installCandidate(candidate, opts.scratchProjectDir);
         workDir = mkdtempSync(join(tmpdir(), "hbc2js-confirm-"));
-        const hbcPath = bundleAndCompile(candidate.package, opts.scratchProjectDir, opts.hermescPath, workDir);
+        const { hbcPath, bundlePath, mapPath } = bundleAndCompile(candidate.package, opts.scratchProjectDir, opts.hermescPath, workDir);
         const mod = parseHbc(new Uint8Array(readFileSync(hbcPath)));
-        const built = fingerprintModule(mod, decodeFunction);
-        fp = { hbcVersion: mod.header.version, functions: built.functions, modules: built.modules, legacyExactHashes: built.legacyExactHashes };
+        const built = fingerprintWithPaths(mod, bundlePath, mapPath);
+        fp = { hbcVersion: mod.header.version, functions: built.functions, modules: built.modules, legacyExactHashes: built.legacyExactHashes, ...(built.modulePaths !== undefined ? { modulePaths: built.modulePaths } : {}) };
         writeFpCache(fpPath, fp);
       } else {
         fp = cached;
@@ -657,6 +678,7 @@ export async function confirmCandidates(candidates: readonly ConfirmCandidate[],
       const db: SigDbFile = {
         schema: 2,
         hashScheme: SIG_HASH_SCHEME,
+        ...(fp.modulePaths !== undefined ? { modulePaths: fp.modulePaths } : {}),
         package: candidate.package,
         version: candidate.version,
         hbcVersion: fp.hbcVersion,
