@@ -7,6 +7,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DEFAULT_MODEL_ALIAS } from "./types.ts";
 import { buildReadabilityCtx } from "../ui-server/server.ts";
 import { openProjectDb } from "../projdb/db.ts";
 import { dbPath } from "../projdb/artifact-read.ts";
@@ -296,7 +297,7 @@ export async function runReadabilityAgent(opts: RunReadabilityAgentOpts): Promis
   resolveBundleHbc(opts);
   const cliPath = opts.cliPath ?? join(import.meta.dirname, "..", "cli.ts");
   const claudeBin = opts.claudeBin ?? process.env["HBC2JS_CLAUDE_BIN"] ?? "claude";
-  const model = opts.model ?? "haiku";
+  const model = opts.model ?? DEFAULT_MODEL_ALIAS;
   // 12 turns of read-only investigation on a real module ended with stop_reason
   // "tool_use" and nothing written (docs/BUGS.md 2026-09-13): the agent needs
   // room to read AND write. 24 is the budget the token cap bounds anyway.
