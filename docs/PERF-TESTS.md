@@ -150,3 +150,11 @@ to make its own tests pass.
    budget change needs a measured justification recorded in the test's own
    comment, the same way the existing budgets in this file cite specific
    measured numbers and dates.
+
+## Gate deflake (load-dependent failures under the full parallel gate)
+
+Three tests passed alone but failed intermittently in `npm test` (`node --test`, one process per file, all files at once):
+
+- **Playwright smoke (`tests/gate/ui/e2e-smoke.test.ts`)** spawned the whole 82-spec run inside the parallel batch (~1 min alone, 90-240 s and failing under load). `npm test` / `npm run test:gate` now set `HBC2JS_E2E_DEFER=1` for the parallel batch (the test skips with that reason) and then run `node --test tests/gate/ui/e2e-smoke.test.ts` as a serial stage afterwards, alone on the box. Still in the gate: a red spec fails `npm test`. Running the file directly (no env var) runs the suite inline.
+- **`routes.test.ts` segregation settle waits** polled 200 x 20 ms (4 s) for a worker-thread compute; under load that is load, not a hang. Now a 120 s deadline (the loop still exits the instant the compute settles; a genuine hang still fails).
+- **`tiers.test.ts` identity run 120 s wall budget** measured 67 s alone vs 165 s under the gate: contention. The wall assertion now follows mechanism 3 (`tooBusyForTiming()`: logged, not enforced, on a busy box); DIVERGENT/ERROR correctness assertions are unconditional.

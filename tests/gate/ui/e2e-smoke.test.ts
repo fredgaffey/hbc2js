@@ -53,7 +53,14 @@ test("ui/package.json has e2e and e2e:live scripts and @playwright/test pinned e
 
 test(
   "the Playwright smoke suite (cd ui && npm run e2e) is actually green",
-  { timeout: 6 * 60_000, skip: chromiumInstalled() ? false : "Playwright's Chromium is not installed under its cache dir (run `npx playwright install chromium` in ui/) — this environment cannot run a real browser" },
+  {
+    timeout: 6 * 60_000,
+    skip: process.env["HBC2JS_E2E_DEFER"] === "1"
+      ? "deferred: `npm test` runs this file again as its own serial stage (after the parallel batch) so the 82-spec browser run does not compete with ~4k concurrent tests"
+      : chromiumInstalled()
+        ? false
+        : "Playwright's Chromium is not installed under its cache dir (run `npx playwright install chromium` in ui/) — this environment cannot run a real browser",
+  },
   () => {
     // A port/root distinct from every documented default (7341/7342, the
     // live rig's 4173/7331) and from every other concurrent caller of this
