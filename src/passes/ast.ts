@@ -1993,14 +1993,28 @@ type StmtListPass = Pass<readonly Stmt[]>;
  * reverted (not just abandoned site-by-site) and one `W_PASS_ABANDONED`
  * fires with reason `"whole-function parse failed"`.
  */
-export function applyAstPasses(fnBody: readonly Stmt[], passes: readonly StmtListPass[], base: Omit<PassContext, "applied" | "structured" | "parentOf" | "fnBody">): AstApplyResult {
+/** A body transform `applyAstPasses` runs once, immediately before the pass
+ *  named `before` (or after the last pass when none has that name). The
+ *  overlay's live-range names use it to fill `reg-split`'s webs right before
+ *  `var-naming` (docs/RENAME.md); it must be a pure alpha-rename. */
+export interface AstInterpose {
+  readonly before: string;
+  readonly apply: (body: readonly Stmt[]) => readonly Stmt[];
+}
+
+export function applyAstPasses(fnBody: readonly Stmt[], passes: readonly StmtListPass[], base: Omit<PassContext, "applied" | "structured" | "parentOf" | "fnBody">, interpose?: AstInterpose): AstApplyResult {
   const applied: AppliedRecord[] = [];
   const abandoned: AbandonedRecord[] = [];
   const diagnostics: Diagnostic[] = [];
   const appliedNames: string[] = [];
   let current = fnBody;
 
+  let interposed = interpose === undefined;
   for (const pass of passes) {
+    if (!interposed && pass.name === interpose!.before) {
+      current = interpose!.apply(current);
+      interposed = true;
+    }
     const beforePass = current;
     const appliedCountBefore = applied.length;
     const refused = new Set<readonly Stmt[]>();
@@ -2053,6 +2067,7 @@ export function applyAstPasses(fnBody: readonly Stmt[], passes: readonly StmtLis
   for (const a of abandoned) {
     diagnostics.push({ severity: "info", code: "W_PASS_ABANDONED", message: `pass ${a.pass} left fn#${a.at.functionIndex} @${a.at.offset} as is: ${a.reason}`, context: { functionIndex: a.at.functionIndex, offset: a.at.offset } });
   }
+  if (!interposed) current = interpose!.apply(current);
   return { body: current, applied, abandoned, diagnostics };
 }
 

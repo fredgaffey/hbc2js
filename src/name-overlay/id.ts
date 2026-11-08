@@ -12,6 +12,11 @@ export interface RegisterId {
   readonly kind: "reg";
   readonly fn: number;
   readonly reg: number;
+  /** One live range ("web") of a register that `reg-split` split
+   *  (docs/specs/passes/19-reg-split.md section 11): web 1 is the range rendered
+   *  `rN`, web W >= 2 the range rendered `rN_W`. Absent = the whole register
+   *  (the v1 / legacy identity, still what an unsplit register uses). */
+  readonly web?: number;
 }
 
 /** An environment slot (spec §8) — reserved; v1 stores but never renders one,
@@ -31,8 +36,21 @@ export interface FnId {
 export type BindingId = RegisterId | EnvId | FnId;
 
 /** Construct a register-local id. */
-export function regId(fn: number, reg: number): RegisterId {
-  return { kind: "reg", fn, reg };
+export function regId(fn: number, reg: number, web?: number): RegisterId {
+  return web === undefined ? { kind: "reg", fn, reg } : { kind: "reg", fn, reg, web };
+}
+
+/** The identifier a register id's binding has in the post-`reg-split` tree:
+ *  `rN` for the whole register or its web 1, `rN_W` for web W >= 2. */
+export function registerIdent(id: RegisterId): string {
+  return id.web === undefined || id.web === 1 ? `r${id.reg}` : `r${id.reg}_${id.web}`;
+}
+
+/** Inverse of `registerIdent` for a split name: `rN_W` -> `{reg, web}`;
+ *  `null` for anything else (a plain `rN` is ambiguous without the split). */
+export function parseWebIdent(ident: string): { readonly reg: number; readonly web: number } | null {
+  const m = /^r(\d+)_(\d+)$/.exec(ident);
+  return m === null ? null : { reg: Number(m[1]), web: Number(m[2]) };
 }
 
 /** A stable, order-independent string key for a binding id — the map key the
@@ -41,7 +59,7 @@ export function regId(fn: number, reg: number): RegisterId {
 export function bindingKey(id: BindingId): string {
   switch (id.kind) {
     case "reg":
-      return `reg:${id.fn}:${id.reg}`;
+      return id.web === undefined ? `reg:${id.fn}:${id.reg}` : `reg:${id.fn}:${id.reg}:${id.web}`;
     case "env":
       return `env:${id.fn}:${id.env}`;
     case "fn":
@@ -53,6 +71,7 @@ export function bindingKey(id: BindingId): string {
 export function parseKey(key: string): BindingId {
   const parts = key.split(":");
   if (parts[0] === "reg" && parts.length === 3) return { kind: "reg", fn: Number(parts[1]), reg: Number(parts[2]) };
+  if (parts[0] === "reg" && parts.length === 4) return { kind: "reg", fn: Number(parts[1]), reg: Number(parts[2]), web: Number(parts[3]) };
   if (parts[0] === "env" && parts.length === 3) return { kind: "env", fn: Number(parts[1]), env: Number(parts[2]) };
   if (parts[0] === "fn" && parts.length === 2) return { kind: "fn", fn: Number(parts[1]) };
   throw new Error(`malformed binding key: ${JSON.stringify(key)}`);
@@ -61,7 +80,7 @@ export function parseKey(key: string): BindingId {
 /** The `{fn,reg}` short form the spec's token-minimal output uses:
  *  `named {42,7} → …`. Register ids only. */
 export function shortForm(id: RegisterId): string {
-  return `{${id.fn},${id.reg}}`;
+  return id.web === undefined ? `{${id.fn},${id.reg}}` : `{${id.fn},${id.reg},${id.web}}`;
 }
 
 // --- Native-side binding keys (docs/specs/27-native-side.md §L1) ------------

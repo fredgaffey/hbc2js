@@ -69,7 +69,15 @@ export function passHook(analysis: ModuleAnalysis, opts: PassPipelineOptions = {
   };
 }
 
-export type AstPassHook = (fn: AstStmt, cfg: FunctionCfg) => { readonly fn: AstStmt; readonly diagnostics: readonly Diagnostic[] };
+/** Per-call extras for one stage-B run. `beforeVarNaming` is applied to the
+ *  body right after the structure-recovery block and `reg-split`, immediately
+ *  before `var-naming` (the overlay's live-range names, docs/RENAME.md); it
+ *  receives the post-split body, so it is also how a caller observes the webs. */
+export interface AstPassExtras {
+  readonly beforeVarNaming?: (body: readonly AstStmt[]) => readonly AstStmt[];
+}
+
+export type AstPassHook = (fn: AstStmt, cfg: FunctionCfg, extras?: AstPassExtras) => { readonly fn: AstStmt; readonly diagnostics: readonly Diagnostic[] };
 
 /**
  * F10: after the stage-B pipeline has fired at least one site in a function,
@@ -221,7 +229,7 @@ export function hoistRegisterInits(body: readonly AstStmt[]): readonly AstStmt[]
 export function astPassHook(analysis: ModuleAnalysis, opts: PassPipelineOptions = {}, onResult?: (functionIndex: number, r: AstApplyResult) => void): AstPassHook {
   const moduleView = buildModuleView(analysis);
   const mod = analysis.module;
-  return (fn, cfg) => {
+  return (fn, cfg, extras) => {
     if (fn.k !== "func" || opts.none === true) return { fn, diagnostics: [] };
     const diagnostics: Diagnostic[] = [];
     const base = enabledPasses({ ...opts, stage: "B" }) as readonly Pass<readonly AstStmt[]>[];
@@ -248,7 +256,7 @@ export function astPassHook(analysis: ModuleAnalysis, opts: PassPipelineOptions 
       fnParams,
       functionMeta,
       diagnostic: (d) => diagnostics.push(d),
-    });
+    }, extras?.beforeVarNaming !== undefined ? { before: "var-naming", apply: extras.beforeVarNaming } : undefined);
     onResult?.(cfg.functionIndex, r);
     const body = r.applied.length > 0 ? hoistRegisterInits(pruneRegisterDecls(r.body, fn.params)) : r.body;
     return { fn: { ...fn, body }, diagnostics: [...diagnostics, ...r.diagnostics] };

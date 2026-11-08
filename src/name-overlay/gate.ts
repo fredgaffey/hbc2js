@@ -6,9 +6,10 @@
 
 import type { ModuleAnalysis } from "../cfg/types.ts";
 import type { Stmt } from "../emit/ast.ts";
-import { identUses, isSafeIdentifier } from "../passes/ast.ts";
+import { identUses, isSafeIdentifier, registerUses } from "../passes/ast.ts";
 import { classifySite, EMITTER_NAME_CLASS_RE, IDENT_RE } from "../passes/var-naming/match.ts";
 import type { BindingId } from "./id.ts";
+import { parseWebIdent, registerIdent } from "./id.ts";
 import type { Gate } from "./store.ts";
 
 export type GateRefusal =
@@ -35,6 +36,13 @@ export function frameHasRegister(body: readonly Stmt[], rN: string): boolean {
   return u.reads + u.writes > 0;
 }
 
+/** Whether `reg-split` split register `reg` in this post-split `body` (some
+ *  `rN_W` ident is live). */
+export function splitWebsOf(body: readonly Stmt[], reg: number): boolean {
+  for (const n of registerUses(body).keys()) if (parseWebIdent(n)?.reg === reg) return true;
+  return false;
+}
+
 /** Evaluate the gate for naming `id` `name` against `body` (the raw `rN` frame
  *  body, from `rawFrameBodies`). Pure — no bytecode read here. */
 export function gateForFrame(body: readonly Stmt[] | undefined, id: BindingId, name: string, override: boolean): GateResult {
@@ -46,8 +54,17 @@ export function gateForFrame(body: readonly Stmt[] | undefined, id: BindingId, n
     return { ok: false, reason: "invalid-name", overridable: false };
   }
 
-  const from = `r${id.reg}`;
+  const from = registerIdent(id);
   if (!frameHasRegister(body, from)) return { ok: false, reason: "no-binding", overridable: false };
+  // A live range is one def-web by reg-split's construction, so the
+  // register-wide reuse gate below does not apply to it; web 1 of a split
+  // register must really be a split (some `rN_W` exists), else it is the
+  // whole register and takes the whole-register path.
+  if (id.web !== undefined) {
+    const web1 = id.web === 1;
+    if (!web1 || splitWebsOf(body, id.reg)) return { ok: true, gate: "passed" };
+    return { ok: false, reason: "no-binding", overridable: false };
+  }
 
   const verdict = classifySite(body, from);
   if (verdict.ok) return { ok: true, gate: "passed" };

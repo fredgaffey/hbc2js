@@ -371,6 +371,12 @@ function parseWireBindingId(raw: unknown): BindingId | undefined {
   if ("reg" in b) {
     const reg = b["reg"];
     if (typeof reg !== "number" || !Number.isInteger(reg) || reg < 0) return undefined;
+    // A live-range id (docs/RENAME.md): `web` names one reg-split web.
+    if ("web" in b) {
+      const web = b["web"];
+      if (typeof web !== "number" || !Number.isInteger(web) || web < 1) return undefined;
+      return { kind: "reg", fn, reg, web };
+    }
     return { kind: "reg", fn, reg };
   }
   return { kind: "fn", fn };

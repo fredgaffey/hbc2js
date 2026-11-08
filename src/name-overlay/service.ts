@@ -7,7 +7,10 @@
 import type { ModuleAnalysis } from "../cfg/types.ts";
 import type { Stmt } from "../emit/ast.ts";
 import type { PassPipelineOptions } from "../passes/index.ts";
-import { rawFrameBodies } from "./frames.ts";
+import { rawFrameBodies, rawFrames } from "./frames.ts";
+import type { RawFrame } from "./frames.ts";
+import { astPassHook } from "../passes/index.ts";
+import type { AstPassHook } from "../passes/index.ts";
 import { gateForFrame } from "./gate.ts";
 import type { GateRefusal } from "./gate.ts";
 import type { BindingId } from "./id.ts";
@@ -36,6 +39,9 @@ export class NameService {
   private readonly passes: PassPipelineOptions | undefined;
   private readonly strictEnv: boolean;
   private frames: Map<number, readonly Stmt[]> | null = null;
+  private frameNodes: Map<number, RawFrame> | null = null;
+  private hook: AstPassHook | null = null;
+  private readonly splitBodies = new Map<number, readonly Stmt[]>();
 
   constructor(analysis: ModuleAnalysis, store: OverlayStore, opts: { readonly passes?: PassPipelineOptions; readonly strictEnv?: boolean } = {}) {
     this.analysis = analysis;
@@ -50,10 +56,27 @@ export class NameService {
     return this.frames;
   }
 
+  /** `fn`'s body right after reg-split (the `beforeVarNaming` point), built
+   *  on demand and memoised -- the body a live-range id's web lives in. */
+  private splitFrame(fn: number): readonly Stmt[] | undefined {
+    const hit = this.splitBodies.get(fn);
+    if (hit !== undefined) return hit;
+    if (this.frameNodes === null) this.frameNodes = rawFrames(this.analysis, { ...(this.passes !== undefined ? { passes: this.passes } : {}), strictEnv: this.strictEnv });
+    const frame = this.frameNodes.get(fn);
+    if (frame === undefined) return undefined;
+    if (this.hook === null) this.hook = astPassHook(this.analysis, this.passes);
+    let split: readonly Stmt[] | undefined;
+    this.hook(frame.node, frame.cfg, { beforeVarNaming: (b) => (split = b) });
+    if (split !== undefined) this.splitBodies.set(fn, split);
+    return split;
+  }
+
   /** Assign a name: gate it, then record it (spec §5/§6). A refused, non-forced
    *  name is NOT stored — the caller sees the gate's reason. */
   setName(id: BindingId, name: string, input: SetNameInput): SetOutcome {
-    const body = id.kind === "reg" ? this.rawFrames().get(id.fn) : undefined;
+    // A live-range id is gated against the post-reg-split body, where its
+    // web is a binding of its own (docs/RENAME.md).
+    const body = id.kind === "reg" ? (id.web !== undefined ? this.splitFrame(id.fn) : this.rawFrames().get(id.fn)) : undefined;
     const verdict = gateForFrame(body, id, name, input.override === true);
     if (!verdict.ok) return { ok: false, reason: verdict.reason, overridable: verdict.overridable };
     const overridden = verdict.gate === "overridden";
