@@ -316,6 +316,39 @@ reads throw -- the same hazard `isThisArg` refuses inside the constructor, one
 frame out. Fixture `81-derived-ctor-private-fields` is exactly that shape and
 therefore keeps its symbol-keyed output.
 
+**R-PF1 is def-use (2026-11-09).** What counts as a surviving reference is
+decided per name. The *env slot* keeps the strict rule: any mention left
+anywhere, nested closures included, refuses -- a slot is a frame-shared
+binding a closure may read at any moment, so no ordering inside one frame
+covers it, and hermesc gives each binding its own slot, so a slot is never
+recycled. The *register* only refuses for a read the symbol's own store still
+reaches. Argument: the defining frame's top-level list is straight-line (a
+later index runs only after every earlier one has finished; a `break` out of a
+labelled block only moves forward), and no closure can name a register. So a
+top-level plain store `r = e` whose `e` does not read `r` kills the symbol for
+every later statement, and a later read of `r` sees that store's value, never
+the symbol. Anything else that mentions `r` between the creation and that
+kill (a read, or a write inside an `if` or loop that kills only on some
+paths) refuses. So does a mention *before* the creation, because the list may
+be a loop body entered again with the symbol still in `r`. When the matched
+list is not the whole function body (a class inside `L0: {...}`), a mention
+of `r` anywhere else in the frame refuses, because a register is frame-wide.
+That last case was a real gap in the old rule: it only looked inside the
+matched list. A recycled register keeps its declaration. Fixtures
+`90-inlined-new` and `94-private-field-register-reuse` (where inline-new
+rebuilt the inlined construction that last read the register) now fold.
+`95-private-field-inlined-escape` (a constructor with a loop, which inline-new
+refuses R-IN1, so the inlined copy's symbol-keyed install stays) still
+refuses. Folding 90/94 also exposed hermesc's double-initialisation guard
+ahead of an install (`if (hasOwnProperty.call(this, sym))
+throwTypeError("Cannot initialize private field twice.")`; at v98 in derived
+bodies the test goes through a register). It is now dropped with the install
+it guards, because the field declaration's own PrivateFieldAdd makes that
+check natively. Left behind, it read `#x in this` after the field existed and
+threw on every construction, and the checker did not notice (it re-derives
+the fold, it does not run it). Only the expected.txt run caught it. Any other
+brand test on `this` ahead of the install refuses the name.
+
 ### 1.8 Corpus reach
 
 `tests/fixtures/bundles/rn-template-0.72/index.android.hbc` is v94 (layout C), so it has
@@ -837,10 +870,10 @@ look-alike, stays), 93 (F1 labelled block), T2 PASS at v98/v99, both modes
 print expected.txt (v99 VM), and a hand-built AST with one extra write between
 the create and the body (R-IN2) beside the same shape without it (folded).
 Open: (a) the dead `CreateThisForNew` block ahead of an inlined `new` in
-another frame stays (it is sound, and the warning is the lowering's); (b) on
-fixture 90 `private-fields` still refuses R-PF1 after the rebuild because the
-symbol's register is REUSED later in the defining frame -- R-PF1 counts any
-later mention of the register name, including writes of unrelated values;
+another frame stays (it is sound, and the warning is the lowering's); (b) FIXED 2026-11-09: on
+fixture 90 `private-fields` refused R-PF1 after the rebuild because the
+symbol's register is reused later in the defining frame; R-PF1 is now def-use
+for the register (section 1.7);
 (c) on 93 `private-fields` refuses `ambiguous-multiple-classes`; (d) a class
 whose only prototype member is installed through `C.prototype` directly
 (fixture 91's `Base`, 92's `Point` with one method) is refused `no-members`
