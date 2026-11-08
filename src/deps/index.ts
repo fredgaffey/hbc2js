@@ -12,7 +12,7 @@ import { classifyInventory, loadCommonalityIndex, DEFAULT_COMMONALITY_INDEX_PATH
 import type { ClassificationReport } from "./classify.ts";
 import { confirmCandidates, detectRnVersionFromBaselineFilenames } from "./confirm.ts";
 import type { ConfirmResult } from "./confirm.ts";
-import { resolveDbLayers, loadSignatures, defaultSharedDbDir } from "./db.ts";
+import { resolveDbLayers, loadSignatures, defaultSharedDbDir, projectDbDir as projectDbDirFor, userCacheDbDir as userCacheDbDirDefault } from "./db.ts";
 import { guessModules } from "./guess.ts";
 import type { ModuleGuess } from "./guess.ts";
 import { buildInventory } from "./inventory.ts";
@@ -28,6 +28,10 @@ import { buildNativeTables, openApk } from "../native/ingest.ts";
 export interface DepsOptions {
   readonly out?: string;
   readonly confirm?: boolean;
+  /** Also write `--confirm`-built signatures into the user cache
+   *  (`~/.cache/hbc2js/sigdb`), which every later run reads as its "user"
+   *  layer. Off by default (corpus-confirm-precision). CLI `--confirm-cache`. */
+  readonly confirmCache?: boolean;
   readonly offline?: boolean;
   readonly sigdb?: string;
   readonly noSharedDb?: boolean;
@@ -97,7 +101,9 @@ export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promis
 
   let confirmResults: ConfirmResult[] = [];
   if (opts.confirm === true && opts.offline !== true) {
-    const projectDbDir = resolveDbLayers({ ...(opts.out !== undefined ? { outDir: opts.out } : {}), ...(opts.sigdb !== undefined ? { sigdb: opts.sigdb } : {}) })[0]!.dir;
+    const scoringProjectDir = resolveDbLayers({ ...(opts.out !== undefined ? { outDir: opts.out } : {}), ...(opts.sigdb !== undefined ? { sigdb: opts.sigdb } : {}) })[0]!.dir;
+    const writeTargets = confirmWriteTargets({ ...(opts.out !== undefined ? { out: opts.out } : {}), ...(opts.sigdb !== undefined ? { sigdb: opts.sigdb } : {}), confirmCache: opts.confirmCache === true });
+    const projectDbDir = writeTargets.projectDbDir;
     const userCacheDbDir = resolveDbLayers({})[1]!.dir;
     const sharedDbDir = defaultSharedDbDir();
     // Baselines (`_baselines/*`, see `confirm.ts`) are toolchain
@@ -109,7 +115,7 @@ export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promis
     // react-native signature to detect one from at all — the common case on
     // an empty/`--no-shared-db` DB, which is exactly when `--confirm` is
     // most needed (docs/DEPS.md §4, D17a/D17b).
-    const baselineDirs = [projectDbDir, userCacheDbDir, sharedDbDir];
+    const baselineDirs = [...new Set([scoringProjectDir, projectDbDir, userCacheDbDir, sharedDbDir])];
     const rnVersion = matchReport.packages.find((p) => p.package === "react-native" && (p.tier === "high" || p.tier === "medium"))?.version ?? detectRnVersionFromBaselineFilenames(baselineDirs, inventory.hbcVersion) ?? undefined;
     const hermescPath = join(opts.hermescDir ?? join(process.cwd(), "tools", "hermesc"), `v${inventory.hbcVersion}`, "hermesc");
     if (rnVersion !== undefined) {
@@ -135,7 +141,8 @@ export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promis
         hbcVersion: inventory.hbcVersion,
         hermescPath,
         projectDbDir: useSigDb ? join(projectDbDir, "sigdb.sqlite") : projectDbDir,
-        userCacheDbDir: useSigDb ? join(userCacheDbDir, "sigdb.sqlite") : userCacheDbDir,
+        ...(writeTargets.userCacheDbDir !== undefined ? { userCacheDbDir: useSigDb ? join(writeTargets.userCacheDbDir, "sigdb.sqlite") : writeTargets.userCacheDbDir } : {}),
+        ownedTargetFactoryHashes: ownedTargetFactoryHashes(inventory, matchReport),
         baselineDirs,
         rateLimitMs: 500,
         failureLogPath: join(scratchDir, "..", "confirm-failures.json"),
@@ -257,3 +264,26 @@ function nativeChannelForApk(apkPath: string, report: DepsReport): NativeChannel
 
 export type { DepsReport } from "./report.ts";
 export { formatReportText, packageJsonDependencies } from "./report.ts";
+
+/** Where `--confirm` writes the signatures it builds (corpus-confirm-precision).
+ *  Never the `--sigdb` directory: that is the DB this and later runs score
+ *  against, and one app's confirm results (which include generic-name
+ *  collisions) must not change another app's report. The project-local
+ *  `<out>/.hbc2js/sigdb` always; the user cache only when opted in. */
+export function confirmWriteTargets(opts: { readonly out?: string; readonly sigdb?: string; readonly confirmCache?: boolean }): { projectDbDir: string; userCacheDbDir?: string } {
+  const projectDbDir = projectDbDirFor(opts.out !== undefined ? { outDir: opts.out } : {});
+  return opts.confirmCache === true ? { projectDbDir, userCacheDbDir: userCacheDbDirDefault() } : { projectDbDir };
+}
+
+/** Exact hashes of target module factories the match stage already owns —
+ *  `confirmMinimumEvidence` does not count a candidate hit on one. */
+function ownedTargetFactoryHashes(inventory: ModuleInventory, matchReport: MatchReport): Set<string> {
+  const byIndex = new Map(inventory.functions.map((f) => [f.index, f.exactHash]));
+  const owned = new Set<string>();
+  for (const a of matchReport.moduleAttributions) {
+    if (a.owners.length === 0) continue;
+    const h = byIndex.get(a.factoryFunctionIndex);
+    if (h !== undefined) owned.add(h);
+  }
+  return owned;
+}

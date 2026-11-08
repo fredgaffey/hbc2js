@@ -14,10 +14,10 @@ import type { Provenance } from "../project/schema.ts";
 import { TransientBackendError, type WorkerBackend, type WorkerJobRequest } from "./backend.ts";
 import { JobQueue, type Job, type JobKind } from "./queue.ts";
 import type { Presence } from "./presence.ts";
-import { fileOp, rewriteFunction, suggestNames, ReadabilitySurfaceError, type ReadabilityContext, type SuggestNamesArgs } from "../readability/surfaces.ts";
+import { commitFileOp, commitRewriteFunction, computeFileOp, computeRewriteFunction, suggestNames, tracedOriginsFor, ReadabilitySurfaceError, type FileOpPlan, type ReadabilityContext, type RewriteFunctionArgs, type RewritePlan, type SuggestNamesArgs } from "../readability/surfaces.ts";
 import type { ReadabilityWorkerInput, ReadabilityWorkerMessage } from "./readability-worker.ts";
 import { TransactionRefused } from "../readability/transactions.ts";
-import { FileOpError } from "../readability/file-ops.ts";
+import { FileOpError, type FileOpRequest } from "../readability/file-ops.ts";
 
 /** Body prefix every worker-written annotation carries (§4). The UI greps it
  *  to draw the accept/reject affordance. */
@@ -253,7 +253,12 @@ export class WorkerRunner {
       } else if (job.kind === "readability-rewrite-function") {
         const fn = job.input["fn"];
         if (typeof fn !== "number") throw new ReadabilitySurfaceError("readability-rewrite-function: fn is required");
-        result = await rewriteFunction(this.readability, { fn });
+        const rwArgs: RewriteFunctionArgs = { fn };
+        // P-65: compute (backend + equiv gate) off-thread, commit here --
+        // this thread stays the single writer on the hash-chained log.
+        const off = this.offThreadInput(this.readability, rwArgs, "rewrite-function");
+        const plan = off === undefined ? await computeRewriteFunction(this.readability, rwArgs) : ((await runReadabilityWorker(off)) as RewritePlan);
+        result = await commitRewriteFunction(this.readability, plan);
       } else {
         const inputs = job.input["inputs"];
         const outputs = job.input["outputs"];
@@ -265,7 +270,10 @@ export class WorkerRunner {
           throw new ReadabilitySurfaceError("readability-combine-files: outputs must be exactly one file path (combine has one target)");
         }
         if (typeof evidence !== "string" || evidence === "") throw new ReadabilitySurfaceError("readability-combine-files: evidence is required");
-        result = fileOp(this.readability, { op: "combine", from: inputs as readonly string[], to: outputs[0] as string, evidence });
+        const req = { op: "combine", from: inputs as readonly string[], to: outputs[0] as string, evidence } as const;
+        const off = this.offThreadInput(this.readability, { fn: 0 }, "combine-files", req);
+        const plan = off === undefined ? computeFileOp(this.readability, req) : ((await runReadabilityWorker(off)) as FileOpPlan);
+        result = commitFileOp(this.readability, plan);
       }
       // §2.3: cancellation is a guarantee about WRITES -- re-read before
       // "finishing" (the write already happened inside the surface call for
@@ -303,7 +311,12 @@ export class WorkerRunner {
    *  `oracle`/`functionOracle` are not checked here because `suggestNames`
    *  never calls them (it has its own batch equiv backstop inside
    *  `runNamePass`). */
-  private offThreadInput(ctx: ReadabilityContext, args: SuggestNamesArgs): ReadabilityWorkerInput | undefined {
+  private offThreadInput(
+    ctx: ReadabilityContext,
+    args: SuggestNamesArgs | RewriteFunctionArgs,
+    job: "suggest-names" | "rewrite-function" | "combine-files" = "suggest-names",
+    fileOpReq?: FileOpRequest,
+  ): ReadabilityWorkerInput | undefined {
     if (process.env[READABILITY_INPROCESS_ENV] === "1") return undefined;
     if (ctx.hbcPath === undefined || ctx.backendId === undefined) return undefined;
     // `replay` needs a recording path `backendForId` takes as a separate
@@ -311,7 +324,12 @@ export class WorkerRunner {
     // not rebuild it -- keep it in-process rather than fail the job.
     if (ctx.backendId === "replay") return undefined;
     if (ctx.evaluator !== undefined) return undefined;
+    // Live-function oracles cannot cross the thread boundary.
+    if (job === "rewrite-function" && ctx.functionOracle !== undefined) return undefined;
+    if (job === "combine-files" && ctx.oracle !== undefined) return undefined;
     return {
+      job,
+      ...(fileOpReq !== undefined ? { fileOp: fileOpReq, tracedOrigins: tracedOriginsFor(ctx, fileOpReq) } : {}),
       hbcPath: ctx.hbcPath,
       projectDir: ctx.projectDir,
       treeDir: ctx.treeDir,
