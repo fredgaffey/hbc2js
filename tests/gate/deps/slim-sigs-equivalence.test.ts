@@ -4,14 +4,15 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { after, describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { loadSignatures, type DbLayer } from "../../../src/deps/db.ts";
 import { matchInventory } from "../../../src/deps/match.ts";
 import type { ModuleInventory } from "../../../src/deps/inventory.ts";
 import type { SigDbFile, SigFunction, SigModule } from "../../../src/deps/sigdb-types.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "slim-sigs-"));
-afterAll(() => rmSync(dir, { recursive: true, force: true }));
+after(() => rmSync(dir, { recursive: true, force: true }));
 
 const h = (s: string, n = 0): string => (s + n).padEnd(32, "0");
 function fn(index: number, tag: string, extra: Partial<SigFunction> = {}): SigFunction {
@@ -55,22 +56,22 @@ describe("deps-slim-sigs", () => {
     const slimOther = new Set<string>();
     const full = loadSignatures(layers, { hbcVersion: 96, otherHbcPackages: fullOther });
     const slim = loadSignatures(layers, { hbcVersion: 96, otherHbcPackages: slimOther, slim: true });
-    expect(slim.map((s) => `${s.file.package}@${s.file.version}`)).toEqual(full.map((s) => `${s.file.package}@${s.file.version}`));
-    expect([...slimOther]).toEqual([...fullOther]);
+    assert.deepEqual(slim.map((s) => `${s.file.package}@${s.file.version}`), full.map((s) => `${s.file.package}@${s.file.version}`));
+    assert.deepEqual([...slimOther], [...fullOther]);
     const a = matchInventory(inventory, full);
     const b = matchInventory(inventory, slim);
-    expect(a.packages.length).toBeGreaterThan(2);
-    expect(b).toEqual(a);
+    assert.ok(a.packages.length > 2);
+    assert.deepEqual(b, a);
     // no hbcVersion filter either
-    expect(matchInventory(inventory, loadSignatures(layers, { slim: true }))).toEqual(matchInventory(inventory, loadSignatures(layers)));
+    assert.deepEqual(matchInventory(inventory, loadSignatures(layers, { slim: true })), matchInventory(inventory, loadSignatures(layers)));
   });
 
   it("slim records drop the fields the matcher never reads", () => {
     const [first] = loadSignatures(layers, { hbcVersion: 96, slim: true });
     const f = first!.file as unknown as { functions: Record<string, unknown>[]; modules: Record<string, unknown>[]; provenance?: unknown; subtractedBaselines?: unknown };
-    expect(f.provenance).toBeUndefined();
-    expect(f.subtractedBaselines).toBeUndefined();
-    for (const x of f.functions) for (const k of ["name", "paramCount", "owner"]) expect(k in x).toBe(false);
-    for (const m of f.modules) for (const k of ["depIds", "depCount", "functionSetHash", "nestedFunctionCount"]) expect(k in m).toBe(false);
+    assert.equal(f.provenance, undefined);
+    assert.equal(f.subtractedBaselines, undefined);
+    for (const x of f.functions) for (const k of ["name", "paramCount", "owner"]) assert.equal(k in x, false);
+    for (const m of f.modules) for (const k of ["depIds", "depCount", "functionSetHash", "nestedFunctionCount"]) assert.equal(k in m, false);
   });
 });
