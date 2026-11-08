@@ -21,6 +21,7 @@
 import type { HbcModule } from "../parse/types.ts";
 import type { DecodedFunction } from "../disasm/decode.ts";
 import type { SigDbFile, SigFunction, SigModule } from "./sigdb-types.ts";
+import { closureOwnership, directClosures } from "./closure-owner.ts";
 
 /** `SigDbFile.modulePaths` value this code writes and understands. */
 export const MODULE_PATHS_VERSION = 1;
@@ -147,21 +148,15 @@ export function attachModulePaths(
   modules: readonly SigModule[],
   paths: ReadonlyMap<number, string | null>,
 ): { functions: SigFunction[]; modules: SigModule[] } {
+  // "first" policy: the first module (in registration order) to reach a
+  // function claims it -- the stored meaning of SigFunction.moduleId.
+  // Modules without a numeric id claim nothing but still bound the walk.
+  const roots = modules.filter((m) => m.localModuleId !== null).map((m) => m.factoryFunctionIndex);
+  const stops = new Set(modules.filter((m) => m.localModuleId === null).map((m) => m.factoryFunctionIndex));
+  const idOf = new Map(modules.map((m) => [m.factoryFunctionIndex, m.localModuleId]));
+  const { owner } = closureOwnership(roots, (i) => directClosures(mod, decodeFunction, i), "first", stops);
   const moduleOf = new Map<number, number>();
-  const factories = new Set(modules.map((m) => m.factoryFunctionIndex));
-  for (const m of modules) {
-    if (m.localModuleId === null) continue;
-    const stack = [m.factoryFunctionIndex];
-    while (stack.length > 0) {
-      const idx = stack.pop()!;
-      if (moduleOf.has(idx)) continue;
-      if (idx !== m.factoryFunctionIndex && factories.has(idx)) continue;
-      moduleOf.set(idx, m.localModuleId);
-      for (const insn of decodeFunction(mod, idx).instructions) {
-        for (const op of insn.operands) if (op.role === "function" && !moduleOf.has(op.value)) stack.push(op.value);
-      }
-    }
-  }
+  for (const [fn, root] of owner) moduleOf.set(fn, idOf.get(root)!);
   return {
     functions: functions.map((f) => {
       const id = moduleOf.get(f.index);

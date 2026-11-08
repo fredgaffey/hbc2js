@@ -1914,6 +1914,30 @@ react is still confirmed through the react-foundation baseline
 (`tests/gate/deps/match.test.ts` updated). Test:
 `tests/gate/deps/corpus-residual-fp.test.ts`.
 
+**Closure ownership (deps-closure-ownership, 2026-11-09).** The module
+inventory gave a module only the closures its factory creates directly.
+A closure created by another closure belonged to no module, so it looked
+like app code. It now follows the closure-creation graph to any depth
+(`src/deps/closure-owner.ts`, shared with `SigFunction.moduleId`). A
+function reachable from two factories is owned by neither; there were none
+on either holdout. Unowned functions: Expensify 36,870 to 95 of 98,775
+(37.3% to 0.1%), react-navigation-example 5,259 to 1,114 of 15,551 (33.8%
+to 7.2%; the rest are `global`, polyfills and the prelude). Stored
+signature fields don't change (docs/PACKAGE-SIGNATURES.md §7), so the DBs
+need no rebuild. Scoring itself looks at every target function, owned or
+not, so its numbers barely move. The one change comes from candidate
+pre-selection, which now also sees the strings of deeper closures. That
+adds `punycode.js` on Expensify: the same source as `punycode` (a true
+dependency) published under a second name. Both match the same hashes,
+like the embedded copies above.
+
+| holdout (DB) | before: confirmed / TP / FP, recall (direct) | after |
+|---|---|---|
+| Expensify J3, db-v4-paths-partial | 100 / 87 / 13, 30.2% (37.4%) | 101 / 87 / 14, 30.2% (37.4%) |
+| Expensify J3, db-v3-clean | 134 / 89 / 45, 30.9% (35.2%) | 135 / 89 / 46, 30.9% (35.2%) |
+| react-navigation-example, db-v4-paths-partial | 10 / 10 / 0, 13.2% (15.0%) | unchanged |
+| react-navigation-example, db-v3-clean | 14 / 14 / 0, 18.4% (21.7%) | unchanged |
+
 **Shipping.** Per D17c, the DB itself is never committed — the v2 build
 lives on a build host in `db-v2` (dependency-subtracted,
 353-file-quarantined) and is packaged the same way round 1's first archive

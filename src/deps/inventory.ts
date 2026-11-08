@@ -10,6 +10,7 @@ import type { HbcModule, ParseOptions } from "../parse/types.ts";
 import { fingerprintModule, functionStringEvidence } from "./fingerprint.ts";
 import type { SigFunction } from "./sigdb-types.ts";
 import type { BundleKind } from "./wscan.ts";
+import { closureOwnership, directClosures } from "./closure-owner.ts";
 
 // Same truncated-sha256 convention as fingerprint.ts's own `sha256` (96
 // bits, docs/PACKAGE-SIGNATURES.md §5.3) — kept as a private copy here
@@ -25,6 +26,9 @@ export interface InventoryModule {
   readonly localModuleId: number | null;
   readonly depCount: number | null;
   readonly depIds: readonly number[] | null;
+  /** Every closure the factory creates, directly or through other closures
+   *  (direct ones first, in creation order, then deeper ones by index).
+   *  Unlike `SigModule.nestedFunctionIndices` (direct only, stored). */
   readonly nestedFunctionIndices: readonly number[];
   /** Factory function index followed by every nested closure — the module's
    *  full function set for the purposes of size/string-evidence gathering. */
@@ -73,8 +77,14 @@ export interface InventoryModule {
 export interface ModuleInventory {
   readonly hbcVersion: number;
   readonly totalFunctions: number;
-  /** Every function belonging to some `__d()` module (factory or nested). */
+  /** Every function belonging to some `__d()` module (factory or a closure
+   *  it creates at any depth -- deps-closure-ownership). */
   readonly moduledFunctionCount: number;
+  /** Functions in no module: `global`, top-level helpers, polyfills, and
+   *  the ambiguous ones below. Optional for hand-built inventories. */
+  readonly unownedFunctionCount?: number;
+  /** Functions reachable from two or more factories: owned by none. */
+  readonly ambiguousFunctionCount?: number;
   readonly modules: readonly InventoryModule[];
   readonly functions: readonly SigFunction[];
   /** Hash-scheme-1 (pre-LB1, width-unfolded) exact / fuzzy hash per
@@ -94,9 +104,29 @@ export function buildInventoryFromModule(mod: HbcModule): ModuleInventory {
   const { functions, modules, legacyExactHashes, legacyFuzzyHashes, bundleKind } = fingerprintModule(mod, decodeFunction);
   const byIndex = new Map(functions.map((f) => [f.index, f]));
 
+  // deps-closure-ownership: a module owns every function its factory
+  // creates at ANY depth (closure-owner.ts, "ambiguous" policy: a function
+  // reached from two factories belongs to neither). `m.nestedFunctionIndices`
+  // (SigModule, a stored signature field) stays direct-only; only this
+  // target-side view is transitive.
+  const { owner, ambiguous } = closureOwnership(
+    modules.map((m) => m.factoryFunctionIndex),
+    (i) => directClosures(mod, decodeFunction, i),
+    "ambiguous",
+  );
+  const ownedBy = new Map<number, number[]>();
+  for (const [fn, root] of owner) {
+    if (fn === root) continue;
+    let list = ownedBy.get(root);
+    if (list === undefined) ownedBy.set(root, (list = []));
+    list.push(fn);
+  }
   const moduled = new Set<number>();
   const invModules: InventoryModule[] = modules.map((m) => {
-    const nested = m.nestedFunctionIndices ?? [];
+    const direct = (m.nestedFunctionIndices ?? []).filter((i) => owner.get(i) === m.factoryFunctionIndex);
+    const directSet = new Set(direct);
+    const deeper = (ownedBy.get(m.factoryFunctionIndex) ?? []).filter((i) => !directSet.has(i)).sort((a, b) => a - b);
+    const nested = [...direct, ...deeper];
     const functionIndices = [m.factoryFunctionIndex, ...nested];
     for (const i of functionIndices) moduled.add(i);
 
@@ -148,6 +178,8 @@ export function buildInventoryFromModule(mod: HbcModule): ModuleInventory {
     hbcVersion: mod.header.version,
     totalFunctions: functions.length,
     moduledFunctionCount: moduled.size,
+    unownedFunctionCount: functions.length - moduled.size,
+    ambiguousFunctionCount: ambiguous.size,
     modules: invModules,
     functions,
     legacyExactHashes,
