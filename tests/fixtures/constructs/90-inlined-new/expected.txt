@@ -1,0 +1,2 @@
+top: top 10 15 true
+open: o 7

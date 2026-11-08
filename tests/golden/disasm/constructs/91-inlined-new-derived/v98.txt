@@ -1,0 +1,143 @@
+; hbc2js disassembly of 91-inlined-new-derived/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=6 strings=18 globalCodeIndex=0
+function #0 "global"  params=1 frame=25 env=0 flags=dbg,overflowed  @0x000001b4 size=241
+  0000  CreateFunctionEnvironment r5, 3
+  0003  DeclareGlobalVar     s11 "child"
+  0008  GetGlobalObject      r4
+  000a  CreateClosure        r6, r5, f1 "child"
+  000f  PutByIdLoose         r4, r6, #c0, s11 "child"
+  0015  LoadConstUndefined   r1
+  0017  CreateBaseClass      r10, r6, r1, 2
+  001d  Mov                  r8, r6
+  0020  LoadConstString      r7, s17 "who"
+  0024  CreateClosure        r6, r1, f3 "who"
+  0029  DefineOwnByVal       r8, r6, r7, 0
+  002e  CreatePrivateName    r7, s13 "#secret"
+  0034  StoreToEnvironment   r5, 1, r7
+  0038  CreateDerivedClass   r9, r6, r5, r10, 4
+  003f  Mov                  r11, r6
+  0042  LoadConstString      r8, s16 "reveal"
+  0046  CreateClosure        r6, r5, f5 "reveal"
+  004b  DefineOwnByVal       r11, r6, r8, 0
+  0050  StoreToEnvironment   r5, 2, r9
+  0054  StoreToEnvironment   r5, 0, r9
+  0058  LoadParentNoTraps    r5, r9
+  005b  CreateThisForSuper   r6, r5, r9, 0
+  0060  LoadConstUInt8       r16, 1
+  0063  Mov                  r17, r6
+  0066  CallWithNewTarget    r5, r5, r9, 2
+  006b  SelectObject         r5, r6, r5
+  006f  LoadConstEmpty       r6
+  0071  ThrowIfThisInitialized r6
+  0073  PrivateIsIn          r2, r7, r5, r0
+  0078  JmpTrue              L1, r2
+  007b  AddOwnPrivateBySym   r5, r1, r7
+  007f  LoadConstString      r6, s10 "x"
+  0083  PutOwnPrivateBySym   r5, r6, 1, r7
+  0088  TryGetById           r8, r4, #c1, s14 "print"
+  008e  GetByIdShort         r15, r5, #c2, s12 "a"
+  0093  GetByIdShort         r6, r5, #c3, s16 "reveal"
+  0098  Call1                r14, r6, r5
+  009c  InstanceOf           r13, r5, r10
+  00a0  InstanceOf           r12, r5, r9
+  00a4  LoadConstString      r16, s7 "dtop:"
+  00a8  LoadConstUndefined   r17
+  00aa  Call                 r5, r8, 6
+  00ae  TryGetById           r7, r4, #c1, s14 "print"
+  00b4  GetByIdShort         r5, r4, #c4, s11 "child"
+  00b9  LoadConstUInt8       r0, 2
+  00bc  Call2                r6, r5, r1, r0
+  00c1  GetByIdShort         r5, r6, #c3, s16 "reveal"
+  00c6  Call1                r6, r5, r6
+  00ca  GetByIdShort         r4, r4, #c4, s11 "child"
+  00cf  LoadConstUInt8       r0, 3
+  00d2  Call2                r4, r4, r1, r0
+  00d7  GetByIdShort         r5, r4, #c2, s12 "a"
+  00dc  LoadConstString      r4, s0 "child:"
+  00e0  Call4                r4, r7, r1, r4, r6, r5
+  00e7  Ret                  r4
+L1:
+  00e9  LoadConstString      r16, s5 "Cannot initialize private field …"
+  00ed  CallBuiltin          r4, b44 "throwTypeError", 2
+
+function #1 "child"  params=2 frame=16 env=0 flags=dbg,overflowed  @0x000002a5 size=102
+  0000  GetParentEnvironment r2, 0
+  0003  LoadParam            r6, 1
+  0006  LoadFromEnvironment  r5, r2, 0
+  000a  LoadConstString      r1, s4 "s"
+  000e  Add                  r3, r1, r6
+  0012  CreateThisForNew     r1, r5, 0
+  0016  JmpTypeOfIs          L1, r5, 128
+  001e  LoadConstString      r7, s8 "Trying to call a non-function"
+  0022  CallBuiltin          r1, b44 "throwTypeError", 2
+L1:
+  0026  LoadFromEnvironment  r1, r2, 2
+  002a  LoadParentNoTraps    r1, r1
+  002d  CreateThisForSuper   r4, r1, r5, 0
+  0032  Mov                  r8, r4
+  0035  Mov                  r7, r6
+  0038  CallWithNewTarget    r1, r1, r5, 2
+  003d  SelectObject         r1, r4, r1
+  0041  LoadConstEmpty       r4
+  0043  ThrowIfThisInitialized r4
+  0045  LoadFromEnvironment  r2, r2, 1
+  0049  PrivateIsIn          r0, r2, r1, r0
+  004e  JmpTrue              L2, r0
+  0051  LoadConstUndefined   r0
+  0053  AddOwnPrivateBySym   r1, r0, r2
+  0057  PutOwnPrivateBySym   r1, r3, 1, r2
+  005c  Ret                  r1
+L2:
+  005e  LoadConstString      r7, s5 "Cannot initialize private field …"
+  0062  CallBuiltin          r1, b44 "throwTypeError", 2
+
+function #2 "Base"  params=2 frame=2 env=0 flags=strict,dbg,overflowed,ctor  @0x0000030b size=21
+  0000  GetNewTarget         r0
+  0002  GetByIdShort         r0, r0, #c0, s15 "prototype"
+  0007  NewObjectWithParent  r0, r0
+  000a  LoadParam            r1, 1
+  000d  PutByIdStrict        r0, r1, #c0, s12 "a"
+  0013  Ret                  r0
+
+function #3 "who"  params=1 frame=2 env=0 flags=strict,dbg,overflowed,nc  @0x00000320 size=18
+  0000  LoadParam            r0, 0
+  0003  GetByIdShort         r1, r0, #c0, s12 "a"
+  0008  LoadConstString      r0, s2 "B"
+  000c  Add                  r0, r0, r1
+  0010  Ret                  r0
+
+function #4 "Derived"  params=3 frame=15 env=0 flags=strict,dbg,overflowed,ctor  @0x00000332 size=72
+  0000  GetParentEnvironment r2, 0
+  0003  GetNewTarget         r5
+  0005  LoadFromEnvironment  r1, r2, 2
+  0009  LoadParentNoTraps    r4, r1
+  000c  CreateThisForSuper   r3, r4, r5, 0
+  0011  LoadParam            r6, 1
+  0014  Mov                  r7, r3
+  0017  CallWithNewTarget    r1, r4, r5, 2
+  001c  SelectObject         r1, r3, r1
+  0020  LoadConstEmpty       r3
+  0022  ThrowIfThisInitialized r3
+  0024  LoadFromEnvironment  r3, r2, 1
+  0028  PrivateIsIn          r0, r3, r1, r0
+  002d  JmpTrue              L1, r0
+  0030  LoadParam            r2, 2
+  0033  LoadConstUndefined   r0
+  0035  AddOwnPrivateBySym   r1, r0, r3
+  0039  PutOwnPrivateBySym   r1, r2, 1, r3
+  003e  Ret                  r1
+L1:
+  0040  LoadConstString      r6, s5 "Cannot initialize private field …"
+  0044  CallBuiltin          r1, b44 "throwTypeError", 2
+
+function #5 "reveal"  params=1 frame=11 env=0 flags=strict,dbg,overflowed,nc  @0x0000037a size=38
+  0000  LoadParam            r2, 0
+  0003  GetByIdShort         r0, r2, #c0, s17 "who"
+  0008  Call1                r1, r0, r2
+  000c  LoadConstString      r0, s1 ":"
+  0010  Add                  r1, r1, r0
+  0014  GetParentEnvironment r0, 0
+  0017  LoadFromEnvironment  r0, r0, 1
+  001b  GetOwnPrivateBySym   r0, r2, 0, r0
+  0020  Add                  r0, r1, r0
+  0024  Ret                  r0

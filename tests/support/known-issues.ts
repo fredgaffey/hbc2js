@@ -66,6 +66,10 @@ export const KNOWN_AMBIGUOUS_V98: readonly string[] = [
   // (tests/gate/passes/super-call.test.ts) already pass `resolveV98Ambiguity:
   // true`.
   "80-super-forward-field-installs",
+  // Added 2026-11-09 with the fixture itself (spec 24 section 9, inline-new):
+  // its v98 build hits exactly the ambiguity above (hbc98-late and
+  // hbc99-mar2026 disagree on function ids 0-2); 91-93 probe cleanly.
+  "90-inlined-new",
 ];
 
 export function isKnownAmbiguousV98(group: string, name: string, version: number): boolean {
