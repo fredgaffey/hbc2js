@@ -74,8 +74,13 @@ function post(path: string, body: unknown) {
  *  brief item 3), so tests that assert on the recovered tree's CONTENT
  *  must wait for it exactly as the UI's own poll loop does, rather than
  *  asserting on whichever call happens to land first. */
+const SETTLE_DEADLINE_MS = 120_000;
 async function getSegregationSettled() {
-  for (let i = 0; i < 200; i++) {
+  // Deadline, not an iteration count: the worker-thread compute can take far
+  // longer than 4s when the gate runs thousands of tests concurrently, and
+  // that is load, not a hang. A real hang still fails, at the deadline.
+  const deadline = Date.now() + SETTLE_DEADLINE_MS;
+  while (Date.now() < deadline) {
     const r = await get("/api/segregation");
     if (r.status !== 200) return r;
     const body = r.json as { computing?: boolean };
@@ -695,7 +700,8 @@ test("segregation() is a no-op-persistence, never-error path for a --split artif
     let r = (await handle({ method: "GET", path: "/api/segregation", query: {}, body: null }, fresh)).json as
       | { computing?: boolean }
       | { reason: string };
-    for (let i = 0; i < 200 && "computing" in r && r.computing === true; i++) {
+    const settleBy = Date.now() + SETTLE_DEADLINE_MS;
+    while ("computing" in r && r.computing === true && Date.now() < settleBy) {
       await new Promise((res) => setTimeout(res, 20));
       r = (await handle({ method: "GET", path: "/api/segregation", query: {}, body: null }, fresh)).json as { computing?: boolean } | { reason: string };
     }

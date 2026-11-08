@@ -81,6 +81,9 @@ Own build scored against the package lockfile truth. Offline and `--confirm` giv
 | react-navigation-example 0.85.3 (held out, db-v3 offline) | 76 (60) | 17 / 100% / 22.4% | 17 / 100% / 22.4% (direct 26.7%; unchanged by corpus-offline-precision) | not run | n/a |
 | Expensify/App 12a92bd (J3, module paths: db-v3-clean before, db-v4-paths-partial offline) | 288 (91) | 144 / 62.5% / 31.2% (branch deps-sig-module-paths, after the main merges) | 119 / 74.8% / 30.9% (direct 38.5%) | not run | n/a |
 | react-navigation-example 0.85.3 (held out, module paths: db-v3-clean before, db-v4-paths-partial offline) | 76 (60) | 15 / 100% / 19.7% (same branch) | 11 / 100% / 14.5% (direct 16.7%) | not run | n/a |
+| Expensify/App 12a92bd (J3, generic-hash rule, db-v4-paths-partial offline) | 288 (91) | 119 / 74.8% / 30.9% (module paths) | 100 / 87.0% / 30.2% (direct 37.4%; corpus-residual-fp) | not run | n/a |
+| Expensify/App 12a92bd (J3, generic-hash rule, db-v3-clean offline) | 288 (91) | 144 / 62.5% / 31.2% | 134 / 66.4% / 30.9% (direct 35.2%; corpus-residual-fp) | not run | n/a |
+| react-navigation-example 0.85.3 (held out, generic-hash rule) | 76 (60) | partial 11 / 100% / 14.5%; clean 15 / 100% / 19.7% | partial 10 / 100% / 13.2%; clean 14 / 100% / 18.4% (corpus-residual-fp; `expo-modules-core` lost) | not run | n/a |
 
 Store-bundle scoring was not repeated in this measurement.
 
