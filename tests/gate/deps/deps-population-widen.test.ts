@@ -25,7 +25,7 @@ test("dbVersions reads names per HBC version and restores the scope separator", 
 });
 
 test("pickVersion takes the version most ranges resolve to, never a prerelease", () => {
-  const vs = Object.keys(REGISTRY["dep-x"].versions);
+  const vs = Object.keys(REGISTRY["dep-x"]!.versions);
   assert.equal(pickVersion(vs, ["^1.0.0", "^1.2.0", "^2.0.0"], "2.1.0"), "1.3.0");
   assert.equal(pickVersion(vs, ["^1.0.0", "^2.0.0"], "2.1.0"), "2.1.0"); // tie -> higher
   assert.equal(pickVersion(vs, [], "2.1.0"), "2.1.0"); // no range -> latest
