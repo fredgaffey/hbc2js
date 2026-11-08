@@ -387,6 +387,8 @@ async function main(): Promise<void> {
       const res = await backend.run({ kind: "suggest-name", prompt: "", context });
       const callSeconds = (Date.now() - callStart) / 1000;
       recording[key] = { text: res.text, ...(res.cost !== undefined ? { cost: res.cost } : {}), meta: { fn, requested: regs.length } };
+      // Checkpoint after every call: a timeout later in the run must not lose the paid-for replies.
+      writeFileSync(out, `${JSON.stringify(recording satisfies Recording, null, 2)}\n`);
       calls += 1;
       const tokensIn = res.cost?.tokensIn ?? 0;
       const tokensOut = res.cost?.tokensOut ?? 0;
