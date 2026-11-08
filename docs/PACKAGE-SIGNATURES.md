@@ -864,6 +864,52 @@ see strings and sizes of deeper closures (measured in docs/DEPS.md
 transitive too. It would change `functionSetHash` in every stored file
 for no matching gain, since nothing scores on it.
 
+**Recovery through the module graph (corpus-path-recall, 2026-11-09).**
+Scoring a path-bearing file on its own files loses true packages whose own
+file is small or built differently from the signature while the code it
+requires is in the app: `hoist-non-react-statics` (three own functions,
+under the tiny-package bar of five exact hits), `define-properties` (three),
+`abort-controller` (the app resolves `dist/abort-controller.mjs`, the
+signature Metro build `dist/abort-controller.js`; the class methods match
+only by mnemonic shape). On a pathless DB these were confirmed by their
+dependency's code inside their signature, the same evidence that made
+`safe-buffer` a false positive through its copy of `buffer`. The
+signature's module graph (`SigModule.depIds`) says which dependency module
+each own file requires, and the target inventory has the same edges, so
+`promoteViaDependency` (`src/deps/match.ts`) raises a package that is not
+high and was not demoted when one own file S (path under the package) that
+requires another package D's module S_D has an app module T that is S:
+exact form, T has S's exact factory hash, every distinct eligible hash of
+the package's own-path functions is a hit (at least 2), and T requires an
+app module with S_D's exact factory hash (not generic in the app); fuzzy
+form, D is high on its own evidence (no chaining), T's eligible functions
+match at least 3 distinct fuzzy hashes of S's, half of S's and half of
+T's, and T requires an app module holding at least 3 of D's hit hashes.
+`PackageScore.viaDependency` records `{ by: D, edge }`. Soundness: the rule
+only ever credits a module the app holds that is shaped like the
+package's own file, and its required module must be the dependency's
+code; the copy of D inside P's signature is never evidence for P. An
+impostor whose own file is not in the app (safe-buffer: the app has
+`buffer` but no module shaped like `safe-buffer/index.js` requiring it)
+has no T, so it stays refused; a module shaped like P's file that does not
+require D's module is not P either. A coincidence needs an app module with
+P's factory and code shape whose required module is D's, which is what a
+copy of P is. Not recovered: a one-function own file (`es-define-property`,
+`hasown`), whose single hash plus one edge was judged too little; an own
+file the app holds in another version whose dependency also differs
+(`hoist-non-react-statics` requires a hoisted `react-is` of another
+version). Weakest case: when the dependency is a hub such as
+`react-native`, which nearly every module requires, the edge adds little
+and the evidence is the fuzzy shape of a whole own file
+(`@react-navigation/native`, `react-native-screens` and four more on
+react-navigation-example and bluesky, all true; docs/DEPS.md "Path
+recall"). Slimmed records (`slim-sigs.ts`) keep module `depIds`, the own
+files that require another package and those packages' module records,
+and the two counts the rule reads (`slim.ownPathDistinct`,
+`slim.ownFuzzy`), so no stored field or DB changes. Tests:
+`tests/gate/deps/corpus-path-recall.test.ts` (the fuzzy and exact forms,
+the missing-edge and safe-buffer negatives).
+
 **Rejected.** (1) A lower ambiguity cutoff (`AMBIGUOUS_OWNER_THRESHOLD`
 4): Expensify 20 FP but 74 TP, react-navigation recall 22.4% to 18.4%. The
 copy and the original share one hash with only two owners, so any cutoff
@@ -953,15 +999,19 @@ here publishes; the owner runs the printed command.
    tools/pkgsig/fetch-db.sh [dest]` (no default tag; the current default is
    unchanged until the owner flips it).
 
-**Known gap: the sqlite asset.** The sqlite layer stores neither
-`module.factoryIsDependency`, `nestedFunctionIndices`,
-`subtractedDependencies` nor `bulkBuildFixVersion`, so `import-json.mjs
---verify` reports round-trip mismatches on any db-v3-style file, and
-`match.ts` (which reads `factoryIsDependency` and `subtractedDependencies`)
-would score a sqlite copy differently from the JSON. `finalize.sh` therefore
-builds the sqlite, reports the verify result, and attaches it to the release
-command only when verify passes (`SQLITE_RELEASE=1` forces it). Ship the JSON
-tarball; making the sqlite lossless is a separate item.
+**The sqlite asset (schema rev 3, lossless).** Rev 3 stores every
+`SigDbFile` field: `modules.factory_is_dependency`,
+`fingerprints.subtracted_dependencies` (JSON; NULL = absent, `[]` = empty),
+`fingerprint_functions.owner_json`, the already-present
+`modules.nested_function_indices` (kept when a file carries it) and
+`bulk_build_fix_version` (now taken from the file's `bulkBuildFixVersion`).
+Absent fields stay NULL and read back absent, so a rev-1/2 DB is migrated in
+place by `openSigDb` (columns added, rows untouched) and scores as before.
+`match.ts` reads `factoryIsDependency` and `subtractedDependencies`, so a
+sqlite copy now scores identically to the JSON copy, and `import-json.mjs
+--verify` passes. `finalize.sh` attaches the sqlite to the owner command by
+default whenever verify passes (`SQLITE_RELEASE=1` forces it). Test:
+`tests/gate/deps/sigdb-sqlite-lossless.test.ts`.
 
 Validator (`tools/pkgsig/ship/validate-path-db.mjs <dir> [--src <dir>]
 [--list-pathless]`) reads only. Tests: `tests/gate/deps/validate-path-db.test.ts`,

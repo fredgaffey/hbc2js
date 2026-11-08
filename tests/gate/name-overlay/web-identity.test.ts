@@ -66,7 +66,9 @@ test("web identity: nameable bindings list each bound web of a split register, n
   assert.ok(keys.includes("reg:3:1:1"), keys.join(" "));
   assert.ok(keys.includes("reg:3:1:3"), keys.join(" "));
   assert.ok(!keys.includes("reg:3:1"), "a split register is asked about per web");
-  assert.ok(keys.includes("reg:3:1:2"), keys.join(" "));
+  // r1_2 is printed as `apply` (var-naming): not a literal identifier of the
+  // body the model sees, so it is not requested (readability-id-match).
+  assert.ok(!keys.includes("reg:3:1:2"), keys.join(" "));
   assert.ok(!keys.includes("reg:3:1:4"), "a web that does not exist is not a binding");
   assert.ok(idx.of(SETUP).includes(1), "of() still lists registers");
 });

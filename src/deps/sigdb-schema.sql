@@ -51,6 +51,7 @@ CREATE TABLE fingerprints (
   source_file TEXT, source_sha256 TEXT,
   hash_scheme INTEGER,   -- SigDbFile.hashScheme (NULL = scheme 1)
   module_paths INTEGER,  -- SigDbFile.modulePaths (NULL = no module paths)
+  subtracted_dependencies TEXT, -- rev 3: JSON array, SigDbFile.subtractedDependencies (NULL = absent, '[]' = empty)
   imported_at TEXT NOT NULL,
   UNIQUE (pv_id, hbc_version, variant, is_baseline_file)
 );
@@ -83,6 +84,7 @@ CREATE TABLE fingerprint_functions (
   fn_index INTEGER NOT NULL,
   shape_id INTEGER NOT NULL REFERENCES function_shapes(shape_id),
   module_id INTEGER,     -- SigFunction.moduleId (module paths v1)
+  owner_json TEXT,       -- rev 3: JSON of SigFunction.owner (NULL = absent, 'null' = explicit null)
   PRIMARY KEY (fp_id, fn_index)
 ) WITHOUT ROWID;
 
@@ -98,6 +100,7 @@ CREATE TABLE modules (
   function_set_hash BLOB NOT NULL,
   factory_is_baseline INTEGER NOT NULL,
   path TEXT,             -- SigModule.path (module paths v1)
+  factory_is_dependency INTEGER, -- rev 3: SigModule.factoryIsDependency (NULL = absent)
   PRIMARY KEY (fp_id, module_ordinal)
 ) WITHOUT ROWID;
 

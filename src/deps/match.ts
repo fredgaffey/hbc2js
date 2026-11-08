@@ -7,7 +7,7 @@
 import type { LoadedSig } from "./db.ts";
 import type { ModuleInventory } from "./inventory.ts";
 import type { SigDbFile } from "./sigdb-types.ts";
-import { foreignSets } from "./module-paths.ts";
+import { foreignSets, isOwnModulePath, viaDependencyCounts } from "./module-paths.ts";
 
 export type ConfidenceTier = "high" | "medium" | "low" | "none";
 
@@ -35,6 +35,15 @@ export interface PackageScore {
    *  package's own files), `twin` (the same hits as another confirmed
    *  package, which was kept). `by` names the other package. */
   readonly demotion?: { readonly rule: "few-distinct" | "container" | "scattered" | "embedded" | "twin"; readonly by?: string };
+  /** Set when corpus-path-recall's module-graph rule (`promoteViaDependency`,
+   *  docs/PACKAGE-SIGNATURES.md §7 "Recovery through the module graph")
+   *  raised a path-bearing package to "high": an app module shaped like one
+   *  of its own files requires the module of `by`, its signature's own
+   *  dependency. `edge: "exact"`: the own code is all present by exact hash
+   *  and the required module is the dependency's exact module; `"fuzzy"`:
+   *  the own file matches by mnemonic shape and `by` is a confirmed package
+   *  whose evidence sits in the required module. */
+  readonly viaDependency?: { readonly by: string; readonly edge: "exact" | "fuzzy" };
 }
 
 export interface ModuleAttribution {
@@ -425,6 +434,10 @@ interface ScoredEntry {
 //    the path-bearing one (its hits are its own files), else a declared
 //    dependency of another high package, else the one with more distinct
 //    hits, else the first by name.
+//    One-sided too: a package whose hits that share covers, inside a
+//    path-bearing package with more hits that outranks it (fork
+//    source-map-js: 40 hits, all among source-map's 46, too few of them
+//    for mutual cover and under the embedded ratio).
 function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInventory, legacyExact: readonly string[]): readonly ScoredEntry[] {
   const high = (): ScoredEntry[] => scored.filter((s) => s.score.tier === "high" && !s.score.isBaseline && s.hitKeys.size > 0);
   const demote = (s: ScoredEntry, rule: NonNullable<PackageScore["demotion"]>["rule"], by?: string): void => {
@@ -520,8 +533,14 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
     for (const q of twins) {
       if (q === s || q.score.tier !== "high" || q.score.package === s.score.package || (!pathBearing(s) && !pathBearing(q))) continue;
       const n = shared(s.hitKeys, q.hitKeys);
-      if (n < EXPLAINED_EVIDENCE_SHARE * s.hitKeys.size || n < EXPLAINED_EVIDENCE_SHARE * q.hitKeys.size) continue;
-      if (better(s, q)) demote(q, "twin", s.score.package);
+      const sCovered = n >= EXPLAINED_EVIDENCE_SHARE * s.hitKeys.size;
+      const qCovered = n >= EXPLAINED_EVIDENCE_SHARE * q.hitKeys.size;
+      // One-sided (corpus-twin-sourcemap): a fork whose hits all sit inside
+      // a path-bearing original's larger set (source-map-js in source-map).
+      const sInQ = sCovered && !qCovered && q.hitKeys.size > s.hitKeys.size && pathBearing(q) && better(q, s);
+      const qInS = qCovered && !sCovered && s.hitKeys.size > q.hitKeys.size && pathBearing(s) && better(s, q);
+      if (!(sCovered && qCovered) && !sInQ && !qInS) continue;
+      if (sCovered && qCovered ? better(s, q) : qInS) demote(q, "twin", s.score.package);
       else {
         demote(s, "twin", q.score.package);
         break;
@@ -529,6 +548,140 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
     }
   }
   return scored;
+}
+
+/** Package directory of a node_modules-relative path (`@s/p/x.js` -> `@s/p`,
+ *  `p/node_modules/q/i.js` -> `q`). */
+function packageOfPath(path: string): string {
+  const tail = path.slice(path.lastIndexOf("node_modules/") >= 0 ? path.lastIndexOf("node_modules/") + "node_modules/".length : 0);
+  const parts = tail.split("/");
+  return parts[0]!.startsWith("@") ? `${parts[0]}/${parts[1]}` : parts[0]!;
+}
+
+// corpus-path-recall (docs/PACKAGE-SIGNATURES.md §7 "Recovery through the
+// module graph"): a path-bearing package is scored on its own files only, so
+// a true package whose own file is small (hoist-non-react-statics: three
+// functions) or built differently from the signature (abort-controller: the
+// app resolves dist/*.mjs, the signature dist/*.js) is lost even though the
+// code it requires is in the app. Its signature's module graph says which
+// dependency module each own file requires; the app's module graph says the
+// same of each app module. A package that is not "high" and was not demoted
+// becomes "high" when, for one own file S (path under the package, with a
+// dependency edge to another package D's module S_D), an app module T
+//  - exact: has S's exact factory hash, every distinct eligible own hash of
+//    the package is a hit (hitKeys covers distinctEligible, at least
+//    MIN_DISTINCT_EVIDENCE_HASHES - 1 of them), and T requires an app module
+//    whose factory exact hash is S_D's; or
+//  - fuzzy: D is a "high" package (before this rule: no chaining), T's
+//    eligible functions match at least MIN_DISTINCT_EVIDENCE_HASHES distinct
+//    fuzzy hashes of S's own eligible functions, which are half of S's and
+//    half of T's, and T requires an app module holding at least
+//    MIN_DISTINCT_EVIDENCE_HASHES of D's hit hashes (where D's confirmed code
+//    is).
+// An impostor matched only through its copy of D (safe-buffer through
+// buffer) has no app module shaped like its own file, so it never qualifies:
+// the edge only credits a module the app holds, never the copy.
+function promoteViaDependency(scored: readonly ScoredEntry[], inventory: ModuleInventory, minInstr: number, targetCopies: ReadonlyMap<string, number>): void {
+  const highByName = new Map<string, ScoredEntry[]>();
+  for (const s of scored) {
+    if (s.score.tier !== "high" || s.score.isBaseline) continue;
+    const list = highByName.get(s.score.package) ?? [];
+    list.push(s);
+    highByName.set(s.score.package, list);
+  }
+  const tById = new Map<number, ModuleInventory["modules"][number]>();
+  const tByFactory = new Map<string, ModuleInventory["modules"][number][]>();
+  for (const m of inventory.modules) {
+    if (m.localModuleId !== null) tById.set(m.localModuleId, m);
+    if (m.exactHash === null) continue;
+    const list = tByFactory.get(m.exactHash) ?? [];
+    list.push(m);
+    tByFactory.set(m.exactHash, list);
+  }
+  const fuzzyIndex = new Map<string, Set<ModuleInventory["modules"][number]>>();
+  const eligibleFuzzy = (m: ModuleInventory["modules"][number]): Set<string> => {
+    const out = new Set<string>();
+    for (const i of m.functionIndices ?? []) {
+      const f = inventory.functions[i];
+      if (f !== undefined && f.instrCount >= minInstr) out.add(f.fuzzyHash);
+    }
+    return out;
+  };
+  const tFuzzy = new Map<ModuleInventory["modules"][number], Set<string>>();
+  for (const m of inventory.modules) {
+    const set = eligibleFuzzy(m);
+    tFuzzy.set(m, set);
+    for (const h of set) {
+      let s = fuzzyIndex.get(h);
+      if (s === undefined) fuzzyIndex.set(h, (s = new Set()));
+      s.add(m);
+    }
+  }
+  const depsOf = (m: ModuleInventory["modules"][number]): ModuleInventory["modules"][number][] =>
+    (m.depIds ?? []).map((d) => tById.get(d)).filter((x): x is ModuleInventory["modules"][number] => x !== undefined);
+  const holdsHits = (m: ModuleInventory["modules"][number], hits: readonly ScoredEntry[]): boolean =>
+    hits.some((d) => {
+      let n = 0;
+      const seen = new Set<string>();
+      for (const i of m.functionIndices ?? []) {
+        const h = inventory.functions[i]?.exactHash;
+        if (h !== undefined && d.hitKeys.has(h) && !seen.has(h)) {
+          seen.add(h);
+          n++;
+        }
+      }
+      return n >= MIN_DISTINCT_EVIDENCE_HASHES;
+    });
+  for (const s of scored) {
+    const file = s.entry.file;
+    if (s.score.tier === "high" || s.score.demotion !== undefined || s.score.isBaseline || (file.modulePaths ?? 0) < 1 || (file.hashScheme ?? 1) < 2) continue;
+    // Counts over the full file (a slimmed file carries them precomputed:
+    // slimming drops the functions that are not in the app).
+    const graph = viaDependencyCounts(file, minInstr);
+    const ownPathDistinct = file.slim?.ownPathDistinct ?? graph.ownPathDistinct;
+    const ownFuzzyCount = (id: number): number => file.slim?.ownFuzzy?.[id] ?? graph.ownFuzzy[id] ?? 0;
+    // exact form: every distinct eligible hash of the own path-bearing
+    // functions is a hit (the pathless prelude and entry stub say nothing).
+    const ownPathIds = new Set(file.modules.filter((m) => typeof m.path === "string" && isOwnModulePath(file.package, m.path)).map((m) => m.localModuleId));
+    const ownHit = new Set(file.functions.filter((f) => f.instrCount >= minInstr && f.moduleId !== undefined && ownPathIds.has(f.moduleId) && s.hitKeys.has(schemeKey(file, f.exactHash))).map((f) => f.exactHash));
+    const complete = ownPathDistinct >= MIN_DISTINCT_EVIDENCE_HASHES - 1 && ownHit.size >= ownPathDistinct;
+    let found: PackageScore["viaDependency"];
+    for (const own of graph.wrappers) {
+      if (found !== undefined) break;
+      const depMods = graph.depsOf(own);
+      if (complete && own.factoryExactHash !== null) {
+        for (const t of tByFactory.get(own.factoryExactHash) ?? []) {
+          const tDeps = depsOf(t);
+          const d = depMods.find((sd) => sd.factoryExactHash !== null && (targetCopies.get(sd.factoryExactHash) ?? 0) < TARGET_GENERIC_COPIES && tDeps.some((td) => td.exactHash === sd.factoryExactHash));
+          if (d !== undefined) {
+            found = { by: packageOfPath(d.path!), edge: "exact" };
+            break;
+          }
+        }
+        if (found !== undefined) break;
+      }
+      // fuzzy form: an app module shaped like this own file requires a
+      // confirmed dependency's code.
+      const total = ownFuzzyCount(own.localModuleId!);
+      if (total < MIN_DISTINCT_EVIDENCE_HASHES) continue;
+      const confirmedDeps = depMods.map((d) => packageOfPath(d.path!)).filter((p) => p !== file.package && highByName.has(p));
+      if (confirmedDeps.length === 0) continue;
+      const ownFuzzy = new Set<string>();
+      for (const f of file.functions) if (f.moduleId === own.localModuleId && f.instrCount >= minInstr) ownFuzzy.add(f.fuzzyHash);
+      const counts = new Map<ModuleInventory["modules"][number], number>();
+      for (const h of ownFuzzy) for (const t of fuzzyIndex.get(h) ?? []) counts.set(t, (counts.get(t) ?? 0) + 1);
+      for (const [t, n] of counts) {
+        if (n < MIN_DISTINCT_EVIDENCE_HASHES || n < 0.5 * total || n < 0.5 * (tFuzzy.get(t)?.size ?? 0)) continue;
+        const tDeps = depsOf(t);
+        const by = confirmedDeps.find((p) => tDeps.some((td) => holdsHits(td, highByName.get(p)!)));
+        if (by !== undefined) {
+          found = { by, edge: "fuzzy" };
+          break;
+        }
+      }
+    }
+    if (found !== undefined) s.score = { ...s.score, tier: "high", viaDependency: found };
+  }
 }
 
 export interface MatchOptions {
@@ -637,7 +790,9 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
     if (scored === null) continue;
     scoredEntries.push({ entry, ...scored });
   }
-  for (const s of demoteExplained(scoredEntries, inventory, legacyExact)) {
+  const afterDemotion = demoteExplained(scoredEntries, inventory, legacyExact);
+  promoteViaDependency(afterDemotion, inventory, minInstr, targetCopies);
+  for (const s of afterDemotion) {
     packages.push(s.score);
     scoreByOwner.set(`${s.entry.file.package}@${s.entry.file.version}`, s.score);
   }

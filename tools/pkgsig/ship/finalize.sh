@@ -38,12 +38,9 @@ echo "staged $(ls "$DB" | grep -c '\.json$') files ($np pathless originals linke
 SRCARG=(); [ "$SAMPLE" = 0 ] && SRCARG=(--src "$SRC")
 node "$R/tools/pkgsig/ship/validate-path-db.mjs" "$DB" "${SRCARG[@]}" > "$STAGE/validate.json" || { echo "VALIDATION FAILED, see $STAGE/validate.json" >&2; head -c 2000 "$STAGE/validate.json" >&2; exit 1; }
 grep -E '"(files|withPaths|modulePathCoveragePct|functionModuleIdCoveragePct|filesWithPathsPct)"' "$STAGE/validate.json"
-# sqlite import + verify. KNOWN GAP (2026-11-09): the sqlite layer does not
-# store module.factoryIsDependency / nestedFunctionIndices / subtractedDependencies /
-# bulkBuildFixVersion, so --verify reports round-trip mismatches on db-v3-style
-# JSON and match.ts (which reads the first two) would score a sqlite copy
-# differently. The sqlite asset is therefore built and reported but only
-# attached to the release command when verify passes (SQLITE_RELEASE=1 forces it).
+# sqlite import + verify (schema rev 3 stores every SigDbFile field, so --verify
+# passes on real files). The sqlite asset is attached to the owner command
+# by default whenever verify passes (SQLITE_RELEASE=1 forces it regardless).
 SQLITE_OK=0
 if node --experimental-strip-types "$R/tools/pkgsig/sigdb/import-json.mjs" "$DB" "$STAGE/sigdb.sqlite" --verify > "$STAGE/import.log" 2>&1; then SQLITE_OK=1; fi
 grep -E '"ok"|enumerated|roundtripMismatches' "$STAGE/import.log" || true

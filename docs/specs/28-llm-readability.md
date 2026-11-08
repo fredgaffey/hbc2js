@@ -420,7 +420,7 @@ explicit overrides, then environment, then defaults.
 
 | field | default | env override | meaning |
 | --- | --- | --- | --- |
-| `model` | `claude-haiku-4-5-20251001` | `HBC2JS_LLM_MODEL` | model id; any Anthropic model id is legal, so a caller can point the same backend at a stronger model per job (section 1e) |
+| `model` | `claude-sonnet-5-5` (Sonnet since 2026-11-09, `DEFAULT_SONNET_MODEL`) | `HBC2JS_LLM_MODEL` | model id; any Anthropic model id is legal, so a caller can point the same backend at a stronger model per job (section 1e) |
 | `budgetTokens` | 2000000 | `HBC2JS_LLM_BUDGET_TOKENS` | hard stop for one run, in TOKENS (the project's tokens-not-dollars convention). Reaching it stops the run cleanly between targets, never mid-write |
 | `cacheDir` | `<projectDir>/cache/llm-readability` | `HBC2JS_LLM_CACHE_DIR` | content-hash cache root. Derived data: gitignored, rebuildable, spec 18 section 4 |
 | `skillsDir` | `skills` | - | where skill files are loaded from |
@@ -512,7 +512,7 @@ the **opt-in** API backend, selected with `--backend haiku` or
 **Config**: `ClaudeCliBackendConfig` (`src/readability/types.ts`), resolved by
 `resolveClaudeCliConfig(env, overrides, projectDir)` with the same precedence
 and the same shared fields as `HaikuBackendConfig` (`model` -- default the
-alias `"haiku"`, not a full model id, since `claude --model` accepts aliases;
+alias `"sonnet"` (`DEFAULT_MODEL_ALIAS`, was `"haiku"` until 2026-11-09; `--model haiku` / `HBC2JS_LLM_MODEL=haiku` still select it), not a full model id, since `claude --model` accepts aliases;
 `budgetTokens`, `cacheDir`, `skillsDir`, `maxOutputTokens` -- kept for
 config-surface parity, not passed as an argument because the `claude` CLI has
 no per-call output-token flag), plus `claudeBin` (default `"claude"`, env

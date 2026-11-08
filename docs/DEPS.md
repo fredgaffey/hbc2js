@@ -1951,7 +1951,7 @@ confirmed package matches the same hashes:
 | copy inlined in a much larger module of another package's pre-built dist file | Expensify 2 | `process`, `stackframe` (all hits in `react-devtools-core/dist/backend.js`, 886 functions; the packages have about 70) | fixed (`container`) |
 | copy inside another confirmed package's own, path-bearing file | Expensify 2 | `oboe` (21 of 21 hashes in `react-native-blob-util`), `jszip` (27 of 28 in `localforage`) | fixed on path-bearing hosts (`embedded`); still FPs on pathless DBs (rainbow, metamask) |
 | one source under two names, both loaded | Expensify 1 | `punycode.js` = `punycode` | fixed when one is path-bearing (`twin`) |
-| fork whose original is not a candidate | Expensify 2, metamask 2 | `source-map-js` (`source-map`), `whatwg-url` (`whatwg-url-without-unicode`) | open: the originals (`source-map`@0.6.1, `whatwg-url-without-unicode`@8.0.0-3) are in none of `db-v3-clean`, `db-v4-paths-partial`, `db-v4-paths`, so no index derived from the DB can name them; once fingerprinted, `twin` applies (both path-bearing) |
+| fork whose original is not a candidate | Expensify 2, metamask 2 | `source-map-js` (`source-map`), `whatwg-url` (`whatwg-url-without-unicode`) | open: the originals (`source-map`@0.6.1, `whatwg-url-without-unicode`@8.0.0-3) are in none of `db-v3-clean`, `db-v4-paths-partial`, `db-v4-paths`, so no index derived from the DB can name them; with the exact-version overlay `source-map-js` is demoted by the one-sided `twin` (corpus-twin-sourcemap) and `whatwg-url` by `embedded` on db-v4-paths-partial |
 | part generic, part another package's single file | Expensify 1 | `lodash-es` (41 of 93 hashes in `lodash/lodash.js`, the rest generic factories) | open: the 41 no longer anchor (`scattered`), but tiny-module shapes the package repeats over its 450 files still match whole 2-function app modules |
 | small helper functions spread over many app modules | Expensify 4 | `ai`, `ky`, `culori`, `swiper` (3-8 distinct hashes) | fixed (`scattered`) |
 | pathless signature holding its dependencies' code (the es-shim chain, `victory*`, `wagmi`, `typeorm`...) | rainbow ~20, metamask ~30 | `reflect.getprototypeof`, `is-regex`, `globalthis`, `define-properties` | open: needs path-bearing signatures (the full `db-v4-paths`) |
@@ -1980,6 +1980,12 @@ Four rules (five with `scattered`, below) now lower a would-be "high" package to
   at least one of them path-bearing. The path-bearing one is kept, else a
   declared dependency (`subtractedDependencies`) of another high package,
   else the one with more distinct hits, else the first by name.
+  One-sided twins too (corpus-twin-sourcemap): a package whose hits are
+  90% inside a path-bearing package with more hits is demoted when that
+  package outranks it by the same order. A fork that changed some functions
+  hits a strict subset of the original: `source-map-js` 40 hashes, all
+  among `source-map`@0.6.1's 46, so 87% of the original's set (no mutual
+  cover) and under the 2x `embedded` ratio.
 
 Rejected: the twin rule on two pathless files. It removed 14 Expensify
 FPs on `db-v3-clean` and 4-5 on rainbow and metamask, but cost 6 TPs: on a
@@ -2048,6 +2054,56 @@ offline, before = corpus-precision-forks):
 Recall is unchanged everywhere. Still open on Expensify's partial DB:
 `source-map-js`, `whatwg-url` (originals not in any DB, see the table
 above) and `lodash-es`. Test: `tests/gate/deps/corpus-precision-residual.test.ts`.
+
+**Path recall (corpus-path-recall, 2026-11-09).** Layering the
+path-bearing `db-v4-paths` over `db-v3-clean` lost true packages that were
+confirmed, on the pathless DB, by their dependencies' code inside their
+signature. Traced on deb (`trace-recall.mjs`, `cmp.mjs`):
+
+| lost TP (app) | own file in the app | where the v3 evidence was | recovered by |
+|---|---|---|---|
+| `abort-controller` (nav, bsky, Expensify) | `dist/abort-controller.mjs`; the signature built `dist/abort-controller.js`: 0-5 of 6 own functions exact, 3 by mnemonic shape, factory differs | `event-target-shim` (33 hits on nav), confirmed | fuzzy edge to `event-target-shim` |
+| `define-properties` (Expensify) | `index.js`, all 3 own functions exact (under the tiny bar of 5) | `es-define-property`, `define-data-property`, `gopd` copies | exact edge (`has-property-descriptors`) |
+| `hoist-non-react-statics` (all three) | 3 own functions; exact on bsky/Expensify, other build on nav | its nested `react-is` copy (15 hits) | not recovered: the app's `react-is` is a hoisted module of another version, so the edge is not the signature's |
+| `es-define-property`, `hasown` (Expensify) | one own function each | `get-intrinsic` / `function-bind` copies | not recovered: one hash plus one edge judged too little |
+| `@react-navigation/native` (nav, bsky) | 2-6 of 48 own modules exact (nav: a workspace build of the example) | `@react-navigation/core` / `routers` copies (157 hits on nav) | fuzzy edge to `react-native` |
+
+The rule (`promoteViaDependency`, docs/PACKAGE-SIGNATURES.md §7 "Recovery
+through the module graph") confirms a path-bearing package that is not
+high and was not demoted when an app module shaped like one of its own
+files requires that file's dependency: exact form (all own code present
+by exact hash, the required module has the dependency's exact factory) or
+fuzzy form (3+ distinct mnemonic shapes, half of the own file and half of
+the app module, and the required module holds 3+ hit hashes of a
+confirmed dependency). Slimmed records now keep module `depIds`, the own
+files that require another package (with their dependencies' module
+records) and the two counts the rule reads (`slim.ownPathDistinct`,
+`slim.ownFuzzy`), so the real pipeline judges as the full files do
+(the tests match both). Most promotions on react-navigation-example and
+bluesky name `react-native` as the dependency (`react-native-screens`,
+`-gesture-handler`, `-safe-area-context`, `-worklets`,
+`-is-edge-to-edge`, `@react-navigation/native`): `react-native` is required
+by nearly every module, so for these the edge adds little and the
+evidence is the mnemonic shape of a whole own file. All were true; a hub
+dependency is the first place to look if this rule adds a false positive.
+Measured on deb (`meas.sh`, offline, v4 = `db-v4-paths` over
+`db-v3-clean` as the user layer; before = corpus-precision-residual):
+
+| holdout | db-v3-clean: confirmed / TP / FP, recall | v4 before | v4 after | TPs recovered | FPs added |
+|---|---|---|---|---|---|
+| Expensify J3 | 128 / 89 / 39, 30.9% | 95 / 88 / 7, 92.6%, 30.6% | 98 / 91 / 7, 92.9%, 31.6% | `abort-controller`, `define-properties`, `htmlparser2` | 0 |
+| react-navigation-example | 14 / 14 / 0, 18.4% | 11 / 11 / 0, 100%, 14.5% | 18 / 18 / 0, 100%, 23.7% | `abort-controller`, `@react-navigation/native`, `react-native-gesture-handler`, `-safe-area-context`, `-screens`, `-worklets`, `-is-edge-to-edge` | 0 |
+| bluesky own build | 42 / 34 / 8, 17.2% | 33 / 32 / 1, 97.0%, 16.2% | 42 / 41 / 1, 97.6%, 20.7% | `abort-controller`, `@react-navigation/core`, `@react-navigation/native`, `react-native-date-picker`, `-is-edge-to-edge`, `-pager-view`, `-safe-area-context`, `-screens`, `-webview` | 0 |
+| rainbow own build | 104 / 82 / 22, 15.8% | same as v3 | unchanged | none | 0 |
+| metamask own build | 169 / 132 / 37, 17.6% | same as v3 | unchanged | none | 0 |
+
+`db-v3-clean` alone is pathless, so the rule never fires there (numbers
+unchanged by construction). v4 recall now exceeds v3 recall on all three
+apps it covers, with v4's precision. Still lost against `db-v3-clean`:
+`hoist-non-react-statics` (all three), `es-define-property` and `hasown`
+(Expensify), for the reasons in the table above.
+
+Test: `tests/gate/deps/corpus-path-recall.test.ts`.
 
 **Shipping.** Per D17c, the DB itself is never committed — the v2 build
 lives on a build host in `db-v2` (dependency-subtracted,
@@ -2266,8 +2322,21 @@ originals become true positives on both DBs. With the overlay,
 `source-map-js`, `lodash-es`, `ky`, `ai`, `culori`, `swiper`) but stays on
 db-v3-clean, whose `whatwg-url` file is pathless. `source-map-js` stays a
 false positive on both, although its db-v4-paths-partial file
-(`1.2.1`, hbc98) has paths. Its matched functions were not traced, so it is
-unknown why the twin rule does not demote it.
+(`1.2.1`, hbc98) has paths. Traced (corpus-twin-sourcemap): every
+`source-map-js` version has 38-40 hits, all of them among `source-map`'s
+46, in six `source-map/lib/*` target modules. That is 100% of the fork's
+set but 87% of the original's, so the mutual 90% twin test failed, and
+46 < 2 x 40 kept `embedded` off. The one-sided twin rule above demotes it.
+
+| holdout (DB) | before: confirmed / TP / FP, precision | after | removed |
+|---|---|---|---|
+| Expensify, db-v4-paths-partial + overlay | 166 / 164 / 2, 98.8% | 165 / 164 / 1, 99.4% | `source-map-js` |
+| Expensify, db-v3-clean + overlay | 204 / 167 / 37, 81.9% | 201 / 167 / 34, 83.1% | `source-map-js`, `punycode.js`, `cssstyle` |
+
+The other 18 runs (react-navigation, bluesky, rainbow, metamask on all four
+DB setups; Expensify without the overlay) are unchanged; 0 TP lost and
+react-navigation stays at 0 FP. On metamask `source-map-js` stays a false
+positive: the overlay holds no `source-map` for it, so no original competes.
 
 **Version tolerance is not the lever.** Matching is already by package name
 across every loaded version, so other-version signatures were already
