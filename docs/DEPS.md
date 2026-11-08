@@ -1743,12 +1743,29 @@ wiring `confirm.ts`'s informed-confirm path to `build-one.mjs`'s
 install-and-bundle approach instead of `npm pack`** — not attempted here,
 follow-up.
 
-**Expensify: not measured, and cannot be — recorded plainly, not invented.**
-J3 (the Expensify/App truth fixture) was deferred and is not done: no
-`.hbc`, no `deps-truth.json` exist for it in this repo (the bundling attempt itself never
-completed; it hit a `react-native-worklets`/watchman race three times). There
-is no committed open-source Expensify fixture to score against; nothing in
-this task invents one.
+**Expensify (J3): measured 2026-11-08.** The bundling attempt that previously
+failed (react-native-worklets/watchman race) was made to work by retrying
+`react-native bundle` until it succeeds (each run leaves more `.worklets/`
+files); recipe, pinned commit `12a92bd3...` and hashes in
+`tests/fixtures/bundles/expensify-app-0.86.0/BUILD.md`, truth in that
+directory's `deps-truth.json` (288 packages, 91 direct, from the source map
+via `tools/deps-truth.mjs`). Blind offline `runDeps` + `scoreAgainstTruth`
+against db-v3 on our own hermesc-98 build of that bundle (sha pin matched),
+same columns as the held-out table above:
+
+| bundle | confirmed | falsePositives | recall all / direct | ceiling | bar losses | no signature | in DB, never a candidate |
+|---|---|---|---|---|---|---|---|
+| expensify-app.hbc (own build) | 155 (83 TP) | 72 | 28.8% / 27.5% | 97/288 | 27 | 154 | 37 |
+
+Confirmed-tier precision is 53.5% here (react-navigation: 15/15), so a
+threshold change that looks safe on react-navigation must also be checked
+against these 72 false positives (e.g. `safe-buffer`, `process`, `uuid`,
+`readable-stream`, `d3-*`, `victory-*`, `core-js`, `util`, `url`, `assert`;
+many are version-less polyfill/utility names or packages whose code is
+shared with a differently-named truth package). Version mismatches: 251
+(confirmed lists many versions of one package). Guessed tier: 9 reported,
+3 correct. The bundle is not byte-reproducible (95-byte delta between
+builds), so truth is pinned to one `.hbc` sha.
 
 **Shipping.** Per D17c, the DB itself is never committed — the v2 build
 lives on a build host in `db-v2` (dependency-subtracted,
