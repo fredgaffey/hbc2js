@@ -1,76 +1,13 @@
-// Known, understood parser limitations shared across test files (each documents its
-// own reasoning at the call site; this just avoids duplicating the fixture list).
+// Known, understood parser limitations shared across test files.
 //
-// M1 review Finding 1 fix: full-file structural verification
-// (src/parse/layout.ts's decodeAndVerifyFunction) can PROVE that hbc98-late and
-// hbc99-mar2026 genuinely disagree on these construct fixtures' meaning for at least
-// one function -- hbc99-mar2026's misreading happens to realign and pass every
-// bounds/id/jump-boundary check anyway. Per the review's own algorithm this is
-// correctly E_LAYOUT_AMBIGUOUS on auto-probe (D8: refuse rather than silently guess).
-// External evidence (this project's 223-function cross-validation against its own
-// verified hbc99-mar2026 decoder, plus a hermes-disassembler cross-check) says
-// hbc98-late is right for all of these; `--opcode-table=hbc98-late` resolves every
-// one. See the status notes's "Review responses" section for the full derivation.
-export const KNOWN_AMBIGUOUS_V98: readonly string[] = [
-  "20-let-const-tdz",
-  "22-nested-closures-counters",
-  "33-class-inheritance-super",
-  "34-class-static-members",
-  "40-spread-array",
-  "41-spread-object",
-  "43-template-literals",
-  "47-typeof-instanceof-in",
-  // Added 2026-09-05 with the fixture itself (the v99 setFunctionName fix): its
-  // v98 build is ambiguous for exactly the reason above, and
-  // `--opcode-table=hbc98-late` resolves it the same way. Nothing about the
-  // fixture's own construct is special here.
-  "64-computed-method-names",
-  // Added 2026-09-21 with the fixture itself (the finally-dedup R-FD2b fix).
-  // Its v98 build hits the same src/parse/** opcode-table ambiguity as every
-  // entry above and `--opcode-table=hbc98-late` resolves it identically; the
-  // fixture's own construct (try/finally with trailing code) has nothing to do
-  // with it. Its syntax, trace and fuzz oracles all PASS at v98 -- only the
-  // roundtrip oracle, which re-parses, hits the ambiguity.
-  "83-try-finally-trailing-code",
-  // Added 2026-11-09 with the fixture itself (the CreateDerivedClass
-  // aliased-superclass-register fix). Its v98 build hits the same
-  // hbc98-late/hbc99-mar2026 function-id disagreement as
-  // 33-class-inheritance-super, and `--opcode-table=hbc98-late` resolves it the
-  // same way. The fixture's own construct has nothing to do with it.
-  "89-derived-class-super-register-alias",
-  // Added 2026-09-05 with the fixture itself (F24-3 regression, two aliased
-  // class-creation opcodes): same v98 hbc98-late/hbc99-mar2026 function-id
-  // disagreement as 34-class-static-members above, resolved the same way by
-  // `--opcode-table=hbc98-late`.
-  "67-class-static-and-new",
-  // Added 2026-09-05 with the fixture itself (the env-slot-order fix): its v98
-  // build hits exactly the ambiguity above -- hbc98-late and hbc99-mar2026 both
-  // verify structurally but disagree on function id 0 -- and
-  // `--opcode-table=hbc98-late` resolves it the same way. Nothing about
-  // `arr[i++]` over a captured environment is special here.
-  "71-env-slot-captured-index",
-  // Added 2026-09-05 with the fixture itself (the sibling-environment repro):
-  // its v98 build hits exactly the ambiguity above -- hbc98-late and
-  // hbc99-mar2026 both verify structurally but disagree on function ids 0 and
-  // 1 -- and `--opcode-table=hbc98-late` resolves it the same way. Nothing
-  // about the inlined IIFEs is special here; the v99 build of the same source
-  // probes cleanly, and the fixture's own test
-  // (tests/gate/emit/sibling-env-slots.test.ts) forces the table.
-  "75-sibling-envs",
-  // Added 2026-09-05 with the fixture itself (spec 28 section 9.7, the
-  // super-call field-install fold): its v98 build hits exactly the ambiguity
-  // above -- hbc98-late and hbc99-mar2026 both verify structurally but
-  // disagree on function ids 1 and 4 -- and `--opcode-table=hbc98-late`
-  // resolves it the same way. Nothing about the class fields or the
-  // forwarding constructor is special here; the fixture's own tests
-  // (tests/gate/passes/super-call.test.ts) already pass `resolveV98Ambiguity:
-  // true`.
-  "80-super-forward-field-installs",
-  // Added 2026-11-09 with the fixture itself (spec 24 section 9, inline-new):
-  // its v98 build hits exactly the ambiguity above (hbc98-late and
-  // hbc99-mar2026 disagree on function ids 0-2); 91-93 probe cleanly.
-  "90-inlined-new",
-];
+// KNOWN_AMBIGUOUS_V98 used to list the v98 construct fixtures on which the
+// layout probe threw E_LAYOUT_AMBIGUOUS (hbc98-late and hbc99-mar2026 both
+// verify structurally and disagree). Since v98-layout-default (DECISIONS D8a)
+// an undecidable v98 table defaults to hbc98-late with W_LAYOUT_ASSUMED, so the
+// list is empty. The mechanism stays so a future genuinely-undecidable fixture
+// can be recorded; tests/gate/parse/v98-layout-default.test.ts covers the
+// default and the `strictLayout` refusal.
+export const KNOWN_AMBIGUOUS_V98: readonly string[] = [];
 
 export function isKnownAmbiguousV98(group: string, name: string, version: number): boolean {
   return group === "constructs" && version === 98 && KNOWN_AMBIGUOUS_V98.includes(name);

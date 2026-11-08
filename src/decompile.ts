@@ -50,6 +50,8 @@ export interface DecompileOptions {
    * external evidence for the eight v98 construct fixtures it applies to.
    */
   readonly resolveV98Ambiguity?: boolean;
+  /** Refuse ambiguous v98 opcode tables (E_LAYOUT_AMBIGUOUS) instead of assuming hbc98-late (D8a). */
+  readonly strictLayout?: boolean;
   readonly analysis?: AnalysisOptions;
   readonly emit?: EmitOptions;
   readonly strictEnv?: boolean;
@@ -97,7 +99,7 @@ export interface DecompileResult {
 export function parseForDecompile(bytes: Uint8Array, opts: DecompileOptions = {}): { readonly module: HbcModule; readonly forced: boolean } {
   if (opts.opcodeTable !== undefined) return { module: parseHbc(bytes, { opcodeTable: opts.opcodeTable }), forced: true };
   try {
-    return { module: parseHbc(bytes), forced: false };
+    return { module: parseHbc(bytes, opts.strictLayout === true ? { strictLayout: true } : {}), forced: false };
   } catch (e) {
     if (opts.resolveV98Ambiguity === true && e instanceof Hbc2jsError && e.code === ErrorCode.E_LAYOUT_AMBIGUOUS) {
       return { module: parseHbc(bytes, { opcodeTable: "hbc98-late" }), forced: true };
@@ -153,6 +155,7 @@ export function decompile(bytes: Uint8Array, opts: DecompileOptions = {}): Decom
   // fresh at the end (below) means it is read only once the whole pipeline —
   // including emitModule's `.envGraph` access — has run.
   const preDiagnostics: Diagnostic[] = [];
+  for (const d of module.diagnostics) if (d.code === "W_LAYOUT_ASSUMED") preDiagnostics.push(d);
   if (forced) {
     preDiagnostics.push({
       severity: "warn",

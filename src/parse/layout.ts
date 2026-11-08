@@ -623,6 +623,18 @@ export function probeLayout(bytes: Uint8Array, options: ParseOptions, diagnostic
           });
           tableSurvivors = preferred !== undefined ? [preferred] : fullSurvivors;
           decidedBy.push("P3-tiebreak");
+        } else if (version === 98 && options.strictLayout !== true && fullSurvivors.includes("hbc98-late")) {
+          // v98-layout-default: the file declares version 98 and hbc98-late is the only
+          // table a public producer (hermes-compiler 250829098.x) emits for it; the
+          // other survivors are v99 tables. Assume it, loudly (see DECISIONS D8a).
+          diagnostics.push({
+            severity: "warn",
+            code: "W_LAYOUT_ASSUMED",
+            message: `opcode tables [${fullSurvivors.join(", ")}] all verify but disagree on function id(s) [${disagreeing.join(", ")}]; assuming hbc98-late (the only known public v98 producer). Pass --opcode-table=hbc98-late (or another id) to choose explicitly, or --strict-layout (strictLayout: true) to refuse instead`,
+            context: {},
+          });
+          tableSurvivors = ["hbc98-late"];
+          decidedBy.push("P3-assumed");
         } else {
           throw new Hbc2jsError(
             ErrorCode.E_LAYOUT_AMBIGUOUS,
@@ -641,7 +653,7 @@ export function probeLayout(bytes: Uint8Array, options: ParseOptions, diagnostic
       );
     }
     chosenOpcodeTable = tableSurvivors[0];
-    if (!decidedBy.includes("P3-tiebreak") && !decidedBy.includes("P3-full")) decidedBy.push("P3");
+    if (!decidedBy.includes("P3-tiebreak") && !decidedBy.includes("P3-assumed") && !decidedBy.includes("P3-full")) decidedBy.push("P3");
   }
 
   const chosenStr = chosenOpcodeTable !== undefined ? `${chosen.layoutClass}/${chosenOpcodeTable}` : `${chosen.layoutClass}/(no opcode table)`;
