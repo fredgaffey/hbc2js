@@ -1,0 +1,2618 @@
+{
+  "f99352bd2121249dbe4251f75ac131716e5a8d85096d5fb7d9a80dc5d1849843": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7667,
+      "tokensOut": 211,
+      "usd": 0.0016387
+    }
+  },
+  "bd5a4468a3c61069b10820a0989b4a279a9f86e36dbed57f701719fe08a961b9": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":10872,\"reg\":3},\"name\":\"instance\",\"confidence\":\"med\",\"evidence\":\"r3 is loaded from captured _e2388_0 and its members are used as an object receiver: r3._hideTimeout (read and written), r3._showUnderlay(), r3.props.delayPressOut, r3.props.onPress. This is consistent with a class component instance (`this`) whose props and private timer state are accessed in a press handler.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8189,
+      "tokensOut": 642,
+      "usd": 0.0014972800000000001
+    }
+  },
+  "430a1d5067342c27b29f6c4653c6894cbbb3d393a1f7727da6196e0f447bf218": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 13943,
+      "tokensOut": 645,
+      "usd": 0.0026495800000000003
+    }
+  },
+  "d93dcf029262602ca830710a49f6b5a662598d1bb569dc1bf9a54e00bb1a9d29": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 9883,
+      "tokensOut": 663,
+      "usd": 0.00184658
+    }
+  },
+  "b5bc50ec9076b71633816b7de09071352a0813ce3843feeae0ba30882cdef7bf": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 10722,
+      "tokensOut": 785,
+      "usd": 0.0020753800000000004
+    }
+  },
+  "6920154c42d6453371737aa5ecd38b6eaa274822c63d0584e08643970405ca6e": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 14146,
+      "tokensOut": 449,
+      "usd": 0.0025921800000000004
+    }
+  },
+  "2559679a1d3a832222c0447e231f5ce77664ef4b5525e011d1497f0622cd95fd": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7542,
+      "tokensOut": 351,
+      "usd": 0.0012223800000000001
+    }
+  },
+  "a567e0d8264cf701631cbf18ac09767ebb3af8e06b82ed873d2e7a224200ed59": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 7367, \"reg\": 9 },\n      \"name\": \"propsWithoutStyle\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from __hbc_b_copyDataProperties({}, props, Object.assign(Object.create(null), {style: 0})); copies props' own enumerable keys while excluding the literal key \\\"style\\\", and the register is later spread into the JSX props object alongside a separately computed style\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8035,
+      "tokensOut": 575,
+      "usd": 0.00143298
+    }
+  },
+  "12ad57e695ddd7d6af5156d973ee779d81fdaa34ab8446a570ab32e7a24a2a26": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":13153,\"reg\":5},\"name\":\"privateReceiver\",\"confidence\":\"med\",\"evidence\":\"loaded from captured _e3189_4 and used in Object.prototype.hasOwnProperty.call(r5, r3) with the \\\"Private element not found\\\" throw on failure, then passed as the thisArg of Reflect.apply(r3, r5, ...). It is the object whose private element is looked up and the receiver for the call.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7856,
+      "tokensOut": 875,
+      "usd": 0.0015471800000000002
+    }
+  },
+  "5c3ed064cfef8af333c2bed5f2f007ff05001f7d1e905b620f144dcaad582242": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8090,
+      "tokensOut": 296,
+      "usd": 0.00130448
+    }
+  },
+  "f65b3e29320c6f598a4bc47f8eb9e378bd977bf9ccce951e6bf020d17de91292": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7847,
+      "tokensOut": 863,
+      "usd": 0.00153938
+    }
+  },
+  "e2a4c3ab0a5fe847c5e8e61c3d0597d8fc59c617e22e646b85e9bf604eab8699": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 13391, \"reg\": 4 },\n      \"name\": \"objectNamespace\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r4 is assigned the global `Object` (`r4 = Object`); its only uses are `r4.defineProperty` (extracted as `defineProperty`) and as the this-argument to `Reflect.apply(defineProperty, r4, ...)`, so it serves as the Object namespace receiver for defineProperty\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7850,
+      "tokensOut": 1216,
+      "usd": 0.0017164800000000003
+    }
+  },
+  "3650cfee89ac3c852248866b440def3245afdc8e5b63cdacdadc830f3fade267": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7585,
+      "tokensOut": 370,
+      "usd": 0.00124048
+    }
+  },
+  "28ba43e514b417b3ad13e00ed486d68433769a11d70b215e116455f648e1a96b": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":15208,\"reg\":4},\"name\":\"callback\",\"confidence\":\"med\",\"evidence\":\"r4 is loaded from closure slot _e3863_6 and used only as the value of the `callback` key in the returned object literal `obj` (`obj.callback = r4`). The name follows that key, and the returned object's `initialValues`/`animations` shape suggests an animation spec.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8418,
+      "tokensOut": 689,
+      "usd": 0.0015665800000000001
+    }
+  },
+  "8fa28d927cfeb4121729aa9be20f0f7f254652e7511e60c8187f414a0006337e": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 23894,
+      "tokensOut": 667,
+      "usd": 0.00465078
+    }
+  },
+  "32b10503422239b45b6b2f29d881d4bae455ddc11a095db19e105312d46d1cae": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 15136, \"reg\": 14 },\n      \"name\": \"slideInFromLeft\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r14_2 = r17(obj7, 0, _e3789_6) with obj7 = {translateX: -a1.windowWidth}: the start offset is the negative window width (off-screen left), and the result feeds as the final keyframe of the shake sequence (r15 calls with 10, -10, 20, then r14_2). The identity of r17 is not visible, so the animation role is inferred from the offset shape.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8215,
+      "tokensOut": 1763,
+      "usd": 0.00206298
+    }
+  },
+  "81216126fcf5fb2e08f18f5c209fddbb314b81060af406e049c3ae5cc559051b": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7534,
+      "tokensOut": 197,
+      "usd": 0.00114378
+    }
+  },
+  "bcd2f2ae2565c9d049eee71f7d4a795ea48912783476ce280db42cb4e6d23b33": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 4570, \"reg\": 4 },\n      \"name\": \"listener\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r4 = a1 is the addListener argument; it is pushed onto the _e399_2 list (arr.push(r4)), and the remove closure filters that list by identity against _e2333_0 (a copy of r4), so the value is the registered callback being added and later removed\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7946,
+      "tokensOut": 645,
+      "usd": 0.0014501800000000001
+    }
+  },
+  "c9d5ff2feb50ed3a2a0e30641988a90d8727284b9bd0869b808f7342108de215": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 9261,
+      "tokensOut": 431,
+      "usd": 0.0016061800000000002
+    }
+  },
+  "d92d847179352cb1d3893d0fcf8aad2b326ec8e4d4b230c9824fa3c90bde5120": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":9039,\"reg\":7},\"name\":\"reactNative\",\"confidence\":\"med\",\"evidence\":\"r7 = _e1841_3 is read only for .View (used as the component type in jsxs(View, ...) and jsx(View2, ...)); sibling module r11 supplies .Text and r12 supplies .jsx/.jsxs, so this is the React Native primitives module, not the jsx runtime\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8439,
+      "tokensOut": 677,
+      "usd": 0.00156478
+    }
+  },
+  "80d59a0fcfcdaf3edd3614b0a3b7268debf4314da02871b2daf5c78441fbd30e": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":9068,\"reg\":12},\"name\":\"iconSpec\",\"confidence\":\"med\",\"evidence\":\"assigned from a1.icon (r12 = r10.icon) in the \\\"submenu\\\" branch, then read for .type compared to the literal \\\"image\\\", and for .tinted and .source; the result feeds r2.icon as either {type:\\\"imageSource\\\"} or {type:\\\"templateSource\\\"}, so it is the caller-supplied icon descriptor\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9294,
+      "tokensOut": 726,
+      "usd": 0.0017602800000000001
+    }
+  },
+  "7b82ac72e951230977f7a5389520f44a7d95f3128d93f8d73cc0d2e964d44093": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8700,
+      "tokensOut": 252,
+      "usd": 0.00140448
+    }
+  },
+  "88a920d4290626a0d8314e7970fbd9e119e5026a1fc5f0c855a7b6c9c7bb68db": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 9324,
+      "tokensOut": 1029,
+      "usd": 0.00191778
+    }
+  },
+  "c1f50e26f9b9b4884f57cd6e427b559fe966dca4d8f4d752ff80180e979fd230": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8785,
+      "tokensOut": 517,
+      "usd": 0.0015539800000000002
+    }
+  },
+  "409a32810323de3c314839610fea4de5fbc89b130d3db5c01b320a440d1dc7d6": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 10825,
+      "tokensOut": 1339,
+      "usd": 0.00237298
+    }
+  },
+  "cce6d15af98b3b8c948542485e74abfb7956b3a365e16be1d94f8d10d2266e9a": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9065, \"reg\": 52 },\n      \"name\": \"headerRightElement\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from r52 = r11(r6), where r11 is the options property headerRight (r11 = r6.headerRight) and r6 is the {tintColor, canGoBack} argument object; the result is passed as children of ScreenStackHeaderRightView. Caveat: r52 is reused later for an unrelated __hbc_b_copyDataProperties return (in the headerSearchBarOptions block), so a whole-register rename would also label that value.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 24098,
+      "tokensOut": 1048,
+      "usd": 0.0048820800000000004
+    }
+  },
+  "369e571db43b1c48763225b64af85c7316d6378b0a67643a26735a946cd3e60c": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7868,
+      "tokensOut": 797,
+      "usd": 0.00151058
+    }
+  },
+  "bb15ea630755d667f58c917e7eaf0fb17c14b44e64f061611a1ba593122fe00f": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 10937, \"reg\": 2 },\n      \"name\": \"gestureStateHost\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from globalThis and used only as the receiver of _setGestureStateSync and _setGestureStateAsync; the function throws \\\"Failed to set gesture state\\\" when neither is present\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7960,
+      "tokensOut": 1033,
+      "usd": 0.0016469800000000001
+    }
+  },
+  "d6d37d90d14f61b18e1076873554787e939225855ad5285b25fe1e86ba048a0b": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7812,
+      "tokensOut": 558,
+      "usd": 0.00137988
+    }
+  },
+  "a14666704feb24d09ab0b536112b63575c6f3453312ddd7f383314f88951d435": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7704,
+      "tokensOut": 775,
+      "usd": 0.00146678
+    }
+  },
+  "a11564a386bf8d52eeb614ec7055e4880adbe27597e277e510d0f617c68c408e": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7542,
+      "tokensOut": 861,
+      "usd": 0.0014773800000000001
+    }
+  },
+  "be736746d102fe40d20be941c55fee8b4077aa2aae821d1573367ad89e752d58": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9171, \"reg\": 6 },\n      \"name\": \"tabWidth\",\n      \"confidence\": \"med\",\n      \"evidence\": \"initialised from the property read a1.flattenedTabWidth (r4.flattenedTabWidth); compared against the literal \\\"auto\\\", then typeof-tested and checked with endsWith(\\\"%\\\") before parseFloat, so it holds a tab width that may be a number, a percentage string, or \\\"auto\\\". Register r6 is reused as a temp (r6 = r4.Error) on the null-route throw path, so the name covers only the initial value.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10004,
+      "tokensOut": 1022,
+      "usd": 0.0020502800000000002
+    }
+  },
+  "421ac09e46e1d4dfd571650be5262352f259191f0efc591afc30cf24ff81f409": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8229,
+      "tokensOut": 1394,
+      "usd": 0.0018812800000000001
+    }
+  },
+  "37426191f8d59f6505c87460732b427ce82370963b94415c5475207ffdd81faa": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7885,
+      "tokensOut": 808,
+      "usd": 0.00151948
+    }
+  },
+  "a85a6851b9cc9fd971824ea060d2d3601aca3b5e72c9e2718782d876a61856b1": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 14522, \"reg\": 12 },\n      \"name\": \"workletInitData\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r12 is loaded from the outer binding _e1651_24 and then stored as the `__initData` property of the worklet closure `l` (`r6.__initData = r12`), alongside `__workletHash` and `__closure`. The Reanimated-style worklet metadata suggests init data for the worklet, but the name is inferred from the property it feeds, not from a literal.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8919,
+      "tokensOut": 549,
+      "usd": 0.00159678
+    }
+  },
+  "019e430157a5059f60ac54effa2d930b8bd995fb6ac9d7f5ed959ca0686580b0": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 651, \"reg\": 3 },\n      \"name\": \"requireModule\",\n      \"confidence\": \"med\",\n      \"evidence\": \"`let r3 = a2` is the module loader: at init it is called on each entry of the dependency list `list = a7` (`r3(list[0])` through `r3(list[4])`), and the results are read for `.MAX_LENGTH`, `.MAX_SAFE_INTEGER`, `.safeRe`, `.t` and `.compareIdentifiers`. The debug call `Reflect.apply(_e835_0, ..., [\\\"SemVer\\\", ...])` and the `SemVer` class body support that these dependencies are the semver internals.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 20013,
+      "tokensOut": 1085,
+      "usd": 0.004083580000000001
+    }
+  },
+  "e3545664900c358fdcea52ad254a66be4d8b0463c84403bcfec9f9e4a1fea1d8": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 14811, \"reg\": 2 },\n      \"name\": \"offlineListener\",\n      \"confidence\": \"high\",\n      \"evidence\": \"r2 is loaded from the captured _e4302_2 and passed as the listener to r4.removeEventListener(\\\"offline\\\", r2); the \\\"offline\\\" literal names the event this register handles\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7612,
+      "tokensOut": 522,
+      "usd": 0.00132188
+    }
+  },
+  "d4f900d383b073da2f01be199cedc1d78913c85d6e1b37709a16c21e1fe4d274": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8391,
+      "tokensOut": 798,
+      "usd": 0.00161568
+    }
+  },
+  "fafb6729d4239e4519fcbdef9545202ada37a5ab835d2c0e4602758bedc56654": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7915,
+      "tokensOut": 414,
+      "usd": 0.0013284800000000002
+    }
+  },
+  "d57a651d6a0947f49f4ab65e468ffd83cdb28fec9e5038c087a2cae9f82c7386": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8870,
+      "tokensOut": 230,
+      "usd": 0.00142748
+    }
+  },
+  "39935f2cf9735c13b6d05d888455c55890ba42a3d91665a1d00b693daa193d6f": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8745, \"reg\": 2 },\n      \"name\": \"normalizedPath\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r2 is the function's return value. It is either r6.substring(1) when r6 starts with the literal \\\"/\\\" and a2 is falsy, or r3, which is r6 itself or the template `/${r6}` when a2 is truthy. The branches normalize the leading slash of the input path.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8141,
+      "tokensOut": 611,
+      "usd": 0.00147218
+    }
+  },
+  "e7fc37e304537daee06c3b512c71182ebc514e25507c2c546f0d7224568512e8": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 6549, \"reg\": 11 },\n      \"name\": \"conflictErrorMessage\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned only two literals in fn 6549: \\\"[Reanimated] You cannot provide both keyframe 0 and 'from'...\\\" and \\\"[Reanimated] You cannot provide both keyframe 100 and 'to'...\\\". Each is the sole argument to `new r4(r11)` before a throw, so the register holds a conflicting-keyframes error message on whichever branch runs.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 13429,
+      "tokensOut": 984,
+      "usd": 0.00271628
+    }
+  },
+  "5a8f9354c67127caa3315e52778840ce17980fddae04d75ae167bb5f5c251c67": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9438, \"reg\": 0 },\n      \"name\": \"Query\",\n      \"confidence\": \"med\",\n      \"evidence\": \"constructed via new.target and Reflect.construct; the body sets queryKey, queryHash, observers, client, and options, calls this.setOptions and this.scheduleGc, and builds a state object with status: \\\"pending\\\"/\\\"success\\\" and fetchStatus: \\\"idle\\\". This matches a query-cache entry class. The class identity is inferred from member names, not a single literal.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9445,
+      "tokensOut": 1068,
+      "usd": 0.0019614800000000003
+    }
+  },
+  "48663ea8042c34690378e3b45f8f59e207858fd92aed9dce5fee1fa91337ac53": {
+    "text": "```json\n{\n  \"names\": [],\n  \"abstained\": true\n}\n```",
+    "cost": {
+      "tokensIn": 7831,
+      "tokensOut": 484,
+      "usd": 0.00134668
+    }
+  },
+  "304e7b8b3e71e434b227d6c54542b63094bd12365a867894b0f6c5aa77af85d3": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 743, \"reg\": 1 },\n      \"name\": \"BaseAnimationBuilder\",\n      \"confidence\": \"high\",\n      \"evidence\": \"the module exports \\\"BaseAnimationBuilder\\\" via Object.defineProperty with a getter returning _e970_5, which is assigned this class (`_e970_5 = r1_2`); the class also has static builder methods (duration, delay, withCallback, reduceMotion, randomDelay, build) and the worklet name pnpm_BaseAnimationBuilderTs1 matches\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10418,
+      "tokensOut": 1355,
+      "usd": 0.0022995800000000003
+    }
+  },
+  "cb37af37f569752ada989dfecc1647429fd3ee7d3fdfc86aa01022f559d43b08": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":9158,\"reg\":16},\"name\":\"react\",\"confidence\":\"med\",\"evidence\":\"assigned from module-scope _e1900_0, then used as the receiver for .useRef, .useEffect, .useLayoutEffect and .useMemo calls (e.g. r16.useRef(null), r16.useEffect(r15)); the hook namespace shape suggests React, but the module identity is not shown by a literal\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 20479,
+      "tokensOut": 644,
+      "usd": 0.0039562799999999995
+    }
+  },
+  "1e3b0e520362c4f097216aceac292a1905647304865b19a35f11111f87f8db84": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8367,
+      "tokensOut": 671,
+      "usd": 0.00154738
+    }
+  },
+  "4ad933d8612e67181986d3b7c377f5d44322e751654f5ac45ed620a877aa5632": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7733,
+      "tokensOut": 645,
+      "usd": 0.00140758
+    }
+  },
+  "12877482b9a6494858962a44fd04a959e12350f06921c8fadd0217b5fb03dcbc": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8348, \"reg\": 0 },\n      \"name\": \"orderIndex\",\n      \"confidence\": \"med\",\n      \"evidence\": \"loop counter over r6: starts at 0, steps by 1 (r0 = r1 + r2 with r2 = 1), bounded by r6.length; each iteration writes its value as r5.order = r1, so it stamps each element of r6 with its position. No string literal names it.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8067,
+      "tokensOut": 1198,
+      "usd": 0.00175088
+    }
+  },
+  "bc50371667ace14de735da206d57cdf2932ab8f9e42d17e7ab5be05bba68907e": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7968,
+      "tokensOut": 937,
+      "usd": 0.0016005799999999999
+    }
+  },
+  "7105616901b82b2b2cfa14f8dac885adbed8281a4af99b1ab3e878ab49a783bf": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 4308, \"reg\": 3 },\n      \"name\": \"nextDepth\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned as r5 + r2 (depth + 1) in both branches and passed as the third argument to the recursive call _e363_2(item, r8, r3); r5 is the depth check against 5 at the top\"\n    },\n    {\n      \"bindingId\": { \"fn\": 4308, \"reg\": 0 },\n      \"name\": \"child\",\n      \"confidence\": \"med\",\n      \"evidence\": \"the parameter a1 is copied to arr at the top of the traversal, then tested with instanceof, Array.isArray, typeof, and _e363_1.isValidElement, and recursed into via Object.keys/index; this is the children-flattening pattern, so the value is a child being flattened\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8922,
+      "tokensOut": 1964,
+      "usd": 0.00230488
+    }
+  },
+  "a89a6476e88ca26e023bb455277f02d75223cef8432547afccb1638609cc2d9a": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 11386, \"reg\": 6 },\n      \"name\": \"makeKeyframeKey\",\n      \"confidence\": \"high\",\n      \"evidence\": \"reg 6 is assigned once from _e972_7 and flows into the object literal key `makeKeyframeKey: r6` (obj3), and the inner closure guards it with `typeof r2 === \\\"function\\\"` before calling it\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 11173,
+      "tokensOut": 1251,
+      "usd": 0.0023985800000000004
+    }
+  },
+  "11c733c74d0ad28e0b640b1e1307ad02aa3e66879345b0f3a247a97e99658034": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 10118,
+      "tokensOut": 723,
+      "usd": 0.00192358
+    }
+  },
+  "f9416b7c6b96ea56d53b42f52930b54c60c5ddebacd6d57f6c587073d74640fb": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 11650, \"reg\": 7 },\n      \"name\": \"duration\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from r2.durationV, defaulted with `?? 300`, then captured into closure slot _e3861_3; the inner closure passes it as the `duration:` key of the object given to withTiming(targetValue, {duration, easing})\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8844,
+      "tokensOut": 997,
+      "usd": 0.0018057800000000003
+    }
+  },
+  "24a5a231bba36a384d14bacd7d0dfe63390b1307fb86439e32767ebd35b8fd7b": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 10194,
+      "tokensOut": 541,
+      "usd": 0.00184778
+    }
+  },
+  "2d5ad967aab1fe5c08525ae333e60d4913a8f75c2557e2b2435ad198f7894c7d": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8235,
+      "tokensOut": 385,
+      "usd": 0.0013779800000000002
+    }
+  },
+  "e220fc4bab0cccb4087b17fd80368dd158218283e8a92f1654d62f6fb461140d": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 11303,
+      "tokensOut": 673,
+      "usd": 0.00213558
+    }
+  },
+  "362db9b72ce0e8822cc359440db28fefcb74a72908c05dfc8de0e75d50b75cf3": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 9845,
+      "tokensOut": 522,
+      "usd": 0.00176848
+    }
+  },
+  "7b6f96588baf4b66df6c25a9b7913592d5c360c544bb8a562dc49a040f8f92db": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7709,
+      "tokensOut": 944,
+      "usd": 0.00155228
+    }
+  },
+  "ec6b9647db5a9b71eaa959a0e03e86e770d8ff412724576f9dc1097fdfe8ba3f": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7599,
+      "tokensOut": 348,
+      "usd": 0.00123228
+    }
+  },
+  "0a7ecd4ea20d828cd5f9ffa515bcb862570017f4ac63c396877a546c7bdc1091": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7883,
+      "tokensOut": 648,
+      "usd": 0.0014390800000000001
+    }
+  },
+  "02fd32b0d2eedd0ee31c2881eafcf42588d595f32ba1f5ea4fdef1d3b6567002": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 27529,
+      "tokensOut": 1710,
+      "usd": 0.005899280000000001
+    }
+  },
+  "320cf6a401320863bdd640a2ddf22f9e25bc7454299135cc577f73e4849dd6dc": {
+    "text": "```json\n{\n  \"names\": [],\n  \"abstained\": true\n}\n```",
+    "cost": {
+      "tokensIn": 7539,
+      "tokensOut": 495,
+      "usd": 0.00129378
+    }
+  },
+  "4efd01bcc3143ec8f7d681a0f8473adc847dec6702d9f6461fd7d176c355bbc8": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8994,
+      "tokensOut": 882,
+      "usd": 0.0017782800000000001
+    }
+  },
+  "040fe734755985c5d2dc4e31c65bba6066ed76e901811c8fc341c8fde2f2c34a": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7981,
+      "tokensOut": 982,
+      "usd": 0.0016256800000000002
+    }
+  },
+  "0cfe319d9f7c8daa1d83d89af1ee5173d1d6293e3afba12a6bdb86bc3950ee34": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7878,
+      "tokensOut": 825,
+      "usd": 0.00152658
+    }
+  },
+  "83555572bbc10755e2c4625db660d8ca87c6e08c5b765513f12063d5883c4c32": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 9442,
+      "tokensOut": 331,
+      "usd": 0.00159238
+    }
+  },
+  "da67ac382cb6b014597f4bc20d0587de44221f144c996b3d0cf7037fbd2324df": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 13702, \"reg\": 0 },\n      \"name\": \"thisArg\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r0_2 has a single assignment, `undefined`, and is passed as the first argument (thisArg) to `Reflect.apply(_e2295_0, r0_2, [r3])`. The name describes that receiver slot. It does not describe a domain value, since the binding is always undefined.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7680,
+      "tokensOut": 1007,
+      "usd": 0.00157798
+    }
+  },
+  "24c7b92252b5049f1409b76e3c3d6f4c65cf10403bd270b8e3d26d05c5792353": {
+    "text": "```json\n{\n  \"names\": [],\n  \"abstained\": true\n}\n```",
+    "cost": {
+      "tokensIn": 13685,
+      "tokensOut": 1118,
+      "usd": 0.00283448
+    }
+  },
+  "6e02ea01fea7d21a0a12f013e9df307df2d3712dc76d9daf32dc6beef76130be": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 9098,
+      "tokensOut": 376,
+      "usd": 0.00154608
+    }
+  },
+  "5e4ea8ba0589892f19853d9945006c0f87ce5e96d7d677b859aac3723e1f3f96": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9093, \"reg\": 6 },\n      \"name\": \"reactNative\",\n      \"confidence\": \"med\",\n      \"evidence\": \"`r6 = _e1871_3` is a module namespace read for `ScrollView` and `ImageBackground`, both core react-native exports, and the file's other Header usage fits a react-native screen\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10754,
+      "tokensOut": 764,
+      "usd": 0.00207128
+    }
+  },
+  "4ed262ce32702da9ecbf57bb3161f6556b38f266ae6e9f47daeff3e2ea5ac69b": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7536,
+      "tokensOut": 269,
+      "usd": 0.00118018
+    }
+  },
+  "18dac63685c4b90ee244bf29f5f4b0030d90bd6bf150a18ef26092c24030e63a": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7562,
+      "tokensOut": 353,
+      "usd": 0.0012273800000000001
+    }
+  },
+  "4278084c94b261895ac5f7d5cf44ee8fee54d75efbbb68f05e9042429cd91e26": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8099,
+      "tokensOut": 167,
+      "usd": 0.00124178
+    }
+  },
+  "b99b5631e63e706e71ef959ea5183cc491717124ba9bdd43d263ddb88f7f4fb1": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":7280,\"reg\":2},\"name\":\"newTarget\",\"confidence\":\"high\",\"evidence\":\"`let r2 = new.target` is the only assignment, and r2 is passed as the third (newTarget) argument of Reflect.construct(getPrototypeOf, [], r2)\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7790,
+      "tokensOut": 482,
+      "usd": 0.00133748
+    }
+  },
+  "2350c934acf542b56946eeb1de4d230f93941c9e3697bc485d4c12f68aedd8f5": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 10479,
+      "tokensOut": 638,
+      "usd": 0.0019532800000000004
+    }
+  },
+  "a33f6a71929525197c280723ff67ff1602d73faeb5456803c285331c5d6366d4": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 3533, \"reg\": 9 },\n      \"name\": \"listener\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r9 = a2 is the second parameter, and its only use is the identity check `r12 !== r9` against the stored node's `.listener` field inside the removal loop. The function's own name (removeEventListener) and the \\\"'this' is expected an EventTarget object\\\" TypeError are consistent with this reading. No string literal names the register directly.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8576,
+      "tokensOut": 791,
+      "usd": 0.00164918
+    }
+  },
+  "6d8f6df169d99291bf4da4e0e084b7d7f65bcd7f51262ceffcf296ed57ed1a86": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12004, \"reg\": 7 },\n      \"name\": \"react\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r7 is loaded from _e1360_4 at the start of the L3 block and then used as the React namespace: r7.createElement (L3, L5, L7), r7.Children.only(...) (L4), and r7.Fragment (L5). Earlier writes to r7 in L2 (overlay style, fileName) are overwritten before any use on the L3+ path.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9223,
+      "tokensOut": 1631,
+      "usd": 0.0021985800000000003
+    }
+  },
+  "81db243c31dd8093ff813b3449c0861b83e263bac77609f3c71f638895faff16": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 11392, \"reg\": 2 },\n      \"name\": \"globalObject\",\n      \"confidence\": \"high\",\n      \"evidence\": \"the only assignment is `let r2_2 = globalThis;`, and the binding is then used only to read `.Error` for the `\\\"Error\\\" in r2_2` guard before the range-check throw\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10778,
+      "tokensOut": 953,
+      "usd": 0.00217058
+    }
+  },
+  "d8517f72cb0d1630d805aea3e50d78d14518157f4b1a4cc0d76462e8c256abcf": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 10154,
+      "tokensOut": 256,
+      "usd": 0.00169728
+    }
+  },
+  "7b7f6f8249ff9b49bfb7f99296d14b687657d2425e9ee1047a0e8ca8f73cc0f7": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 11120,
+      "tokensOut": 433,
+      "usd": 0.00197898
+    }
+  },
+  "333dade95f07154f4aa6f03259d6455aa995b1050d4171a3ae28eda5c9bf8cf8": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9205, \"reg\": 0 },\n      \"name\": \"renderArticle\",\n      \"confidence\": \"med\",\n      \"evidence\": \"body is a single return of jsx(_e1928_8.Article, {}) with no props, so it renders the Article element; the render header comment labels it \\\"article\\\". The Article identifier is a property access on a captured module, not a string literal, so the name rests on the call shape and the header label.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7566,
+      "tokensOut": 744,
+      "usd": 0.00142368
+    }
+  },
+  "e1a74559563f6ece749a6c53d545ef50bfd34000c2776cb4d60b829dd859f6e1": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7534,
+      "tokensOut": 441,
+      "usd": 0.0012657800000000002
+    }
+  },
+  "4f1ce69a7715ff6bc95fd3c22fc8bac22851ba16cd94c94a117f205fdaf4c851": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8191,
+      "tokensOut": 571,
+      "usd": 0.00146218
+    }
+  },
+  "1927b14ef9bf79c24cb296daa25d9b2b99a8bf03f9e92f52ddca5bec4889d828": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 9249,
+      "tokensOut": 131,
+      "usd": 0.00145378
+    }
+  },
+  "03335c731a54d94b6ad64938fdaf7b868a82eaddb65ef85e4bacc9182a856b61": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 10020,
+      "tokensOut": 252,
+      "usd": 0.0016684800000000002
+    }
+  },
+  "36fee790dc70de7118def73c6a9082ea8ccf404b4f7926f3a6189006c5b7480d": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 13823,
+      "tokensOut": 1633,
+      "usd": 0.00311958
+    }
+  },
+  "cdc45c2936208b379d505a87f33ccc39464adcc1af48358a03af14f82294ef54": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 14907, \"reg\": 2 },\n      \"name\": \"normalizedField\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r2 holds r1.title.toLowerCase() and is later reassigned to r1.artist.toLowerCase(); both values are tested with .includes against the captured _e4355_0. The register is reused for two fields, so the name describes the shared role rather than either field.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7705,
+      "tokensOut": 723,
+      "usd": 0.0014409800000000001
+    }
+  },
+  "4e2aa1b6f0b4d8a8bcd943441a0592766c1dff8d8f87fc6e3df0b3cb3057e801": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8208,
+      "tokensOut": 592,
+      "usd": 0.00147608
+    }
+  },
+  "7019f130869ae557d9a3b39498a16e9349c44e1aebf025b16c7cac2672f4e8b9": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 17433,
+      "tokensOut": 437,
+      "usd": 0.0032435800000000002
+    }
+  },
+  "d1d82a01a0de35d47d52b74819642d3bd2c9ed70d4806b9d78c3e334ee3e2b4f": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12408, \"reg\": 37 },\n      \"name\": \"openParen\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned only the string literals \\\"(\\\" and \\\"a(\\\" (the alpha variant under the L14 and L19 branches), and used only as an argument piece in the __hbc_HermesInternal.concat / Reflect.apply argument lists that build the CSS color function string, so it holds the opening-parenthesis fragment\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 18277,
+      "tokensOut": 880,
+      "usd": 0.0036338800000000004
+    }
+  },
+  "28f6a9439177feca59dfc4aba3aced55b8e0735cc7cc79037a6e1e2b51e90f21": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7552,
+      "tokensOut": 355,
+      "usd": 0.00122638
+    }
+  },
+  "fdff8ea61c0e24a7bc26fa7672d61fbbef9af3c50dd75991e249a6be1117b8be": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":6912,\"reg\":2},\"name\":\"duration\",\"confidence\":\"med\",\"evidence\":\"assigned from the property read this.durationV, then defaulted to 600 with ?? before return; the enclosing function is labelled getDuration\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7581,
+      "tokensOut": 388,
+      "usd": 0.00124868
+    }
+  },
+  "32af4339581259cc1431094bbcc570ba836254c6a5f6ab9513c536c7ad4f478b": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9506, \"reg\": 0 },\n      \"name\": \"payload\",\n      \"confidence\": \"med\",\n      \"evidence\": \"a1 is captured as _e3181_0 and passed as the sole argument to every entry of this.listeners inside notifyManager.batch(_fn13139); the function's overlay name is \\\"notify\\\", so a1 is the value broadcast to listeners. No literal names it further.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7781,
+      "tokensOut": 1083,
+      "usd": 0.00163618
+    }
+  },
+  "8404d08192ea9a8cae9375fe559386a484b8e2f06e5414c1097c40137325a816": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":4327,\"reg\":8},\"name\":\"childNode\",\"confidence\":\"med\",\"evidence\":\"r8 = arr[sum], where arr = this._nodes and sum indexes it in a loop; each element is passed to r8.__addChild(this), so it is the child node being attached to the receiver\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7831,
+      "tokensOut": 484,
+      "usd": 0.00134668
+    }
+  },
+  "065c699b740efdccb7b6c169ab1774e8ed38b7766d68f8e1f842745201b9fce7": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7870,
+      "tokensOut": 244,
+      "usd": 0.0012344800000000003
+    }
+  },
+  "390ad801a45fb7f78d6a9fbdcae08cbbf5036efd7657d657ad3891c147cb0a41": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8471,
+      "tokensOut": 846,
+      "usd": 0.00165568
+    }
+  },
+  "0eefae73b52fcfd68e49fd97e817a0b9c8ac15225e659e2e7fb7936899963435": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12994,\"reg\":9},\"name\":\"rawRightMargin\",\"confidence\":\"med\",\"evidence\":\"Assigned from r7?.marginStart when the literal \\\"rtl\\\" matches the direction (r5 === r8), otherwise from r7?.marginEnd. If that is null, it falls back to r7?.marginRight, then to r4 via ??. It is then percent-resolved (endsWith(\\\"%\\\"), parseFloat, /100 * r6) into r5 and stored as result.right. So r9 is the unresolved right-side margin value before percent handling.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9424,
+      "tokensOut": 930,
+      "usd": 0.0018882800000000002
+    }
+  },
+  "e1e24697964236408214a6e7950b4727461f1416eb170f603e4c5fec2d6fff03": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 6445, \"reg\": 6 },\n      \"name\": \"easingName\",\n      \"confidence\": \"high\",\n      \"evidence\": \"single assignment `let r6 = _e959_7.easingName`, loaded from the literal property key \\\"easingName\\\"; r6 is the leading segment of the returned template `${r6}(${r8})`, so it names the easing function being printed\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8315,
+      "tokensOut": 648,
+      "usd": 0.00152548
+    }
+  },
+  "99a8d5ec5bdd05d3698b2899f8097d9ff497dcd40f4ac5e6195f5ebd3da03b0a": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8361, \"reg\": 8 },\n      \"name\": \"candidateRoute\",\n      \"confidence\": \"med\",\n      \"evidence\": \"loop variable over a2 (`r8 = r10` in `for (let r10 of r3)`, with r3 = a2). Inside the loop it reads `r8.routeNames`, `r8.order`, and `r8.shared`, and it is assigned to r0 when the comparison wins. Its role is a route entry being evaluated as the best candidate.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9360,
+      "tokensOut": 1665,
+      "usd": 0.0022429800000000003
+    }
+  },
+  "01ad1ef3d098875fa7cbdb253cf26b05533fa4f2652a11d0bcc38652fea22695": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8448,
+      "tokensOut": 245,
+      "usd": 0.00135058
+    }
+  },
+  "ddf8973b339a00da4f766ab5ee2908a83216c6589695c433cec65804be02ea35": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7946,
+      "tokensOut": 705,
+      "usd": 0.0014801800000000002
+    }
+  },
+  "26bf350b954f549a10c22d237b1fbc043d6cd140201b8d20b2a3305505be43d1": {
+    "text": "```json\n{\n  \"names\": [],\n  \"abstained\": true\n}\n```",
+    "cost": {
+      "tokensIn": 13318,
+      "tokensOut": 688,
+      "usd": 0.00254608
+    }
+  },
+  "fe3c54097d1a598755fb8ca7db6df6a5b83f59fe3ed654171c4510a6d3519525": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7904,
+      "tokensOut": 752,
+      "usd": 0.0014952799999999999
+    }
+  },
+  "fdb31e2480b9269ef06408e1704fb03944836e5eb484d7f7a934f3bcdb16721a": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 17434,
+      "tokensOut": 788,
+      "usd": 0.0034192800000000002
+    }
+  },
+  "8055dee915a52f63c20511447820c1e0a77c205263bb4025dcd7f565f42b8db9": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7909,
+      "tokensOut": 389,
+      "usd": 0.0013147800000000002
+    }
+  },
+  "2f0d2a0d5606928b82cf9e619f02fb537863bfb4d6ed17b8ff6dd22e4b7750c1": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 10043,
+      "tokensOut": 860,
+      "usd": 0.00197708
+    }
+  },
+  "50e2d9131380dcb74a6f202a79bff16452aee2d31c56a3a8da600174d76adaf7": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12927,\"reg\":0},\"name\":\"pagerView\",\"confidence\":\"med\",\"evidence\":\"the sole statement stores the parameter into `_e3117_0.pagerView`, and the function's own comment tags it as a \\\"ref\\\" callback, so the argument is the pager view instance being captured\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7564,
+      "tokensOut": 501,
+      "usd": 0.00130178
+    }
+  },
+  "b945f9c2b1e759f2f9aeccf2d0a7784f206098d1e5f0d2b264771739e2341383": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7743,
+      "tokensOut": 366,
+      "usd": 0.0012700800000000003
+    }
+  },
+  "efc2b9ae50f0596e202cf1c196629f0fb5c7aa18ce782001ac1f6b18e7e25e3c": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 2093, \"reg\": 1 },\n      \"name\": \"messageQueue\",\n      \"confidence\": \"med\",\n      \"evidence\": \"register 1 is `let r1 = this`, and the body calls r1.__guard(...) and returns r1.flushedQueue(); the nested closure invokes _e2082_3.__callFunction, the same receiver. Its methods match a batched message-queue object, but no literal names it.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7769,
+      "tokensOut": 716,
+      "usd": 0.00145028
+    }
+  },
+  "fe757943cf0463a0320d7e115f75754436ed1ea1a47522ab83817c3bc244fb41": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8255,
+      "tokensOut": 440,
+      "usd": 0.00140948
+    }
+  },
+  "2185cf1717e52dba2a9e4c62e8bd31dd8903d17b91a7942e30ab495187cc1f31": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7545,
+      "tokensOut": 807,
+      "usd": 0.0014509800000000002
+    }
+  },
+  "27c952d16c3024ddea9e8a23e2c06c73480ef09d81675a196ec6952d524da76d": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7545,
+      "tokensOut": 975,
+      "usd": 0.00153498
+    }
+  },
+  "c210b920becacca761e34a6b7185100ee833a5fde810d668a83feec4ecce13cb": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12454, \"reg\": 1 },\n      \"name\": \"layoutEvent\",\n      \"confidence\": \"med\",\n      \"evidence\": \"body reads a1.nativeEvent.layout.width, the React Native onLayout event shape; the function is labelled \\\"onLayout\\\" in its header comment\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7556,
+      "tokensOut": 610,
+      "usd": 0.0013546800000000003
+    }
+  },
+  "6e0a8b1030635c2c36a2ff29b77278341c2f64c0e198efab08188b88a8569661": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8510,
+      "tokensOut": 740,
+      "usd": 0.00161048
+    }
+  },
+  "151a1784b79167fa44a887169c0740212172a53fd844f1990768d3219af8a6f6": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7989,
+      "tokensOut": 265,
+      "usd": 0.00126878
+    }
+  },
+  "bba4648184c50b5a85742279f7774bdac1a2499cf361a8132c58429c3354c539": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9802, \"reg\": 0 },\n      \"name\": \"screenOptions\",\n      \"confidence\": \"med\",\n      \"evidence\": \"`let r0 = a1` copies the sole argument, and the body reads only `r0.theme` and `r0.navigation` (the latter is stored and later used as `goBack`). That shape matches a per-screen options object, and the overlay name for fn#9802 is \\\"screenOptions\\\". No string literal names the value, so this rests on shape plus the overlay label.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8070,
+      "tokensOut": 780,
+      "usd": 0.0015424800000000002
+    }
+  },
+  "97b900f064eb368f41a680f76ea95a9452286b8af121f86a935a5eeb96e76afb": {
+    "text": "```json\n{\n  \"names\": [],\n  \"abstained\": true\n}\n```",
+    "cost": {
+      "tokensIn": 8567,
+      "tokensOut": 412,
+      "usd": 0.00145788
+    }
+  },
+  "cd9053ec9d933b562d3fed93832914e112f485515ea88f296d8e7e1c0d30e2c1": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7573,
+      "tokensOut": 934,
+      "usd": 0.00152008
+    }
+  },
+  "072c17d11d8d321af877e9bc2419cd0650113288990b76d2937bae868a74c78b": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7539,
+      "tokensOut": 333,
+      "usd": 0.00121278
+    }
+  },
+  "004c8642871ec827740e65f56671ff158df24cae5b8510acc8cfa31cfec1c383": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 10505, \"reg\": 4 },\n      \"name\": \"activeTouch\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r4 is assigned from nativeEvent.touches[0], else changedTouches[0], else nativeEvent itself, then read as .pageX/.pageY and passed to _isTouchWithinResponderRegion alongside the region. The earlier write from _e319_17 (typeof-checked as a function) is overwritten before the touch use, so the name reflects the dominant role. No string literal names it directly.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8779,
+      "tokensOut": 1252,
+      "usd": 0.00192028
+    }
+  },
+  "707eed6c17a05edbdfbc22633fdec6c767c30241702edfbceb8d1e8a69f92bc3": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9877, \"reg\": 1 },\n      \"name\": \"props\",\n      \"confidence\": \"med\",\n      \"evidence\": \"sole parameter (a1, copied to r2); body reads .icon, .label and .value from it and renders them as the MaterialDesignIcons name, the Text label and the Text value of a detail-stat View\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8465,
+      "tokensOut": 679,
+      "usd": 0.0015709800000000002
+    }
+  },
+  "9ca6f6d0550bdf2c4bf5d94a0cae266b69668e0650c5a664bf1e211636888ad1": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 7356, \"reg\": 1 },\n      \"name\": \"pressOutTimer\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r1 receives the return of setTimeout(_fn11726, props.delayPressOut) and is then stored as r2.pressOutTimeout; the same function calls clearTimeout(r2.pressOutTimeout) first. The register is reused for the callback before the call, so the name applies only to the post-call value.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8242,
+      "tokensOut": 1051,
+      "usd": 0.0017123800000000001
+    }
+  },
+  "43725c060b0dfe5600d03fb6b63c73be5e68f57fb32daae2d4ac94b4f24a3df7": {
+    "text": "```json\n{\n  \"names\": [],\n  \"abstained\": true\n}\n```",
+    "cost": {
+      "tokensIn": 7917,
+      "tokensOut": 353,
+      "usd": 0.00129838
+    }
+  },
+  "3f7a24f4452caae1a7c4cdde865a639b9ca863445b95347e58802362d46be56e": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7537,
+      "tokensOut": 189,
+      "usd": 0.0011403800000000003
+    }
+  },
+  "114e510fc09309200a77b1d04f74bb27e0a199c18b000f2f11ddb4708a4e3fed": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 15134, \"reg\": 12 },\n      \"name\": \"shakeStep1\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r12 = r15(-10, {duration: 0.15 * r16}); r11 and r10 are the same helper with 10 and -20 and the same duration, and all three are combined by r13 into one chained value that becomes obj3.translateY. This is the first of three alternating-offset steps, but nothing in the body names the animation type.\"\n    }\n  ],\n  \"abstained\": false\n}\n```\n\nI left `{15134,8}` out. Its only use is as the first argument to `_e3787_0` (`r9(r8, r6_5)`), and `_e3787_1` is an unnamed import slot with no literal or named callee, so any name would be a guess about behaviour I can't see.",
+    "cost": {
+      "tokensIn": 8222,
+      "tokensOut": 1382,
+      "usd": 0.00187388
+    }
+  },
+  "10416542f0d267b990cb7b2512815953c9037b57fec77138315890fbb015049d": {
+    "text": "```json\n{\n  \"names\": [],\n  \"abstained\": true\n}\n```",
+    "cost": {
+      "tokensIn": 8809,
+      "tokensOut": 677,
+      "usd": 0.00163878
+    }
+  },
+  "242993d172328b61e3ab13598c64d18299924b932eda205f4973e347b6fae2fc": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 11776,
+      "tokensOut": 728,
+      "usd": 0.00225768
+    }
+  },
+  "d7be68af50c1e29c5e26622e17aca57c8737e1502a96b4610dd74910e94d4e14": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 1497, \"reg\": 5 },\n      \"name\": \"numberParser\",\n      \"confidence\": \"med\",\n      \"evidence\": \"`let r5 = Number;` aliases the global Number, which is used only as the parse entry `{date: r5}` for the route `feed/:date` in obj6.parse. The name reflects that role; the body does not call it as a parser directly.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8294,
+      "tokensOut": 700,
+      "usd": 0.00154728
+    }
+  },
+  "f880aa5b39f727400d34764332273ac3bf45254cb66395bf171565ba13dfa5dd": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8254,
+      "tokensOut": 397,
+      "usd": 0.0013877800000000001
+    }
+  },
+  "af3c48688820108f29ea1ed2e090b2c57566bbf2bcc4d81d04d9ff1710bb1ebe": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":9811,\"reg\":11},\"name\":\"reactNative\",\"confidence\":\"med\",\"evidence\":\"`let r11 = _e2051_4` is read only for `.ScrollView`, `.View`, `.Image` and `.FlatList`, all React Native components, so it is the RN module namespace. The module identity is inferred from its members, not from a literal.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 11139,
+      "tokensOut": 1363,
+      "usd": 0.00244778
+    }
+  },
+  "6048ed52cc4dafbc1bd368bad0d37ea7bce3012e480df179239ec33d3e5a16af": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 14726,
+      "tokensOut": 451,
+      "usd": 0.00270918
+    }
+  },
+  "bfcd6ab469170d3ad5847bbe909527706d9338df3b7ee0b4b8a2abe663a41c90": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 15224,
+      "tokensOut": 635,
+      "usd": 0.00290078
+    }
+  },
+  "2806bfbb06401d0db0a7a615f96cee9c89a366e140301d154989731fac64d617": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8487,
+      "tokensOut": 552,
+      "usd": 0.0015118800000000002
+    }
+  },
+  "d64fac02456845a899ab702f7febdff3524da15e62aa2f79b612dbe1d41e42c9": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12792,\"reg\":3},\"name\":\"navigation\",\"confidence\":\"med\",\"evidence\":\"r3 is loaded from captured _e3079_0, its property `setParams` is read from it, and it is passed as the `this` receiver of Reflect.apply(setParams, r3, [obj]). Sibling read `_e3079_1.params?.author` suggests a route-params pair. The method name matches the React Navigation `navigation.setParams` API, but no string literal in this body confirms it.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7723,
+      "tokensOut": 601,
+      "usd": 0.0013835800000000001
+    }
+  },
+  "02449e88761383d88926b065ace23bd9edc0d3121d4fc230cdb041d236006a88": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 9334,
+      "tokensOut": 551,
+      "usd": 0.0016807800000000002
+    }
+  },
+  "0adb2f14b4d193da2aa3582bddaa6d298abab73065cc01e71cffe3b379b13ad9": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 15160, \"reg\": 15 },\n      \"name\": \"sequenceAnimations\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r15 is loaded once from _e3815_8 and called as r15(r14, r13, r10). Each argument is a step built by r17 from a literal (\\\"10deg\\\", \\\"-5deg\\\", and r16) with a duration scaled from r18. The result is wrapped by r12 and stored as r7.transform's skewX. This looks like a combiner for a sequence of timed steps, but no string names the combiner itself.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8861,
+      "tokensOut": 944,
+      "usd": 0.00178268
+    }
+  },
+  "74ff43b9e8223a77ceed8a5eac3bd5832dd65472cf0bbc3c3eab367580f032be": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":3342,\"reg\":6},\"name\":\"startExtras\",\"confidence\":\"med\",\"evidence\":\"r6 is assigned once from a4 and only read in the store r2.startExtras = r6; the object literal also initialises a startExtras key, so the register holds the start-extras value.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7935,
+      "tokensOut": 564,
+      "usd": 0.0014074800000000002
+    }
+  },
+  "db50b0f9b9aa728cfd9064c6cbced469c926374d191b268d670d8739d635362e": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7542,
+      "tokensOut": 387,
+      "usd": 0.0012403800000000001
+    }
+  },
+  "ec08c4b11394307512c099a8b462b213f30146aa51644f0f7257c644df28c85d": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 1370, \"reg\": 34 },\n      \"name\": \"stackPreloadFlowModule\",\n      \"confidence\": \"med\",\n      \"evidence\": \"`let r34 = r6(list[32])` where r6 is the require-like param (a2, applied to list entries and used as the module loader for exports object r8). Its only read is `StackPreloadFlow = r34.StackPreloadFlow`, so the binding holds the module that exports StackPreloadFlow.\"\n    },\n    {\n      \"bindingId\": { \"fn\": 1370, \"reg\": 20 },\n      \"name\": \"componentsHeadersModule\",\n      \"confidence\": \"med\",\n      \"evidence\": \"`let r20 = r6(list[7])` loads a module through the require-like r6; its only read is `ComponentsHeaders = r20.ComponentsHeaders`, so it is the module exporting ComponentsHeaders.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 11370,
+      "tokensOut": 2154,
+      "usd": 0.00288948
+    }
+  },
+  "a806bc65853ccc2f0ce6ab69410182110e9b2ad08dc208b2178d016fe335e462": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 1494, \"reg\": 6 },\n      \"name\": \"moduleExports\",\n      \"confidence\": \"high\",\n      \"evidence\": \"r6 = a6 is the module's exports object: Object.defineProperty(r6, \\\"__esModule\\\", {value: true}) is followed by r6.useHeaderConfigProps = useHeaderConfigProps, the standard CommonJS export pattern\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 26231,
+      "tokensOut": 1015,
+      "usd": 0.0052921800000000005
+    }
+  },
+  "af66307beab255ac7ff7222997227306374a3b46241914bca676168a3ac5a1f3": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7571,
+      "tokensOut": 386,
+      "usd": 0.0012456799999999999
+    }
+  },
+  "035e15c0c2f75b962f29515b2fd2f6b63255a7e0dac623b79befc1d43e840863": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7542,
+      "tokensOut": 307,
+      "usd": 0.00120038
+    }
+  },
+  "2a421966ace596d0e38303ed7324d2713c74296fbc99534653b3383cf7f18083": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9065, \"reg\": 55 },\n      \"name\": \"headerSlotView\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r55 is assigned r48.ScreenStackHeaderLeftView in the L34 branch and r48.ScreenStackHeaderCenterView in the L38 branch, then passed as the element type to the r56 (jsxs) call that builds the header slot wrapper. The register is reused for either left or center header view, so the name covers both.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 24098,
+      "tokensOut": 950,
+      "usd": 0.00483308
+    }
+  },
+  "4e8bba7e4ccddf30f040300ad01b3db7e783207243817a99ef92eaa5e2345e36": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8019,
+      "tokensOut": 283,
+      "usd": 0.0012837800000000002
+    }
+  },
+  "a77711f678530167371bbeb9a6a1402d15ec02a1642d07dfa1a3e56385b06ff2": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 1643, \"reg\": 9 },\n      \"name\": \"exports\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r9 is assigned from a6 at the top of the module-body block, then passed to Object.defineProperty(r9, \\\"__esModule\\\", {value: true}) and r7.defineProperty(r9, \\\"MyStackNavigator\\\", r3). That is the CommonJS export-object pattern. Confidence is med, not high, because r9 is reused later in the L2 branch for Object.keys(r6).\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 11904,
+      "tokensOut": 1029,
+      "usd": 0.00243378
+    }
+  },
+  "835b79a1f4fb79513f5c7e8bb9433eb9a26907bed927f121200613844d706586": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8890,
+      "tokensOut": 246,
+      "usd": 0.00143948
+    }
+  },
+  "4996fca15a9317c4a6b62ed7f8efc00fcc5975e4b11a7f867e66d8a9389e0732": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 1725, \"reg\": 2 },\n      \"name\": \"assetRegistryDepId\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r2 = a7[0] is passed straight to a2 (the require-like loader), and the result's registerAsset is applied to the __packager_asset literal (httpServerLocation \\\"/assets/assets/places\\\", name \\\"zion\\\"). The value is a dependency-map entry that resolves to the asset registry module, not the registry itself.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7791,
+      "tokensOut": 1193,
+      "usd": 0.0016931800000000003
+    }
+  },
+  "746133890a34110d70e18f9b48d09062e28521cf3615d2a0716fb69838426340": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 13225,
+      "tokensOut": 1166,
+      "usd": 0.0027664800000000004
+    }
+  },
+  "c1ac83076a408873777af13f16463cb9dde4e3d7b380b3d7f7a1bd741754a240": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 15133, \"reg\": 3 },\n      \"name\": \"animateTo\",\n      \"confidence\": \"med\",\n      \"evidence\": \"called four times as r15(<target value>, {duration: r0 * r16}) (targets 1.1, 0.9, 1.2, and a computed value), and its results are fed into the combinator r13(r12, r11, r10, r18). The (toValue, config-with-duration) call shape suggests a timed-animation factory. No string literal names it, so the name rests on call shape alone.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8176,
+      "tokensOut": 1159,
+      "usd": 0.0017531800000000002
+    }
+  },
+  "e8045d5517e9a03e37248eea0c08b80f3cc9bc163d8522546de115adb9aab78b": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7620,
+      "tokensOut": 466,
+      "usd": 0.0012954800000000001
+    }
+  },
+  "729de13d9e30d7202e625cfc7dd2c135f8f933a8095d5634657e0e9950b17c17": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 11901, \"reg\": 2 },\n      \"name\": \"component\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r2 is loaded from captured _e2831_3 and receives the assignment `.displayName = r1`, a display-name convention used on components/classes; the function label \\\"<static_elements_initializer:v>\\\" points the same way. No literal or named callee confirms the object's type.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7656,
+      "tokensOut": 848,
+      "usd": 0.00149368
+    }
+  },
+  "4b4ab555d58e3267a465c723eaf49764fa9659f33702b9c9d8990c80488f822c": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8464,
+      "tokensOut": 950,
+      "usd": 0.0017062800000000001
+    }
+  },
+  "b49cdcfde1ae7af7e018d8c30baff622cc0dac649ddb6f52a8842a52c349e95a": {
+    "text": "```json\n{\n  \"names\": [],\n  \"abstained\": true\n}\n```",
+    "cost": {
+      "tokensIn": 7952,
+      "tokensOut": 384,
+      "usd": 0.00132088
+    }
+  },
+  "f209a090af4a70bfea54db0e90ede74b0d18383ea0fa122a89fcab883939324c": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8303,
+      "tokensOut": 348,
+      "usd": 0.00137308
+    }
+  },
+  "50ecd1b61e1f100dbc2d759e87ed732178726466556f17b9bc0515c9825ebbc2": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8605,
+      "tokensOut": 509,
+      "usd": 0.00151398
+    }
+  },
+  "52c5bc3c470feaf20bdecc6df5b6adb2ff0d2bc8a712c851f2c461345a53b488": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":3521,\"reg\":1},\"name\":\"isCancelable\",\"confidence\":\"high\",\"evidence\":\"`r1_2 = Boolean(get.event.cancelable)`: the register holds the boolean coercion of the `cancelable` property read from the WeakMap-backed event record, and the enclosing function is annotated \\\"get cancelable\\\"\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7646,
+      "tokensOut": 603,
+      "usd": 0.00136918
+    }
+  },
+  "c4c0958fd72566166f6dcc622e2c6fb24a5076f36106ab9ebf7417752e115b79": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 14227,
+      "tokensOut": 676,
+      "usd": 0.0027218800000000003
+    }
+  },
+  "b1ec2ab5fecb7c46b3757df0c378e10330a1507cba8f164f0a4c52b74c9b5d85": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7627,
+      "tokensOut": 675,
+      "usd": 0.00140138
+    }
+  },
+  "2d05f172e75ea75e8dc70a52bb5d0734f980c662771e512a56a751b185491bf1": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8441, \"reg\": 1 },\n      \"name\": \"prevState\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r1 is initialised from a2 and is never reassigned. It is returned unchanged when the early check on a1 matches (`return r1`), and it is the value written to the result when the route name r6.name equals a1 (`r2 = r1`). It is also the second argument in `Reflect.apply(_e1567_11, 0, [a1, r1, r6.state])`, the slot a reducer-style call uses for the incoming state. No string literal names it.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8209,
+      "tokensOut": 1236,
+      "usd": 0.00179828
+    }
+  },
+  "e2ca0e153a65de24361cae1a90b4da5b916135b1fc46ce491d211d0b87c4b392": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8859,
+      "tokensOut": 649,
+      "usd": 0.0016347800000000002
+    }
+  },
+  "3268849713dc7f840b4234df41ba19b33878b5101eb468ffede14677a05b4e14": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 15342,
+      "tokensOut": 838,
+      "usd": 0.0030258800000000003
+    }
+  },
+  "a7914f0f8b1432222a86357b97424efcaa37cf4655db40f257418f7a1797b936": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 13598,
+      "tokensOut": 454,
+      "usd": 0.00248508
+    }
+  },
+  "7820b19539b0a74b3b48074da96776aeb76b6417b14f5b31f13038e009fe532a": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7571,
+      "tokensOut": 775,
+      "usd": 0.0014401799999999999
+    }
+  },
+  "fc70b62c9ab559279668f4a6551d2120c954a35670fac723175fd7bb792c1a22": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 6553, \"reg\": 1 },\n      \"name\": \"reduceMotionValue\",\n      \"confidence\": \"med\",\n      \"evidence\": \"the only use of a1 is the assignment r0.reduceMotionV = a1, so the argument is stored unchanged as the reduce-motion setting; the function's overlay name is \\\"reduceMotion\\\"\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7566,
+      "tokensOut": 647,
+      "usd": 0.0013751800000000002
+    }
+  },
+  "dfa2f6bd6b6ea171cee33426704f359e4eac009e473a00df8489e571ff97c0a4": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7601,
+      "tokensOut": 1518,
+      "usd": 0.0018176800000000001
+    }
+  },
+  "4e1dfc309f2a5a96d884fc0966af1df86d746c7ad10376f83161b3bd00757512": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8058, \"reg\": 1 },\n      \"name\": \"maybeElement\",\n      \"confidence\": \"med\",\n      \"evidence\": \"a1 is copied to r4 and must be a non-null object before `r4.$$typeof` is read and compared to the module constant _e1388_0 (the element-marker sentinel). The function then computes a type tag and returns `tag === _e1388_3`. No string literal is loaded, so the name rests on this structure, not on a literal.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8398,
+      "tokensOut": 1244,
+      "usd": 0.0018400800000000002
+    }
+  },
+  "4208236a005f66d1f66be0f7e92e496ec05791125ff4e6502eab2eba29247065": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 1604, \"reg\": 4 },\n      \"name\": \"swordsAssetDescriptor\",\n      \"confidence\": \"med\",\n      \"evidence\": \"object literal with __packager_asset: true, name: \\\"swords\\\", type: \\\"png\\\", httpServerLocation \\\"/assets/assets/icons\\\", passed as the sole argument to registerAsset; binding is currently the generic `obj`. Mapping to reg 4 is inferred from the single object literal in the body.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7838,
+      "tokensOut": 1002,
+      "usd": 0.00160708
+    }
+  },
+  "0ba85428e4938cb12710b96880a7af858685807dcc83fac7276c5d8afb0aab95": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8876,
+      "tokensOut": 782,
+      "usd": 0.00170468
+    }
+  },
+  "983ca3cb6262a91f4c15bcde1ab84a9fcbc8e113ab7dd894f43b4bad0a1c962f": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 9142,
+      "tokensOut": 1064,
+      "usd": 0.0018988800000000001
+    }
+  },
+  "c0a581b43da8c867a9c4ad28ea2c8c12f2a44433432ec10c91c254eba28205d5": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":10504,\"reg\":1},\"name\":\"isNativeResponderBlocked\",\"confidence\":\"med\",\"evidence\":\"r1 is assigned only `true === r3` where r3 = _e2248_2._config.blockNativeResponder, and is then returned as the function's result; the earlier `r1 = null` is never read. The predicate name follows the config key, but the binding is a return temp, so the mapping is inferred rather than literal.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8360,
+      "tokensOut": 664,
+      "usd": 0.0015424800000000002
+    }
+  },
+  "ced24af2e98651284ebe08f8bf6e1a03a302be60b3fa61d9d809c6a48aac12da": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7668,
+      "tokensOut": 872,
+      "usd": 0.00150808
+    }
+  },
+  "98db132d73feb64c06911a6a3f8f92b5d2b8217f1c8391b3e5d8605581c30366": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8036,
+      "tokensOut": 784,
+      "usd": 0.00153768
+    }
+  },
+  "c0f8f362f858289678b24d0b07f77f05a87c5984d1683d9d12818a1465d47fe7": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7601,
+      "tokensOut": 630,
+      "usd": 0.0013736800000000002
+    }
+  },
+  "8c69d0962982ab99db394048f733bb5f9545835629db9a8bfecf4b9e0db4aa09": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 13407, \"reg\": 8 },\n      \"name\": \"jsx\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned from `.jsx` of the same object whose `.jsxs` is already bound as `jsxs`, and invoked as `r8(component, props)` for Image and View, the React jsx-runtime element factory pattern. Same value also lives in r14 (`let r14 = r11.jsx`), which is left unnamed because both would be declared `jsx` in the same function scope.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8722,
+      "tokensOut": 1827,
+      "usd": 0.00219638
+    }
+  },
+  "7391e5814509e8486bd5016f5298823c90822ac7040bc67aa3adca02406bdb0e": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8176,
+      "tokensOut": 576,
+      "usd": 0.0014616800000000001
+    }
+  },
+  "03d5d9c1c592e171a1b7dc2eca712f93f89de105181fe2500f88a0b0aa13bc45": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 9178,
+      "tokensOut": 461,
+      "usd": 0.00160458
+    }
+  },
+  "62b5d44c903f5d554cd84ef94856d4e37d8b13cc36ce2a2794419e7adce5c406": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 2661, \"reg\": 4 },\n      \"name\": \"yValue\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r4 is a copy of the sole argument a1. The function is named \\\"__setInternalY\\\", and r4 is the value coerced via Number() and stored on `this` under the key held in r3, which is consistent with the Y setter's input.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7815,
+      "tokensOut": 882,
+      "usd": 0.0015424800000000002
+    }
+  },
+  "98db76bbd56b63e071e4c641d2e63d090e6306c7b9def0686a5d4510a7a9b057": {
+    "text": "{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9057, \"reg\": 33 },\n      \"name\": \"onDisappear\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned from `r11.onDisappear` (the props object) and forwarded unchanged as the `onDisappear` field of the ScreenStackItem props object (`r12.onDisappear = r33`)\"\n    },\n    {\n      \"bindingId\": { \"fn\": 9057, \"reg\": 77 },\n      \"name\": \"renderHeader\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from `r78.header` (the screen options object) and then called directly as `r77({back, options, route, navigation})`, with the return value used as the header element's children; it is invoked as a render function, not constructed or used as a JSX type\"\n    }\n  ],\n  \"abstained\": false\n}",
+    "cost": {
+      "tokensIn": 18625,
+      "tokensOut": 1273,
+      "usd": 0.003899980000000001
+    }
+  },
+  "64c966ae480b8fe129a21a974ae97e6841520359e546120ce8c36dd477ec7378": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8089,
+      "tokensOut": 264,
+      "usd": 0.0012882800000000002
+    }
+  },
+  "7ffa34ba1e55adac1ef87c553641deaa3f6f395138d7ec09cb01c236f9a7e41d": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7997,
+      "tokensOut": 544,
+      "usd": 0.00140988
+    }
+  },
+  "04e8dbec3cef59c471e08bc2c2500f06ee7bd5197c10d0cda7974da4d654f752": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7915,
+      "tokensOut": 212,
+      "usd": 0.0012274800000000002
+    }
+  },
+  "ac39c06f5d91313853fd15cafcd19add4ee50a0821e00067bcfaf20ad319ad68": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 13830,
+      "tokensOut": 664,
+      "usd": 0.0026364800000000005
+    }
+  },
+  "3c597577593e54e3cd3627f0cdf270a8f2f78008a42d8dde82539ea0ac8838d5": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 10854,
+      "tokensOut": 244,
+      "usd": 0.00183128
+    }
+  },
+  "743e1207a10107e465b2e68f4e44d34a495675d164cfa250b9cfedd5226341e9": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 6434, \"reg\": 19 },\n      \"name\": \"easingName\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned once from the property read `_e958_2.easingName` and interpolated as the first part of the `${r19}(${r17}, ${r15}, ${r13}, ${r11})` template, which renders the easing function's name followed by its four control points\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7986,
+      "tokensOut": 883,
+      "usd": 0.00157718
+    }
+  },
+  "20ecd56cc56c5e83220c1c5263c23c756379ddcd8f23c470e9464b4f7e2d8f19": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7828,
+      "tokensOut": 455,
+      "usd": 0.00133158
+    }
+  },
+  "a3dc184fedf739dc57fd63d24acc4960ec01a4a61c96f4fa5348a5e62ff653ee": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7923,
+      "tokensOut": 496,
+      "usd": 0.00137108
+    }
+  },
+  "794b5c5cc2416aafb5357422a780f9ff203738849d280d956a11d85027cbeb23": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7850,
+      "tokensOut": 680,
+      "usd": 0.0014484800000000003
+    }
+  },
+  "64bcfb84badd16cf96c8ba2d178a627c5f9e14978a565e938672638a33512a60": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 15318, \"reg\": 5 },\n      \"name\": \"navigateTarget\",\n      \"confidence\": \"med\",\n      \"evidence\": \"reg 5 is loaded from the captured _e4200_0, read only for .name and .params, and passed as the arguments to CommonActions.navigate(r5.name, r5.params); the result is dispatched, so the binding is the {name, params} destination of a navigate action. No string literal names it directly.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7907,
+      "tokensOut": 1175,
+      "usd": 0.00170738
+    }
+  },
+  "1c458a849e2f6d41664c12c9542ae18bbb8dce75fb49e850c7f53837ef402c02": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 3008, \"reg\": 11 },\n      \"name\": \"elementValue\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from r5[sum] (a1 indexed by the loop counter), stored as the descriptor's .value, then passed to Object.defineProperty(r4, sum, ...) at the same index; a per-element copy into the new object\"\n    },\n    {\n      \"bindingId\": { \"fn\": 3008, \"reg\": 14 },\n      \"name\": \"errorMessage\",\n      \"confidence\": \"high\",\n      \"evidence\": \"holds the string literal \\\"Trying to call a non-function\\\" or \\\"Cannot initialize private field twice.\\\" immediately before it is passed as the sole argument to __hbc_b_throwTypeError(r14)\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8331,
+      "tokensOut": 1180,
+      "usd": 0.0017946800000000003
+    }
+  },
+  "c893a5664fca7f7c4276f9a01b6ac97fe53d7398c3e3602dbed95c609b56b1da": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 629, \"reg\": 6 },\n      \"name\": \"requireModule\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r6 is `let r6 = a2`. It is called as r6(list[0]) and r6(list[1]), and the result is read for `.SVG_COMMON_PROPERTIES_CONFIG` and `.processNumberArray`. That is the call shape of a module loader keyed by dependency id, but no string literal names it.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8692,
+      "tokensOut": 607,
+      "usd": 0.0015803800000000002
+    }
+  },
+  "04746ac43d9e98bdb0ed58ee08c7591f3868cddee253f97587ddb5b06aab21e4": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 11451,
+      "tokensOut": 334,
+      "usd": 0.00199568
+    }
+  },
+  "cb64464b85bd3a1095aa722119e76e47fda2e9970a324cb0fd4242b41abbe2c7": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8399,
+      "tokensOut": 637,
+      "usd": 0.0015367800000000002
+    }
+  },
+  "50a7abd99cd96be890575ff570ab0801968517f66d86eb98a71246e4265b9803": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7778,
+      "tokensOut": 999,
+      "usd": 0.0015935800000000003
+    }
+  },
+  "b397a0e50d35245f307edb39f9724a90119e78c4b07e692eb51951b33f38e475": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8792,
+      "tokensOut": 334,
+      "usd": 0.0014638799999999999
+    }
+  },
+  "228b97e18005c1f86d95c512c27e98c031d73dd62547b13bad72112ce7e6dc6d": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 6161, \"reg\": 9 },\n      \"name\": \"copySource\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r9 is assigned only twice: from a1 (r5) and from r4.cssStyle, and both values are passed as the source argument (second parameter) of __hbc_b_copyDataProperties in the same block that writes into the target object r2/r10\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8507,
+      "tokensOut": 779,
+      "usd": 0.0016293800000000002
+    }
+  },
+  "bb1bf60f62ae16b0b4ff4eb587af6bf8dc56b0bf8bddb4f098041b15fbf90c36": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 15530, \"reg\": 1 },\n      \"name\": \"transformsByName\",\n      \"confidence\": \"low\",\n      \"evidence\": \"a1 is only read via Object.keys(a1) and then forEach; each own key is interpolated into the literal \\\"_transform:\\\" template with the captured prefix a2, so a1 is a record keyed by transform name. Nothing shows what the values are used for.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8290,
+      "tokensOut": 1101,
+      "usd": 0.00174698
+    }
+  },
+  "363131cef6c1c6a94e7b065d7b0007b0df0bbcddd7e77163f1f0c9c0d7e45a10": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7565,
+      "tokensOut": 212,
+      "usd": 0.00115748
+    }
+  },
+  "596d13a1a630a2abc01f510f0fc2b41ac1872fc22709eb7a5d43513407faa40f": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8360,
+      "tokensOut": 284,
+      "usd": 0.0013524800000000003
+    }
+  },
+  "17494df25e4e2c2d04b390715f98dc42f84df2f493078cc91f3d055d0950b351": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 12006,
+      "tokensOut": 694,
+      "usd": 0.00228668
+    }
+  },
+  "678daad39db03bbeaf6d9f1614f0de9153156eb47fea75977bb4f2aa5e9361d9": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8191,
+      "tokensOut": 798,
+      "usd": 0.0015756799999999999
+    }
+  },
+  "e4a5c9d0c8ac6fdb5cb634ce192e6de3209c742fa8afff65ec0e7d79cf0987b0": {
+    "text": "```json\n{\n  \"names\": [],\n  \"abstained\": true\n}\n```",
+    "cost": {
+      "tokensIn": 8269,
+      "tokensOut": 414,
+      "usd": 0.00139928
+    }
+  },
+  "888b78fd5c3c8d72379150a317cc645dbc154f5d0a8fd23528e0bfb5c123f5ce": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8079,
+      "tokensOut": 274,
+      "usd": 0.0012912800000000001
+    }
+  },
+  "8b0e7846c2a68543ce08ab5b5c2fdb72b66ab66338cbcc62388e01cce6a75d99": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 13370, \"reg\": 4 },\n      \"name\": \"navigation\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r2 (loaded from captured _e3268_0) is the receiver of `r2.dispatch(obj)`, where obj is the result of `CommonActions.goBack()` spread with a payload. A navigation-style object that takes CommonActions actions via .dispatch is the usual shape of a navigation object. No string literal names it directly, so this is contextual, not literal.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7828,
+      "tokensOut": 676,
+      "usd": 0.00144208
+    }
+  },
+  "ebf2e7d9519c7ff8e5c8457f451bc882cc483d357cf812ba918120190a66983d": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8705,
+      "tokensOut": 727,
+      "usd": 0.00164298
+    }
+  },
+  "0edfbd17f7dc7b2992914b203dd6593da7cf6b4d21561dea5a833e5cdd04b335": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8251,
+      "tokensOut": 813,
+      "usd": 0.00159518
+    }
+  },
+  "61104135e165d38338f57fc633c1b9ca03a89aa89cee0a942b983903c46ff99c": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 9659,
+      "tokensOut": 766,
+      "usd": 0.0018532800000000001
+    }
+  },
+  "3dba4af59bc97b1340d2771e3092ab9d3a2bba5e8a65748ec34838c2cfa8bf06": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 13382,
+      "tokensOut": 739,
+      "usd": 0.00258438
+    }
+  },
+  "632311d30f033dd69e1e8f4305cc6e510f2a2dc9e2ef702cb1fb3c57b5b9f499": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 10102,
+      "tokensOut": 730,
+      "usd": 0.00192388
+    }
+  },
+  "61403fe2cfec04bbb89cb540bd41fffb14451c5ed12033e1e834efdf1eb79e22": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":6514,\"reg\":3},\"name\":\"workletInitData\",\"confidence\":\"med\",\"evidence\":\"assigned from enclosing-scope _e970_3 (first branch) or _e970_4 (second branch), then stored as `.__initData` on both worklet closures (_fn13982 and _fn13983), alongside `.__closure` and `.__workletHash`. The value is metadata for the worklet, but its contents are not visible in this body.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8271,
+      "tokensOut": 707,
+      "usd": 0.00154618
+    }
+  },
+  "ff1c31e872203037285252623084b7980fedcf89db086ac169a39207c342023a": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8750,
+      "tokensOut": 531,
+      "usd": 0.0015539800000000002
+    }
+  },
+  "daf14b8ff5647fed7a7751fffeab56db3434858dedc3da145f88f5ec08beaa86": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7545,
+      "tokensOut": 215,
+      "usd": 0.0011549800000000001
+    }
+  },
+  "a5cbe029957148503baa0135a4252aae3fa1d4bac485244701690fa4aa9ddaa7": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7767,
+      "tokensOut": 413,
+      "usd": 0.00129838
+    }
+  },
+  "f1f351dbf15bdff695f8e58d5fa6cb5cd9e2667a64a30883f7f1431b572c749d": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7811,
+      "tokensOut": 449,
+      "usd": 0.00132518
+    }
+  },
+  "892663772a9aa5e81a69e6a8de751335caa55e5e6a5be13fc5f135a919f286bb": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8053, \"reg\": 3 },\n      \"name\": \"resolvedElementType\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r3 is the classification that the function returns: it is assigned r4.type, r4.$$typeof, or the $$typeof value on each path, and the final `return r3 === r2` tests it against the captured constant _e1388_2. The $$typeof property check and the chain of comparisons against captured type constants match the react-is typeOf pattern. No string literal names it directly, so this rests on structure.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8398,
+      "tokensOut": 1404,
+      "usd": 0.0019200800000000002
+    }
+  },
+  "f963368a46c0891a5d15fc7fae54502bf1dc712753987019ee53805784e65ed3": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 1691, \"reg\": 3 },\n      \"name\": \"assetRegistry\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r3 = a2(r2) is the loaded module; its .registerAsset member is passed to Reflect.apply with r3 as receiver and a __packager_asset descriptor (name \\\"RobotoSlab_400Regular\\\", type \\\"ttf\\\") as the sole argument, so r3 is the module exposing registerAsset. The module is identified by a dependency id, not a string literal, so this is contextual rather than literal-backed.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7796,
+      "tokensOut": 893,
+      "usd": 0.00154418
+    }
+  },
+  "5375e0cc859d93629957353f78df8f65c80496f65ee75f64c54de18b11174187": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9725, \"reg\": 2 },\n      \"name\": \"navigationHooks\",\n      \"confidence\": \"med\",\n      \"evidence\": \"`let r2 = _e2022_1` is only read for `.useRoute` (called with \\\"NewsFeed\\\") and `.useNavigation` (applied with [\\\"NewsFeed\\\"]), so it is the module exposing the navigation hooks. The name rests on property reads, not a string literal.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8404,
+      "tokensOut": 628,
+      "usd": 0.0015332800000000001
+    }
+  },
+  "4c24e9159dd7b9f40b82859144218b952e68adf646c2c2987472e4eda15c26e3": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 4193, \"reg\": 3 },\n      \"name\": \"self\",\n      \"confidence\": \"med\",\n      \"evidence\": \"first assigned `r3 = this`, then used as the receiver for `._interpolation` reads and writes and `._config`; the function is named \\\"_getInterpolation\\\". The register is reused at the end for `this._interpolation`, so the name covers the receiver role only.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 17059,
+      "tokensOut": 857,
+      "usd": 0.00337878
+    }
+  },
+  "26e6f248bc05b6946aef402ecfb32803f5744bc7ab84dab314f5d93caee91533": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7778,
+      "tokensOut": 377,
+      "usd": 0.0012825800000000002
+    }
+  },
+  "828a3d1295d268f944dcbe84736425e585198f3245b425345f35bd34e7ba4a97": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7906,
+      "tokensOut": 281,
+      "usd": 0.00126018
+    }
+  },
+  "caa8757190ac11f06f2c796611dfa20cf094502d4d7c5e527b39dfbdcbd5a461": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 6007, \"reg\": 2 },\n      \"name\": \"ErrorCtor\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned from the global `Error` at the top of the function and used as `new r2(\\\"[Reanimated] `registerPseudoStyles` is not available in JSReanimated.\\\")`, so the register holds the Error constructor\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7611,
+      "tokensOut": 684,
+      "usd": 0.00140268
+    }
+  },
+  "37be275eac9eb0e9a41103b045007103dd70d67f3b651be399ef4895fd8e6dbb": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7545,
+      "tokensOut": 249,
+      "usd": 0.00117198
+    }
+  },
+  "f0844b35daf93209c315abb9ab387b5e9fa33b573316021d9fd00d94f6014bcb": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9374, \"reg\": 1 },\n      \"name\": \"timerId\",\n      \"confidence\": \"med\",\n      \"evidence\": \"passed as the sole argument to the global clearTimeout(a1) call; clearTimeout takes the handle returned by setTimeout, and nothing else in the body touches it\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7578,
+      "tokensOut": 755,
+      "usd": 0.00143158
+    }
+  },
+  "092e5aa4e8e1c6f9b5fff5e15cddaff14bf1418b8ddbe2733e82591db82f5ceb": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 15200, \"reg\": 1 },\n      \"name\": \"layout\",\n      \"confidence\": \"med\",\n      \"evidence\": \"the only use of a1 is the read `a1.windowWidth` in `translateX: -a1.windowWidth`, which positions the screen just off the window edge; the function builds a screen-transition spec from that layout width, which supports a layout/window-metrics object, not a generic props bag\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7829,
+      "tokensOut": 833,
+      "usd": 0.0015207800000000002
+    }
+  },
+  "16d0551cceb547220637853b3fd6f31b9fe6dcbd6c660b7b7c616681df0af32d": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 9064,
+      "tokensOut": 767,
+      "usd": 0.0017347800000000002
+    }
+  },
+  "e21e20f77ba2d39fc84637b2a76055a1187dc3c0e5e82706e2e4c8469b6b4c3e": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7633,
+      "tokensOut": 389,
+      "usd": 0.0012595800000000002
+    }
+  },
+  "499f665366babedd527276a4bb37e5597408f4b0209bafaaf9926c0590ccb8ec": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 9602,
+      "tokensOut": 1585,
+      "usd": 0.0022513800000000003
+    }
+  },
+  "b4e51d320cd52b1863ca6f36f1fc39317fa287730300f76a901a6d3d71c084b9": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 10722,
+      "tokensOut": 855,
+      "usd": 0.0021103800000000002
+    }
+  },
+  "34372b543417ea20ce4eeceb5453ab614813f68132a5907aa3a412405624068a": {
+    "text": "```json\n{\n  \"names\": [],\n  \"abstained\": true\n}\n```",
+    "cost": {
+      "tokensIn": 9859,
+      "tokensOut": 707,
+      "usd": 0.00186378
+    }
+  },
+  "e6b784a8f924e866b8e3edffa3197e368a4298c4a9a52733e80952db3e69fdc0": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":4295,\"reg\":8},\"name\":\"animatedProps\",\"confidence\":\"med\",\"evidence\":\"r8 = this, and the body reads this._props and walks its keys, copying each value through __getValue() or __getHandler(). The enclosing method is named \\\"__getValue\\\" in the fn#4295 header comment. The receiver is the object whose _props are unwrapped into a plain props object, which fits an animated-props node.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7994,
+      "tokensOut": 1082,
+      "usd": 0.0016782800000000003
+    }
+  },
+  "3c2c6c737b0561e43ea05d81e9e9fabe443124f984f511ec49b9a21bdef77d48": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 28732,
+      "tokensOut": 1124,
+      "usd": 0.0058468800000000005
+    }
+  },
+  "857f75c33a99a0787d1544e8e7acbc7bd273922a29e50e5e4a33391a4b837711": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 1530, \"reg\": 1 },\n      \"name\": \"pagerViewModuleRef\",\n      \"confidence\": \"med\",\n      \"evidence\": \"`let r1 = list[0]` is passed straight to `r5(r1)` (the require-like parameter a2), and the result is stored in `_e1897_0`, whose `.PagerView` property is read in usePagerView. No string literal in this body names the module, so this is inferred from the require-and-read pattern.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 15598,
+      "tokensOut": 1027,
+      "usd": 0.00317158
+    }
+  },
+  "096c02d389b0922416f0ad38176ac40713f926e173165ffed00ded5c3e0d1172": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 22963,
+      "tokensOut": 1227,
+      "usd": 0.00474458
+    }
+  },
+  "642ec31398a7423fe51b6959f58e97dfc343034ba10950a0bd08e30c925bde6c": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 9836,
+      "tokensOut": 882,
+      "usd": 0.0019466800000000001
+    }
+  },
+  "4bdc24dd4ab85dce7e8e9588c59283a5ad44b3e57663f5f5e6edbb4c74824e65": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 15533, \"reg\": 5 },\n      \"name\": \"resumeThrowMode\",\n      \"confidence\": \"med\",\n      \"evidence\": \"`let r5 = 1` is compared against the resume-action argument `r3` (`arguments[0]`) in `if (r3 === r5) { throw r0; }`, the throw branch, while `r4 = 2` is the return branch (`if (r3 === r4) { ... return {value: r0, done: true} }`). r5 is also stored into the state slots `_e4619_3` and `_e4619_4`, so it doubles as a state tag, which is why this is med rather than high.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9055,
+      "tokensOut": 1083,
+      "usd": 0.00189098
+    }
+  },
+  "26116575b5950315d4f5bb0b2877ba33493a83b519f11c556cddc835cdbca0ae": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":8343,\"reg\":41},\"name\":\"expectedType\",\"confidence\":\"high\",\"evidence\":\"Assigned per config key from the literals \\\"string\\\" (path, initialRouteName), \\\"object\\\" (screens), \\\"array\\\" (alias/exact/shared branch), and \\\"boolean\\\". It is then copied into r45 and interpolated into the message `- ${r47} (expected '${r45}', got '${r40}')`, where r40 is typeof of the value.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 11902,
+      "tokensOut": 934,
+      "usd": 0.00238588
+    }
+  },
+  "84beb589002558bd687e02d46cfa05b454226dede2325af09a5e5d802e1074fa": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 9493,
+      "tokensOut": 645,
+      "usd": 0.00175958
+    }
+  },
+  "997333daf8d4f3cab2ca90498f6917ac670cf41ec7642a3307f356b63e2432b5": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 8827, \"reg\": 29 },\n      \"name\": \"selectedTabIcon\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned from Reflect.apply(fe, undefined, [true]) in the L12 block (fe is the tabBarIcon resolver, and the true argument selects the focused state). Its .ios/.android/.shared parts are stored only into the `selectedIcon` fields of the android and ios appearance objects. The unselected counterpart r25 = fe(false) feeds `icon`.\"\n    }\n  ],\n  \"abstained\": false\n}\n```\n\nI left out `{8827,4}`. That register is reused for at least four unrelated values: the props argument, the theme from `useTheme`, the route from `routes[index]`, and the per-route options. Any single name would describe only one of those uses.",
+    "cost": {
+      "tokensIn": 28916,
+      "tokensOut": 1605,
+      "usd": 0.00612418
+    }
+  },
+  "e7d4b146b8e1babc0856cd6d5514a6d46506257c65b8c26360cdad2159be96a1": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8567,
+      "tokensOut": 463,
+      "usd": 0.00148338
+    }
+  },
+  "198bcb43c957ff2a864f4c99cb079df9530624b86320377fcc373023f2de57b3": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 943, \"reg\": 5 },\n      \"name\": \"callbackTypeModule\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from r9(list[0]) and used only as a module object whose .CALLBACK_TYPE property is read for the BEGAN/START/END/FINALIZE/UPDATE callback types passed to runCallback; no literal names the module itself\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 14739,
+      "tokensOut": 1287,
+      "usd": 0.00312978
+    }
+  },
+  "ab1edcd4f03ad1c4cf98e9f95690b6c80ff3a81222cf9cb7a9adfa1556bc76fd": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8388,
+      "tokensOut": 655,
+      "usd": 0.0015435800000000001
+    }
+  },
+  "0b9db39b800dfdb539d9f426680009dc8a80c5b83982c3a35fadf969bbdcb96c": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7542,
+      "tokensOut": 961,
+      "usd": 0.00152738
+    }
+  },
+  "6d8a90d4c549baa1f9c3813550148649306fa163d20d5113f2a869b2e7074dec": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12973, \"reg\": 0 },\n      \"name\": \"lastIndex\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r0 is set to literal 1, then reassigned to `r6 - r0` where r6 = _e3122_14.length, and that value is passed as the first argument to `r4.subtract(r0, r5)`. The register holds length minus one, which fits a last-index role, but the array's identity is not visible in this scope.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7864,
+      "tokensOut": 1006,
+      "usd": 0.00161428
+    }
+  },
+  "7c3beaa0e5732ef6c1614ff81662b46f3619066e9f69db6f8c656a133854f96b": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8150,
+      "tokensOut": 334,
+      "usd": 0.00133548
+    }
+  },
+  "d68b06b4aef1184ff02a10dfc6868eadccc3273c9d07811c1b3e95af43e4c69a": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12239, \"reg\": 2 },\n      \"name\": \"segmentRank\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r2 takes literal ranks 5 (undefined segment), 8 (\\\"*\\\"), 0 (\\\":\\\"-prefixed, neither \\\"(\\\" nor \\\"+\\\"/\\\"*\\\" suffix), then 0-7 from the nested branch tests on \\\"(\\\", \\\"+\\\", and \\\"*\\\" endsWith; it is copied into the emitted descriptor's `rank:` field in the param, wildcard and static object literals\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9575,
+      "tokensOut": 644,
+      "usd": 0.0017754800000000003
+    }
+  },
+  "61eace099d4e43ca4d2b855d5921bdc5c05ab19dde567f49057acb51a8be4c87": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 11807, \"reg\": 1 },\n      \"name\": \"handler\",\n      \"confidence\": \"low\",\n      \"evidence\": \"parameter a1 is stored into the closure slot _e3887_0, which the inner callback reads as .handlerTag and compares against another handlerTag; ghQueueMicrotask is loaded from a module-scope object, so the value is probably a gesture-handler-style object. Register-to-parameter mapping is inferred from the signature, not confirmed.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8102,
+      "tokensOut": 1656,
+      "usd": 0.00198688
+    }
+  },
+  "0db946b4f267b720dc068fdd7633c16eb702ad193d4b9611f599a7df53795548": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8618,
+      "tokensOut": 710,
+      "usd": 0.0016170800000000001
+    }
+  },
+  "9eac611a3c4d3be99d734ad858920a99a752ce3585b8f3ca24dfd632cc609644": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":9797,\"reg\":1},\"name\":\"navigationHooks\",\"confidence\":\"med\",\"evidence\":\"`r1 = _e2047_1` is only used for `r1.useNavigation` (assigned to `_e3279_0` via `useNavigation(\\\"StandardStaticProfile\\\")`) and `Reflect.apply(r1.useRoute, ...)`, so the register holds a module namespace of navigation hooks\"},{\"bindingId\":{\"fn\":9797,\"reg\":9},\"name\":\"uiComponents\",\"confidence\":\"med\",\"evidence\":\"`r9 = _e2047_0` is only used for `r9.Text` (the `jsx(Text, ...)` title) and `r9.Button` (the two `jsx(Button, ...)` elements), so the register holds a module namespace of UI components\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8413,
+      "tokensOut": 749,
+      "usd": 0.0015955799999999999
+    }
+  },
+  "511b1507ccb5f1c2ed66981415b3fa68d0deffb94566cb176ed386424f8f4a39": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8179,
+      "tokensOut": 1260,
+      "usd": 0.0018042800000000001
+    }
+  },
+  "1c7ffd0c143af37a4d54c04a6b4082672014d045eaaa6f46c2f669a750796d8c": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 15102, \"reg\": 8 },\n      \"name\": \"transformOriginKey\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned once from the literal \\\"transformOrigin\\\" (`r8 = \\\"transformOrigin\\\"`) and only compared against the property key (`if (r8 === r18)`), selecting the array-map branch for that key\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9477,
+      "tokensOut": 684,
+      "usd": 0.00177588
+    }
+  },
+  "5f71e4149a7197ff53e70cfbaccceffb2f6ba96609cf0f8208111582a9f8d03a": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 15469, \"reg\": 10 },\n      \"name\": \"customThemeName\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r10 is assigned only once, from the literal \\\"custom\\\". It sits alongside \\\"material\\\", \\\"light\\\" and \\\"dark\\\" (r11, r9, r8), which are compared against a value that is then sent as `themeName` in the RESTORE_SUCCESS payload. The literal is high-confidence evidence; the theme-name role is an inference from its siblings.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10239,
+      "tokensOut": 710,
+      "usd": 0.00194128
+    }
+  },
+  "80aea8023639c66207ee1b4bfb8de795e7b5fdc46ca9b35d0731256e34beae6b": {
+    "text": "{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 14148, \"reg\": 9 },\n      \"name\": \"bodyText\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r9 is assigned the result of Reflect.apply(Object.getPrototypeOf(...).text, list, []) on the non-cloned path, and the result of TextDecoder.prototype.decode (_e3909_1 with this=_e3909_2) applied to the read chunk on the cloned path. It is then returned as {value: r9, done: true}. The function is reached via list.checkBodyUsedError(\\\"text\\\"), which indicates the Body mixin's text() reader.\"\n    }\n  ],\n  \"abstained\": false\n}",
+    "cost": {
+      "tokensIn": 9456,
+      "tokensOut": 1169,
+      "usd": 0.00201418
+    }
+  },
+  "9c169811ef7a6dacb7e7bcb7f37d51fd3f82c10623d0990e5fa3016db56930bf": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7570,
+      "tokensOut": 593,
+      "usd": 0.00134898
+    }
+  },
+  "19edae89b2d7dce06958fa639b385c1107ad465e545b729323f705f0c29bcc58": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 15104, \"reg\": 2 },\n      \"name\": \"transformKey\",\n      \"confidence\": \"med\",\n      \"evidence\": \"the only register-2 definition with a literal is `let r2_2 = `${r6}_transform:${a1}``, and it is used as the property key in `list[r2_2] = arr`; the \\\"_transform:\\\" literal marks it as a key. The `r2 = undefined` assignment is a separate, unused definition of the same register, so the mapping is not certain.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8069,
+      "tokensOut": 1042,
+      "usd": 0.00167328
+    }
+  },
+  "613cd9b405256273b09744a0bc4f6d09a9c687bc5cb25652fb5f994cbb19254b": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 7753, \"reg\": 2 },\n      \"name\": \"value\",\n      \"confidence\": \"med\",\n      \"evidence\": \"a2 is coerced to string (r16) and stored as the second element of a [key, value] pair: it replaces r12[1] when the key a1 already exists in this.list, otherwise [r17, r16] is pushed. The function is named \\\"set\\\" in its header, and the list is serialised into url.query, which fits a name/value setter.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9440,
+      "tokensOut": 682,
+      "usd": 0.00176748
+    }
+  },
+  "24f7bfcbbbd7eacc0948c2ae523b000d18ccaabf502442f201e34a035b5341c0": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7998,
+      "tokensOut": 535,
+      "usd": 0.00140558
+    }
+  },
+  "0a4ed62f36e0a82e74846c13e553f6990ad8b59ceca69a93344650aa05239c92": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7803,
+      "tokensOut": 143,
+      "usd": 0.00117058
+    }
+  },
+  "077ba60240b22c8a154acad666516adfc9ff3c490b9cae926db668cbbc1a4886": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7792,
+      "tokensOut": 864,
+      "usd": 0.00152888
+    }
+  },
+  "b3410a008abc5211a4e5ff46f8bad2c3af6262928e9165cf3f2e7581516d8abb": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9199, \"reg\": 13 },\n      \"name\": \"onSwipeEnd\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned once from the property read `r13 = r3.onSwipeEnd` in the prop-destructuring block, then read as the value of the `onSwipeEnd: r13` key in the navigationState object literal. Caveat: r13 is reused later as a temp for `r13 = onIndexChange`, so the name fits only the first live range.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 12970,
+      "tokensOut": 1398,
+      "usd": 0.00283148
+    }
+  },
+  "fe71cf6e95322dab99acf61438fd0976e447e50c48c1d21bc5376967c60c0e89": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7534,
+      "tokensOut": 245,
+      "usd": 0.0011677800000000002
+    }
+  },
+  "62bb0e9747f685fbebd48d74c266c8679058e3d6cd8bbdb8e6a48a6a4b22c777": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8449,
+      "tokensOut": 1996,
+      "usd": 0.0022262799999999998
+    }
+  },
+  "a9a9278e9c085781332cb1e7c78934125bebb0f30fda035e50582fa57ec026c3": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8078,
+      "tokensOut": 487,
+      "usd": 0.0013975800000000003
+    }
+  },
+  "677496a25e360734d6ae828af42e7218711291fa0f46a69bd66feaa9c6db6a88": {
+    "text": "```json\n{\n  \"names\": [],\n  \"abstained\": true\n}\n```",
+    "cost": {
+      "tokensIn": 8537,
+      "tokensOut": 296,
+      "usd": 0.0013938800000000001
+    }
+  },
+  "642249589cec241219c0781a9890d20833d714fb9207875e803ed5b0b8748011": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9698, \"reg\": 5 },\n      \"name\": \"reactNative\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r5 = _e2016_2 is only used to read ScrollView and View, which are passed as JSX element types. The ScrollView props (contentInsetAdjustmentBehavior) and View props (style) fit the React Native core components. This is a contextual inference, not a literal.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8491,
+      "tokensOut": 869,
+      "usd": 0.00167118
+    }
+  },
+  "e7c5ed560eb4caa00cafb6320cba06e9fe5bc55ea5f0cc26426c7c2a502a8b03": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 10117,
+      "tokensOut": 590,
+      "usd": 0.0018568800000000002
+    }
+  },
+  "fe78cb8df83a0ef39e4ddf5f32e722d3efdd69ea0dd1df8a50821ca7a0866928": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 19623,
+      "tokensOut": 1064,
+      "usd": 0.00399508
+    }
+  },
+  "2255de7cad9ad61e7f52d45afdcfb972b8e3dad752838baed4be3f93213ffb93": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":10634,\"reg\":4},\"name\":\"hasMoreColumns\",\"confidence\":\"med\",\"evidence\":\"r4 is written only as the boolean `r0 < r8` (column index against props.numColumns) and read once by `if (!r4) break L1`, which is the entry guard for the column loop. Its initial `null` is overwritten before any read. Inferred from the body and the `_getItem` overlay, not from a literal.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7908,
+      "tokensOut": 925,
+      "usd": 0.00158258
+    }
+  },
+  "1cbb0500363aeabdea254141f92f7eff30d810097eec6e19b4735575d6bb94ca": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 15461, \"reg\": 7 },\n      \"name\": \"transformKey\",\n      \"confidence\": \"med\",\n      \"evidence\": \"assigned from the for-of key r13 over Object.keys(a1), and used as the index into _e4576_0.initialValues.transform[a2] (r12[r9]) and into a1 (r6[r7]); the key is a property name of a1 that selects an entry from the transform initial-values map\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8055,
+      "tokensOut": 1064,
+      "usd": 0.00168148
+    }
+  },
+  "0fd80d3d31300b9af242570e4c008af32060c7f109124563fb5f7cb13ed84c64": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7771,
+      "tokensOut": 264,
+      "usd": 0.0012246800000000001
+    }
+  },
+  "0c797811d4bb07c9ed7c1fe89fb0ea5341bfb19282b914a17804a7088e6d3a9b": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 9996,
+      "tokensOut": 594,
+      "usd": 0.0018346800000000002
+    }
+  },
+  "79dacaaa32f81845ca621973812efa061de35ecc7b590df612ec31e0708627ad": {
+    "text": "```json\n{\n  \"names\": [],\n  \"abstained\": true\n}\n```",
+    "cost": {
+      "tokensIn": 17528,
+      "tokensOut": 701,
+      "usd": 0.0033945800000000003
+    }
+  },
+  "6d0db05458bc03eac523700284809499eeb6dccb72a9dcd5e20773a96b9638c6": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 9406,
+      "tokensOut": 1075,
+      "usd": 0.00195718
+    }
+  },
+  "e0b8d0988013d7cfd29485307964c133f4346e4dab58794e71e6e24d1a742982": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8444,
+      "tokensOut": 1010,
+      "usd": 0.00173228
+    }
+  },
+  "f2a24aa1c2d873a4761d2c6a36a3bb83d8ec1dc71696d1f6c319557c7c6e0170": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12706,\"reg\":1},\"name\":\"reexportDescriptor\",\"confidence\":\"med\",\"evidence\":\"r1 is first set to Object.getOwnPropertyDescriptor(_e1749_0, r5). If that descriptor has no getter, r1 is replaced by {enumerable: true, get: get}, where get returns _e1749_0[_e4194_0]. The register is then passed as the third argument of Reflect.apply(defineProperty, Object, [_e1749_1, r5, r1]). This is the Object.defineProperty re-export-getter pattern, but the enclosing module is not visible, so the role is inferred.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7850,
+      "tokensOut": 1019,
+      "usd": 0.0016179800000000002
+    }
+  },
+  "f119d83a8e652f04f51dd9a7b97bd7f73c03bfb02e3af9dd418a4fbee0376177": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8409,
+      "tokensOut": 1018,
+      "usd": 0.0017292800000000001
+    }
+  },
+  "82d1cb273465707a3e0f445544bf30974ea76cd39a489511153986f35460d6f7": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7959,
+      "tokensOut": 529,
+      "usd": 0.00139478
+    }
+  },
+  "2f5608b7d611f91251a867ef91670802eb28d16e85bdd472220a49cdaae23c9b": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7762,
+      "tokensOut": 712,
+      "usd": 0.0014468800000000002
+    }
+  },
+  "5713bbf5c320c318d692a7278f11ec4bbffe3a695d5585936e36c1e78b5e7438": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12721, \"reg\": 1 },\n      \"name\": \"leadingOffset\",\n      \"confidence\": \"low\",\n      \"evidence\": \"a1 is the base that every return path adds to the item's flattened width/maxWidth (`r3 + r2.width`, `r3 + r2.maxWidth`), with a fallback of `a1 + 125`. The role is an offset from which the tab item's extent is measured. No string literal names it, and the body does not show what the offset is measured from.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7857,
+      "tokensOut": 847,
+      "usd": 0.00153338
+    }
+  },
+  "126b7589082adef49c431228cadab7ec46bcd6c6cf64285faa75f298f4fbc23a": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 9651,
+      "tokensOut": 845,
+      "usd": 0.0018911800000000001
+    }
+  },
+  "47b77b2059e3674bc0fe7613e738f83f6f230f73094056d8088a8d7a918fe936": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7959,
+      "tokensOut": 503,
+      "usd": 0.00138178
+    }
+  },
+  "59601b1543e5a20aee1d81d3bd9f696adddc17ce445b7f7988020e2c8a3f80d0": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8281,
+      "tokensOut": 181,
+      "usd": 0.0012851800000000001
+    }
+  },
+  "b70447dd2e1e1837529fbd823d7bf3153391d2f2bfe3b72770c80881ab393c2c": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 31798,
+      "tokensOut": 790,
+      "usd": 0.0062930799999999995
+    }
+  },
+  "9d38c3aa00a7011ebe27b895fd7184c4604d2598c52b08c35234cf10e48061f7": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 6451, \"reg\": 6 },\n      \"name\": \"invalidStepsMessage\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned from _e960_0.invalidStepsNumber(r7), where r7 is the steps argument, and interpolated directly after the \\\"[Reanimated] \\\" prefix in the thrown Error's template literal, so it is the message body\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8273,
+      "tokensOut": 820,
+      "usd": 0.0016030800000000002
+    }
+  },
+  "9c274ed9b4e04e23124e3937686e69a4ae43b59bedf6f7535b5f0e73380524e5": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8443,
+      "tokensOut": 561,
+      "usd": 0.0015075800000000001
+    }
+  },
+  "075f1b20c3cdd0ad61207ec09fa2f823436007c55544a4fa4980d360965513b8": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 11892,
+      "tokensOut": 724,
+      "usd": 0.00227888
+    }
+  },
+  "1f29b3e5e590d2c5451fee323219ec20c38ea10a6df13816809f355bf7481974": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8051,
+      "tokensOut": 273,
+      "usd": 0.0012851800000000001
+    }
+  },
+  "23e4ae084fe91629017f4b11b589c9b42a98926bcde5a6f59b261383ad4bdecd": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":5991,\"reg\":3},\"name\":\"sensorType\",\"confidence\":\"high\",\"evidence\":\"`let r3 = a1` is the value compared with `===` against `_e822_2.SensorType.ACCELEROMETER`, `GYROSCOPE`, `GRAVITY`, `MAGNETIC_FIELD` and `ROTATION`, and each match selects a sensor constructor, so it is the SensorType discriminator argument.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8495,
+      "tokensOut": 519,
+      "usd": 0.0014969800000000002
+    }
+  },
+  "f6acf160533b10e6cf9d5a9f447d133da888ee72eb3c2093976aa30e6927fe25": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8424,
+      "tokensOut": 612,
+      "usd": 0.00152928
+    }
+  },
+  "5ae30eb7e40daaba812a583f1e92acf94e2a2f55fd71c58d7b6eff282d9ce023": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 1379, \"reg\": 9 },\n      \"name\": \"exportDefiner\",\n      \"confidence\": \"med\",\n      \"evidence\": \"`let r9 = Object;` is an alias of the global Object, and its only use is `r9.defineProperty(r8, \\\"createBottomTabNavigator\\\", obj4)`, defining a getter-based export on the module exports object r8. The sibling `r7 = Object` does the same for \\\"createBottomTabScreen\\\".\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9211,
+      "tokensOut": 1024,
+      "usd": 0.00189268
+    }
+  },
+  "8d7aed1158dd3799477044151d4046ab0af3749fec1fbe3bcf70bf493f1a02bf": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 7076, \"reg\": 3 },\n      \"name\": \"Ctor\",\n      \"confidence\": \"med\",\n      \"evidence\": \"the binding holds the captured value _e1114_22, is read for `.prototype`, and is then the operand of `new r1()` in the same body. Its role is the constructor that createInstance instantiates. No string literal names it, and the function-level label \\\"createInstance\\\" comes from the overlay, not the body.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7601,
+      "tokensOut": 810,
+      "usd": 0.0014636800000000002
+    }
+  },
+  "c9ca5f5e0e7661f607b9bf6920e9e8ddbd9aa4a997ce717a5f3f21c0a9ec2d27": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":13825,\"reg\":6},\"name\":\"gestureHandler\",\"confidence\":\"med\",\"evidence\":\"r6 is the receiver of attachGestureHandler: it gets viewTag assigned from a1, supplies handlerTag, onGestureHandlerEvent and onGestureHandlerStateChange to registerOldGestureHandler, and its props are read for onGestureEvent and onHandlerStateChange. The string keys \\\"workletEventHandler\\\" and \\\"current\\\" are checked on these handlers.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8639,
+      "tokensOut": 842,
+      "usd": 0.0016872800000000002
+    }
+  },
+  "3d6f1597095ecf655178f199aa0d6f510e3ec9cbe325a5b44e30624d4cddaca3": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7599,
+      "tokensOut": 612,
+      "usd": 0.00136428
+    }
+  },
+  "f9aa2de6586ba6784278139a68bdf6a2adc8f503f3b6cfdfa0db3f95a0e5fdf4": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":13449,\"reg\":0},\"name\":\"navigation\",\"confidence\":\"med\",\"evidence\":\"initialised from the captured binding _e3308_1 and then used only as `r3.navigate(\\\"LocationDetails\\\", obj)`, the React Navigation navigator call shape\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7586,
+      "tokensOut": 522,
+      "usd": 0.0013166800000000002
+    }
+  },
+  "1ad822604e8d200c9bee46372ccbb0ee06fedceebeffc2fecbd73ddfe741c354": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8757,
+      "tokensOut": 349,
+      "usd": 0.0014643800000000002
+    }
+  },
+  "488ae069209f7d7977a88ba45c0f7fa7689ecdfcf4dde2ed323b83147876e97e": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12912,\"reg\":0},\"name\":\"routeKey\",\"confidence\":\"med\",\"evidence\":\"a1 is copied into captured _e4252_0, which is compared against a1.key inside the findIndex callback over _e3114_15.current.routes; the parameter is a key used to locate a route by its key field. No string literal names it.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7700,
+      "tokensOut": 728,
+      "usd": 0.00144248
+    }
+  },
+  "84bef271987b94643280d91892b4ae977c06e0b97e410d455d4df72d126326cf": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7785,
+      "tokensOut": 256,
+      "usd": 0.00122348
+    }
+  },
+  "e2e023a4cdd6a9a1d69db0408a33555f2f37a2a6deb6c0013f9ae16b35585571": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 7988, \"reg\": 8 },\n      \"name\": \"isHydrated\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r8 is first set by r13.useSyncExternalStore(_e1353_25, _fn11970, _fn11971), where the getSnapshot and getServerSnapshot thunks return true and false, the standard client-vs-server mounted check. It then gates the width >= 1024 comparison (r10 = r8 && width >= 1024). r8 is reused for other values later in the function, so the name covers only this first live range.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 16482,
+      "tokensOut": 1236,
+      "usd": 0.00345288
+    }
+  },
+  "f716023483f7ca0a63f4bc1b8def0649f3b65bdf9c329464dae15d83f0e10475": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7542,
+      "tokensOut": 393,
+      "usd": 0.00124338
+    }
+  },
+  "eb93e108038b6d77628c18eb07c18565ab5a9fafc571176ffb13da5bed6befa5": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7770,
+      "tokensOut": 351,
+      "usd": 0.0012679800000000001
+    }
+  },
+  "2cc89d58671002a9496f481a39960ab3edb20917fff460b223dc137fd7448b21": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8861,
+      "tokensOut": 385,
+      "usd": 0.0015031800000000002
+    }
+  },
+  "acf89e81aaac80cf76f5934c4132cb7384e047666ef9542041b185f03fa30eb0": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 7595,
+      "tokensOut": 971,
+      "usd": 0.00154298
+    }
+  },
+  "40966d4b3925ef12dbf9b6beb00773f5632d72caf74107c65c9466cf1a5cd35d": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8453,
+      "tokensOut": 818,
+      "usd": 0.00163808
+    }
+  },
+  "4b821ca7a497b22d6b8ff7ee1a0879e0724cce3a700d2567e75da147ad77ea5f": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9740, \"reg\": 13 },\n      \"name\": \"jsx\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned from the property \\\"jsx\\\" of _e2028_3 (`r13 = r7.jsx`), the same module that supplies `jsxs` (`jsxs = r7.jsxs`); called as `r13(r11, r5)` with `r11 = _e2028_0.Text`, a single-child element, which matches the runtime's `jsx` (vs `jsxs`) factory\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 8249,
+      "tokensOut": 1003,
+      "usd": 0.00168978
+    }
+  },
+  "d7e10c478ac0007d6dd81b94eb2cf062bca64e5951194ede80be0861bd43a84d": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 13099, \"reg\": 2 },\n      \"name\": \"thenableState\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r2 is loaded from _e3164_1, then written with .promise (r2.promise = r4, where r4 = _e1952_4.pendingThenable()), and read back via .error (r4.reject(r2.error)) and .data (r4.resolve(r2.data)). The {promise, data, error} shape of a thenable-tracking record is the basis; no string literal names it.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7939,
+      "tokensOut": 796,
+      "usd": 0.00152428
+    }
+  },
+  "ea4544ae90c95ddcf630767a70cf637e612cc18d4588ab31b79c234b1b6f28b6": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":3108,\"reg\":5},\"name\":\"eventInit\",\"confidence\":\"med\",\"evidence\":\"assigned from a1 and passed as the second argument to Reflect.construct(superCtor, [\\\"measure\\\", r5], new.target), i.e. the init dict after the literal event type \\\"measure\\\"; its only other use is the read r5?.detail, which copies into construct.__detail\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7785,
+      "tokensOut": 729,
+      "usd": 0.00145998
+    }
+  },
+  "db29eeabec8d6b091af6ccf878b30aca5379ed3e4369aac4e973ca423e47be05": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 9673, \"reg\": 10 },\n      \"name\": \"restProps\",\n      \"confidence\": \"med\",\n      \"evidence\": \"`let r10 = __hbc_b_copyDataProperties(r14, r8, Object.assign(Object.create(r1), {tabBar: 0, state: 0, navigation: 0, descriptors: 0}))` copies the props of the outer argument minus tabBar/state/navigation/descriptors, and r10 is spread into the TabView props object (`{...r10, onIndexChange: ...}`). The register is reused later for `r10 = r9.swipeEnabled`, so the name covers only the first assignment.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 11531,
+      "tokensOut": 848,
+      "usd": 0.0022686800000000003
+    }
+  },
+  "39fe1a2e4a04f00bfc8578e079b9e1a036377fdb150dc20b6c5fc2e0e42e7cc9": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":15141,\"reg\":17},\"name\":\"targetTransforms\",\"confidence\":\"med\",\"evidence\":\"r17 is assigned only from r8, the one-element array [{translateY: 0}], and is passed as the first argument to the helper _e3796_5 that builds the animations.transform value. The sibling initialValues.transform uses translateY: -25, so this array is the animation's end-state transform list. The helper itself is not visible in this scope, so the role is inferred from the values, not from a literal.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8191,
+      "tokensOut": 828,
+      "usd": 0.00159068
+    }
+  },
+  "e7e43b8d4d5e07288f05f03c0e8491036e2e7c802c4d292464b1d994cc16f7c6": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":13417,\"reg\":4},\"name\":\"objectCtor\",\"confidence\":\"med\",\"evidence\":\"`r4 = Object` is the only assignment to this register (a global read). It is then used as the receiver for `r4.defineProperty` and passed as `this` to `Reflect.apply(defineProperty, r4, ...)`. The name records that it is the Object constructor used as the defineProperty receiver, not a generic object.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 7850,
+      "tokensOut": 678,
+      "usd": 0.0014474800000000001
+    }
+  },
+  "2a14479204d04002eec063c7d1b11ea076a36969c0e0bb7c3b7d444edfa02d4f": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12719, \"reg\": 24 },\n      \"name\": \"positionInSet\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned once as `r24 = r5 + r0` with `r0 = 1` (where r5 is still the parameter a2, the tab index compared against _e3055_0.index), and consumed only in the template literal `${r26}, ${r24} of ${r22}` where r22 = _e3055_20.length. It is the 1-based position of the tab in the set, the value behind the accessibility label \\\"Label, N of M\\\".\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 11287,
+      "tokensOut": 1374,
+      "usd": 0.0024828800000000002
+    }
+  },
+  "990de33ee55c845bdc8556ff3814369fed34b8ab433e46d5cef6a1bd25ab0e26": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 9182,
+      "tokensOut": 262,
+      "usd": 0.00150588
+    }
+  },
+  "fde2e8836a20928e3f95b9714f011dd3148ade63511d567a5b0ffe99dd25de34": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 10506,
+      "tokensOut": 1245,
+      "usd": 0.00226218
+    }
+  },
+  "d4f8cbda371f81d54ae5565354ee89274f42af212583916e0e07bb4d4712ad46": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 11612, \"reg\": 12 },\n      \"name\": \"config\",\n      \"confidence\": \"high\",\n      \"evidence\": \"r12 is the second element of the iterator result from getAnimationAndConfig() (r6 = __t[0] after __hbc_iterNext, then r12 = r6), and it is stored into the closure record as the property `config: r12` alongside `animation: r14`.\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10182,
+      "tokensOut": 1173,
+      "usd": 0.00216138
+    }
+  },
+  "35b34fb2d2cf874e725d9081c8b30a7e2c3c6b024d29489dbcae982e9611d99a": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 3035, \"reg\": 0 },\n      \"name\": \"illegalConstructorError\",\n      \"confidence\": \"high\",\n      \"evidence\": \"constructed as new TypeError(\\\"Failed to construct 'Performance': Illegal constructor\\\") and immediately thrown; the literal names the illegal-constructor failure\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7595,
+      "tokensOut": 573,
+      "usd": 0.00134398
+    }
+  },
+  "9ef16d2df9a6a63a7c464b6a1625946ca0837146f186bc52d2b88546b7fbc632": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8258,
+      "tokensOut": 702,
+      "usd": 0.00154108
+    }
+  },
+  "36b862afc40ee6bcc0d01ad841257950739dbf8ca4d7ce6f80bf1e14a16dcd02": {
+    "text": "```json\n{\"names\": [], \"abstained\": true}\n```",
+    "cost": {
+      "tokensIn": 8349,
+      "tokensOut": 205,
+      "usd": 0.00131078
+    }
+  },
+  "b5b93ae6101cd7d5c1f641b57eec66c2553293d92bdeda8e68a9ee33f3354a34": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7535,
+      "tokensOut": 403,
+      "usd": 0.00124698
+    }
+  },
+  "249e511d4788b9403201ef9299116e0f48905f5ac9fcd8c3165fc7aebed0c619": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12023, \"reg\": 4 },\n      \"name\": \"objectRef\",\n      \"confidence\": \"med\",\n      \"evidence\": \"only assignment is `r4 = Object;` (the global Object), and r4 is used only as `r4.defineProperty` and as the thisArg in `Reflect.apply(defineProperty, r4, [...])`, so it is the Object receiver for defineProperty\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 7850,
+      "tokensOut": 632,
+      "usd": 0.00142448
+    }
+  },
+  "1cb8494c23a15d9a7efa57d1fdab6bc199a9edc59876f3a356f8bd8560b1b3f2": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 10547,
+      "tokensOut": 483,
+      "usd": 0.00188938
+    }
+  },
+  "6b91f8d11f00d20e15db80467e15463e96139cf4bc39b0c80c1a3b779f4702b9": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7685,
+      "tokensOut": 718,
+      "usd": 0.0014344800000000001
+    }
+  },
+  "bea5b7a07ad2c50bb42aded90a1e24b389cc02d7f8806b121f6f3155c3bb28ae": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8475,
+      "tokensOut": 831,
+      "usd": 0.00164898
+    }
+  },
+  "2ca1a5bd227f9d507a5f2c02129e2b0d6e505ef80680923637ef3c54d5ea5119": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 10021,
+      "tokensOut": 156,
+      "usd": 0.00162068
+    }
+  },
+  "664ba1c3e6976f071233fdfe1c6ffadaa90b02e6c8e2d3581039f26b2ad3641a": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 10504,
+      "tokensOut": 549,
+      "usd": 0.00191378
+    }
+  },
+  "6d23d4af2d9ff17ec18a2e34f351588eebbc3e76cbcc84c5e475d47b2b9d9714": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 285, \"reg\": 8 },\n      \"name\": \"moduleExports\",\n      \"confidence\": \"high\",\n      \"evidence\": \"r8 = a6 is assigned once and never reassigned in fn 285; it is the receiver of Object.defineProperty(r8, \\\"__esModule\\\", {value: true}) and of defineProperty(r8, \\\"default\\\", getter), the standard export-object setup\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 22414,
+      "tokensOut": 687,
+      "usd": 0.00436478
+    }
+  },
+  "a6d55324ff3ecb445aa1766765a92b8a4a248387de183953df68eacf2bfc8059": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7733,
+      "tokensOut": 700,
+      "usd": 0.00143508
+    }
+  },
+  "dca3525abf4629ae147692d0ac01fd6dff66155c9682bcd19b56bfdf09a25888": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 8125,
+      "tokensOut": 502,
+      "usd": 0.00141448
+    }
+  },
+  "f361f9a79d98c776af1b5c1c6a1d835c323286540bdf7253120017d268677274": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 11941,
+      "tokensOut": 667,
+      "usd": 0.00226018
+    }
+  },
+  "6648a503d35543f0900d5812e6b6ebc579d5bccd5def28fd82cc401f64b27310": {
+    "text": "{\"names\": [], \"abstained\": true}",
+    "cost": {
+      "tokensIn": 7624,
+      "tokensOut": 701,
+      "usd": 0.0014137800000000001
+    }
+  }
+}
