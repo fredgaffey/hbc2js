@@ -1913,3 +1913,25 @@ set) stops being read automatically.
   — the same, held-out app, sweep-gated + skips (INCONCLUSIVE) if the
   gitignored fixture isn't seeded locally. Numbers: "Informed confirm mode"
   above.
+
+### Generic-word guesses (corpus-guess-generic)
+
+The guessed tier carried common words as package names across the 22-app
+corpus (`focus`, `any`, `reject`, `fallback`, `point`, `event`, `round`,
+`regex`, `sections`, `fixed`): a bundle string literal equal to some npm
+package name became a `package-name-string` guess (step 3b of
+`src/deps/guess.ts`), and the npm-search fallback (step 5) seeded queries
+from the same kind of string. A bare single-token string is a common
+identifier, not package-identifying evidence. The rule is structural, with
+no word list: a bare string counts as `package-name-string` evidence only
+when it carries a package separator (`-`, `.`, `/`, `@`), or is one of the
+curated native-module/host package names; the npm-search lead string needs
+a separator too. `name@version` literals and native-module/url-host evidence
+are unaffected. Cost: a real single-word package seen only as a bare string
+(`debounce`, `invariant`, `nanoid`) is no longer guessed by that clue; it
+can still be confirmed by signature, or guessed by native-module, host or
+dependency-edge evidence. Measured offline against `db-v3-clean`:
+Expensify guessed tier 14 reported / 3 TP / 11 FP became 8 / 2 TP / 6 FP
+(`debounce` lost; `test-renderer` and `@react-native-community/checkbox`
+newly surfaced as FP); react-navigation-example 5 / 4 TP / 1 FP became
+4 / 4 TP / 0 FP. Tests: `tests/gate/deps/guess.test.ts` (`corpus-guess-generic`).
