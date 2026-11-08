@@ -1,4 +1,4 @@
-; hbc2js disassembly of 94-reg-reuse-straight/v84.hbc
+; hbc2js disassembly of 96-reg-reuse-straight/v84.hbc
 ; version=84 layout=B opcodeTable=hbc84 functions=5 strings=19 globalCodeIndex=0
 function #0 "global"  params=1 frame=13 env=0 flags=dbg  @0x000001a0 size=99
   0000  DeclareGlobalVar     s12 "makeLoader"

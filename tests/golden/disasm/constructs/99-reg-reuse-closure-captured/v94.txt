@@ -1,4 +1,4 @@
-; hbc2js disassembly of 97-reg-reuse-closure-captured/v94.hbc
+; hbc2js disassembly of 99-reg-reuse-closure-captured/v94.hbc
 ; version=94 layout=C opcodeTable=hbc94 functions=3 strings=9 globalCodeIndex=0
 function #0 "global"  params=1 frame=12 env=0 flags=dbg  @0x00000118 size=56
   0000  DeclareGlobalVar     s7 "counter"

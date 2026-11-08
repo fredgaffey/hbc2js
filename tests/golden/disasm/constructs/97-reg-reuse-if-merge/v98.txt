@@ -1,4 +1,4 @@
-; hbc2js disassembly of 95-reg-reuse-if-merge/v98.hbc
+; hbc2js disassembly of 97-reg-reuse-if-merge/v98.hbc
 ; version=98 layout=E opcodeTable=hbc98-late functions=2 strings=10 globalCodeIndex=0
 function #0 "global"  params=1 frame=18 env=0 flags=dbg,overflowed  @0x000000fc size=78
   0000  DeclareGlobalVar     s8 "pick"

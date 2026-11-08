@@ -1,4 +1,4 @@
-; hbc2js disassembly of 96-reg-reuse-loop-carried/v94.hbc
+; hbc2js disassembly of 98-reg-reuse-loop-carried/v94.hbc
 ; version=94 layout=C opcodeTable=hbc94 functions=2 strings=6 globalCodeIndex=0
 function #0 "global"  params=1 frame=13 env=0 flags=dbg  @0x000000e4 size=71
   0000  DeclareGlobalVar     s5 "sumTo"
