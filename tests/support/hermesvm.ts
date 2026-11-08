@@ -15,6 +15,7 @@ const CANDIDATES: readonly { version: number; rel: readonly string[] }[] = [
   { version: 84, rel: ["tools", "hermesc", "v84", "hermes"] },
   { version: 94, rel: ["tools", "hermes-vm", "v94", "bin", "hermes"] },
   { version: 96, rel: ["tools", "hermes-vm", "v96", "bin", "hermes"] },
+  { version: 98, rel: ["tools", "hermes-vm", "v98", "bin", "hermes"] },
   { version: 99, rel: ["tools", "hermes-vm", "v99", "bin", "hermes"] },
 ];
 

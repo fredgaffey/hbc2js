@@ -6,7 +6,7 @@
 # react-native/hermes-compiler ship hermesc only, no VM).
 #
 # Usage:
-#   tools/build-hermes-vm.sh <94|96|99>
+#   tools/build-hermes-vm.sh <94|96|98|98-early|99>
 #
 # Output: tools/hermes-vm/v<N>/bin/{hermes,hermesc,hbcdump} (gitignored).
 # Source clones and build trees live in tools/hermes-vm/src-<N>/ and
@@ -47,6 +47,15 @@
 #         tarball's `osx-bin/`), which is why this project's harness could
 #         already run v96 fixtures against a VM on macOS — but nothing
 #         portable ships for Linux, hence this source build.
+#   98 -> 639e5d6afb16ce5018afe5005427a4a85f9bf28b   ("v98-late", the default 98)
+#         "static_h", parent of the v99 bump; BYTECODE_VERSION==98, 210 opcode
+#         defs (third_party/hermes/hbc98-late), class-E header layout and
+#         f74f6bbe37's NumCacheNewObject (37-byte large header). This is the
+#         layout every publicly shipped hermes-compiler@250829098.0.x emits,
+#         hence the RN 0.85/0.86 held-out bundles. Output dir tools/hermes-vm/v98.
+#   98-early -> c00cc57595b3ef504a323360ba77e7b2e0ac26ce  (third_party/hermes/hbc98-2024)
+#         v97-shaped class-D layout; no known public producer. Output dir
+#         tools/hermes-vm/v98-early (src-98-early, build-98-early).
 #   99 -> 913d31acd10aff31e0856657c9c566c3e72bd24a
 #         "static_h" (Static Hermes) lineage. This is "Revert bytecode version
 #         to 99" (2026-03-05), the commit that inserts NewTypedObjectWithBuffer
@@ -74,10 +83,12 @@ REPO_URL="${HERMES_REPO_URL:-https://github.com/facebook/hermes.git}"
 
 version_94_sha="3815fec63d1a6667ca3195160d6e12fee6a0d8d5"
 version_96_sha="644c8be78af1eae7c138fa4093fb87f0f4f8db85"
+version_98_sha="639e5d6afb16ce5018afe5005427a4a85f9bf28b"
+version_98_early_sha="c00cc57595b3ef504a323360ba77e7b2e0ac26ce"
 version_99_sha="913d31acd10aff31e0856657c9c566c3e72bd24a"
 
 usage() {
-  echo "Usage: $0 [--clean] <94|96|99>" >&2
+  echo "Usage: $0 [--clean] <94|96|98|98-early|99>" >&2
   exit 1
 }
 
@@ -86,13 +97,13 @@ VERSION=""
 for arg in "$@"; do
   case "$arg" in
     --clean) CLEAN=1 ;;
-    94|96|99) VERSION="$arg" ;;
+    94|96|98|98-early|99) VERSION="$arg" ;;
     *) usage ;;
   esac
 done
 [ -n "$VERSION" ] || usage
 
-sha_var="version_${VERSION}_sha"
+sha_var="version_${VERSION//-/_}_sha"
 SHA="${!sha_var}"
 
 SRC_DIR="$OUT_ROOT/src-$VERSION"
