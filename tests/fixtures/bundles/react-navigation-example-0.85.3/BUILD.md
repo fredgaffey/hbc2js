@@ -88,6 +88,16 @@ npm/yarn/pnpm/lerna workspace using the common `packages/<name>` layout, not
 special-cased to this repo. Only active when `--root` is passed (fixture
 generation time); scoring a committed `truth.json` never needs it.
 
+**Versions without a node_modules tree (2026-11-09).** `deps-truth.mjs` now
+takes a package's version from the pnpm store directory name
+(`node_modules/.pnpm/<name>@<ver>[_peers]/node_modules/<name>/`) when no
+`package.json` is readable, so a truth regenerated after the install is gone no
+longer has `version: null` for pnpm-installed packages (64 of 76 before). Any
+package still without a version carries a `versionNullReasons` entry. Workspace
+packages (`packages/<name>/`) still need `--root` for name and version.
+Regenerating from the on-disk `.map` alone drops the workspace packages, so
+the existing file was patched in place (null versions filled, nothing else).
+
 ## Sizes, timing, hashes
 
 Reproduction notes (2026-11-09 repro): fetch.sh used to clone upstream HEAD
