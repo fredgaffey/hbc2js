@@ -55,3 +55,8 @@ test("deps-recall-nosig: entry source requires each specifier; build-one uses th
   const src = readFileSync(new URL("../../../tools/pkgsig/bulk/build-one.mjs", import.meta.url), "utf8");
   assert.ok(/entryPlan\(/.test(src) && /entrySource\(/.test(src));
 });
+
+test("deps-recall-nosig: a non-string main (math-intrinsics) does not throw", () => {
+  const d = pkgDir({ "package.json": JSON.stringify({ name: "mi", main: false, exports: { "./abs": "./abs.js" } }), "abs.js": "", "index.js": "" });
+  try { assert.deepEqual(entryPlan("mi", d).attempts, [["mi", "mi/abs"], ["mi"]]); } finally { rmSync(d, { recursive: true, force: true }); }
+});

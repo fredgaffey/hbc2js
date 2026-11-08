@@ -92,7 +92,8 @@ export function entryPlan(name, pkgDir, fs = createRequire(import.meta.url)("nod
   const pj = JSON.parse(readFileSync(`${pkgDir}/package.json`, "utf8"));
   const exp = pj.exports;
   const sugar = typeof exp === "string" || Array.isArray(exp) || (exp && typeof exp === "object" && !Object.keys(exp).some((k) => k.startsWith(".")));
-  const mainRel = (pj["react-native"] && typeof pj["react-native"] === "string" ? pj["react-native"] : null) ?? pj.main ?? "index";
+  const str = (v) => (typeof v === "string" && v !== "" ? v : null);
+  const mainRel = str(pj["react-native"]) ?? str(pj.main) ?? "index";
   const root = sugar || (exp && typeof exp === "object" && "." in exp) || fileExists(pkgDir, mainRel.replace(/^\.\//, ""), existsSync, statSync);
   const subs = [];
   if (exp && typeof exp === "object" && !sugar) {
