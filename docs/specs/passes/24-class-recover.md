@@ -432,7 +432,18 @@ class-recover: { stage: "B", catalogue: [20],
 
 ### 3.1 Site
 
-`match(list, ctx)` returns `null` unless `list === ctx.fnBody` (F1). One site
+`match(list, ctx)` returns `null` unless `list === ctx.fnBody` (F1). Since
+2026-11-09 a group may also sit in the body of a labelled block that is,
+through labelled blocks only, a statement of that body: the structurer opens
+`L0: { ... }` around the class definitions whenever a later `break` skips to a
+shared inlined-constructor brand-check throw, and F1 then recovered no class
+at all (fixture 93-class-labelled-block). Such a list is entered at most once
+per activation and runs in order until a `break` leaves it -- the property F1
+relies on -- and a group is simple statements, so no `break` sits inside it.
+The group is walked over a *view*: the function body's `func` declarations
+(hoisted, so bound before any statement runs) followed by the block's body;
+the checker states its effect obligation over the same view, and obligation 1
+(rebuild and compare) still pins every statement of the whole body. One site
 per **class-creation group** in that body; a body may hold several (fixture
 33 has three). A group is, in statement order:
 
@@ -740,3 +751,98 @@ assignment: an AssignmentExpression evaluates its right-hand side, the class
 heritage included, before `PutValue` (ES2024 13.15.2), and no statement
 between the pair and the head writes a register. Pinned by
 `tests/gate/passes/derived-ctor.test.ts`.
+
+## 9. Inlined construction: `inline-new` (2026-11-09, catalogue R16)
+
+**Problem.** hermesc inlines `new C(args)` of a class whose constructor it can
+see, in the defining frame and in functions nested in it: the receiver (base:
+`X = C.prototype; X = Object.create(X === null ? null : typeof X === "object"
+? X : Object.prototype)`; derived: `P = Object.getPrototypeOf(C); X =
+Reflect.construct(P, [args], C)` plus the dead `"super() called twice"` guard)
+followed by a copy of the constructor body with `this` := X. The copy keeps a
+symbol-keyed private install outside the class, which is what
+`private-fields`' R-PF1 (`defining-body-escape`) refuses, and in another frame
+a dead `CreateThisForNew` ahead of it (`W_UNPAIRED_NEW`).
+
+**Choice.** A separate rung (`src/passes/inline-new/`), after `class-recover`,
+`super-call` and `ctor-this` and before `private-fields`, rebuilds the region
+as `X = new C(args)`. It is the only owner of this shape: the other class rungs
+rewrite the class node, this one rewrites its *uses*. It works on the defining
+frame's body (top level and labelled blocks, as F1) and the top-level lists of
+the functions declared directly in it. Rejected alternative: matching the
+inlined bytecode against the constructor's bytecode -- the inliner
+constant-propagates arguments and re-allocates registers, so instruction
+identity fails exactly where the AST comparison below succeeds by tokens.
+
+### 9.1 Candidates
+
+A region starts at a header whose class operand holds a *class token*: the
+register a `C = class {...}` store wrote, or an env slot `classBindingSlots`
+(spec 28) proves holds that class for the module's life. Base header H-B
+needs a class with no `extends`, derived H-D one with `extends`.
+
+### 9.2 Soundness: lock-step comparison over value tokens
+
+Both sides are walked once, in order. Each identifier carries a token: `lit:`
+(a literal), `id:N` (N unchanged since the scan began), `w:n` (a value written
+during the scan), `cls:`, `obj` (the receiver). (1) *Silent* statements --
+stores whose value is an identifier or literal, and declarations -- run no
+user code; on either side they only update that side's tokens. (2) Every
+other constructor statement pairs with exactly one caller statement, compared
+structurally with identifiers compared by token; a constructor parameter binds
+on first use to the caller token at that position; a constructor free name
+(an env slot, `Object`, the throw helper) is resolved in the caller's tokens,
+because the class's scope is the defining frame's. After each paired
+statement every env slot is re-tokened unknown (user code may have written
+it) except slots whose only write in the module is one straight-line store
+in the defining frame. (3) `if (E)` pairs with `if (E')` or `A = E'; if (A)`
+(either side) and both branches must throw the emitter's TypeError helper
+with the same literal message; a caller `break L` stands for the code after
+`L: {...}`. A frame containing a `try` is never examined, so a throw's
+register writes are unobservable. (4) Arguments: each bound token must be
+held, at the header, by a literal or a name (unbound parameters become
+`undefined`, trailing ones dropped -- sound because R-IN1 forbids `arguments`).
+(5) Every other register the region wrote is dead after it (overwritten
+before any read on every path, conservative: a jump refuses), or re-stored
+after the `new` from a literal / unwritten name. The constructor that
+`new C` runs is the very body compared (the class token proves the callee),
+so the region and `X = new C(args)` perform the same effects on the same
+receiver. Accepted deviation: an env-slot class binding read before its one
+store throws a TypeError in both forms, with a different message.
+
+### 9.3 Refusal codes (via `ctx.refuse`, counted per site)
+
+| code | meaning |
+|---|---|
+| R-IN1 | the constructor body has something the comparison does not model (control flow other than a throwing `if`, `return`, a nested function, `arguments`, `new.target`, a write to an outer name), or a derived body without a leading `super(...)` after silent stores |
+| R-IN2 | the caller region is not the constructor body (a statement or `if` test differs, an extra write -- 92 and the unit test --, the receiver overwritten, the frame ends first) |
+| R-IN3 | an `if` is not the same TypeError throw on both sides |
+| R-IN4 | an argument value is held by no name at the header |
+| R-IN5 | a register the region wrote is live after it and cannot be re-stored |
+| R-IN7 | a constructor free name is declared in the calling frame (capture) |
+
+(R-IN6, a frame with `try`, is silent: no candidate is examined.)
+
+### 9.4 Checker
+
+The rewrite moves effects into the constructor, so `effectSequence` equality
+cannot guard it. `check` re-derives the whole fold from `before` and requires
+`after` to be identical, then no new free name and `parses`.
+
+### 9.5 Tests and what stays open
+
+`tests/gate/passes/inline-new.test.ts`: fixtures 90 (base + private field, top
+level and `open`), 91 (derived, top level and `child`), 92 (a hand-written
+look-alike, stays), 93 (F1 labelled block), T2 PASS at v98/v99, both modes
+print expected.txt (v99 VM), and a hand-built AST with one extra write between
+the create and the body (R-IN2) beside the same shape without it (folded).
+Open: (a) the dead `CreateThisForNew` block ahead of an inlined `new` in
+another frame stays (it is sound, and the warning is the lowering's); (b) on
+fixture 90 `private-fields` still refuses R-PF1 after the rebuild because the
+symbol's register is REUSED later in the defining frame -- R-PF1 counts any
+later mention of the register name, including writes of unrelated values;
+(c) on 93 `private-fields` refuses `ambiguous-multiple-classes`; (d) a class
+whose only prototype member is installed through `C.prototype` directly
+(fixture 91's `Base`, 92's `Point` with one method) is refused `no-members`
+by class-recover; (e) fixture 89's env-IIFE class is not reached (the class
+sits in the spec-27 IIFE's body, a different function body).

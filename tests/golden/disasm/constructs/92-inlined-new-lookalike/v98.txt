@@ -1,0 +1,94 @@
+; hbc2js disassembly of 92-inlined-new-lookalike/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=4 strings=17 globalCodeIndex=0
+function #0 "global"  params=1 frame=24 env=0 flags=dbg,overflowed  @0x0000016c size=206
+  0000  CreateFunctionEnvironment r4, 1
+  0003  DeclareGlobalVar     s7 "lookalike"
+  0008  GetGlobalObject      r5
+  000a  CreateClosure        r6, r4, f1 "lookalike"
+  000f  PutByIdLoose         r5, r6, #c0, s7 "lookalike"
+  0015  LoadConstUndefined   r2
+  0017  CreateBaseClass      r8, r6, r2, 2
+  001d  Mov                  r9, r6
+  0020  LoadConstString      r7, s13 "norm"
+  0024  CreateClosure        r6, r2, f3 "norm"
+  0029  DefineOwnByVal       r9, r6, r7, 0
+  002e  StoreToEnvironment   r4, 0, r8
+  0032  GetByIdShort         r4, r8, #c0, s15 "prototype"
+  0037  NewObjectWithParent  r7, r4
+  003a  LoadConstUInt8       r0, 1
+  003d  PutByIdStrict        r7, r0, #c1, s16 "x"
+  0043  LoadConstUInt8       r0, 2
+  0046  PutByIdStrict        r7, r0, #c2, s9 "y"
+  004c  GetByIdShort         r4, r5, #c1, s7 "lookalike"
+  0051  LoadConstUInt8       r1, 4
+  0054  LoadConstUInt8       r0, 3
+  0057  Call3                r4, r4, r2, r0, r1
+  005d  TryGetById           r11, r5, #c2, s14 "print"
+  0063  TryGetById           r9, r5, #c3, s10 "Object"
+  0069  GetByIdShort         r6, r9, #c4, s8 "keys"
+  006e  Call2                r10, r6, r9, r7
+  0073  GetByIdShort         r6, r10, #c5, s12 "join"
+  0078  LoadConstString      r9, s0 ","
+  007c  Call2                r10, r6, r10, r9
+  0081  GetByIdShort         r6, r7, #c6, s13 "norm"
+  0086  Call1                r7, r6, r7
+  008a  LoadConstString      r6, s5 "real:"
+  008e  Call4                r6, r11, r2, r6, r10, r7
+  0095  TryGetById           r7, r5, #c2, s14 "print"
+  009b  TryGetById           r6, r5, #c3, s10 "Object"
+  00a1  GetByIdShort         r5, r6, #c4, s8 "keys"
+  00a6  Call2                r6, r5, r6, r4
+  00ab  GetByIdShort         r5, r6, #c5, s12 "join"
+  00b0  Call2                r14, r5, r6, r9
+  00b5  GetByIdShort         r5, r4, #c6, s13 "norm"
+  00ba  Call1                r13, r5, r4
+  00be  InstanceOf           r12, r4, r8
+  00c2  LoadConstString      r15, s4 "fake:"
+  00c6  LoadConstUndefined   r16
+  00c8  Call                 r4, r7, 5
+  00cc  Ret                  r4
+
+function #1 "lookalike"  params=3 frame=14 env=0 flags=dbg,overflowed  @0x0000023a size=88
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r0, r0, 0
+  0007  GetByIdShort         r1, r0, #c0, s15 "prototype"
+  000c  GetGlobalObject      r2
+  000e  TryGetById           r4, r2, #c1, s10 "Object"
+  0014  GetByIdShort         r3, r4, #c2, s11 "create"
+  0019  LoadConstNull        r0
+  001b  JStrictEqual         L2, r1, r0
+  001f  JmpTypeOfIs          L1, r1, 258
+  0027  TryGetById           r2, r2, #c1, s10 "Object"
+  002d  GetByIdShort         r1, r2, #c0, s15 "prototype"
+L1:
+  0032  Mov                  r0, r1
+L2:
+  0035  LoadParam            r2, 1
+  0038  LoadParam            r1, 2
+  003b  Call2                r0, r3, r4, r0
+  0040  LoadConstString      r3, s3 "fake"
+  0044  PutByIdLoose         r0, r3, #c0, s6 "tag"
+  004a  PutByIdLoose         r0, r2, #c1, s16 "x"
+  0050  PutByIdLoose         r0, r1, #c2, s9 "y"
+  0056  Ret                  r0
+
+function #2 "Point"  params=3 frame=2 env=0 flags=strict,dbg,overflowed,ctor  @0x00000292 size=30
+  0000  GetNewTarget         r0
+  0002  GetByIdShort         r0, r0, #c0, s15 "prototype"
+  0007  NewObjectWithParent  r0, r0
+  000a  LoadParam            r1, 1
+  000d  PutByIdStrict        r0, r1, #c0, s16 "x"
+  0013  LoadParam            r1, 2
+  0016  PutByIdStrict        r0, r1, #c1, s9 "y"
+  001c  Ret                  r0
+
+function #3 "norm"  params=1 frame=3 env=0 flags=strict,dbg,overflowed,nc  @0x000002b0 size=37
+  0000  LoadParam            r0, 0
+  0003  GetByIdShort         r2, r0, #c0, s16 "x"
+  0008  GetByIdShort         r1, r0, #c0, s16 "x"
+  000d  Mul                  r1, r2, r1
+  0011  GetByIdShort         r2, r0, #c1, s9 "y"
+  0016  GetByIdShort         r0, r0, #c1, s9 "y"
+  001b  Mul                  r0, r2, r0
+  001f  Add                  r0, r1, r0
+  0023  Ret                  r0
