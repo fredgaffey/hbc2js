@@ -1777,7 +1777,7 @@ which package really owns them:
 | module hits on J4 dependency-flagged modules (`factoryIsDependency`) counted as the package's own | 14 | `victory-stack` (130 module hits, 0 function hits, all lodash/d3), `victory-chart/-pie/-shared-events`, `d3`, `d3-contour`, `util`, `bl` | fixed |
 | signature embeds a copy of another package that is in the app, not removed by dependency subtraction (undeclared dependency, Node built-in polyfill, or a transitive dependency) | 46 | `buffer`+`ieee754` copy: `safe-buffer`, `sax`, `obuf`, `encoding`; es-shim chain (`es-errors`, `call-bind`...): `assert`, `is-typed-array`, `url`; `@babel/runtime` helpers: `bucket`, `plaid`, `vaul`; lodash: `dagre`, `victory-core`, `cubic` | open (BUGS) |
 | react-native code left in the signature (baseline gap) | 2 | `@react-native-firebase/auth`, `/firestore` | open |
-| matched code the truth places in app code or in another package's generated code | 10 | `uuid`, `process`, `stackframe`, `swiper`, `culori` | open |
+| matched code the truth places in app code or in another package's generated code | 10 | `uuid`, `process`, `stackframe`, `swiper`, `culori` | re-diagnosed: see "Residual offline false positives on J3" |
 
 The fix: `scorePackage` (`src/deps/match.ts`) no longer counts a module
 flagged `factoryIsDependency` as a module hit, and the two fuzzy module
@@ -1855,6 +1855,54 @@ it as not the package's own code. Remaining Expensify FPs: lodash-es,
 d3-*, victory*, `uuid`, `process`, `stackframe`... (the d3 files are among
 the 11 whose transplant failed: their dependencies drifted between the
 original build and the rebuild).
+
+**Residual offline false positives on J3 (corpus-residual-fp, 2026-11-09).**
+The 30 Expensify false positives left on `db-v4-paths-partial` were traced
+the same way, with one correction: the inventory lists only a module's
+direct closures, so 36,870 of Expensify's 98,775 functions belong to no
+inventory module, and code there had looked like app code. Following
+closures transitively (as `attachModulePaths` does for signatures) puts
+it in other packages' pre-built dist files.
+
+| mechanism | FPs | examples | status |
+|---|---|---|---|
+| generic code: an exact hash the target holds three or more times (ES-module boilerplate factories, 2-instruction empty modules, transpiler helpers inlined into single-file dist bundles) | 20 | `uuid`, `d3-geo`, `d3-hierarchy`, `dagre`, `victory`, `victory-core`, `core-js`, `asynckit`; `axios`, `ai`, `keyv`, `ocache`, `meros`, `react-plaid-link` (helpers in 17-28 target modules). Most of the hits of `lodash-es` (146 of 273; factories the target holds 1,241 times), `culori` and `swiper` are this too, but those three stay FPs on the rows below | fixed (17 of 20; `ai`, `ky`, `d3-fetch` remain) |
+| copy inlined in another package's pre-built dist file (one module, so module paths cannot split it) | 4 | `process`, `stackframe` (inside `react-devtools-core/dist/backend.js`), `oboe` (`react-native-blob-util/lib/oboe-browser.min.js`), `jszip` (`localforage/dist/localforage.js`) | open (BUGS) |
+| fork or generated-from package with identical code | 4 | `source-map-js` (= `source-map`), `whatwg-url` (= `whatwg-url-without-unicode`), `mdn-data` (`css-tree`), `lodash-es` (`lodash/lodash.js`) | open (BUGS) |
+| small functions matching app code at one or two copies | 2 | `culori`, `swiper` (after the fix) | open |
+| react-native code left in the signature | 0 | `@react-native-firebase/auth`, `/firestore` reach high in the raw match but are no longer confirmed on this branch | not reproduced |
+
+Only one of the 11 pathless files was among the FPs (`d3-geo`, generic
+mechanism). The fix: `scorePackage` (`src/deps/match.ts`) ignores an exact
+hash the target holds `TARGET_GENERIC_COPIES` (3) or more times and more
+than twice as often as the package itself does, as a function hit and as
+a module hit. Toolchain baselines are exempt. The DB-side ambiguity check
+(`AMBIGUOUS_OWNER_THRESHOLD`) cannot catch these hashes, because only the
+candidate packages are loaded. Two copies stay evidence (a package
+installed twice). So does a hash the package repeats itself: react-native
+holds many identical small functions, and without the "twice its own
+count" clause its rn-template coverage drops below 90%. That clause costs
+three FPs (`ai`, `ky`, `d3-fetch`; plain 3 copies gave Expensify 10 FP).
+Thresholds 4, 5, 8 and 12 gave 13, 16, 21 and 21 FP with 88 TP.
+
+| holdout (DB) | before: confirmed / TP / FP, recall (direct) | after |
+|---|---|---|
+| Expensify J3, db-v4-paths-partial | 119 / 89 / 30, 30.9% (38.5%) | 100 / 87 / 13, 30.2% (37.4%) |
+| Expensify J3, db-v3-clean | 144 / 90 / 54, 31.2% (35.2%) | 134 / 89 / 45, 30.9% (35.2%) |
+| react-navigation-example, db-v4-paths-partial | 11 / 11 / 0, 14.5% (16.7%) | 10 / 10 / 0, 13.2% (15.0%) |
+| react-navigation-example, db-v3-clean | 15 / 15 / 0, 19.7% (23.3%) | 14 / 14 / 0, 18.4% (21.7%) |
+
+Precision on Expensify goes from 74.8% to 87.0% (partial DB). The TPs lost
+were resting on generic evidence. `expo-modules-core` (react-navigation)
+had three module hits, all 2-instruction empty factories the target holds
+18 times. `react-native-localize` had one empty `types.js` factory (23
+copies). `@react-native/normalize-colors` loses 3 of its 6 hits to
+duplicates and drops to medium. On rn-template the non-baseline `react`
+signature drops from high to medium: its two module hits were
+`module.exports = require(dep)` factories the target holds six times.
+react is still confirmed through the react-foundation baseline
+(`tests/gate/deps/match.test.ts` updated). Test:
+`tests/gate/deps/corpus-residual-fp.test.ts`.
 
 **Shipping.** Per D17c, the DB itself is never committed — the v2 build
 lives on a build host in `db-v2` (dependency-subtracted,
