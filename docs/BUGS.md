@@ -11,7 +11,7 @@ prove it fixed — a fixture, a test, or a measurement) and an `owner`. Every
 of another row, or a deliberate design choice). New bugs are appended to Open
 with a `cluster` and `verdict` from the start.
 
-## Open — 29 rows
+## Open — 31 rows
 
 | date | source | component | description | why no test yet | owner | status | cluster | verdict |
 |---|---|---|---|---|---|---|---|---|
