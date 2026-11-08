@@ -4,7 +4,7 @@ Reading list: `src/passes/README.md`, this file. Read
 `docs/specs/passes/07-var-naming.md` §2 (baseline shape) and §6 (the reuse
 hazard) for the problem this rung solves; you do not need any other spec.
 
-Status: specced; not yet implemented.
+Status: implemented, default-on (2026-09-03); section 11 (live-range naming identity) added 2026-11-09.
 
 ## 1. Purpose
 
@@ -461,6 +461,31 @@ Red→green: the downstream proof is `var-naming` naming a register it
 previously refused as `reuse-conflict` on `04-for-loop-basic` (e.g. the
 `join`-result range or the inner induction var) — asserted structurally
 (named-count rises), not by golden output.
+
+## 11. Live-range naming identity (2026-11-09)
+
+Problem: the rendered source already had one binding per web, but every
+external naming surface (the overlay store, the readability targets and its
+nameable denominator) was keyed `{fn, reg}`, so a model asked to name `r4`
+saw `r4` and `r4_2` holding a loader and a stylesheet and abstained
+(docs/READABILITY.md: abstentions dominated by reuse). Choice: the web this
+pass mints IS the identity: `{fn, reg, web}` (key `reg:F:R:W`, ident `rN` for
+web 1, `rN_W` otherwise), named at a new interposition point between this pass
+and `var-naming` (`astPassHook(...)(fn, cfg, { beforeVarNaming })`, backed by
+`applyAstPasses`' `interpose`). With no web names the interposition is never
+installed, so default output, goldens and round-trip numbers are unchanged by
+construction. Rejected: re-deriving webs on the raw (pre-structure) frame
+body, keyed by the defining bytecode offset. It is more stable across
+decompiler versions, but the raw body's webs are not the rendered ones
+(expr-rebuild inlines temporaries and merges defs), so an id could name a
+range the reader never sees, and two ids could land on one rendered binding.
+Webs are not split further when a merge or loop joins them (section 4.2), and
+env slots, which is where a closure-observed variable lives, are never
+registers, so neither case gains an identity. Legacy `{fn, reg}` names keep
+their old meaning (docs/RENAME.md). Tests: `tests/gate/name-overlay/
+web-identity.test.ts` (construct fixtures 94-97: straight-line reuse, if/else
+merge, loop-carried, closure-observed; VM equivalence of web-named renders at
+every version).
 
 ## Acceptance checklist
 
