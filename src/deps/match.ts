@@ -302,6 +302,7 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
   }
 
   let moduleExactHits = 0;
+  const factoryInstr = new Map(pkg.functions.map((f) => [f.index, f.instrCount]));
   for (const m of pkg.modules) {
     // corpus-offline-precision: a J4 dependency-flagged module is the
     // dependency's code (dep-subtract.mjs keeps the module only for graph
@@ -312,7 +313,9 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
     if (m.factoryIsBaseline || m.factoryIsDependency === true || foreign.factories.has(m.factoryFunctionIndex)) continue;
     if (m.factoryExactHash !== null && targetExact.has(schemeKey(pkg, m.factoryExactHash)) && isUnambiguous(schemeKey(pkg, m.factoryExactHash))) {
       moduleExactHits++;
-      hitKeys.add(schemeKey(pkg, m.factoryExactHash));
+      // An empty or re-export factory (under minInstr) is a module hit but
+      // not distinct evidence for the precision rules below.
+      if ((factoryInstr.get(m.factoryFunctionIndex) ?? 0) >= minInstr) hitKeys.add(schemeKey(pkg, m.factoryExactHash));
     }
   }
   const moduleTotal = pkg.slim !== undefined ? pkg.slim.moduleTotal : pkg.modules.filter((m) => !m.factoryIsBaseline && m.factoryExactHash !== null && !foreign.factories.has(m.factoryFunctionIndex)).length;
@@ -394,10 +397,13 @@ interface ScoredEntry {
 //    pathless host is not trusted: its signature may still hold its
 //    dependencies' code (d3-zoom holds d3-ease);
 //  - twin: two packages whose hit sets each cover that share of the
-//    other's (punycode / punycode.js: one source, two names). One is
-//    kept: a declared dependency of another high package, else the
-//    path-bearing one, else the one with more distinct hits, else the
-//    first by name.
+//    other's (punycode / punycode.js: one source, two names), at least
+//    one of them path-bearing. Two pathless files with the same hits may
+//    be a package and its dependent whose signature still holds its code
+//    (event-target-shim / abort-controller), so both stay. One is kept:
+//    the path-bearing one (its hits are its own files), else a declared
+//    dependency of another high package, else the one with more distinct
+//    hits, else the first by name.
 function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInventory, legacyExact: readonly string[]): readonly ScoredEntry[] {
   const high = (): ScoredEntry[] => scored.filter((s) => s.score.tier === "high" && !s.score.isBaseline && s.hitKeys.size > 0);
   const demote = (s: ScoredEntry, rule: NonNullable<PackageScore["demotion"]>["rule"], by?: string): void => {
@@ -440,7 +446,8 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
   const twins = high();
   const dependedOn = new Set<string>();
   for (const s of twins) for (const d of s.entry.file.subtractedDependencies ?? []) dependedOn.add(d.slice(0, d.lastIndexOf("@") > 0 ? d.lastIndexOf("@") : d.length));
-  const rank = (s: ScoredEntry): readonly number[] => [dependedOn.has(s.score.package) ? 1 : 0, (s.entry.file.modulePaths ?? 0) >= 1 ? 1 : 0, s.hitKeys.size];
+  const pathBearing = (s: ScoredEntry): boolean => (s.entry.file.modulePaths ?? 0) >= 1;
+  const rank = (s: ScoredEntry): readonly number[] => [pathBearing(s) ? 1 : 0, dependedOn.has(s.score.package) ? 1 : 0, s.hitKeys.size];
   const better = (a: ScoredEntry, b: ScoredEntry): boolean => {
     const ra = rank(a);
     const rb = rank(b);
@@ -450,7 +457,7 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
   for (const s of twins) {
     if (s.score.tier !== "high") continue;
     for (const q of twins) {
-      if (q === s || q.score.tier !== "high" || q.score.package === s.score.package) continue;
+      if (q === s || q.score.tier !== "high" || q.score.package === s.score.package || (!pathBearing(s) && !pathBearing(q))) continue;
       const n = shared(s.hitKeys, q.hitKeys);
       if (n < EXPLAINED_EVIDENCE_SHARE * s.hitKeys.size || n < EXPLAINED_EVIDENCE_SHARE * q.hitKeys.size) continue;
       if (better(s, q)) demote(q, "twin", s.score.package);

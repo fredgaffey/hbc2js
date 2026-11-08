@@ -124,13 +124,25 @@ test("corpus-precision-forks: one source under two names keeps one (twin); a few
   const h = requireHermesc(t, 96);
   if (h === null) return;
   const bodies = [moduleOf("tw", 3, 21), moduleOf("tx", 3, 61), moduleOf("ty", 3, 81)];
-  const a = signature(h.path, "twin-a", bodies);
-  const b = signature(h.path, "twin-b", bodies);
+  const own = (pkg: string) => ({ paths: bodies.map((_, i) => `${pkg}/lib/m${i}.js`) });
+  const a = signature(h.path, "twin-a", bodies, own("twin-a"));
+  const b = signature(h.path, "twin-b", bodies, own("twin-b"));
   const target = buildInventory(compile(h.path, bundle([APP, ...bodies, moduleOf("us", 3, 700), moduleOf("ut", 3, 740), moduleOf("uu", 3, 780)]))).inventory;
   const r1 = matchInventory(target, loaded([a, b]));
   assert.equal(tierOf(r1, "twin-a")?.tier, "high");
   assert.deepEqual(tierOf(r1, "twin-b")?.demotion, { rule: "twin", by: "twin-a" }, "same evidence: first by name kept");
   // A confirmed package declaring twin-b as its dependency decides it.
+  // A pathless twin loses to a path-bearing one (its hits are that one's
+  // own files); two pathless files with the same hits may be a package and
+  // a dependent still holding its code (event-target-shim /
+  // abort-controller), so both stay.
+  const { modulePaths: _ma, ...aPathless } = a;
+  const { modulePaths: _mb, ...bPathless } = b;
+  const r4 = matchInventory(target, loaded([aPathless as SigDbFile, b]));
+  assert.deepEqual(tierOf(r4, "twin-a")?.demotion, { rule: "twin", by: "twin-b" }, "the path-bearing twin is kept");
+  const r5 = matchInventory(target, loaded([aPathless as SigDbFile, bPathless as SigDbFile]));
+  assert.equal(tierOf(r5, "twin-a")?.tier, "high", "two pathless twins both stay");
+  assert.equal(tierOf(r5, "twin-b")?.tier, "high", "two pathless twins both stay");
   const user = signature(h.path, "user-pkg", [moduleOf("us", 3, 700), moduleOf("ut", 3, 740), moduleOf("uu", 3, 780)], { deps: ["twin-b@1.0.0__hbc96.json"] });
   const r2 = matchInventory(target, loaded([a, b, user]));
   assert.equal(tierOf(r2, "twin-b")?.tier, "high", "the declared dependency is kept");
