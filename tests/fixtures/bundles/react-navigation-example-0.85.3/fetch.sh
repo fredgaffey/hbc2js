@@ -11,8 +11,15 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 echo "==> cloning react-navigation/react-navigation into $WORK/rn-nav"
-git clone --depth 1 https://github.com/react-navigation/react-navigation.git "$WORK/rn-nav"
+# Pinned: the BUILD.md hashes were made against exactly this commit. Never run
+# against upstream HEAD (the repo moves; ids/fn numbers in tests would shift).
+PIN=ab1319d6bbf05eae8dc25e33cbf4dc56494e0f0c
+git init -q "$WORK/rn-nav"
 cd "$WORK/rn-nav"
+git remote add origin https://github.com/react-navigation/react-navigation.git
+git fetch -q --depth 1 origin "$PIN"
+git checkout -q FETCH_HEAD
+[ "$(git rev-parse HEAD)" = "$PIN" ] || { echo "pin mismatch" >&2; exit 1; }
 echo "==> HEAD: $(git rev-parse HEAD)"
 
 echo "==> pnpm install --frozen-lockfile"
@@ -24,18 +31,24 @@ node_modules/.bin/expo export --platform android --output-dir dist-js --no-bytec
 
 JSBUNDLE="$(find dist-js -name '*.js' | head -1)"
 JSMAP="$(find dist-js -name '*.map' | head -1)"
-cp "$JSBUNDLE" "$HERE/index.android.bundle"
+# Strip the trailing //# sourceMappingURL / //# debugId comments that
+# --source-maps appends (debugId is a random UUID per build): BUILD.md's hash is
+# of the bundle exported WITHOUT source maps. The original $JSBUNDLE is kept
+# untouched for the truth derivation below.
+perl -0pe 's{\n//# (?:sourceMappingURL|debugId)=[^\n]*}{}g' "$JSBUNDLE" > "$HERE/index.android.bundle"
 
 echo "==> fetching hermesc v98 (HBC bytecode version for RN 0.85.3)"
 "$REPO_ROOT/tools/get-hermesc.sh" 98
 HERMESC="$REPO_ROOT/tools/hermesc/v98/hermesc"
 
+# hermesc embeds the input path it was given in the .hbc, so compile from $HERE
+# with a bare relative name: output is then independent of where the repo lives.
 echo "==> compiling -O"
-"$HERMESC" -O -emit-binary -out="$HERE/react-navigation-example.hbc" "$HERE/index.android.bundle"
+(cd "$HERE" && "$HERMESC" -O -emit-binary -out=react-navigation-example.hbc index.android.bundle)
 echo "==> compiling -O -g"
-"$HERMESC" -O -g -emit-binary -out="$HERE/react-navigation-example.debug.hbc" "$HERE/index.android.bundle"
+(cd "$HERE" && "$HERMESC" -O -g -emit-binary -out=react-navigation-example.debug.hbc index.android.bundle)
 
-echo "==> done. sha256:"
+echo "==> done. sha256 (BUILD.md expects 07b00f6d.../38fdce65.../255c46d8...):"
 shasum -a 256 "$HERE/index.android.bundle" "$HERE/react-navigation-example.hbc" "$HERE/react-navigation-example.debug.hbc"
 
 # D17d ground truth (docs/DECISIONS.md D17d, docs/DEPS.md "Ground truth"):
