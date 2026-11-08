@@ -92,7 +92,14 @@ test("every gate binary decompiles with strictEnv and reports no error diagnosti
       // the designed outcome of every guard in that spec's refusal table and
       // changes nothing about the output.
       const unexpected = r.diagnostics.filter((d) => d.code !== "W_NO_CAPTURE_HOSTED" && d.code !== "W_FORCED_OPCODE_TABLE" && d.code !== "W_ORPHAN_FUNCTION" && d.code !== "W_UNUSED_LABEL" && d.code !== "W_EXPANSION_CAP" && d.code !== "W_UNREACHABLE_BLOCK" && d.code !== "W_LOOP_LOCAL_ENV" && d.code !== "W_PASS_ABANDONED" && d.code !== "W_PASS_VERSION_SKIP" && d.code !== "W_PASS_REFUSED" && d.code !== "W_IIFE_RECONSTRUCTED" && d.code !== "W_IIFE_REFUSED");
-      if (unexpected.length > 0) failures.push(`${b.fixture} v${b.version}${b.variant}: ${unexpected.map((d) => d.code).join(", ")}`);
+      // W_UNPAIRED_NEW is EXPECTED on exactly the two inlined-construction
+      // fixtures: their nested functions keep hermesc's dead
+      // `CreateThisForNew` ahead of the inlined `new` (lowered directly,
+      // output correct), which inline-new leaves in place -- spec 24 section
+      // 9.5 item (a), docs/BUGS.md GetOwnPrivateBySym row.
+      const inlined = b.fixture === "90-inlined-new" || b.fixture === "91-inlined-new-derived";
+      const reported = unexpected.filter((d) => !(inlined && d.code === "W_UNPAIRED_NEW"));
+      if (reported.length > 0) failures.push(`${b.fixture} v${b.version}${b.variant}: ${reported.map((d) => d.code).join(", ")}`);
     } catch (e) {
       failures.push(`${b.fixture} v${b.version}${b.variant}: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -109,10 +116,10 @@ test("the pass registry lists the M5 passes in dependency order", () => {
   // selection below unless `optIn` names it. `reg-split` is default-on
   // (P-11b resolved by the D23 reorder), so it appears in every selection
   // below.
-  assert.deepEqual(REGISTRY.map((p) => p.name), ["finally-dedup", "loop-cond", "for-header", "for-in", "for-of", "switch-raise", "if-chain", "try-shape", "label-clean", "expr-rebuild", "global-access", "globalthis-dead-store", "call-shape", "default-params", "destructure", "spread-rest", "template-literal", "optional-chain", "object-literal", "array-literal", "yield-recovery", "yield-loop", "async-recovery", "arguments-form", "literal-forms", "try-clean", "class-recover", "super-call", "ctor-this", "private-fields", "jsx-recover", "fn-naming", "reg-split", "var-naming"]);
+  assert.deepEqual(REGISTRY.map((p) => p.name), ["finally-dedup", "loop-cond", "for-header", "for-in", "for-of", "switch-raise", "if-chain", "try-shape", "label-clean", "expr-rebuild", "global-access", "globalthis-dead-store", "call-shape", "default-params", "destructure", "spread-rest", "template-literal", "optional-chain", "object-literal", "array-literal", "yield-recovery", "yield-loop", "async-recovery", "arguments-form", "literal-forms", "try-clean", "class-recover", "super-call", "ctor-this", "inline-new", "private-fields", "jsx-recover", "fn-naming", "reg-split", "var-naming"]);
   assert.deepEqual(enabledPasses({ stage: "A" }).map((p) => p.name), ["finally-dedup", "loop-cond", "for-header", "for-in", "for-of", "switch-raise", "if-chain", "try-shape", "label-clean"]);
-  assert.deepEqual(enabledPasses({ skip: ["loop-cond"] }).map((p) => p.name), ["finally-dedup", "for-header", "for-in", "for-of", "switch-raise", "if-chain", "try-shape", "label-clean", "expr-rebuild", "global-access", "globalthis-dead-store", "call-shape", "default-params", "destructure", "spread-rest", "template-literal", "optional-chain", "object-literal", "array-literal", "yield-recovery", "yield-loop", "async-recovery", "arguments-form", "literal-forms", "try-clean", "class-recover", "super-call", "ctor-this", "private-fields", "fn-naming", "reg-split", "var-naming"]);
-  assert.deepEqual(enabledPasses({ stage: "B" }).map((p) => p.name), ["expr-rebuild", "global-access", "globalthis-dead-store", "call-shape", "default-params", "destructure", "spread-rest", "template-literal", "optional-chain", "object-literal", "array-literal", "yield-recovery", "yield-loop", "async-recovery", "arguments-form", "literal-forms", "try-clean", "class-recover", "super-call", "ctor-this", "private-fields", "fn-naming", "reg-split", "var-naming"]);
+  assert.deepEqual(enabledPasses({ skip: ["loop-cond"] }).map((p) => p.name), ["finally-dedup", "for-header", "for-in", "for-of", "switch-raise", "if-chain", "try-shape", "label-clean", "expr-rebuild", "global-access", "globalthis-dead-store", "call-shape", "default-params", "destructure", "spread-rest", "template-literal", "optional-chain", "object-literal", "array-literal", "yield-recovery", "yield-loop", "async-recovery", "arguments-form", "literal-forms", "try-clean", "class-recover", "super-call", "ctor-this", "inline-new", "private-fields", "fn-naming", "reg-split", "var-naming"]);
+  assert.deepEqual(enabledPasses({ stage: "B" }).map((p) => p.name), ["expr-rebuild", "global-access", "globalthis-dead-store", "call-shape", "default-params", "destructure", "spread-rest", "template-literal", "optional-chain", "object-literal", "array-literal", "yield-recovery", "yield-loop", "async-recovery", "arguments-form", "literal-forms", "try-clean", "class-recover", "super-call", "ctor-this", "inline-new", "private-fields", "fn-naming", "reg-split", "var-naming"]);
 });
 
 test("decompileTree covers every function of a module", () => {

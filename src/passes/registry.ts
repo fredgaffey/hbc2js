@@ -16,6 +16,7 @@ import { spreadRest } from "./spread-rest/index.ts";
 import { optionalChain } from "./optional-chain/index.ts";
 import { objectLiteral } from "./object-literal/index.ts";
 import { privateFields } from "./private-fields/index.ts";
+import { inlineNew } from "./inline-new/index.ts";
 import { exprRebuild } from "./expr-rebuild/index.ts";
 import { fnNaming } from "./fn-naming/index.ts";
 import { forHeader } from "./for-header/index.ts";
@@ -157,6 +158,10 @@ export const REGISTRY: readonly Pass[] = [
   // `private-fields`, whose install shape is only recognisable once the
   // constructor's target IS `this`.
   ctorThis as Pass,
+  // R16 (docs/specs/passes/24-class-recover.md section 9): an inlined
+  // `new C(...)` rebuilt against the constructor `ctor-this`/`super-call`
+  // just left; before `private-fields`, whose R-PF1 it unblocks.
+  inlineNew as Pass,
   // Private-name follow-up (docs/BUGS.md 2026-09-01 "class private fields"):
   // needs the `class` node `classRecover` just built, and the same register
   // identity, so it sits immediately after it and before every renaming rung.

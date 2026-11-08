@@ -25,6 +25,10 @@ export interface ClassGroup {
   readonly deleted: readonly number[];
   /** Names of the `func` declarations moved into the class body. */
   readonly movedNames: readonly string[];
+  /** F1 (section 3.1): `[]` when the group sits in the function body itself;
+   *  otherwise the indices of the labelled blocks leading to its list. Then
+   *  every index above is into `viewOf(root, path).list`, not into `root`. */
+  readonly path: readonly number[];
 }
 
 /** Section 4's refusal families, one counted reason each. */
@@ -125,22 +129,70 @@ function readDescriptor(e: Expr): Descriptor | null {
 export function match(list: readonly Stmt[], ctx: PassContext): Match<readonly Stmt[], ClassGroup> | null {
   if (ctx.fnBody === undefined || list !== ctx.fnBody) return null; // F1: one site per function body
   if (ctx.cfg === undefined) return null;
-  for (let i = 0; i < list.length; i++) {
-    const head = simpleStore(list[i]!);
-    if (head === null || head.value.k === "class") continue; // PL-08 fixed point: already recovered
-    const origin = originOf(list[i]!);
-    if (origin === undefined || origin.fn !== ctx.functionIndex) continue;
-    const site = classSiteAt(ctx.cfg, origin.start);
-    if (site === null) continue;
-    const m = buildGroup(list, i, head.name, site, ctx);
-    if (m !== null) return { root: list, nodes: [list], data: m, at: { functionIndex: ctx.functionIndex, offset: site.offset } };
+  for (const path of labelledPaths(list, [])) {
+    const view = viewOf(list, path);
+    for (let i = view.nDecls; i < view.list.length; i++) {
+      const head = simpleStore(view.list[i]!);
+      if (head === null || head.value.k === "class") continue; // PL-08 fixed point: already recovered
+      const origin = originOf(view.list[i]!);
+      if (origin === undefined || origin.fn !== ctx.functionIndex) continue;
+      const site = classSiteAt(ctx.cfg, origin.start);
+      if (site === null) continue;
+      const m = buildGroup(view.list, i, head.name, site, ctx, list, path);
+      if (m !== null) return { root: list, nodes: [list], data: m, at: { functionIndex: ctx.functionIndex, offset: site.offset } };
+    }
   }
   return null; // R-C0 no-class-site: nothing read, nothing reported
 }
 
+/**
+ * F1 (section 3.1): the function body itself, then the body of every labelled
+ * block that sits, through labelled blocks only, directly in it (the
+ * structurer opens `L0: { ... }` around the class definitions when a later
+ * `break` skips to an inlined constructor's brand-check throw). Such a list is
+ * entered at most once per activation and runs in order until a `break`
+ * leaves it -- the guarantee the function body gives -- and a group is simple
+ * statements, so no `break` sits inside one. The rewrite is an assignment
+ * (`C = class C {...}`), not a declaration, so no binding moves into the
+ * block's scope.
+ */
+function labelledPaths(list: readonly Stmt[], prefix: readonly number[]): (readonly number[])[] {
+  const out: (readonly number[])[] = [prefix];
+  list.forEach((s, i) => {
+    if (s.k === "labeled") out.push(...labelledPaths(s.body, [...prefix, i]));
+  });
+  return out;
+}
+
+/** The statement list a group at `path` is walked over: for a nested list,
+ *  the function body's `func` declarations (hoisted: bound before any
+ *  statement of the frame runs, so placing them first is their real order)
+ *  followed by the labelled block's body. `nDecls` declarations lead it. */
+export function viewOf(root: readonly Stmt[], path: readonly number[]): { readonly list: readonly Stmt[]; readonly nDecls: number; readonly declAt: readonly number[] } {
+  if (path.length === 0) return { list: root, nDecls: 0, declAt: [] };
+  const declAt: number[] = [];
+  root.forEach((s, i) => {
+    if (s.k === "func") declAt.push(i);
+  });
+  return { list: [...declAt.map((i) => root[i]!), ...innerAt(root, path)], nDecls: declAt.length, declAt };
+}
+
+function innerAt(root: readonly Stmt[], path: readonly number[]): readonly Stmt[] {
+  let cur = root;
+  for (const i of path) cur = (cur[i] as Extract<Stmt, { k: "labeled" }>).body;
+  return cur;
+}
+
+function replaceAt(list: readonly Stmt[], path: readonly number[], inner: readonly Stmt[]): readonly Stmt[] {
+  if (path.length === 0) return inner;
+  const [i, ...rest] = path;
+  const node = list[i!] as Extract<Stmt, { k: "labeled" }>;
+  return list.map((s, j) => (j === i ? { ...node, body: replaceAt(node.body, rest, inner) } : s));
+}
+
 /** Section 3.1's group walk. Returns `null` (after counting a refusal) for
  *  every family of section 4. */
-function buildGroup(list: readonly Stmt[], headIndex: number, ctorName: string, site: ClassSite, ctx: PassContext): ClassGroup | null {
+function buildGroup(list: readonly Stmt[], headIndex: number, ctorName: string, site: ClassSite, ctx: PassContext, root: readonly Stmt[], path: readonly number[]): ClassGroup | null {
   const off = site.offset;
   const meta = ctx.functionMeta?.(site.ctorFnIdx) ?? null;
   if (meta === null || meta.role !== "ctor") return refuse(ctx, off, "no-function-meta"); // R-C2
@@ -319,11 +371,12 @@ function buildGroup(list: readonly Stmt[], headIndex: number, ctorName: string, 
     headIndex,
     deleted: [...new Set(deleted)].sort((a, b) => a - b),
     movedNames,
+    path,
   };
 
   // R-C5: a moved declaration referenced anywhere else stays a declaration,
   // which this rung cannot express -- so the whole group is refused.
-  const after = buildAfter(list, group);
+  const after = buildAfter(root, group);
   const free = freeNames(after);
   for (const name of movedNames) if (free.has(name)) return refuse(ctx, off, "method-escapes");
   return group;
@@ -385,7 +438,23 @@ function mentions(e: Expr, names: ReadonlySet<string>): boolean {
  * (section 3.4 item 1) compares two products of the same function. Every
  * surviving sub-expression is carried over `===`-identical.
  */
-export function buildAfter(list: readonly Stmt[], g: ClassGroup): readonly Stmt[] {
+export function buildAfter(root: readonly Stmt[], g: ClassGroup): readonly Stmt[] {
+  if (g.path.length === 0) return buildAfterList(root, g);
+  // F1 nested: the view is the hoisted declarations then the block's body;
+  // deleted declarations leave the function body, the rest of the view's
+  // rewrite is the block's new body.
+  const view = viewOf(root, g.path);
+  const goneDecls = new Set(g.deleted.filter((i) => i < view.nDecls).map((i) => view.declAt[i]!));
+  const inner = buildAfterList(innerAt(root, g.path), { ...g, headIndex: g.headIndex - view.nDecls, deleted: g.deleted.filter((i) => i >= view.nDecls).map((i) => i - view.nDecls) });
+  return replaceAt(root.filter((_, i) => !goneDecls.has(i)), g.path.map((p, d) => (d === 0 ? p - [...goneDecls].filter((i) => i < p).length : p)), inner);
+}
+
+/** The rewritten view (section 3.4's effect obligation is stated over it). */
+export function viewAfter(root: readonly Stmt[], g: ClassGroup): readonly Stmt[] {
+  return buildAfterList(viewOf(root, g.path).list, g);
+}
+
+function buildAfterList(list: readonly Stmt[], g: ClassGroup): readonly Stmt[] {
   const drop = new Set(g.deleted);
   const cls: Expr = { k: "class", name: g.className, superClass: g.superClass, members: g.members };
   const out: Stmt[] = [];

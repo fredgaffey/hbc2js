@@ -4,7 +4,7 @@
 import type { Stmt } from "../ast.ts";
 import { effectSequence, freeNames, parses } from "../ast.ts";
 import type { CheckResult, PassContext } from "../types.ts";
-import { buildAfter, match } from "./match.ts";
+import { buildAfter, match, viewAfter, viewOf } from "./match.ts";
 
 export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: PassContext): CheckResult {
   // 3. Independent re-derivation: recompute the group from `before` by
@@ -41,6 +41,11 @@ export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: Pass
   // the register store that fed one of those -- and nothing else. A class
   // body defines the same own properties, with the same descriptors, in the
   // same order, that those calls defined.
+  // F1 nested (section 3.1): the obligation is stated over the group's view
+  // (hoisted declarations, then the labelled block's body); obligation 1
+  // above already pinned every statement outside it.
+  const view = viewOf(before, g.path).list;
+  const viewRebuilt = viewAfter(before, g);
   const drop = new Set(g.deleted);
   // The head's index in `rebuilt`, which is `before` with `g.deleted` removed:
   // its original index less the deletions that precede it. (F24-5: this used to
@@ -52,14 +57,14 @@ export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: Pass
   // and the group was abandoned with "changed the effect sequence".)
   const headPos = g.headIndex - g.deleted.filter((i) => i < g.headIndex).length;
   const expected: unknown[] = [];
-  for (let i = 0; i < before.length; i++) {
+  for (let i = 0; i < view.length; i++) {
     if (drop.has(i)) continue;
-    expected.push(...effectSequence([i === g.headIndex ? rebuilt[headPos]! : before[i]!]));
+    expected.push(...effectSequence([i === g.headIndex ? viewRebuilt[headPos]! : view[i]!]));
   }
-  const got = effectSequence(after);
+  const got = effectSequence(viewRebuilt);
   if (JSON.stringify(got) !== JSON.stringify(expected)) return { ok: false, reason: "class-recover changed the effect sequence beyond the group it declared" };
   for (const i of g.deleted) {
-    const s = before[i]!;
+    const s = view[i]!;
     if (s.k === "func" && g.movedNames.includes(s.name)) continue;
     if (s.k !== "expr") return { ok: false, reason: `class-recover deleted statement ${i}, which is not an install it owns` };
     if (s.expr.k === "assign" && s.expr.value.k === "ident" && g.movedNames.includes(s.expr.value.name)) continue;
