@@ -3,6 +3,78 @@
 Real-world `hbc2js deps` measurements. Controlled-fixture numbers live in
 `docs/DEPS.md` (Ground truth, D17d); this file is the corpus layer.
 
+## Measurement 2026-11-09 (main c92c9e4, db-v3-clean, offline)
+
+- `hbc2js` measured at commit `c92c9e4`, `deps --offline` only (no `--confirm`).
+- Signature DB: db-v3-clean (71,222 signature files, read-only, nothing written back).
+- Three runs in parallel on a 32-core host. Bundle shapes: 22 bundle-bearing apps; every row below is a count.
+- "before" is the section further down (commit `ce7acd8`).
+
+### Per-app counts, before and after (offline)
+
+| app | HBC | modules before | modules now | confirmed before | confirmed now | unique before | unique now | guessed before | guessed now | wall before | wall now |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| app.phantom | 96 | 19,265 | 19,265 | 365 | 310 | 119 | 106 | 23 | 18 | 42 s | 49 s |
+| com.baronapp.cameo | 96 | 11,174 | 11,174 | 281 | 298 | 92 | 102 | 24 | 12 | 31 s | 36 s |
+| com.bloomberg.android.plus | 96 | 4,995 | 4,995 | 283 | 241 | 89 | 78 | 11 | 6 | 26 s | 28 s |
+| com.brex.mobile | 98 | 15,014 | out of memory | 256 | n/a | 83 | n/a | 25 | n/a | 30 s | n/a |
+| com.discord | 98 | 17,037 | 17,037 | 271 | 222 | 90 | 77 | 18 | 10 | 33 s | 40 s |
+| com.microsoft.office.officehubrow | 96 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 s | 1 s |
+| com.microsoft.teams | 96 | 482 | 482 | 31 | 30 | 9 | 8 | 0 | 1 | 8 s | 8 s |
+| com.microsoft.xboxone.smartglass | 96 | 6,435 | 6,435 | 315 | 259 | 104 | 90 | 6 | 6 | 23 s | 30 s |
+| com.myklarnamobile | 98 | 0 | 23,651 | 0 | 51 | 0 | 17 | 0 | 6 | 14 s | 69 s |
+| com.oculus.twilight | 99 | 13,978 | 13,978 | 40 | 40 | 14 | 12 | 4 | 2 | 25 s | 30 s |
+| com.scee.psxandroid | 96 | 7,657 | 7,657 | 221 | 170 | 73 | 55 | 17 | 6 | 22 s | 28 s |
+| com.shopify.arrive | 96 | 9,461 | 9,461 | 251 | 221 | 80 | 75 | 22 | 9 | 27 s | 33 s |
+| com.shopify.mobile | 98 | 25,439 | 25,439 | 258 | 258 | 87 | 86 | 9 | 6 | 34 s | 41 s |
+| com.shopify.ping | 96 | 8,651 | 8,651 | 205 | 163 | 65 | 49 | 15 | 7 | 22 s | 25 s |
+| com.teslamotors.tesla | 96 | 19,951 | 19,951 | 432 | 403 | 141 | 139 | 28 | 12 | 50 s | 84 s |
+| com.uniswap.mobile | 98 | 11,380 | 11,380 | 360 | 365 | 123 | 107 | 17 | 10 | 37 s | 42 s |
+| com.wix.android | 96 | 19,286 | 19,286 | 474 | 433 | 160 | 153 | 33 | 17 | 46 s | 56 s |
+| host.exp.exponent | 96 | 2,370 | 2,370 | 87 | 79 | 29 | 27 | 9 | 6 | 13 s | 15 s |
+| io.metamask | 96 | 18,909 | 18,909 | 482 | 434 | 156 | 147 | 34 | 21 | 46 s | 61 s |
+| me.rainbow | 96 | 10,307 | 10,307 | 396 | 297 | 121 | 100 | 30 | 14 | 33 s | 38 s |
+| org.toshi | 96 | 31,131 | 31,131 | 443 | 369 | 142 | 126 | 31 | 12 | 53 s | 69 s |
+| xyz.blueskyweb.app | 98 | 6,392 | 6,392 | 117 | 119 | 39 | 39 | 10 | 11 | 25 s | 29 s |
+
+### Aggregate
+
+| metric | before | now |
+|---|---|---|
+| apps with a module inventory | 20 | 21 listed, 20 measured (1 out of memory) |
+| confirmed, 19 apps comparable in both runs (excl. the out-of-memory app and the newly inventoried app) | 5,312 | 4,711 |
+| guessed, same 19 apps | 341 | 186 |
+| confirmed, sum over the 20 measured apps | 5,568 (incl. the out-of-memory app, 256) | 4,762 |
+| guessed, sum over the 20 measured apps | 366 (incl. the out-of-memory app, 25) | 192 |
+| wall per measured app | about 31 s | about 41 s (811 s over 20 apps) |
+
+- Newly inventoried: 1 app went from 0 to 23,651 modules (51 confirmed, 17 unique, 6 guessed). 1 app still reports 0 modules.
+- 1 app (15,014 modules before) exhausts the Node heap at 8 GB during candidate derivation: about 10,000 signature files read and retained, mostly `@aws-sdk/*` and `@aws-amplify/*` versions, none of it released. No result.
+- Confirmed counts fell on 14 of 19 comparable apps (generic-copy hashes and dep-flagged module hits no longer count), guessed counts fell on 16.
+
+### Ground-truth apps (offline, db-v3-clean)
+
+Precision and recall against the lockfile truth; `direct` recall is over direct dependencies.
+
+| app | truth packages (direct) | before: confirmed / precision / recall | now: confirmed / precision / recall | now: recall of direct | now: guessed / precision |
+|---|---|---|---|---|---|
+| bluesky-social/social-app | 198 (198) | 47 / 63.8% / 15.2% | 51 / 68.6% / 17.7% | 17.7% | 12 / 91.7% |
+| rainbow-me/rainbow | 518 (211) | 141 / 60.3% / 16.4% | 116 / 72.4% / 16.2% | 21.3% | 11 / 54.5% |
+| MetaMask/metamask-mobile | 749 (306) | 186 / 67.7% / 16.8% | 183 / 74.3% / 18.2% | 21.9% | 15 / 66.7% |
+| Expensify/App 12a92bd | 288 (91) | 135 / 65.9% / 30.9% | 154 / 59.1% / 31.6% | 35.2% | 5 / 20.0% |
+| react-navigation-example 0.85.3 | 76 (61) | 14 / 100% / 18.4% | 14 / 100% / 18.4% | 23.0% | 7 / 100% |
+
+### Precision proxy (sample of confirmed packages)
+
+Ten packages per app, drawn with the fixed seed, judged by string evidence in the bundle and APK file names. The sample for one of the three apps could not be drawn (no result, see above).
+
+| apps sampled | packages | string evidence in bundle or APK | generic word | no evidence found |
+|---|---|---|---|---|
+| 2 (phantom, cameo) | 20 | 14 | 1 | 5 |
+| before: 3 apps | 30 | 16 | 11 | 3 |
+
+## Previous measurement (commit `ce7acd8`)
+
 - Signature DB: db-v3 (71,222 signature files, the pristine file set; copies were used for every run, nothing was written back). Offline match + guess for the per-app table; `--confirm` for the confirm tables below.
 - `hbc2js` measured at commit `ce7acd84840093c037e6447c12aaf112643ce461`.
 - Corpus: 27 published Android APKs. Package names are not listed in the per-app tables: counts only.
