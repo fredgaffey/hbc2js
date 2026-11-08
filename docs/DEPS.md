@@ -300,8 +300,18 @@ hbc2js deps <bundle.hbc|app.apk> [--out <dir>] [--confirm] [--confirm-cache] [--
    `<user-cache>/confirm-fp/` keyed by package@version + hbc + hash scheme + RN
    version, so a re-confirm (new target, wiped project DB) does no npm, Metro
    or hermesc work. Not done: batching many candidates into one bundle (it
-   would mix shared dependencies into every signature and change verdicts) and
-   a parallel worker pool (needs one scratch project per worker).
+   would mix shared dependencies into every signature and change verdicts).
+
+   *Worker pool (CONFPOOL1).* `--confirm-jobs N` (default `min(4, cpus/2)`;
+   1 = serial) runs N workers, each with its own scratch RN project: worker 0
+   is the usual scratch dir, workers 1..N-1 are `<scratch>-w<i>` siblings
+   copied from the ready scaffold once and reused across runs (npm install
+   into one dir is not concurrency-safe, so a dir is only ever used by one
+   worker). With N>1 each worker also gets its own `TMPDIR` (Metro's cache
+   location) inside its scratch dir. npm/Metro/hermesc run asynchronously;
+   candidates are pulled from a shared queue, results land in candidate
+   order (output identical to N=1), a failing candidate fails alone, and the
+   500 ms registry rate limit is one shared throttle across workers.
 
 5. **Report** (`src/deps/report.ts`): the human table / `--json` shape, plus
    `<out>/package.json` when confident. `DepsReport.moduleOwnership` is the

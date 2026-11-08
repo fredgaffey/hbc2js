@@ -12,7 +12,7 @@ import type { ApkEvidence } from "./apk.ts";
 import { deriveCandidatePackages } from "./candidates.ts";
 import { classifyInventory, loadCommonalityIndex, DEFAULT_COMMONALITY_INDEX_PATH } from "./classify.ts";
 import type { ClassificationReport } from "./classify.ts";
-import { confirmCandidates, detectRnVersionFromBaselineFilenames } from "./confirm.ts";
+import { confirmCandidates, defaultConfirmJobs, detectRnVersionFromBaselineFilenames } from "./confirm.ts";
 import type { ConfirmResult } from "./confirm.ts";
 import { resolveDbLayers, loadSignatures, defaultSharedDbDir, projectDbDir as projectDbDirFor, userCacheDbDir as userCacheDbDirDefault } from "./db.ts";
 import { guessModules } from "./guess.ts";
@@ -34,6 +34,8 @@ export interface DepsOptions {
    *  (`~/.cache/hbc2js/sigdb`), which every later run reads as its "user"
    *  layer. Off by default (corpus-confirm-precision). CLI `--confirm-cache`. */
   readonly confirmCache?: boolean;
+  /** Worker pool size for the confirm stage (default min(4, cpus/2); 1 = serial). */
+  readonly confirmJobs?: number;
   readonly offline?: boolean;
   readonly sigdb?: string;
   readonly noSharedDb?: boolean;
@@ -150,6 +152,7 @@ export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promis
         ownedTargetFactoryHashes: ownedTargetFactoryHashes(inventory, matchReport),
         baselineDirs,
         rateLimitMs: 500,
+        jobs: opts.confirmJobs ?? defaultConfirmJobs(),
         failureLogPath: join(scratchDir, "..", "confirm-failures.json"),
         ...(opts.onProgress !== undefined ? { onProgress: opts.onProgress } : {}),
       });

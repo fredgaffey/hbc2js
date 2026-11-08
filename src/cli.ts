@@ -220,6 +220,7 @@ Options (gate, sweep):
 Options (deps):
   --out <dir>               decompile-project output dir (project-local DB lives at <dir>/.hbc2js/sigdb)
   --confirm                 run the npm confirm stage (network; never executes package code)
+  --confirm-jobs N          parallel confirm workers, one scratch RN project each (default min(4, cpus/2); 1 = serial)
   --confirm-cache           also write confirm-built signatures to the user cache (read by later runs)
   --offline                 skip npm registry search + the confirm stage entirely
   --sigdb <dir>             override the project-local signature-DB directory
@@ -1257,6 +1258,7 @@ interface DepsArgs {
   readonly out: string | undefined;
   readonly confirm: boolean;
   readonly confirmCache: boolean;
+  readonly confirmJobs: number | undefined;
   readonly offline: boolean;
   readonly sigdb: string | undefined;
   readonly noSharedDb: boolean;
@@ -1272,6 +1274,7 @@ function parseDepsArgs(argv: readonly string[]): DepsArgs {
   let out: string | undefined;
   let confirm = false;
   let confirmCache = false;
+  let confirmJobs: number | undefined;
   let offline = false;
   let sigdb: string | undefined;
   let noSharedDb = false;
@@ -1285,6 +1288,7 @@ function parseDepsArgs(argv: readonly string[]): DepsArgs {
     else if (a === "--out") out = argv[++i];
     else if (a === "--confirm") confirm = true;
     else if (a === "--confirm-cache") confirmCache = true;
+    else if (a === "--confirm-jobs") confirmJobs = Math.max(1, Math.floor(Number(argv[++i])) || 1);
     else if (a === "--offline") offline = true;
     else if (a === "--sigdb") sigdb = argv[++i];
     else if (a === "--no-shared-db") noSharedDb = true;
@@ -1294,7 +1298,7 @@ function parseDepsArgs(argv: readonly string[]): DepsArgs {
     else if (a === "--known") known = argv[++i];
     else if (input === undefined && !a.startsWith("-")) input = a;
   }
-  return { help, input, out, confirm, confirmCache, offline, sigdb, noSharedDb, minInstr, json, exhaustive, known };
+  return { help, input, out, confirm, confirmCache, confirmJobs, offline, sigdb, noSharedDb, minInstr, json, exhaustive, known };
 }
 
 /** J7's `--known` path: informed confirm, offline by construction (see
@@ -1349,6 +1353,7 @@ async function runDepsCmd(argv: readonly string[]): Promise<number> {
       ...(args.out !== undefined ? { out: args.out } : {}),
       confirm: args.confirm,
       confirmCache: args.confirmCache,
+      ...(args.confirmJobs !== undefined ? { confirmJobs: args.confirmJobs } : {}),
       offline: args.offline,
       ...(args.sigdb !== undefined ? { sigdb: args.sigdb } : {}),
       noSharedDb: args.noSharedDb,

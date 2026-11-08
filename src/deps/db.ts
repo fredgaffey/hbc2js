@@ -150,7 +150,7 @@ function loadSqliteSignatures(dbPath: string): SigDbFile[] {
       `SELECT f.fp_id, f.hbc_version, f.source_schema, f.total_functions, f.raw_function_count,
               f.toolchain_baseline, f.package_sha256, f.metro_version, f.react_native_version,
               f.hermesc_version, f.hermesc_rn_era, f.repo_commit, f.built_at,
-              pv.version AS pv_version, p.name AS pkg_name
+              f.hash_scheme, f.module_paths, pv.version AS pv_version, p.name AS pkg_name
        FROM fingerprints f
        JOIN package_versions pv ON pv.pv_id = f.pv_id
        JOIN packages p ON p.pkg_id = pv.pkg_id
@@ -170,6 +170,8 @@ function loadSqliteSignatures(dbPath: string): SigDbFile[] {
     hermesc_rn_era: string | null;
     repo_commit: string | null;
     built_at: string;
+    hash_scheme: number | null;
+    module_paths: number | null;
     pv_version: string;
     pkg_name: string;
   }>;
@@ -183,7 +185,7 @@ function loadSqliteSignatures(dbPath: string): SigDbFile[] {
       db
         .prepare(
           `SELECT ff.fn_index AS idx, s.exact_hash, s.fuzzy_hash, s.string_set_hash, s.name,
-                  s.param_count, s.instr_count, s.string_count
+                  s.param_count, s.instr_count, s.string_count, ff.module_id
            FROM fingerprint_functions ff JOIN function_shapes s ON s.shape_id = ff.shape_id
            WHERE ff.fp_id = ? ORDER BY ff.fn_index`,
         )
@@ -196,6 +198,7 @@ function loadSqliteSignatures(dbPath: string): SigDbFile[] {
         param_count: number;
         instr_count: number;
         string_count: number;
+        module_id: number | null;
       }>
     ).map((r) => ({
       index: r.idx,
@@ -206,6 +209,7 @@ function loadSqliteSignatures(dbPath: string): SigDbFile[] {
       fuzzyHash: hexHash(r.fuzzy_hash),
       stringSetHash: hexHash(r.string_set_hash),
       stringCount: r.string_count,
+      ...(r.module_id != null ? { moduleId: r.module_id } : {}),
     }));
 
     const modules = (
@@ -219,6 +223,7 @@ function loadSqliteSignatures(dbPath: string): SigDbFile[] {
         nested_function_count: number;
         function_set_hash: Uint8Array;
         factory_is_baseline: number;
+        path: string | null;
       }>
     ).map((r) => ({
       factoryFunctionIndex: r.factory_function_index,
@@ -230,10 +235,13 @@ function loadSqliteSignatures(dbPath: string): SigDbFile[] {
       nestedFunctionCount: r.nested_function_count,
       functionSetHash: hexHash(r.function_set_hash),
       factoryIsBaseline: !!r.factory_is_baseline,
+      ...(fp.module_paths != null ? { path: r.path ?? null } : {}),
     }));
 
     return {
       schema: fp.source_schema as 2,
+      ...(fp.hash_scheme != null ? { hashScheme: fp.hash_scheme } : {}),
+      ...(fp.module_paths != null ? { modulePaths: fp.module_paths } : {}),
       package: fp.pkg_name,
       version: fp.pv_version,
       hbcVersion: fp.hbc_version,
@@ -347,7 +355,6 @@ export function loadSignatures(layers: readonly DbLayer[], opts: LoadSignaturesO
  *  its own index). */
 export function writeSignature(dir: string, db: SigDbFile): string {
   if (dir.endsWith(SQLITE_SUFFIX)) {
-    if ((db.hashScheme ?? 1) >= 2) throw new Error(`sigdb sqlite layer cannot store hash-scheme-${db.hashScheme} signatures yet (${db.package}@${db.version}); write to a JSON directory`);
     const { db: sqlDb, cache } = sqliteWriteHandleFor(dir);
     insertFingerprint(sqlDb, db, cache);
     return dir;

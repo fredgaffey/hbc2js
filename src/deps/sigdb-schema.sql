@@ -49,6 +49,8 @@ CREATE TABLE fingerprints (
   sum_instr_count INTEGER, module_count INTEGER,
   non_baseline_module_count INTEGER, distinct_exact_hashes INTEGER,
   source_file TEXT, source_sha256 TEXT,
+  hash_scheme INTEGER,   -- SigDbFile.hashScheme (NULL = scheme 1)
+  module_paths INTEGER,  -- SigDbFile.modulePaths (NULL = no module paths)
   imported_at TEXT NOT NULL,
   UNIQUE (pv_id, hbc_version, variant, is_baseline_file)
 );
@@ -80,6 +82,7 @@ CREATE TABLE fingerprint_functions (
   fp_id INTEGER NOT NULL REFERENCES fingerprints(fp_id),
   fn_index INTEGER NOT NULL,
   shape_id INTEGER NOT NULL REFERENCES function_shapes(shape_id),
+  module_id INTEGER,     -- SigFunction.moduleId (module paths v1)
   PRIMARY KEY (fp_id, fn_index)
 ) WITHOUT ROWID;
 
@@ -94,6 +97,7 @@ CREATE TABLE modules (
   nested_function_indices TEXT,
   function_set_hash BLOB NOT NULL,
   factory_is_baseline INTEGER NOT NULL,
+  path TEXT,             -- SigModule.path (module paths v1)
   PRIMARY KEY (fp_id, module_ordinal)
 ) WITHOUT ROWID;
 
