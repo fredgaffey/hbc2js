@@ -243,7 +243,13 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
 
   let moduleExactHits = 0;
   for (const m of pkg.modules) {
-    if (m.factoryIsBaseline) continue;
+    // corpus-offline-precision: a J4 dependency-flagged module is the
+    // dependency's code (dep-subtract.mjs keeps the module only for graph
+    // anchoring), never this package's own module hit. It stays in
+    // `moduleTotal` below: dropping it there too would turn some packages
+    // into "tiny" ones and unlock the tiny-package path (measured: adds
+    // react-shallow-renderer as a false positive on react-navigation-example).
+    if (m.factoryIsBaseline || m.factoryIsDependency === true) continue;
     if (m.factoryExactHash !== null && targetExact.has(schemeKey(pkg, m.factoryExactHash)) && isUnambiguous(schemeKey(pkg, m.factoryExactHash))) moduleExactHits++;
   }
   const moduleTotal = pkg.modules.filter((m) => !m.factoryIsBaseline && m.factoryExactHash !== null).length;
@@ -368,7 +374,7 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
       }
     }
     for (const m of entry.file.modules) {
-      if (m.factoryIsBaseline || m.factoryFuzzyHash === null) continue;
+      if (m.factoryIsBaseline || m.factoryIsDependency === true || m.factoryFuzzyHash === null) continue;
       const factory = fnByIndex.get(m.factoryFunctionIndex);
       if (factory === undefined || !fallbackEligible(factory.instrCount, factory.stringCount)) continue;
       const key = `${schemeKey(entry.file, m.factoryFuzzyHash)}|${factory.stringSetHash}`;
@@ -404,7 +410,7 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
     if (score === undefined || score.isBaseline || (score.tier !== "high" && score.tier !== "medium")) continue;
     const fnByIndex = fnByIndexByEntry.get(entry)!;
     for (const m of entry.file.modules) {
-      if (m.factoryIsBaseline || m.factoryFuzzyHash === null) continue;
+      if (m.factoryIsBaseline || m.factoryIsDependency === true || m.factoryFuzzyHash === null) continue;
       const factory = fnByIndex.get(m.factoryFunctionIndex);
       if (factory === undefined || factory.instrCount < MIN_FUZZY_ONLY_FACTORY_INSTR) continue;
       const fuzzyKey = schemeKey(entry.file, m.factoryFuzzyHash);
