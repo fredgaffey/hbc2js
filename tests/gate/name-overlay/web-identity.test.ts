@@ -11,7 +11,8 @@
 // this item; the structural guards run at every compiled version.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { repoRoot } from "../../support/paths.ts";
 import { analyseModule } from "../../../src/cfg/index.ts";
@@ -24,6 +25,8 @@ import { astPassHook } from "../../../src/passes/index.ts";
 import { nameableIndex } from "../../../src/readability/nameable.ts";
 import { parseReadabilityResult } from "../../../src/readability/types.ts";
 import { collectTargets } from "../../../tools/readability/record.ts";
+import { hbcVsJsUnderHermes } from "../../../src/harness/hbc-equiv.ts";
+import { TRACE_VERDICT } from "../../../src/harness/compare.ts";
 
 const DIR = join(repoRoot(), "tests", "fixtures", "constructs");
 const VERSIONS = ["v84", "v94", "v96", "v98", "v99"] as const;
@@ -153,4 +156,40 @@ test("web identity guard: a closure-observed variable is never split (fixture 97
     if (src === null) continue;
     assert.doesNotMatch(src, /\b_e\d+_\d+_\d+\b/, `${v}: an environment slot was split`);
   }
+});
+
+test("web identity: naming every web keeps fixtures 94-97 equivalent under the real VM, every version", (t) => {
+  const tmp = mkdtempSync(join(tmpdir(), "hbc2js-web-"));
+  let checked = 0, named = 0;
+  try {
+    for (const dir of ["94-reg-reuse-straight", "95-reg-reuse-if-merge", "96-reg-reuse-loop-carried", "97-reg-reuse-closure-captured"]) {
+      for (const v of VERSIONS) {
+        const hbc = join(DIR, dir, `${v}.hbc`);
+        if (!existsSync(hbc)) continue;
+        const analysis = analysisOf(hbc);
+        const idx = nameableIndex(analysis, { strictEnv: false });
+        const svc = new NameService(analysis, new OverlayStore(), { strictEnv: false });
+        for (let fn = 0; fn < analysis.module.functions.length; fn++) {
+          for (const b of idx.bindings(fn)) {
+            if (b.web === undefined) continue;
+            const r = svc.setName(b, `web_${String(b.reg)}_${String(b.web)}`, { confidence: "med", evidence: "test", source: "human" });
+            if (r.ok) named += 1;
+          }
+        }
+        const js = join(tmp, `${dir}.${v}.js`);
+        writeFileSync(js, svc.render().code);
+        const res = hbcVsJsUnderHermes(hbc, js);
+        if (res.verdict === TRACE_VERDICT.INCONCLUSIVE && res.vm === undefined) {
+          t.diagnostic(`${dir}/${v}: no VM (${res.why})`);
+          continue;
+        }
+        assert.equal(res.verdict, TRACE_VERDICT.EQUIVALENT, `${dir}/${v}: ${res.why}`);
+        checked += 1;
+      }
+    }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+  assert.ok(named > 0, "no web was named");
+  t.diagnostic(`${String(checked)} renders equivalent, ${String(named)} webs named`);
 });
