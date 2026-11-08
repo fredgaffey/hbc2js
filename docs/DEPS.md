@@ -2188,29 +2188,32 @@ Remaining build failures (23 of 286: peer dependencies under the
 `--legacy-peer-deps` fallback, exports-less packages without a main) are
 in docs/BUGS.md.
 
-**Measured** (deb, offline `scoreAgainstTruth`, sha pins matched, overlay
-symlinked beside every file of the base DB; ceiling = signature present
-AND candidate):
+**Measured** (deb, offline `scoreAgainstTruth`, sha pins matched, code at
+main after the corpus-precision-forks merge, overlay symlinked beside every
+file of the base DB; ceiling = signature present AND candidate):
 
 | bundle, DB | confirmed / TP / FP | recall all (direct) | signature present | ceiling | bar losses |
 |---|---|---|---|---|---|
-| Expensify, db-v3-clean | 135 / 89 / 46 | 30.9% (35.2%) | 143 | 125 | 36 |
-| Expensify, db-v3-clean + overlay | 215 / 168 / 47 | 58.3% (80.2%) | 280 | 224 | 56 |
-| Expensify, db-v4-paths-partial | 101 / 87 / 14 | 30.2% (37.4%) | 143 | 125 | 38 |
-| Expensify, db-v4-paths-partial + overlay | 181 / 166 / 15 | 57.6% (82.4%) | 280 | 224 | 58 |
+| Expensify, db-v3-clean | 131 / 89 / 42 | 30.9% (35.2%) | 143 | 125 | 36 |
+| Expensify, db-v3-clean + overlay | 207 / 167 / 40 | 58.0% (80.2%) | 280 | 224 | 57 |
+| Expensify, db-v4-paths-partial | 94 / 87 / 7 | 30.2% (37.4%) | 143 | 125 | 38 |
+| Expensify, db-v4-paths-partial + overlay | 170 / 164 / 6 | 56.9% (82.4%) | 280 | 224 | 60 |
 | react-navigation, db-v3-clean | 14 / 14 / 0 | 18.4% (21.7%) | 44 | 33 | 19 |
-| react-navigation, db-v3-clean + overlay | 19 / 19 / 0 | 25.0% (26.7%) | 65 | 47 | 28 |
+| react-navigation, db-v3-clean + overlay | 18 / 18 / 0 | 23.7% (25.0%) | 65 | 47 | 29 |
 | react-navigation, db-v4-paths-partial | 10 / 10 / 0 | 13.2% (15.0%) | 44 | 33 | 23 |
 | react-navigation, db-v4-paths-partial + overlay | 15 / 15 / 0 | 19.7% (20.0%) | 65 | 47 | 32 |
 
-Expensify gains 80 true positives (42 never-queued packages, 19 built only
-at other versions before, 9 other-versions-only, 3 queued-never-built, 3
-previously failed, 4 already exact) and one false positive (`eventemitter3`,
-open). react-navigation stays at 0 FP and gains `@react-navigation/core`,
-`/elements`, `/bottom-tabs`, `@react-native/normalize-colors`, `semver`.
+No new false positive on either DB (before the merge, `eventemitter3` was
+one; the precision rules removed it). Expensify on db-v3-clean gains 78
+true positives (mostly never-queued packages and packages built before only
+at other versions) and loses `hoist-non-react-statics`. react-navigation
+stays at 0 FP and gains `@react-navigation/core`, `/elements`,
+`/bottom-tabs`, `@react-native/normalize-colors`, `semver` (db-v3-clean
+also `@react-navigation/...` one fewer than before the merge: 18, not 19).
 After the overlay the bottleneck moves: the Expensify ceiling is 224/288
-(77.8%), with 56 signatures never proposed as candidates and 56 lost at the
-bar; only 8 truth packages lack a signature.
+(77.8%), with 56 signatures never proposed as candidates and 57-60 lost at
+the bar; only 8 truth packages lack a signature. react-navigation's
+ceiling is 47/76.
 
 **Version tolerance is not the lever.** Matching is already by package name
 across every loaded version, so other-version signatures were already

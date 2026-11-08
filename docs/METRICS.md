@@ -165,9 +165,9 @@ Own build scored against the package lockfile truth. Offline and `--confirm` giv
 | bluesky own build (precision rules, offline) | see DEPS.md | partial 37 / 78.4% / 14.6%; clean 46 / 73.9% / 17.2% | partial 32 / 90.6% / 14.6%; clean 43 / 79.1% / 17.2% (corpus-precision-forks) | not run | n/a |
 | rainbow own build (precision rules, offline, either DB) | see DEPS.md | 107 / 76.6% / 15.8% | 106 / 77.4% / 15.8% (corpus-precision-forks) | not run | n/a |
 | metamask own build (precision rules, offline, either DB) | see DEPS.md | 169 / 78.1% / 17.6% | unchanged (corpus-precision-forks) | not run | n/a |
-| Expensify/App 12a92bd (J3, + exact-version overlay `db-overlay-recall` 264 files, db-v3-clean offline) | 288 (91) | 135 / 65.9% / 30.9% | 215 / 78.1% / 58.3% (direct 80.2%; deps-recall-nosig; overlay population taken from this truth file, see DEPS.md) | not run | n/a |
-| Expensify/App 12a92bd (J3, + exact-version overlay, db-v4-paths-partial offline) | 288 (91) | 101 / 86.1% / 30.2% | 181 / 91.7% / 57.6% (direct 82.4%; deps-recall-nosig) | not run | n/a |
-| react-navigation-example 0.85.3 (held out, + exact-version overlay) | 76 (60) | partial 10 / 100% / 13.2%; clean 14 / 100% / 18.4% | partial 15 / 100% / 19.7%; clean 19 / 100% / 25.0% (deps-recall-nosig) | not run | n/a |
+| Expensify/App 12a92bd (J3, + exact-version overlay `db-overlay-recall` 264 files, db-v3-clean offline) | 288 (91) | 131 / 67.9% / 30.9% (precision rules) | 207 / 80.7% / 58.0% (direct 80.2%; deps-recall-nosig; overlay population taken from this truth file, see DEPS.md) | not run | n/a |
+| Expensify/App 12a92bd (J3, + exact-version overlay, db-v4-paths-partial offline) | 288 (91) | 94 / 92.6% / 30.2% (precision rules) | 170 / 96.5% / 56.9% (direct 82.4%; deps-recall-nosig) | not run | n/a |
+| react-navigation-example 0.85.3 (held out, + exact-version overlay) | 76 (60) | partial 10 / 100% / 13.2%; clean 14 / 100% / 18.4% | partial 15 / 100% / 19.7%; clean 18 / 100% / 23.7% (deps-recall-nosig) | not run | n/a |
 
 Store-bundle scoring was not repeated in this measurement.
 
