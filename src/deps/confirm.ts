@@ -17,7 +17,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { decodeFunction } from "../disasm/decode.ts";
 import { parseHbc } from "../parse/module.ts";
 import { fingerprintModule, SIG_HASH_SCHEME } from "./fingerprint.ts";
@@ -268,6 +268,11 @@ export interface ConfirmOptions {
   readonly projectDbDir: string;
   readonly userCacheDbDir: string;
   readonly rateLimitMs?: number;
+  /** Raw-fingerprint cache (CONFSPEED1): a built candidate's pre-subtraction
+   *  fingerprint is stored here keyed by package@version + hbc + hash scheme
+   *  + RN version, so re-confirming it (another target, wiped project DB)
+   *  runs no npm/Metro/hermesc. Defaults to `<userCacheDbDir>/../confirm-fp`. */
+  readonly fingerprintCacheDir?: string;
   /** Skip candidates already recorded as a failure in
    *  `<projectDbDir>/../confirm-failures.json` from a previous run. */
   readonly failureLogPath?: string;
@@ -473,12 +478,43 @@ function bundleAndCompile(pkg: string, scratchProjectDir: string, hermescPath: s
   mkdirSync(assetsDir, { recursive: true });
   execFileSync(
     "npx",
-    ["react-native", "bundle", "--platform", "android", "--dev", "false", "--minify", "true", "--reset-cache", "--entry-file", entryFile, "--bundle-output", bundlePath, "--assets-dest", assetsDir],
+    ["react-native", "bundle", "--platform", "android", "--dev", "false", "--minify", "true", "--entry-file", entryFile, "--bundle-output", bundlePath, "--assets-dest", assetsDir],
     { cwd: scratchProjectDir, stdio: "ignore" },
   );
   const hbcPath = join(workDir, "out.hbc");
   execFileSync(hermescPath, ["-O", "-emit-binary", `-out=${hbcPath}`, bundlePath], { stdio: "ignore" });
   return hbcPath;
+}
+
+interface CachedFingerprint {
+  readonly hbcVersion: number;
+  readonly functions: readonly SigFunction[];
+  readonly modules: readonly SigModule[];
+  readonly legacyExactHashes: readonly string[];
+}
+
+function fpCachePath(opts: ConfirmOptions, c: ResolvedCandidate): string {
+  const dir = opts.fingerprintCacheDir ?? join(dirname(opts.userCacheDbDir), "confirm-fp");
+  const name = `${c.package}@${c.version}__hbc${opts.hbcVersion}__s${SIG_HASH_SCHEME}__rn${opts.rnVersion}`.replace(/[^a-zA-Z0-9@._-]+/g, "_");
+  return join(dir, `${name}.json`);
+}
+
+function readFpCache(path: string): CachedFingerprint | null {
+  try {
+    const v = JSON.parse(readFileSync(path, "utf8")) as CachedFingerprint;
+    return Array.isArray(v.functions) && Array.isArray(v.modules) && Array.isArray(v.legacyExactHashes) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeFpCache(path: string, v: CachedFingerprint): void {
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify(v));
+  } catch {
+    /* cache is best-effort */
+  }
 }
 
 /** Resolve a candidate's version ("nearest by date" when the guess evidence
@@ -533,13 +569,22 @@ export async function confirmCandidates(candidates: readonly ConfirmCandidate[],
     opts.onProgress?.(`confirming ${candidate.package}@${candidate.version} (hbc${opts.hbcVersion})...`);
     let workDir: string | null = null;
     try {
-      installCandidate(candidate, opts.scratchProjectDir);
-      workDir = mkdtempSync(join(tmpdir(), "hbc2js-confirm-"));
-      const hbcPath = bundleAndCompile(candidate.package, opts.scratchProjectDir, opts.hermescPath, workDir);
-
-      const bytes = new Uint8Array(readFileSync(hbcPath));
-      const mod = parseHbc(bytes);
-      const { functions: rawFunctions, modules: rawModules, legacyExactHashes } = fingerprintModule(mod, decodeFunction);
+      const fpPath = fpCachePath(opts, candidate);
+      const cached = readFpCache(fpPath);
+      let fp: CachedFingerprint;
+      if (cached === null) {
+        installCandidate(candidate, opts.scratchProjectDir);
+        workDir = mkdtempSync(join(tmpdir(), "hbc2js-confirm-"));
+        const hbcPath = bundleAndCompile(candidate.package, opts.scratchProjectDir, opts.hermescPath, workDir);
+        const mod = parseHbc(new Uint8Array(readFileSync(hbcPath)));
+        const built = fingerprintModule(mod, decodeFunction);
+        fp = { hbcVersion: mod.header.version, functions: built.functions, modules: built.modules, legacyExactHashes: built.legacyExactHashes };
+        writeFpCache(fpPath, fp);
+      } else {
+        fp = cached;
+        opts.onProgress?.(`  (fingerprint cache hit)`);
+      }
+      const rawFunctions = fp.functions, rawModules = fp.modules, legacyExactHashes = fp.legacyExactHashes;
       const { functions, modules } = subtractBaseline(rawFunctions, rawModules, baseline.hashes, { package: candidate.package, owners: baseline.owners, legacyExactHashes });
 
       const db: SigDbFile = {
@@ -547,7 +592,7 @@ export async function confirmCandidates(candidates: readonly ConfirmCandidate[],
         hashScheme: SIG_HASH_SCHEME,
         package: candidate.package,
         version: candidate.version,
-        hbcVersion: mod.header.version,
+        hbcVersion: fp.hbcVersion,
         totalFunctions: functions.length,
         rawFunctionCount: rawFunctions.length,
         subtractedBaselines: baseline.paths,
