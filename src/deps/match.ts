@@ -34,7 +34,7 @@ export interface PackageScore {
    *  `embedded` (the hits are a subset of another confirmed, path-bearing
    *  package's own files), `twin` (the same hits as another confirmed
    *  package, which was kept). `by` names the other package. */
-  readonly demotion?: { readonly rule: "few-distinct" | "container" | "embedded" | "twin"; readonly by?: string };
+  readonly demotion?: { readonly rule: "few-distinct" | "container" | "scattered" | "embedded" | "twin"; readonly by?: string };
 }
 
 export interface ModuleAttribution {
@@ -216,6 +216,13 @@ export const EXPLAINED_EVIDENCE_SHARE = 0.9;
 // `embedded`: the explaining package must have at least this many times
 // as many distinct hit hashes (it is the larger file the copy sits in).
 const EMBEDDED_HOST_SIZE_RATIO = 2;
+// corpus-precision-residual (`scattered`): a hit hash is anchored when a
+// target module holding it holds at least 2 of the package's distinct hit
+// hashes and they are at least this share of that module's functions (or
+// the module is all hits, or holds 5 hits of one own file; see
+// demoteExplained). A real copy is a module made mostly of the package's
+// own functions.
+export const ANCHOR_DENSITY = 0.1;
 
 function tierRank(t: ConfidenceTier): number {
   return { high: 3, medium: 2, low: 1, none: 0 }[t];
@@ -233,7 +240,7 @@ function buildIndex<K extends "exactHash" | "fuzzyHash" | "stringSetHash">(funct
   return s;
 }
 
-function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Set<string>, targetFuzzy: Set<string>, targetStringHash: Set<string>, minInstr: number, hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetCopies: ReadonlyMap<string, number>): { readonly score: PackageScore; readonly hitKeys: ReadonlySet<string> } | null {
+function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Set<string>, targetFuzzy: Set<string>, targetStringHash: Set<string>, minInstr: number, hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetCopies: ReadonlyMap<string, number>): { readonly score: PackageScore; readonly hitKeys: ReadonlySet<string>; readonly distinctEligible: number } | null {
   const pkg: SigDbFile = entry.file;
   if (pkg.hbcVersion !== target.hbcVersion) return null;
   // corpus-embedded-copy (module paths v1, docs/PACKAGE-SIGNATURES.md §7):
@@ -373,13 +380,14 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
     tier,
     ...(demotion === undefined ? {} : { demotion }),
   };
-  return { score, hitKeys };
+  return { score, hitKeys, distinctEligible };
 }
 
 interface ScoredEntry {
   readonly entry: LoadedSig;
   score: PackageScore;
   readonly hitKeys: ReadonlySet<string>;
+  readonly distinctEligible: number;
 }
 
 // corpus-precision-forks: demote a "high" package whose evidence another
@@ -390,6 +398,19 @@ interface ScoredEntry {
 //    CONTAINER_SIZE_RATIO x the package's whole function count — a copy
 //    inlined in another package's pre-built dist file (process and
 //    stackframe in react-devtools-core's backend.js);
+//  - scattered (corpus-precision-residual): fewer than
+//    MIN_DISTINCT_EVIDENCE_HASHES of its distinct hit hashes are anchored —
+//    held by a target module that holds at least 2 of them, at least
+//    ANCHOR_DENSITY of that module's functions, or all of its functions
+//    (one-function modules: gopd inside define-properties), or at least
+//    MIN_TINY_PACKAGE_EXACT_FUNCTION_HITS from one of the package's own
+//    files (tslib: 7 of tslib.js in its 87-function module). Small helpers each alone
+//    in an unrelated app module (ai, ky), tiny factory shapes matching app
+//    modules of 1-3 functions (culori, swiper), or a few dozen among the
+//    500 functions of another package's single file (lodash-es inside
+//    lodash/lodash.js) are not a copy: a real copy is a module made mostly
+//    of the package's functions. A package whose every distinct eligible
+//    hash is hit (one-function packages: cross-fetch) is exempt;
 //  - embedded: that share of its distinct hit hashes are also hits of
 //    another high package's OWN files (path-bearing signature, so those
 //    files really are that package's), which has EMBEDDED_HOST_SIZE_RATIO
@@ -432,6 +453,46 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
       }
     }
     if (all > 0 && inside >= EXPLAINED_EVIDENCE_SHARE * all) demote(s, "container");
+  }
+  const moduleOf = new Map<number, number>();
+  inventory.modules.forEach((m, mi) => {
+    for (const i of m.functionIndices ?? []) moduleOf.set(i, mi);
+  });
+  for (const s of high()) {
+    if (s.hitKeys.size >= s.distinctEligible) continue;
+    const keysIn = new Map<number, Set<string>>();
+    for (const k of s.hitKeys) {
+      for (const i of occurrences.get(k) ?? []) {
+        const m = moduleOf.get(i);
+        if (m === undefined) continue;
+        let set = keysIn.get(m);
+        if (set === undefined) keysIn.set(m, (set = new Set()));
+        set.add(k);
+      }
+    }
+    if (keysIn.size === 0) continue; // hand-built inventory without modules: nothing to judge
+    // The package's own file(s) each hit hash comes from (pathless files
+    // carry no module ids: one file).
+    const filesOf = new Map<string, Set<number>>();
+    for (const fn of s.entry.file.functions) {
+      const k = schemeKey(s.entry.file, fn.exactHash);
+      if (!s.hitKeys.has(k)) continue;
+      let set = filesOf.get(k);
+      if (set === undefined) filesOf.set(k, (set = new Set()));
+      set.add(fn.moduleId ?? -1);
+    }
+    const anchored = new Set<string>();
+    for (const [m, set] of keysIn) {
+      const size = inventory.modules[m]!.functionIndices.length || 1;
+      let anchors = (set.size >= 2 && set.size >= ANCHOR_DENSITY * size) || set.size >= size;
+      if (!anchors && set.size >= MIN_TINY_PACKAGE_EXACT_FUNCTION_HITS) {
+        const perFile = new Map<number, number>();
+        for (const k of set) for (const f of filesOf.get(k) ?? []) perFile.set(f, (perFile.get(f) ?? 0) + 1);
+        anchors = Math.max(0, ...perFile.values()) >= MIN_TINY_PACKAGE_EXACT_FUNCTION_HITS;
+      }
+      if (anchors) for (const k of set) anchored.add(k);
+    }
+    if (anchored.size < MIN_DISTINCT_EVIDENCE_HASHES) demote(s, "scattered");
   }
   const shared = (a: ReadonlySet<string>, b: ReadonlySet<string>): number => {
     let n = 0;
