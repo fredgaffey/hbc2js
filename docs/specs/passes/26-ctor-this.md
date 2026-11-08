@@ -229,3 +229,56 @@ in the 22 modules that own a bucket function is the seeded shape (11 are
 R-CT1, 9 R-CT0, 2 R-CT3). It is a readability fold on this bundle, and a
 correctness prerequisite only where a seeded class also has private fields
 (9 classes here; fixture 76-class-fields-private).
+
+## 11. The derived-`super` rung (2026-11-09): it is `super-call`, and what it must prove
+
+Section 10 calls rebuilding `super(...)` "a *different* rung". That rung
+exists: it is `super-call` (row R14, spec 28), which runs `before:
+["ctor-this"]`. On react-navigation it already folds 129 derived constructors
+(spec 28 section 10). So no second rung and no `R-DS*` refusal family was
+added. A second matcher for the same `Reflect.construct` shape would put two
+owners on one rewrite, which is exactly the duplication spec 28 section 5
+rules out. `ctor-this`'s R-CT1 stays as it is: a vacuous code that declines
+every derived class, whether or not `super-call` folded it.
+
+The soundness obligations a super-rebuilding rewrite has to meet, and where
+each one is discharged:
+
+1. **The callee is the class's own `extends` value.** SuperCall (ES2024
+   13.3.7.1) constructs `GetSuperConstructor()`, the active function's
+   `[[GetPrototypeOf]]`. The lowering reads `Object.getPrototypeOf(<the class's
+   own env slot>)`, so the slot must be proven to hold exactly this class,
+   written once: R-SC1.
+2. **Exactly one construct, on every path, ahead of every receiver use.** A
+   conditional `super(...)` is two Construct sites, not one statement. It is
+   refused (R-SC2), and so is anything that reads the stand-in register
+   before the call or rewrites it after: R-SC3..R-SC5. The double-super guard
+   reads a register that is always `__hbc_empty` on the folded path, so it is
+   statically dead and goes with the call.
+3. **Code before `super(...)`** may stay before it only if it touches no
+   receiver. The stand-in does not exist yet, and `this` would be in its TDZ.
+   R-SC3 refuses any read of the stand-in ahead of the call.
+4. **`this` replaces the stand-in only.** An env slot that captured the
+   receiver for an arrow class field is left alone, because the substitution
+   turns its store into `_eD_S = this` (spec 28 section 9.7).
+
+Acceptance fixture: **88-derived-ctor-shapes** at v98 and v99. `Plain`
+(`super(x); this.y = x`), `Fields` (public class fields), `Arrow` (an arrow
+class field) and `Before` (statements before `super`) are all rebuilt to one
+`super(...)` addressing `this`. `Cond` (an `if`/`else` with a `super` in each
+arm) is refused as R-SC2 and keeps its lowering
+(`node tools/passes/ctor-this-refusals.ts` on the fixture: FOLD 4, R-SC2 1).
+The private-field derived constructor is fixture 81's. T2 equivalence passes
+at v98 and v99 (`tests/gate/passes/derived-ctor.test.ts`), and fixture 88's
+expected.txt is the v99 Hermes VM's own output (`tools/hermes-vm/v99`).
+
+What building fixture 88 found instead was a lowering bug. With the
+constructions at top level, every class sat inside a `L0: { ... }` that the
+structurer opens for the inlined conditional `new Cond(...)`, and
+`class-recover` (one site per function body, its F1 rule) recovered nothing.
+Once the constructions moved into a function, `Cond`'s `CreateDerivedClass`
+aliased its superclass register and the output threw `Cyclic __proto__ value`
+at `--passes=none` (spec 24 section 8, fixture 89). Both are recorded in the
+`docs/BUGS.md` `diff:GetOwnPrivateBySym/GetByVal` row. The labelled-block
+blocker, and the defining-frame inlined construction behind
+`private-fields`' `defining-body-escape`, are still open there.

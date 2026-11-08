@@ -63,7 +63,7 @@ for (const version of ["v98", "v99"] as const) {
     // an aliased superclass register (dst r2 == superclass r2 here)...
     assert.match(js(version, "none"), /Object\.setPrototypeOf\((_fn\d+), (r\d+)\);\n\s+Object\.setPrototypeOf\(\1\.prototype, \2 === null \? null : \2\.prototype\);\n\s+\2 = \1;/);
     // ...and class-recover takes that pair as the class's `extends` link
-    // (spec 24 section 6.7), so the output is a real class again.
+    // (spec 24 section 8), so the output is a real class again.
     const on = js(version, "on");
     assert.match(on, /class Cond extends /);
     assert.doesNotMatch(on, /Object\.setPrototypeOf\(_fn\d+/);

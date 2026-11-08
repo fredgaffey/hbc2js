@@ -711,7 +711,7 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
         // it before writing either result, so both links are made here,
         // through the closure's own binding, before any register is
         // written. `class-recover` recognises this pre-head pair
-        // (docs/specs/passes/24-class-recover.md section 6.7).
+        // (docs/specs/passes/24-class-recover.md section 8).
         out.push({ k: "expr", expr: call(prop(id("Object"), "setPrototypeOf"), [closure, superReg]) });
         out.push({
           k: "expr",

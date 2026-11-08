@@ -74,20 +74,24 @@ class Cond extends A {
   }
 }
 
-// Constructed from a separate function, so hermesc's inliner does not pull
-// the constructors into the class-defining frame (that shape is fixture 89's
-// and the docs/BUGS.md row's `defining-body-escape` residue).
+// Constructed through one shared `make`, called six times, so hermesc's
+// inliner pulls no constructor into a caller's frame (an inlined `new C(...)`
+// is the docs/BUGS.md row's `defining-body-escape` residue and lowers with a
+// W_UNPAIRED_NEW today).
+function make(C, x) {
+  return new C(x);
+}
 function main() {
-  const p = new Plain(3);
+  const p = make(Plain, 3);
   print('plain:', p.base, p.y, p.sum(), p.who(), p instanceof A);
-  const f = new Fields(4);
+  const f = make(Fields, 4);
   print('fields:', f.base, f.count, f.label, f.z, f.show());
-  const a = new Arrow(5);
+  const a = make(Arrow, 5);
   print('arrow:', a.base, a.w, a.handle(), a.call());
-  const b = new Before(6);
+  const b = make(Before, 6);
   print('before:', b.base, b.d, b.pair);
-  const c1 = new Cond(7);
-  const c2 = new Cond(-8);
+  const c1 = make(Cond, 7);
+  const c2 = make(Cond, -8);
   print('cond:', c1.base, c1.c, c1.sign(), c2.base, c2.c, c2.sign());
 }
 main();

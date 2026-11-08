@@ -188,7 +188,7 @@ function buildGroup(list: readonly Stmt[], headIndex: number, ctorName: string, 
     else regValues.delete(store.name);
   }
 
-  // Section 6.7: when hermesc gives `CreateDerivedClass` the same register as
+  // Spec 24 section 8: when hermesc gives `CreateDerivedClass` the same register as
   // destination and superclass, the emitter makes both links BEFORE the head,
   // through the closure's own binding (`Object.setPrototypeOf(_fnN, r4);
   // Object.setPrototypeOf(_fnN.prototype, r4 === null ? null : r4.prototype);
