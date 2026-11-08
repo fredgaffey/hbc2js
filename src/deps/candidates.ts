@@ -24,6 +24,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ModuleInventory } from "./inventory.ts";
 import type { SigDbFile } from "./sigdb-types.ts";
+import { proposeFromHashIndex } from "./hash-index.ts";
 
 /** `<safeName>@<version>__hbc<N>.json` -> canonical package name (reverses
  *  `writeSignature`'s `db.package.replace(/\//g, "__")`, `db.ts`). Returns
@@ -241,6 +242,13 @@ export function deriveCandidatePackages(layers: readonly DbLayer[], inventory: M
   for (const pkg of [...found]) {
     for (const dep of recordedDependencyPackageNames(layers, pkg, depIndex)) found.add(dep);
   }
+
+  // Hash-index proposal (corpus-recall-candidates, `hash-index.ts`): a
+  // package whose own distinctive function hashes appear in the target is a
+  // candidate even when nothing names it. Added after the dependency
+  // snapshot above, so a hash-proposed package's dependencies are never
+  // expanded (no stacked inference).
+  for (const pkg of proposeFromHashIndex(layers, inventory)) found.add(pkg);
 
   // Scope-prefix corroboration: a scoped package's own full name
   // (`@react-navigation/native`) doesn't always survive verbatim in a
