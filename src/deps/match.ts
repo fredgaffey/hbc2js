@@ -6,8 +6,8 @@
 
 import type { LoadedSig } from "./db.ts";
 import type { ModuleInventory } from "./inventory.ts";
-import type { SigDbFile } from "./sigdb-types.ts";
-import { foreignSets } from "./module-paths.ts";
+import type { SigDbFile, SigModule } from "./sigdb-types.ts";
+import { foreignSets, isOwnModulePath } from "./module-paths.ts";
 
 export type ConfidenceTier = "high" | "medium" | "low" | "none";
 
@@ -35,6 +35,15 @@ export interface PackageScore {
    *  package's own files), `twin` (the same hits as another confirmed
    *  package, which was kept). `by` names the other package. */
   readonly demotion?: { readonly rule: "few-distinct" | "container" | "scattered" | "embedded" | "twin"; readonly by?: string };
+  /** Set when corpus-path-recall's module-graph rule (`promoteViaDependency`,
+   *  docs/PACKAGE-SIGNATURES.md §7 "Recovery through the module graph")
+   *  raised a path-bearing package to "high": an app module shaped like one
+   *  of its own files requires the module of `by`, its signature's own
+   *  dependency. `edge: "exact"`: the own code is all present by exact hash
+   *  and the required module is the dependency's exact module; `"fuzzy"`:
+   *  the own file matches by mnemonic shape and `by` is a confirmed package
+   *  whose evidence sits in the required module. */
+  readonly viaDependency?: { readonly by: string; readonly edge: "exact" | "fuzzy" };
 }
 
 export interface ModuleAttribution {
@@ -531,6 +540,141 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
   return scored;
 }
 
+/** Package directory of a node_modules-relative path (`@s/p/x.js` -> `@s/p`,
+ *  `p/node_modules/q/i.js` -> `q`). */
+function packageOfPath(path: string): string {
+  const tail = path.slice(path.lastIndexOf("node_modules/") >= 0 ? path.lastIndexOf("node_modules/") + "node_modules/".length : 0);
+  const parts = tail.split("/");
+  return parts[0]!.startsWith("@") ? `${parts[0]}/${parts[1]}` : parts[0]!;
+}
+
+// corpus-path-recall (docs/PACKAGE-SIGNATURES.md §7 "Recovery through the
+// module graph"): a path-bearing package is scored on its own files only, so
+// a true package whose own file is small (hoist-non-react-statics: three
+// functions) or built differently from the signature (abort-controller: the
+// app resolves dist/*.mjs, the signature dist/*.js) is lost even though the
+// code it requires is in the app. Its signature's module graph says which
+// dependency module each own file requires; the app's module graph says the
+// same of each app module. A package that is not "high" and was not demoted
+// becomes "high" when, for one own file S (path under the package, with a
+// dependency edge to another package D's module S_D), an app module T
+//  - exact: has S's exact factory hash, every distinct eligible own hash of
+//    the package is a hit (hitKeys covers distinctEligible, at least
+//    MIN_DISTINCT_EVIDENCE_HASHES - 1 of them), and T requires an app module
+//    whose factory exact hash is S_D's; or
+//  - fuzzy: D is a "high" package (before this rule: no chaining), T's
+//    eligible functions match at least MIN_DISTINCT_EVIDENCE_HASHES distinct
+//    fuzzy hashes of S's own eligible functions, which are half of S's and
+//    half of T's, and T requires an app module holding at least
+//    MIN_DISTINCT_EVIDENCE_HASHES of D's hit hashes (where D's confirmed code
+//    is).
+// An impostor matched only through its copy of D (safe-buffer through
+// buffer) has no app module shaped like its own file, so it never qualifies:
+// the edge only credits a module the app holds, never the copy.
+function promoteViaDependency(scored: readonly ScoredEntry[], inventory: ModuleInventory, minInstr: number, targetCopies: ReadonlyMap<string, number>): void {
+  const highByName = new Map<string, ScoredEntry[]>();
+  for (const s of scored) {
+    if (s.score.tier !== "high" || s.score.isBaseline) continue;
+    const list = highByName.get(s.score.package) ?? [];
+    list.push(s);
+    highByName.set(s.score.package, list);
+  }
+  const tById = new Map<number, ModuleInventory["modules"][number]>();
+  const tByFactory = new Map<string, ModuleInventory["modules"][number][]>();
+  for (const m of inventory.modules) {
+    if (m.localModuleId !== null) tById.set(m.localModuleId, m);
+    if (m.exactHash === null) continue;
+    const list = tByFactory.get(m.exactHash) ?? [];
+    list.push(m);
+    tByFactory.set(m.exactHash, list);
+  }
+  const fuzzyIndex = new Map<string, Set<ModuleInventory["modules"][number]>>();
+  const eligibleFuzzy = (m: ModuleInventory["modules"][number]): Set<string> => {
+    const out = new Set<string>();
+    for (const i of m.functionIndices ?? []) {
+      const f = inventory.functions[i];
+      if (f !== undefined && f.instrCount >= minInstr) out.add(f.fuzzyHash);
+    }
+    return out;
+  };
+  const tFuzzy = new Map<ModuleInventory["modules"][number], Set<string>>();
+  for (const m of inventory.modules) {
+    const set = eligibleFuzzy(m);
+    tFuzzy.set(m, set);
+    for (const h of set) {
+      let s = fuzzyIndex.get(h);
+      if (s === undefined) fuzzyIndex.set(h, (s = new Set()));
+      s.add(m);
+    }
+  }
+  const depsOf = (m: ModuleInventory["modules"][number]): ModuleInventory["modules"][number][] =>
+    (m.depIds ?? []).map((d) => tById.get(d)).filter((x): x is ModuleInventory["modules"][number] => x !== undefined);
+  const holdsHits = (m: ModuleInventory["modules"][number], hits: readonly ScoredEntry[]): boolean =>
+    hits.some((d) => {
+      let n = 0;
+      const seen = new Set<string>();
+      for (const i of m.functionIndices ?? []) {
+        const h = inventory.functions[i]?.exactHash;
+        if (h !== undefined && d.hitKeys.has(h) && !seen.has(h)) {
+          seen.add(h);
+          n++;
+        }
+      }
+      return n >= MIN_DISTINCT_EVIDENCE_HASHES;
+    });
+  for (const s of scored) {
+    const file = s.entry.file;
+    if (s.score.tier === "high" || s.score.demotion !== undefined || s.score.isBaseline || (file.modulePaths ?? 0) < 1 || (file.hashScheme ?? 1) < 2) continue;
+    const sById = new Map(file.modules.map((m) => [m.localModuleId, m]));
+    const fnByIndex = new Map(file.functions.map((f) => [f.index, f]));
+    // The own code proper: functions of modules whose path is under the
+    // package (the pathless bundle prelude and entry stub are neutral for
+    // scoring but say nothing about this package).
+    const ownPathIds = new Set(file.modules.filter((m) => typeof m.path === "string" && isOwnModulePath(file.package, m.path)).map((m) => m.localModuleId));
+    const ownHashes = new Set(file.functions.filter((f) => f.instrCount >= minInstr && f.moduleId !== undefined && ownPathIds.has(f.moduleId)).map((f) => schemeKey(file, f.exactHash)));
+    const complete = ownHashes.size >= MIN_DISTINCT_EVIDENCE_HASHES - 1 && [...ownHashes].every((k) => s.hitKeys.has(k));
+    let found: PackageScore["viaDependency"];
+    for (const own of file.modules) {
+      if (found !== undefined) break;
+      if (own.path === null || own.path === undefined || own.localModuleId === null || !isOwnModulePath(file.package, own.path)) continue;
+      const depMods = (own.depIds ?? []).map((d) => sById.get(d)).filter((d): d is SigModule => d !== undefined && typeof d.path === "string" && !isOwnModulePath(file.package, d.path));
+      if (depMods.length === 0) continue;
+      // exact: the whole own code is present and this file's factory is an app module.
+      if (complete && own.factoryExactHash !== null) {
+        for (const t of tByFactory.get(own.factoryExactHash) ?? []) {
+          const tDeps = depsOf(t);
+          const d = depMods.find((sd) => sd.factoryExactHash !== null && (targetCopies.get(sd.factoryExactHash) ?? 0) < TARGET_GENERIC_COPIES && tDeps.some((td) => td.exactHash === sd.factoryExactHash));
+          if (d !== undefined) {
+            found = { by: packageOfPath(d.path!), edge: "exact" };
+            break;
+          }
+        }
+        if (found !== undefined) break;
+      }
+      // fuzzy: an app module shaped like this own file requires a confirmed dependency's code.
+      const ownFuzzy = new Set<string>();
+      for (const f of file.functions) if (f.moduleId === own.localModuleId && f.instrCount >= minInstr) ownFuzzy.add(f.fuzzyHash);
+      const fac = fnByIndex.get(own.factoryFunctionIndex);
+      if (fac !== undefined && fac.instrCount >= minInstr) ownFuzzy.add(fac.fuzzyHash);
+      if (ownFuzzy.size < MIN_DISTINCT_EVIDENCE_HASHES) continue;
+      const confirmedDeps = depMods.map((d) => packageOfPath(d.path!)).filter((p) => p !== file.package && highByName.has(p));
+      if (confirmedDeps.length === 0) continue;
+      const counts = new Map<ModuleInventory["modules"][number], number>();
+      for (const h of ownFuzzy) for (const t of fuzzyIndex.get(h) ?? []) counts.set(t, (counts.get(t) ?? 0) + 1);
+      for (const [t, n] of counts) {
+        if (n < MIN_DISTINCT_EVIDENCE_HASHES || n < 0.5 * ownFuzzy.size || n < 0.5 * (tFuzzy.get(t)?.size ?? 0)) continue;
+        const tDeps = depsOf(t);
+        const by = confirmedDeps.find((p) => tDeps.some((td) => holdsHits(td, highByName.get(p)!)));
+        if (by !== undefined) {
+          found = { by, edge: "fuzzy" };
+          break;
+        }
+      }
+    }
+    if (found !== undefined) s.score = { ...s.score, tier: "high", viaDependency: found };
+  }
+}
+
 export interface MatchOptions {
   /** FLIRT-style minimum-instruction floor before a hash is trusted at all. */
   readonly minInstr?: number;
@@ -637,7 +781,9 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
     if (scored === null) continue;
     scoredEntries.push({ entry, ...scored });
   }
-  for (const s of demoteExplained(scoredEntries, inventory, legacyExact)) {
+  const afterDemotion = demoteExplained(scoredEntries, inventory, legacyExact);
+  promoteViaDependency(afterDemotion, inventory, minInstr, targetCopies);
+  for (const s of afterDemotion) {
     packages.push(s.score);
     scoreByOwner.set(`${s.entry.file.package}@${s.entry.file.version}`, s.score);
   }
