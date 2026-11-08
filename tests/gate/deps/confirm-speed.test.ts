@@ -70,7 +70,7 @@ __d(function (global, require, importDefault, exportAll, module, exports, depend
 __d(function (global, require, importDefault, exportAll, module, exports, dependencyMap) {
   var arr = [];
   for (var k = 0; k < 41; k++) {
-    arr.push(k * k - k + 7);
+    arr.push(k * k - k + 7, k + 1);
   }
   module.exports = arr;
 }, 2, []);

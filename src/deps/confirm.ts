@@ -24,7 +24,7 @@ import { fingerprintModule, SIG_HASH_SCHEME } from "./fingerprint.ts";
 import { matchInventory } from "./match.ts";
 import type { ModuleInventory } from "./inventory.ts";
 import type { PackageScore } from "./match.ts";
-import { writeSignature } from "./db.ts";
+import { userCacheDbDir, writeSignature } from "./db.ts";
 import type { SigDbFile, SigFunction, SigModule } from "./sigdb-types.ts";
 import { isHintEligibleEvidence } from "./guess.ts";
 
@@ -559,7 +559,7 @@ interface CachedFingerprint {
 }
 
 function fpCachePath(opts: ConfirmOptions, c: ResolvedCandidate): string {
-  const dir = opts.fingerprintCacheDir ?? join(dirname(opts.userCacheDbDir), "confirm-fp");
+  const dir = opts.fingerprintCacheDir ?? join(dirname(opts.userCacheDbDir ?? userCacheDbDir()), "confirm-fp");
   const name = `${c.package}@${c.version}__hbc${opts.hbcVersion}__s${SIG_HASH_SCHEME}__rn${opts.rnVersion}`.replace(/[^a-zA-Z0-9@._-]+/g, "_");
   return join(dir, `${name}.json`);
 }
