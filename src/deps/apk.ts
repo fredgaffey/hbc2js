@@ -50,7 +50,7 @@ function listZipEntries(apkPath: string): string[] {
 
 function readZipEntry(apkPath: string, entry: string): Uint8Array | null {
   try {
-    return execFileSync("unzip", ["-p", apkPath, entry], { maxBuffer: 64 * 1024 * 1024 });
+    return execFileSync("unzip", ["-p", apkPath, entry], { maxBuffer: 1024 * 1024 * 1024 });
   } catch {
     return null;
   }
@@ -151,6 +151,9 @@ export function pickApkBundleCandidates(entries: readonly string[], namedCandida
   const out: string[] = [];
   for (const c of namedCandidates) if (entries.includes(c)) out.push(c);
   for (const e of entries) if (/^assets\/.*\.hbc$/i.test(e) && !out.includes(e)) out.push(e);
+  // Custom-named Metro bundles (e.g. assets/kernel.android.bundle); the
+  // Hermes-magic check in extractBundleFromApk disambiguates.
+  for (const e of entries) if (/^assets\/[^/]*\.bundle$/i.test(e) && !out.includes(e)) out.push(e);
   return out;
 }
 
@@ -172,7 +175,7 @@ export function extractBundleFromApk(apkPath: string): ExtractedBundle {
   const namedCandidates = ["assets/index.android.bundle", "assets/index.bundle"];
   const candidates = pickApkBundleCandidates(entries, namedCandidates);
   if (candidates.length === 0) {
-    throw new Error(`no bundle found in ${apkPath} (looked for ${namedCandidates.join(", ")} and assets/*.hbc)`);
+    throw new Error(`no bundle found in ${apkPath} (looked for ${namedCandidates.join(", ")} and assets/*.hbc, assets/*.bundle)`);
   }
   let chosenPath = candidates[0]!;
   let chosenBytes = readZipEntry(apkPath, chosenPath);
