@@ -26,6 +26,7 @@ import type { ModuleInventory } from "./inventory.ts";
 import type { PackageScore } from "./match.ts";
 import { writeSignature } from "./db.ts";
 import type { SigDbFile, SigFunction, SigModule } from "./sigdb-types.ts";
+import { isHintEligibleEvidence } from "./guess.ts";
 
 export interface ConfirmCandidate {
   readonly package: string;
@@ -34,6 +35,64 @@ export interface ConfirmCandidate {
    *  string with no `@version` suffix). `confirmCandidates` resolves it to
    *  the npm release nearest `ConfirmOptions.referenceDate` before packing. */
   readonly version: string | null;
+  /** The guess evidence that proposed this candidate (`GuessCandidate.evidence`
+   *  is structurally compatible). Only `kind` is read, by the confirm
+   *  minimum-evidence rule's corroboration leg. */
+  readonly evidence?: readonly { readonly kind: string }[];
+}
+
+// --- confirm minimum evidence (corpus-confirm-precision, docs/DEPS.md
+// "Confirm minimum evidence") ------------------------------------------
+//
+// A confirm candidate is scored against the target IN ISOLATION (one
+// signature file loaded), so match.ts's ambiguity gate never fires and a
+// single coincidental factory hash reads as the package's own evidence.
+// Real-world this confirmed generic-name 1-3-module packages (`name`,
+// `focus`, `atob`, ...) proposed from bare identifier strings. A confirm
+// therefore needs, on top of the scored tier:
+//   - tier "high" (the same bar `confirmedDeps` uses for db-match; "medium"
+//     is a single module hit), and
+//   - CONFIRM_MIN_OWN_MODULE_HITS module factories that exact-match the
+//     target, are not baseline/dependency-flagged, weigh at least
+//     CONFIRM_MIN_FACTORY_INSTR instructions, and whose target module is not
+//     already owned by another package (a candidate's bundled dependency
+//     tree is fingerprinted with it), OR at least one such hit plus
+//     corroborating evidence of a specific kind (native-module, url-host,
+//     or a `name@version` string — `isHintEligibleEvidence`). A bare
+//     package-name string is not corroboration: it is how the junk got
+//     proposed.
+export const CONFIRM_MIN_FACTORY_INSTR = 16;
+export const CONFIRM_MIN_OWN_MODULE_HITS = 3;
+
+export interface ConfirmEvidenceContext {
+  readonly corroborated: boolean;
+  /** Exact hashes of target module factories the match stage already
+   *  attributed to some package. */
+  readonly ownedTargetFactoryHashes?: ReadonlySet<string>;
+}
+
+export interface ConfirmEvidenceVerdict {
+  readonly ok: boolean;
+  readonly ownModuleHits: number;
+  readonly reason?: string;
+}
+
+export function confirmMinimumEvidence(score: Pick<PackageScore, "tier">, sig: SigDbFile, target: ModuleInventory, ctx: ConfirmEvidenceContext): ConfirmEvidenceVerdict {
+  const legacy = (sig.hashScheme ?? 1) < 2;
+  const targetExact = new Set<string>(legacy ? (target.legacyExactHashes ?? target.functions.map((f) => f.exactHash)) : target.functions.map((f) => f.exactHash));
+  const instrByIndex = new Map<number, number>(sig.functions.map((f) => [f.index, f.instrCount]));
+  let ownModuleHits = 0;
+  for (const m of sig.modules) {
+    if (m.factoryIsBaseline || m.factoryIsDependency === true || m.factoryExactHash === null) continue;
+    if (!targetExact.has(m.factoryExactHash)) continue;
+    if (ctx.ownedTargetFactoryHashes?.has(m.factoryExactHash) === true) continue;
+    if ((instrByIndex.get(m.factoryFunctionIndex) ?? 0) < CONFIRM_MIN_FACTORY_INSTR) continue;
+    ownModuleHits++;
+  }
+  if (score.tier !== "high") return { ok: false, ownModuleHits, reason: `confidence tier ${score.tier} below the confirm bar (high)` };
+  if (ownModuleHits >= CONFIRM_MIN_OWN_MODULE_HITS) return { ok: true, ownModuleHits };
+  if (ownModuleHits >= 1 && ctx.corroborated) return { ok: true, ownModuleHits };
+  return { ok: false, ownModuleHits, reason: `minimum evidence: ${ownModuleHits} sizeable unowned module hit(s) (need ${CONFIRM_MIN_OWN_MODULE_HITS}, or 1 with native-module/url-host/name@version evidence)` };
 }
 
 // --- baseline subtraction (docs/PACKAGE-SIGNATURES.md §5.2/§6.4) ---------
@@ -266,7 +325,13 @@ export interface ConfirmOptions {
   readonly hbcVersion: number;
   readonly hermescPath: string;
   readonly projectDbDir: string;
-  readonly userCacheDbDir: string;
+  /** Optional (corpus-confirm-precision): the user cache is read by every
+   *  later run as the "user" layer, so `runDeps` only passes it under
+   *  `confirmCache: true`. */
+  readonly userCacheDbDir?: string;
+  /** Target module factory hashes already owned by a db-match package —
+   *  see `confirmMinimumEvidence`. */
+  readonly ownedTargetFactoryHashes?: ReadonlySet<string>;
   readonly rateLimitMs?: number;
   /** Raw-fingerprint cache (CONFSPEED1): a built candidate's pre-subtraction
    *  fingerprint is stored here keyed by package@version + hbc + hash scheme
@@ -546,6 +611,8 @@ export async function confirmCandidates(candidates: readonly ConfirmCandidate[],
   const referenceDate = opts.referenceDate ?? (await defaultReferenceDate(opts.rnVersion, opts));
   const baseline = computeBaselineHashes(opts.baselineDirs ?? [], opts.hbcVersion);
 
+  const corroborated = new Set<string>();
+  for (const c of candidates) if (c.evidence?.some((e) => isHintEligibleEvidence(e.kind, c.version)) === true) corroborated.add(c.package);
   for (const rawCandidate of dedupeCandidatesByPackage(candidates)) {
     const resolved = await resolveCandidateVersion(rawCandidate, referenceDate, opts);
     if (resolved.version === null) {
@@ -613,8 +680,14 @@ export async function confirmCandidates(candidates: readonly ConfirmCandidate[],
       const scored = matchInventory(target, [{ file: db, layer: "project", path: "<confirm-candidate>" }], { minInstr: 8 });
       const score = scored.packages.find((p) => p.package === candidate.package && p.version === candidate.version);
 
-      if (score !== undefined && (score.tier === "high" || score.tier === "medium")) {
-        const written = [writeSignature(opts.projectDbDir, db), writeSignature(opts.userCacheDbDir, db)];
+      const verdict = score === undefined ? null : confirmMinimumEvidence(score, db, target, { corroborated: corroborated.has(candidate.package), ...(opts.ownedTargetFactoryHashes !== undefined ? { ownedTargetFactoryHashes: opts.ownedTargetFactoryHashes } : {}) });
+      if (score !== undefined && verdict !== null && !verdict.ok && (score.tier === "high" || score.tier === "medium")) {
+        // Demoted, not a build failure: target-specific, so never written to
+        // the (target-independent) failure log.
+        results.push({ candidate, ok: false, reason: verdict.reason ?? "minimum evidence", score, ...(usedPrereleaseVersion ? { usedPrereleaseVersion } : {}) });
+        opts.onProgress?.(`  -> not confirmed: ${verdict.reason ?? "minimum evidence"} (${elapsed()})`);
+      } else if (score !== undefined && verdict !== null && verdict.ok) {
+        const written = [writeSignature(opts.projectDbDir, db), ...(opts.userCacheDbDir !== undefined ? [writeSignature(opts.userCacheDbDir, db)] : [])];
         results.push({ candidate, ok: true, score, writtenTo: written, ...(usedPrereleaseVersion ? { usedPrereleaseVersion } : {}) });
         opts.onProgress?.(`  -> confirmed ${candidate.package}@${candidate.version} at ${score.tier} (${elapsed()})`);
       } else {

@@ -8,7 +8,7 @@ second — never by executing any package's code.
 ## Usage
 
 ```sh
-hbc2js deps <bundle.hbc|app.apk> [--out <dir>] [--confirm] [--offline] \
+hbc2js deps <bundle.hbc|app.apk> [--out <dir>] [--confirm] [--confirm-cache] [--offline] \
   [--sigdb <dir>] [--no-shared-db] [--min-instr <n>] [--json] [--exhaustive]
 ```
 
@@ -34,6 +34,8 @@ hbc2js deps <bundle.hbc|app.apk> [--out <dir>] [--confirm] [--offline] \
   native-ingestion problem is reported to stderr without failing the
   JS-side run (native is optional-by-construction — spec 27 §1.4).
 - `--confirm` — run the npm confirm stage (§4 below). Requires network.
+- `--confirm-cache` — also write `--confirm`-built signatures into the user
+  cache, which later runs read. Off by default (corpus-confirm-precision).
 - `--offline` — skip npm registry search and the confirm stage entirely; the
   match and guess stages still run against whatever signature DB is
   reachable locally.
@@ -256,10 +258,11 @@ hbc2js deps <bundle.hbc|app.apk> [--out <dir>] [--confirm] [--offline] \
    install-time scripts never run), extract by hand into a scratch RN
    project pinned to the target's detected RN version, bundle with Metro,
    compile with the matching `tools/hermesc/v<N>`, fingerprint, and match
-   against the target. A candidate that clears High/Medium confidence has
-   its signature written into the **project-local** DB (`<out>/.hbc2js/sigdb`)
-   and the **user cache** (`~/.cache/hbc2js/sigdb`) so it's free on the next
-   run. A candidate that fails to bundle/compile/match is recorded (not
+   against the target. A candidate that clears the confirm minimum-evidence
+   rule (below, "Confirm minimum evidence") has its signature written into
+   the **project-local** DB (`<out>/.hbc2js/sigdb`, never the `--sigdb`
+   directory), and into the **user cache** (`~/.cache/hbc2js/sigdb`) only
+   under `--confirm-cache`. A candidate that fails to bundle/compile/match is recorded (not
    retried) in `<scratch>/confirm-failures.json`. Downloads are rate-limited
    (500ms between candidates by default). When a candidate's version has to
    be resolved by "nearest npm release by date" (no version evidenced),
@@ -705,6 +708,32 @@ Harness defects found by this measurement are fixed with tests
 `corpus-B1` (bundle entries over 64 MiB), `corpus-B3` (`deps-truth.mjs`
 silently scored 0 truth packages for `__d((function...),id,[deps])`
 wrappers) and `corpus-B5` (custom-named `assets/*.bundle`).
+
+### Confirm minimum evidence (corpus-confirm-precision)
+
+On real apps `--confirm` added false positives and no recall (one app went
+from 72 to 209 unique confirmed packages; the additions were generic names
+like `name`, `focus`, `atob`, `i`, each matching 1-3 modules). The cause:
+a bare string in the bundle equal to a DB package name (`guess.ts` 3b,
+`knownPackages`) proposes the package; confirm builds it and scores it
+alone against the target, so `match.ts`'s ambiguity gate never fires; and
+confirm accepted the "medium" tier, which is one module-factory hit. A hit
+could also be a module of the candidate's own bundled dependency tree that
+the match stage already attributed to that dependency. A confirm now needs
+tier "high" and at least 3 module factories (`confirmMinimumEvidence`,
+`src/deps/confirm.ts`) that exact-match the target, weigh at least 16
+instructions, are not baseline- or dependency-flagged, and sit on target
+modules no db-match package already owns. One or two such hits are enough
+only when the guess evidence includes a native-module, url-host or
+`name@version` string. A bare package-name string does not count, because
+that is how the junk got proposed. Anything else stays guessed. Confirm also
+wrote its signatures into the `--sigdb` directory it was scoring against
+(the project layer is that directory when `--sigdb` is given) and into the
+user cache, which every later run reads. So one app's run changed the next
+app's report: db-v3 grew from 71,571 to 72,266 files during a corpus run.
+It now writes only to `<out>/.hbc2js/sigdb`, and to the user cache only
+under `--confirm-cache`. Regression tests:
+`tests/gate/deps/corpus-confirm-precision.test.ts`.
 
 ### Next deps items (loss categories)
 
