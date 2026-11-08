@@ -30,26 +30,36 @@ if [ "$SAMPLE" = 0 ]; then
   [ -d "$OUT/_baselines" ] && { mkdir -p "$DB/_baselines"; for f in "$OUT"/_baselines/*; do lnf "$f" "$DB/_baselines/$(basename "$f")"; done; }
   np=0; if [ -f "$LIST" ]; then while read -r f; do [ -n "$f" ] && [ ! -e "$DB/$f" ] && { lnf "$SRC/$f" "$DB/$f"; np=$((np+1)); }; done < "$LIST"; fi
 else
-  ( cd "$OUT" && ls | grep '\.json$' | head -n "$SAMPLE" | while read -r f; do lnf "$OUT/$f" "$DB/$f"; done )
-  np=0; if [ -f "$LIST" ]; then while read -r f; do [ -n "$f" ] && { lnf "$SRC/$f" "$DB/$f"; np=$((np+1)); }; done < <(head -n $((SAMPLE/10+1)) "$LIST"); fi
+  ( cd "$OUT" && ls | awk -v n="$SAMPLE" '/\.json$/ && c<n {print; c++}' | while read -r f; do lnf "$OUT/$f" "$DB/$f"; done )
+  np=0; if [ -f "$LIST" ]; then while read -r f; do [ -n "$f" ] && { lnf "$SRC/$f" "$DB/$f"; np=$((np+1)); }; done < <(awk -v n=$((SAMPLE/10+1)) 'NR<=n' "$LIST"); fi
   [ -d "$OUT/_baselines" ] && { mkdir -p "$DB/_baselines"; for f in "$OUT"/_baselines/*; do lnf "$f" "$DB/_baselines/$(basename "$f")"; done; }
 fi
 echo "staged $(ls "$DB" | grep -c '\.json$') files ($np pathless originals linked)"
 SRCARG=(); [ "$SAMPLE" = 0 ] && SRCARG=(--src "$SRC")
 node "$R/tools/pkgsig/ship/validate-path-db.mjs" "$DB" "${SRCARG[@]}" > "$STAGE/validate.json" || { echo "VALIDATION FAILED, see $STAGE/validate.json" >&2; head -c 2000 "$STAGE/validate.json" >&2; exit 1; }
 grep -E '"(files|withPaths|modulePathCoveragePct|functionModuleIdCoveragePct|filesWithPathsPct)"' "$STAGE/validate.json"
-node --experimental-strip-types "$R/tools/pkgsig/sigdb/import-json.mjs" "$DB" "$STAGE/sigdb.sqlite" --verify > "$STAGE/import.log" 2>&1 || { tail -20 "$STAGE/import.log" >&2; echo "IMPORT/VERIFY FAILED" >&2; exit 1; }
-grep -E '"ok"|enumerated' "$STAGE/import.log" || true
+# sqlite import + verify. KNOWN GAP (2026-11-09): the sqlite layer does not
+# store module.factoryIsDependency / nestedFunctionIndices / subtractedDependencies /
+# bulkBuildFixVersion, so --verify reports round-trip mismatches on db-v3-style
+# JSON and match.ts (which reads the first two) would score a sqlite copy
+# differently. The sqlite asset is therefore built and reported but only
+# attached to the release command when verify passes (SQLITE_RELEASE=1 forces it).
+SQLITE_OK=0
+if node --experimental-strip-types "$R/tools/pkgsig/sigdb/import-json.mjs" "$DB" "$STAGE/sigdb.sqlite" --verify > "$STAGE/import.log" 2>&1; then SQLITE_OK=1; fi
+grep -E '"ok"|enumerated|roundtripMismatches' "$STAGE/import.log" || true
+[ "$SQLITE_OK" = 1 ] || echo "WARNING: sqlite --verify failed (see $STAGE/import.log); sqlite asset NOT attached to the owner command"
 # archive + index via assemble.sh (its db/ dir layout is exactly $DB)
 HBC2JS_BULK_DIR="$STAGE" "$R/tools/pkgsig/bulk/assemble.sh" >/dev/null
 ARCHIVE="$(ls "$STAGE"/dist/sigdb-*-partial.tar.* | head -1)"; IDX="$STAGE/dist/index-partial.json"
 EXT="${ARCHIVE#*sigdb-*-partial}"
-FINAL="$STAGE/dist/$TAG$EXT"; mv "$ARCHIVE" "$FINAL"; cp "$IDX" "$STAGE/dist/index-$TAG.json"
-rm -f "$STAGE"/dist/index-partial*.json "$STAGE"/dist/index-*-20*.json
-if command -v zstd >/dev/null; then zstd -q -19 -T0 -o "$STAGE/dist/$TAG.sqlite.zst" "$STAGE/sigdb.sqlite"; else gzip -9 -c "$STAGE/sigdb.sqlite" > "$STAGE/dist/$TAG.sqlite.gz"; fi
+FINAL="$STAGE/dist/$TAG$EXT"; mv "$ARCHIVE" "$FINAL"; mv "$IDX" "$STAGE/dist/index-$TAG.json"
+rm -f "$STAGE"/dist/index-partial*.json
+if [ "$SQLITE_OK" = 1 ] || [ "${SQLITE_RELEASE:-0}" = 1 ]; then
+  if command -v zstd >/dev/null; then zstd -q -19 -T0 -o "$STAGE/dist/$TAG.sqlite.zst" "$STAGE/sigdb.sqlite"; else gzip -9 -c "$STAGE/sigdb.sqlite" > "$STAGE/dist/$TAG.sqlite.gz"; fi
+fi
 ( cd "$STAGE/dist" && { sha256sum * 2>/dev/null || shasum -a 256 *; } | grep -v SHA256SUMS > SHA256SUMS; ls -l | awk 'NR>1{print $5, $9}' )
 cat "$STAGE/dist/SHA256SUMS"
 echo
 if [ "$SAMPLE" != 0 ]; then echo "DRY RUN (SAMPLE=$SAMPLE): not publishable. rm -rf $STAGE when done."; exit 0; fi
 echo "OWNER COMMAND (run from a machine that can reach $STAGE/dist; this script published nothing):"
-echo "gh release create $TAG --repo fredgaffey/hbc2js --title \"Signature DB v4 (module paths)\" --notes-file $STAGE/dist/SHA256SUMS $STAGE/dist/$TAG$EXT $STAGE/dist/index-$TAG.json $STAGE/dist/$TAG.sqlite.*"
+echo "gh release create $TAG --repo fredgaffey/hbc2js --title \"Signature DB v4 (module paths)\" --notes-file $STAGE/dist/SHA256SUMS $STAGE/dist/$TAG$EXT $STAGE/dist/index-$TAG.json $(ls "$STAGE"/dist/$TAG.sqlite.* 2>/dev/null | tr '\n' ' ')"
