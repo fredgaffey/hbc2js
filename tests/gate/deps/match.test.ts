@@ -34,11 +34,17 @@ test("shared DB: react-native matches rn-template-0.72 at high confidence", () =
   assert.ok(rn!.exactCoverage > 0.9, `expected >90% exact coverage, got ${(rn!.exactCoverage * 100).toFixed(1)}%`);
 });
 
-test("shared DB: react matches rn-template-0.72 (module-anchored high confidence)", () => {
+// corpus-residual-fp (2026-11-09): this was "module-anchored high", but the
+// anchor was two `module.exports = require(dep)` factories the target holds
+// six times — generic code (TARGET_GENERIC_COPIES), not react's. react's own
+// functions still match (medium); react stays confirmed through the
+// react-foundation baseline (report test below).
+test("shared DB: react matches rn-template-0.72 (function evidence, medium without the generic re-export anchors)", () => {
   const { matchReport } = matchRnTemplate();
   const react = matchReport.packages.find((p) => p.package === "react" && !p.isBaseline);
   assert.ok(react !== undefined, "expected a non-baseline react@... entry in the shared DB");
-  assert.equal(react!.tier, "high");
+  assert.equal(react!.tier, "medium");
+  assert.ok(react!.exactHits >= 30, `react's own functions still match: ${react!.exactHits}`);
 });
 
 test("shared DB: lodash is never reported as a confirmed dependency of rn-template-0.72", () => {
