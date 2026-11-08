@@ -2087,7 +2087,9 @@ for 64 of 76):
 
 The open-source truth apps look the same: never queued is 80 of 198
 (bluesky), 270 of 518 (rainbow), 438 of 749 (MetaMask). No missing
-package was types-only, JSON-only or workspace-local; they are ordinary
+Expensify package was types-only, JSON-only or app-local (react-navigation's
+`@react-navigation/*` are workspace packages of the checkout, but their
+alpha versions are published); they are ordinary
 published JS (Sentry, `@formatjs/*`, `@turf/*`, the es-shim chain,
 `domutils`, expo modules). So the bucket is a population choice, not an
 unfingerprintable package type.
