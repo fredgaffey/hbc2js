@@ -52,7 +52,6 @@ const loaded = (files: readonly SigDbFile[]): LoadedSig[] => files.map((file) =>
 const tierOf = (report: ReturnType<typeof matchInventory>, p: string) => report.packages.find((s) => s.package === p);
 
 // A boilerplate factory: distinct enough to be no-one else's, repeated.
-const BOILER = `var a = require(dependencyMap[0]); var b = require(dependencyMap[1]); exports.default = a && a.__esModule ? a.default : a; exports.extra = b; exports.flag = 17;`;
 const APP = `var c = 1; for (var w = 0; w < 19; w++) { c = (c * 31 + w) % 1000003; } module.exports = function appOnly(v) { return c ^ v; };`;
 
 // corpus-twin-sourcemap: Expensify ships source-map@0.6.1; the fork
