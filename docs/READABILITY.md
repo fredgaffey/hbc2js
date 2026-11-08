@@ -97,13 +97,7 @@ node tools/readability/record.ts <input.hbc> <output.recording.json> \
   (`src/decompile.ts`'s scoped single-function render, docs/DECISIONS.md
   D-scoped-render), never `NameService.render({fn})` (BUGS 2026-09-11
   "render is O(whole-bundle) per call" -- resolved by no longer calling it
-  here at all). `decompileFunction` still re-parses and re-analyses the
-  whole bundle on every call (cheaper than a whole-module structure+emit,
-  but not free): measured on the held-out app with `--backend fake` (zero
-  model latency), a `--sample 50` run took 48.2s (~0.96s/call), so a full
-  non-sampled `--only src` recording still pays tens of minutes of pure
-  parse+analysis before any real model latency -- tracked as its own
-  follow-up (docs/BUGS.md, 2026-09-11, readability / render lane).
+  here at all). `decompileFunction` accepts `DecompileOptions.prepared` (from `prepareModule(bytes, opts)`), so a loop over functions pays parse+analysis once; `name llm-fill` and `tools/readability/record.ts` do this. Without it each call re-parses and re-analyses the whole bundle (~0.9 s/call on rn-template-0.72, measured 44 ms/call with a prepared module).
 - `--only src` (default off): restrict targets to functions belonging to a
   module `src/readability/scope.ts`'s `computeSrcScope` classifies as `src`
   app code (the same `splitProject` -> `segregateSplitTree` path

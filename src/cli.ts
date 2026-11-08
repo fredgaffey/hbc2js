@@ -21,7 +21,7 @@ import { runTier, hbc2jsDecompiler } from "./harness/tiers.ts";
 import type { Tier } from "./harness/tiers.ts";
 import { VERDICT } from "./harness/ladder.ts";
 import type { OracleName } from "./harness/ladder.ts";
-import { decompile, decompileAst, decompileFunction, decompileTree, nodeCheck } from "./decompile.ts";
+import { decompile, decompileAst, decompileFunction, decompileTree, nodeCheck, prepareModule } from "./decompile.ts";
 import { analyseModule } from "./cfg/index.ts";
 import { NameService, OverlayStore, bindingKey, regId, shortForm } from "./name-overlay/index.ts";
 import type { Confidence, NameRecord, Source } from "./name-overlay/index.ts";
@@ -2261,7 +2261,8 @@ async function runNameLlmFill(argv: readonly string[]): Promise<number> {
   const service = new NameService(analysis, store, { strictEnv: serviceStrictEnv });
   const frames = rawFrameBodies(analysis, { strictEnv: serviceStrictEnv });
   const backend = llmFillBackend(argv, json);
-  const renderFn = (fn: number): string => decompileFunction(bytes, fn, { strictEnv: false }).code;
+  const preparedForRender = prepareModule(bytes, { strictEnv: false });
+  const renderFn = (fn: number): string => decompileFunction(bytes, fn, { strictEnv: false, prepared: preparedForRender }).code;
 
   const totalFnsToConsider = allowedFns !== null ? allowedFns.size : analysis.module.functions.length;
   let fnsConsidered = 0;
