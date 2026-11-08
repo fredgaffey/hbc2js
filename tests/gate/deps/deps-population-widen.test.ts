@@ -5,7 +5,7 @@
 // Offline: a canned registry, no network.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dbVersions, pickVersion, planPopulation, skipName, type Packument } from "../../../tools/pkgsig/bulk/population-closure.mjs";
+import { dbVersions, family, pickVersion, planPopulation, skipName, type Packument } from "../../../tools/pkgsig/bulk/population-closure.mjs";
 
 const REGISTRY: Record<string, Packument> = {
   "lib-a": { latest: "2.0.0", versions: { "1.0.0": { dependencies: { "dep-x": "^1.0.0", "@types/foo": "*" } }, "2.0.0": { dependencies: { "dep-x": "^1.2.0", "dep-y": "~3.1.0" }, peerDependencies: { react: "*", "react-native": "*" } } } },
@@ -30,7 +30,11 @@ test("pickVersion takes the version most ranges resolve to, never a prerelease",
   assert.equal(pickVersion(vs, ["^1.0.0", "^2.0.0"], "2.1.0"), "2.1.0"); // tie -> higher
   assert.equal(pickVersion(vs, [], "2.1.0"), "2.1.0"); // no range -> latest
   assert.equal(pickVersion(vs, ["^9.0.0"], null), null);
+  assert.equal(family("@aws-sdk/core"), "@aws-sdk");
+  assert.equal(family("lodash"), "lodash");
   assert.ok(skipName("@types/node") && skipName("react") && !skipName("react-dom"));
+  assert.ok(skipName("typescript") && skipName("@babel/core") && skipName("eslint-plugin-prettier") && skipName("@jest/globals"));
+  assert.ok(!skipName("@babel/runtime") && !skipName("metro-runtime") && !skipName("pretty-format"));
 });
 
 test("planPopulation: closure of the seeds, minus what the DB has, ranked by dependents", async () => {

@@ -11,3 +11,4 @@ export function planPopulation(opts: {
   hops?: number;
   cap?: number;
 }): Promise<{ selected: PopulationRow[]; total: number; unresolved: string[] }>;
+export function family(name: string): string;

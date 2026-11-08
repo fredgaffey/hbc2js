@@ -28,7 +28,8 @@
 // first version of a new name.
 //
 // A name is "new" when no --seed-db or --exclude-db directory has a file
-// for it at --hbc. Candidates are ranked by score = distinct parent names
+// for it at --hbc. Candidates are ranked by score = distinct parent
+// families (scope, else name: one SDK family's 80 packages are one vote)
 // + 2 * corpus apps, then by parents, then by hop (closer first), then name; the top --cap
 // are written as worker.sh jobs ("name\tversion\thbc").
 //
@@ -57,9 +58,14 @@ export function dbVersions(fileNames, hv) {
   return out;
 }
 
-/** Names never worth a JS signature build. */
+// Build/test toolchain: reached through peer/dev-style edges of seed
+// packages, never part of an app's runtime bundle (and slow or impossible
+// to bundle). @babel/runtime and metro-runtime are runtime, so not listed.
+const TOOLCHAIN = /eslint|^(typescript|prettier|ts-node|vite|jest(-.*)?|babel-jest|babel-plugin-.*|babel-preset-.*|webpack(-.*)?|rollup(-.*)?|esbuild(-.*)?|@jest\/.*|@rollup\/.*|@esbuild\/.*|@webpack-cli\/.*|@babel\/(core|cli|register|node|parser|traverse|generator|template|types|preset-.*|plugin-.*|helper-.*))$/;
+
+/** Names never worth a JS signature build: types-only, the scaffold's own react/react-native, the toolchain. */
 export function skipName(name) {
-  return name.startsWith("@types/") || name === "react" || name === "react-native";
+  return name.startsWith("@types/") || name === "react" || name === "react-native" || TOOLCHAIN.test(name);
 }
 
 /**
@@ -79,6 +85,11 @@ export function pickVersion(versions, ranges, latest) {
   return [...votes.entries()].sort((a, b) => b[1] - a[1] || semver.rcompare(a[0], b[0]))[0][0];
 }
 
+/** A dependent's family: its scope, else its name (80 `@aws-sdk/*` parents are one vote). */
+export function family(name) {
+  return name.startsWith("@") ? name.slice(0, name.indexOf("/")) : name;
+}
+
 function depsOf(manifest) {
   return { ...(manifest?.peerDependencies ?? {}), ...(manifest?.dependencies ?? {}) };
 }
@@ -96,7 +107,7 @@ export async function planPopulation({ seeds, existing, corpus = new Map(), getP
     if (skipName(name) || existing.has(name)) return;
     let c = cand.get(name);
     if (!c) cand.set(name, (c = { parents: new Set(), ranges: [], hop }));
-    if (parent) c.parents.add(parent);
+    if (parent) c.parents.add(family(parent));
     if (range) c.ranges.push(range);
     if (hop < c.hop) c.hop = hop;
   };
