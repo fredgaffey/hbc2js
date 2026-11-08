@@ -854,6 +854,16 @@ react-navigation TPs. (3) Persisting each module's one-level
 deeper than one level. (4) Deciding own/foreign at build time and storing
 a boolean: the rule could not change without a DB rebuild.
 
+**sqlite layer.** A sigdb v3 `.sqlite` stores module paths too (schema
+revision 2, additive inside `hbc2js-sigdb/3`): `modules.path`,
+`fingerprint_functions.module_id`, and `fingerprints.module_paths` /
+`hash_scheme` (NULL = absent, i.e. pathless scheme 1). `openSigDb` adds the
+columns in place to an older DB (`meta.schema_rev` = 2) and reads of old rows
+are unchanged; `writeSignature(".sqlite")` no longer refuses hash-scheme-2
+files. A path-bearing file read back through sqlite is deep-equal (bar the
+derived `nestedFunctionIndices`) and scores identically to its JSON copy.
+Test: `tests/gate/deps/sigdb-sqlite-paths.test.ts`.
+
 Tests: `tests/gate/deps/corpus-embedded-copy.test.ts` (synthetic owner and
 impostor packages through the real compile/fingerprint path and through
 `confirmCandidates` with a stubbed npm/npx that writes a source map).
