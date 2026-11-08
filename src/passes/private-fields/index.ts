@@ -36,6 +36,9 @@ import { rewrite } from "./rewrite.ts";
  * the slot or the register in the defining frame refuses the name, because the
  * shape that leaves one behind is an INLINED construction of the same class
  * installing the field by symbol on an object that never ran the constructor.
+ * Since 2026-11-09 the register half is def-use: only a read the symbol's own
+ * store still reaches counts (a recycled register does not; spec 24 section
+ * 1.7), the slot half is unchanged.
  *
  * **Versions.** 98 and 99, layout E -- the same gate `class-recover` uses;
  * there is nothing to fold where there is no class to fold it into.

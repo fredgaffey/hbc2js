@@ -1,0 +1,124 @@
+; hbc2js disassembly of 94-private-field-register-reuse/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=6 strings=22 globalCodeIndex=0
+function #0 "global"  params=1 frame=29 env=0 flags=dbg,overflowed  @0x000001c0 size=310
+  0000  CreateFunctionEnvironment r4, 1
+  0003  CreatePrivateName    r5, s15 "#n"
+  0009  StoreToEnvironment   r4, 0, r5
+  000d  CreateBaseClass      r6, r7, r4, 1
+  0013  Mov                  r8, r7
+  0016  LoadConstString      r9, s21 "value"
+  001a  LoadConstUndefined   r2
+  001c  CreateClosure        r7, r4, f2 "value"
+  0021  DefineOwnGetterSetterByVal r8, r9, r7, r2, 0
+  0027  LoadConstString      r7, s16 "bump"
+  002b  CreateClosure        r4, r4, f3 "bump"
+  0030  DefineOwnByVal       r8, r4, r7, 0
+  0035  GetByIdShort         r4, r6, #c0, s20 "prototype"
+  003a  NewObjectWithParent  r4, r4
+  003d  PrivateIsIn          r3, r5, r4, r0
+  0042  JmpTrueLong          L1, r3
+  0048  LoadConstZero        r1
+  004a  AddOwnPrivateBySym   r4, r1, r5
+  004e  LoadConstString      r7, s7 "a"
+  0052  PutByIdStrict        r4, r7, #c0, s13 "label"
+  0058  LoadConstUInt8       r1, 2
+  005b  PutOwnPrivateBySym   r4, r1, 1, r5
+  0060  NewArrayWithBuffer   r8, 3, 3, lit@0x0000
+  0068  GetByIdShort         r7, r8, #c1, s19 "map"
+  006d  CreateClosure        r5, r2, f4 ""
+  0072  Call2                r10, r7, r8, r5
+  0077  GetByIdShort         r7, r10, #c1, s19 "map"
+  007c  CreateClosure        r5, r2, f5 ""
+  0081  Call2                r14, r7, r10, r5
+  0086  GetByIdShort         r5, r4, #c2, s16 "bump"
+  008b  LoadConstUInt8       r0, 5
+  008e  Call2                r7, r5, r4, r0
+  0093  GetByIndex           r5, r14, 0
+  0097  Add                  r7, r7, r5
+  009b  GetByIndex           r5, r14, 1
+  009f  Add                  r7, r7, r5
+  00a3  GetByIdShort         r5, r10, #c3, s14 "length"
+  00a8  Add                  r5, r7, r5
+  00ac  GetGlobalObject      r7
+  00ae  TryGetById           r13, r7, #c4, s17 "print"
+  00b4  GetByIdShort         r19, r4, #c5, s13 "label"
+  00b9  GetByIdShort         r18, r4, #c6, s21 "value"
+  00be  GetByIdShort         r9, r10, #c7, s18 "join"
+  00c3  LoadConstString      r8, s2 ","
+  00c7  Call2                r16, r9, r10, r8
+  00cc  GetByIdShort         r9, r14, #c7, s18 "join"
+  00d1  LoadConstString      r8, s1 "+"
+  00d5  Call2                r15, r9, r14, r8
+  00da  LoadConstString      r20, s9 "vals:"
+  00de  LoadConstUndefined   r21
+  00e0  Mov                  r17, r5
+  00e3  Call                 r8, r13, 7
+  00e7  TryGetById           r8, r7, #c4, s17 "print"
+  00ed  InstanceOf           r18, r4, r6
+  00f1  GetByIdShort         r6, r4, #c2, s16 "bump"
+  00f6  LoadConstInt         r0, -1
+  00fc  Call2                r17, r6, r4, r0
+  0101  NewArray             r9, 2
+  0105  DefineOwnInDenseArray r9, r5, 0
+  0109  Mul                  r1, r5, r1
+  010d  DefineOwnInDenseArray r9, r1, 1
+  0111  GetByIdShort         r6, r9, #c7, s18 "join"
+  0116  LoadConstString      r5, s3 "/"
+  011a  Call2                r16, r6, r9, r5
+  011f  LoadConstString      r20, s8 "more:"
+  0123  TypeOf               r19, r4
+  0126  LoadConstUndefined   r21
+  0128  Call                 r4, r8, 6
+  012c  Ret                  r4
+L1:
+  012e  LoadConstString      r20, s4 "Cannot initialize private field …"
+  0132  CallBuiltin          r4, b44 "throwTypeError", 2
+
+function #1 "Counter"  params=3 frame=15 env=0 flags=strict,dbg,overflowed,ctor  @0x000002f6 size=58
+  0000  GetNewTarget         r2
+  0002  GetByIdShort         r2, r2, #c0, s20 "prototype"
+  0007  NewObjectWithParent  r2, r2
+  000a  GetParentEnvironment r3, 0
+  000d  LoadFromEnvironment  r4, r3, 0
+  0011  PrivateIsIn          r1, r4, r2, r0
+  0016  JmpTrue              L1, r1
+  0019  LoadParam            r5, 1
+  001c  LoadParam            r3, 2
+  001f  LoadConstZero        r0
+  0021  AddOwnPrivateBySym   r2, r0, r4
+  0025  PutByIdStrict        r2, r5, #c0, s13 "label"
+  002b  PutOwnPrivateBySym   r2, r3, 1, r4
+  0030  Ret                  r2
+L1:
+  0032  LoadConstString      r6, s4 "Cannot initialize private field …"
+  0036  CallBuiltin          r2, b44 "throwTypeError", 2
+
+function #2 "value"  params=1 frame=2 env=0 flags=strict,dbg,overflowed,nc  @0x00000330 size=17
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r1, r0, 0
+  0007  LoadParam            r0, 0
+  000a  GetOwnPrivateBySym   r0, r0, 0, r1
+  000f  Ret                  r0
+
+function #3 "bump"  params=2 frame=4 env=0 flags=strict,dbg,overflowed,nc  @0x00000341 size=34
+  0000  LoadParam            r1, 0
+  0003  GetParentEnvironment r0, 0
+  0006  LoadFromEnvironment  r0, r0, 0
+  000a  GetOwnPrivateBySym   r3, r1, 0, r0
+  000f  LoadParam            r2, 1
+  0012  Add                  r2, r3, r2
+  0016  PutOwnPrivateBySym   r1, r2, 0, r0
+  001b  GetOwnPrivateBySym   r0, r1, 0, r0
+  0020  Ret                  r0
+
+function #4 ""  params=2 frame=1 env=0 flags=dbg,overflowed,nc  @0x00000363 size=9
+  0000  LoadParam            r0, 1
+  0003  Add                  r0, r0, r0
+  0007  Ret                  r0
+
+function #5 ""  params=2 frame=2 env=0 flags=dbg,overflowed,nc  @0x0000036c size=17
+  0000  LoadParam            r1, 1
+  0003  GetByIdShort         r1, r1, #c0, s14 "length"
+  0008  LoadConstUInt8       r0, 3
+  000b  Mul                  r0, r1, r0
+  000f  Ret                  r0

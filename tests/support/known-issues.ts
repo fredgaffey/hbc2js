@@ -70,6 +70,9 @@ export const KNOWN_AMBIGUOUS_V98: readonly string[] = [
   // its v98 build hits exactly the ambiguity above (hbc98-late and
   // hbc99-mar2026 disagree on function ids 0-2); 91-93 probe cleanly.
   "90-inlined-new",
+  // Added 2026-11-09 with the fixture (spec 24 section 1.7, R-PF1 def-use):
+  // same v98 ambiguity (function ids 0-1); 95 probes cleanly.
+  "94-private-field-register-reuse",
 ];
 
 export function isKnownAmbiguousV98(group: string, name: string, version: number): boolean {

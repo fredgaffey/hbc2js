@@ -18,8 +18,8 @@ function sameStmt(a: Stmt, b: Stmt): boolean {
   return a === b || JSON.stringify(a) === JSON.stringify(b);
 }
 
-export function check(before: readonly Stmt[], after: readonly Stmt[], _ctx: PassContext): CheckResult {
-  const rebuilt = foldAll(before);
+export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: PassContext): CheckResult {
+  const rebuilt = foldAll(before, { fnBody: ctx.fnBody });
   if (rebuilt.folded.length === 0) return { ok: false, reason: "private-fields produced no name to re-derive" };
   if (rebuilt.after.length !== after.length) return { ok: false, reason: "private-fields changed a statement count the re-derived fold does not account for" };
   for (let i = 0; i < after.length; i++) {
