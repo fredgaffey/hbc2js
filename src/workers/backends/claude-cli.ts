@@ -53,9 +53,9 @@ export function claudeCliArgs(config: ClaudeCliBackendConfig, systemPrompt: stri
   return ["-p", "--model", config.model, "--output-format", "json", "--tools", "", "--no-session-persistence", "--system-prompt", systemPrompt];
 }
 
-function runClaudeCli(config: ClaudeCliBackendConfig, args: readonly string[], prompt: string, signal?: AbortSignal): Promise<SpawnResult> {
+function runClaudeCli(config: ClaudeCliBackendConfig, args: readonly string[], prompt: string, signal?: AbortSignal, maxOutputTokens?: number): Promise<SpawnResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(config.claudeBin, args, { stdio: ["pipe", "pipe", "pipe"], ...(signal !== undefined ? { signal } : {}) });
+    const child = spawn(config.claudeBin, args, { stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, ...(maxOutputTokens !== undefined ? { CLAUDE_CODE_MAX_OUTPUT_TOKENS: String(maxOutputTokens) } : {}) }, ...(signal !== undefined ? { signal } : {}) });
     let stdout = "";
     let stderr = "";
     let timedOut = false;
@@ -123,29 +123,42 @@ export class ClaudeCliBackend implements WorkerBackend {
     // per-job data are sent as two separate fields instead of being joined.
     const args = claudeCliArgs(this.config, skill.body);
 
-    let spawned: SpawnResult;
-    try {
-      spawned = await runClaudeCli(this.config, args, context, signal);
-    } catch (e) {
-      if (e instanceof ReadabilityConfigError || e instanceof TransientBackendError) throw e;
-      throw new TransientBackendError(`ClaudeCliBackend: ${e instanceof Error ? e.message : String(e)}`);
-    }
-
-    if (spawned.timedOut) {
-      throw new TransientBackendError(`ClaudeCliBackend: timed out after ${String(this.config.timeoutMs)}ms`);
-    }
-    if (spawned.code !== 0) {
-      throw new TransientBackendError(`ClaudeCliBackend: exited ${String(spawned.code)}: ${spawned.stderr.trim()}`);
-    }
-
-    let parsed: ClaudeCliResponse;
-    try {
-      parsed = JSON.parse(spawned.stdout) as ClaudeCliResponse;
-    } catch (e) {
-      throw new TransientBackendError(`ClaudeCliBackend: could not parse CLI output as JSON: ${e instanceof Error ? e.message : String(e)}`);
-    }
-    if (parsed.is_error === true) {
-      throw new TransientBackendError(`ClaudeCliBackend: is_error: ${parsed.result ?? "(no result text)"}`);
+    // The per-call output cap goes to the CLI through its env var. A reply cut
+    // off at the cap (`stop_reason: "max_tokens"`) is retried ONCE with a
+    // 4x cap: a function-batch answer is long, and a truncated JSON object
+    // is a lost function, not a cheap abstention.
+    const runOnce = async (cap: number): Promise<ClaudeCliResponse> => {
+      let spawned: SpawnResult;
+      try {
+        spawned = await runClaudeCli(this.config, args, context, signal, cap);
+      } catch (e) {
+        if (e instanceof ReadabilityConfigError || e instanceof TransientBackendError) throw e;
+        throw new TransientBackendError(`ClaudeCliBackend: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      if (spawned.timedOut) {
+        throw new TransientBackendError(`ClaudeCliBackend: timed out after ${String(this.config.timeoutMs)}ms`);
+      }
+      if (spawned.code !== 0) {
+        throw new TransientBackendError(`ClaudeCliBackend: exited ${String(spawned.code)}: ${spawned.stderr.trim()}`);
+      }
+      let out: ClaudeCliResponse;
+      try {
+        out = JSON.parse(spawned.stdout) as ClaudeCliResponse;
+      } catch (e) {
+        throw new TransientBackendError(`ClaudeCliBackend: could not parse CLI output as JSON: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      if (out.is_error === true) {
+        throw new TransientBackendError(`ClaudeCliBackend: is_error: ${out.result ?? "(no result text)"}`);
+      }
+      return out;
+    };
+    let parsed = await runOnce(this.config.maxOutputTokens);
+    let retryUsage: { tokensIn?: number; tokensOut?: number } = {};
+    if (parsed.stop_reason === "max_tokens") {
+      const first = parsed.usage ?? {};
+      const firstIn = sumDefined(first.input_tokens, first.cache_creation_input_tokens, first.cache_read_input_tokens);
+      retryUsage = { ...(firstIn !== undefined ? { tokensIn: firstIn } : {}), ...(first.output_tokens !== undefined ? { tokensOut: first.output_tokens } : {}) };
+      parsed = await runOnce(this.config.maxOutputTokens * 4);
     }
 
     // `stop_reason === "max_tokens"` is a rejected candidate, not a throw
@@ -154,8 +167,8 @@ export class ClaudeCliBackend implements WorkerBackend {
     // anything that fails to parse as an abstention, never a crash.
     const text = parsed.result ?? "";
     const usage = parsed.usage ?? {};
-    const tokensIn = sumDefined(usage.input_tokens, usage.cache_creation_input_tokens, usage.cache_read_input_tokens);
-    const tokensOut = usage.output_tokens;
+    const tokensIn = sumDefined(usage.input_tokens, usage.cache_creation_input_tokens, usage.cache_read_input_tokens, retryUsage.tokensIn);
+    const tokensOut = sumDefined(usage.output_tokens, retryUsage.tokensOut);
     const cost = {
       ...(tokensIn !== undefined ? { tokensIn } : {}),
       ...(tokensOut !== undefined ? { tokensOut } : {}),

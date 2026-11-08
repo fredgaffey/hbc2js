@@ -844,6 +844,26 @@ through it is pathless and scored as before. `build-one.mjs` caches the
 `[id, path]` pairs beside the `.hbc` (`.paths.json`) so `--refingerprint`
 keeps them; the confirm fingerprint cache key gains `__p1`.
 
+**Closure ownership (deps-closure-ownership, 2026-11-09).** The target-side
+module inventory (`src/deps/inventory.ts`) used to give a module only the
+closures its factory creates directly; it now uses the same transitive
+walker as `SigFunction.moduleId` (`src/deps/closure-owner.ts`). The two
+differ only on a function reachable from two factories: the inventory
+marks it ambiguous and owned by nobody, `moduleId` keeps first-wins. No
+stored field changes: `SigModule.nestedFunctionIndices`,
+`nestedFunctionCount` and `functionSetHash` stay over the factory and its
+direct closures, and `moduleId` is computed exactly as before (pinned by
+`tests/gate/deps/deps-closure-ownership.test.ts`). So no hash scheme or
+`modulePaths` bump, and DB files built before this change (including
+db-v4-paths) stay valid. Scoring does not read the target inventory's
+module membership: `scorePackage` and the ownership indexes look up every
+target function, owned or not. What changes is the target-side view:
+candidate pre-selection (`evidenceTextFromInventory`), guess and classify
+see strings and sizes of deeper closures (measured in docs/DEPS.md
+"Closure ownership"). Rejected: making `SigModule`'s nested set
+transitive too. It would change `functionSetHash` in every stored file
+for no matching gain, since nothing scores on it.
+
 **Rejected.** (1) A lower ambiguity cutoff (`AMBIGUOUS_OWNER_THRESHOLD`
 4): Expensify 20 FP but 74 TP, react-navigation recall 22.4% to 18.4%. The
 copy and the original share one hash with only two owners, so any cutoff
