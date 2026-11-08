@@ -121,6 +121,9 @@ export interface ReadabilityContext {
    *  `none` -- opt-in means a caller supplies the plugin, not just the mode
    *  string (section 1d.1: pluggable, never hard-wired). */
   readonly evaluator?: EvaluatorPlugin;
+  /** A pre-built analysis to use instead of loading `hbcPath` (tests, and
+   *  callers that already hold one). */
+  readonly analysis?: ModuleAnalysis;
 }
 
 /** section 9.6/1d.1's mode selection plus the "opt-in requires a wired
@@ -148,6 +151,15 @@ async function maybeEvaluate(
  *  `promote_change` against the same file. */
 const ANALYSIS_CACHE = new WeakMap<ReadabilityContext, { readonly key: string; readonly analysis: ModuleAnalysis }>();
 
+/** bugs-2026-11-09-surfaces-strictenv: a real app has environment accesses the
+ *  analysis cannot resolve statically (react-navigation-example: 182), and the
+ *  strict default of `NameService` / `rawFrameBodies` / `analyseModule` throws
+ *  `E_ENV_UNRESOLVED` for the whole module. Readability surfaces only need a
+ *  rendering to name and review, so they run lenient: an unresolved site is
+ *  emitted as a `__hbc_unresolved_env` marker with a `W_ENV_UNRESOLVED`
+ *  diagnostic (the `--only src` llm-fill convention in cli.ts). */
+const LENIENT_ENV = { strictEnv: false } as const;
+
 function cacheKey(hbcPath: string): string {
   const st = statSync(hbcPath);
   return `${hbcPath}\u0000${String(st.size)}\u0000${String(st.mtimeMs)}`;
@@ -160,24 +172,26 @@ function cacheKey(hbcPath: string): string {
  *  takes the serial `analyseModule` path, correct and no slower than before
  *  this change. */
 function loadAnalysisSync(ctx: ReadabilityContext, hbcPath: string): ModuleAnalysis {
+  if (ctx.analysis !== undefined) return ctx.analysis;
   const key = cacheKey(hbcPath);
   const hit = ANALYSIS_CACHE.get(ctx);
   if (hit !== undefined && hit.key === key) return hit.analysis;
   const bytes = new Uint8Array(readFileSync(hbcPath));
-  const analysis = analyseModule(parseHbc(bytes), { strictEnv: true });
+  const analysis = analyseModule(parseHbc(bytes), { strictEnv: false });
   ANALYSIS_CACHE.set(ctx, { key, analysis });
   return analysis;
 }
 
 async function loadAnalysis(ctx: ReadabilityContext, hbcPath: string): Promise<ModuleAnalysis> {
+  if (ctx.analysis !== undefined) return ctx.analysis;
   const key = cacheKey(hbcPath);
   const hit = ANALYSIS_CACHE.get(ctx);
   if (hit !== undefined && hit.key === key) return hit.analysis;
   const bytes = new Uint8Array(readFileSync(hbcPath));
-  // Same analysis `analyseModule(module, { strictEnv: true })` returns, with
+  // Same analysis `analyseModule(module, { strictEnv: false })` returns, with
   // the per-function stage-A work fanned out across workers when the bundle
   // is big enough to pay for it.
-  const analysis = await analyseModuleParallel(bytes, { strictEnv: true });
+  const analysis = await analyseModuleParallel(bytes, { strictEnv: false });
   ANALYSIS_CACHE.set(ctx, { key, analysis });
   return analysis;
 }
@@ -192,7 +206,7 @@ function overlayPathFor(ctx: ReadabilityContext): string {
 }
 
 function nameableTargets(analysis: ModuleAnalysis, service: NameService, fns: readonly number[]): NamePassTarget[] {
-  const frames = rawFrameBodies(analysis);
+  const frames = rawFrameBodies(analysis, { strictEnv: false });
   const targets: NamePassTarget[] = [];
   for (const fn of fns) {
     for (const nameable of listNameable(frames, fn, service.store)) {
@@ -240,7 +254,7 @@ export async function suggestNames(ctx: ReadabilityContext, args: SuggestNamesAr
   if (ctx.hbcPath === undefined) throw new ReadabilitySurfaceError("suggest_names: ctx.hbcPath is required");
   const analysis = await loadAnalysis(ctx, ctx.hbcPath);
   const overlayPath = overlayPathFor(ctx);
-  const service = new NameService(analysis, OverlayStore.load(overlayPath));
+  const service = new NameService(analysis, OverlayStore.load(overlayPath), LENIENT_ENV);
   const fns = "fn" in args.target && args.target.fn !== undefined ? [args.target.fn] : analysis.module.functions.map((_, i) => i);
   const targets = nameableTargets(analysis, service, fns);
   const result = await runNamePass(targets, { backend: ctx.backend, service, ...(args.budgetTokens !== undefined ? { budgetTokens: args.budgetTokens } : {}) });
@@ -296,7 +310,7 @@ export function inferModuleRole(text: string): ModuleRole | undefined {
 export async function classifyModule(ctx: ReadabilityContext, args: ClassifyModuleArgs): Promise<ClassifyModuleResult> {
   if (ctx.hbcPath === undefined) throw new ReadabilitySurfaceError("classify_module: ctx.hbcPath is required");
   const analysis = await loadAnalysis(ctx, ctx.hbcPath);
-  const service = new NameService(analysis, new OverlayStore());
+  const service = new NameService(analysis, new OverlayStore(), LENIENT_ENV);
   const source = service.render().code;
   const res = await ctx.backend.run({ kind: "name-module", prompt: "", context: { module: args.module, source } });
   const parsed = parseReadabilityResult(res.text);
@@ -354,7 +368,7 @@ export interface RewritePlan {
 export async function computeRewriteFunction(ctx: ReadabilityContext, args: RewriteFunctionArgs): Promise<RewritePlan> {
   if (ctx.hbcPath === undefined) throw new ReadabilitySurfaceError("rewrite_function: ctx.hbcPath is required");
   const analysis = await loadAnalysis(ctx, ctx.hbcPath);
-  const service = new NameService(analysis, new OverlayStore());
+  const service = new NameService(analysis, new OverlayStore(), LENIENT_ENV);
   const faithfulCode = service.render().code;
   const res = await ctx.backend.run({ kind: "suggest-name", prompt: "", context: { fn: args.fn, source: faithfulCode } });
   const parsed = parseReadabilityResult(res.text);
@@ -508,7 +522,7 @@ export function promoteChange(ctx: ReadabilityContext, args: PromoteChangeArgs):
       if (ctx.hbcPath === undefined) throw new ReadabilitySurfaceError("promote_change: ctx.hbcPath is required to promote a name suggestion");
       const analysis = loadAnalysisSync(ctx, ctx.hbcPath);
       const store = OverlayStore.load(overlayPath);
-      const service = new NameService(analysis, store);
+      const service = new NameService(analysis, store, LENIENT_ENV);
       const outcome = service.setName(record.id, record.name, { confidence: record.confidence, evidence: record.evidence, source: "human" });
       if (!outcome.ok) throw new ReadabilitySurfaceError(`promote_change: gate refused: ${outcome.reason}`);
       store.save(overlayPath);
