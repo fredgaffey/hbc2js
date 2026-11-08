@@ -18,6 +18,7 @@ export function recordedNames(recording: Recording): Map<string, RecordedName> {
     const parsed = parseReadabilityResult(entry.text);
     if (!parsed.ok) continue;
     for (const n of parsed.result.names) {
+      if (!("reg" in n.bindingId)) continue;
       out.set(`${String(n.bindingId.fn)},${String(n.bindingId.reg)}`, { name: n.name, confidence: n.confidence });
     }
   }
@@ -72,7 +73,7 @@ export function recordingStats(recording: Recording): RecordingStats {
     if (parsed.ok) {
       const asked = new Set<string>();
       for (const n of parsed.result.names) {
-        if (n.bindingId.fn === e.meta.fn) asked.add(String(n.bindingId.reg));
+        if ("reg" in n.bindingId && n.bindingId.fn === e.meta.fn) asked.add(String(n.bindingId.reg));
       }
       named += Math.min(asked.size, e.meta.requested);
     }
