@@ -2057,3 +2057,7 @@ Expensify guessed tier 14 reported / 3 TP / 11 FP became 8 / 2 TP / 6 FP
 (`debounce` lost; `test-renderer` and `@react-native-community/checkbox`
 newly surfaced as FP); react-navigation-example 5 / 4 TP / 1 FP became
 4 / 4 TP / 0 FP. Tests: `tests/gate/deps/guess.test.ts` (`corpus-guess-generic`).
+
+### Candidate dependency expansion is indexed (corpus-remeasure2-brex-oom)
+
+`deriveCandidatePackages` builds one `DependencyIndex` per run: each signature directory is listed once, each signature file is read at most once, and only its dependency names are kept (never the parsed file). Previously every evidenced package re-listed the whole directory and re-parsed all its versions, which on a bundle evidencing thousands of `@aws-sdk/*` packages exhausted the heap. Expansion stays one hop from directly evidenced packages; results are unchanged.
