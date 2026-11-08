@@ -68,6 +68,15 @@ hbc2js deps <bundle.hbc|app.apk> [--out <dir>] [--confirm] [--confirm-cache] [--
    ordered dependency-id array, nested closures, and the full set of
    string-literal constants used anywhere in the module — all for free,
    before any signature lookup.
+   The registration global may carry a `__METRO_GLOBAL_PREFIX__`
+   (`<prefix>__d`), and the two-argument `__d(factory, id)` form is
+   accepted with unknown deps. When the `global` function registers
+   nothing, the functions it creates directly are scanned too (one
+   level): this finds bundles whose body is wrapped in an IIFE and lazy
+   definers that switch on a module id (corpus-B4). Re.Pack/webpack chunk
+   bundles (`webpackChunk_*` module objects) and scope-hoisted bundles
+   with no module system are not recognised and still report
+   `totalModules: 0`.
 2. **Match** (`src/deps/match.ts`, `src/deps/db.ts`): score every signature
    DB entry (across the three layers below) against the target's own
    per-function exact/fuzzy/string-set hashes and per-module factory hashes.
