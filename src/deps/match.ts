@@ -134,6 +134,21 @@ const MIN_EXACT_FUNCTION_COVERAGE_FOR_COVERAGE_PATH = 0.1;
  *  path is disabled outright — matching 1 or 2 out of only 1 or 2 modules is
  *  not statistically distinguishable from a single coincidental hash collision. */
 const TINY_PACKAGE_MODULE_TOTAL = 3;
+// corpus-residual-fp (docs/DEPS.md "Residual offline false positives on
+// J3"): an exact hash the TARGET holds this many times or more is generic
+// code — an ES-module boilerplate factory, an empty module, a transpiler
+// helper inlined into many dist files — and is evidence for no package, so
+// neither a function hit nor a module hit counts it. The DB-side check
+// (AMBIGUOUS_OWNER_THRESHOLD) cannot see this: only the candidate packages
+// are loaded. Two copies stay evidence (a package installed twice), and so
+// does a hash the package itself repeats, up to twice its own count
+// (react-native holds many identical small functions of its own).
+// Toolchain baselines (react / react-native foundation) are exempt: their
+// generic code is what they are for, and the react / react-native verdicts
+// rest on it.
+// Measured on Expensify (db-v4-paths-partial): FP 30 to 10, TP 89 to 87; 4
+// keeps one more TP and six more FPs.
+export const TARGET_GENERIC_COPIES = 3;
 const HIGH_EXACT_FUNCTION_COVERAGE = 0.9;
 /** Tiny-package fallback: several exact-matched functions with real bulk
  *  (instruction-count) mass, never one — "never a single tiny function"
@@ -192,7 +207,7 @@ function buildIndex<K extends "exactHash" | "fuzzyHash" | "stringSetHash">(funct
   return s;
 }
 
-function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Set<string>, targetFuzzy: Set<string>, targetStringHash: Set<string>, minInstr: number, hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>): PackageScore | null {
+function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Set<string>, targetFuzzy: Set<string>, targetStringHash: Set<string>, minInstr: number, hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetCopies: ReadonlyMap<string, number>): PackageScore | null {
   const pkg: SigDbFile = entry.file;
   if (pkg.hbcVersion !== target.hbcVersion) return null;
   // corpus-embedded-copy (module paths v1, docs/PACKAGE-SIGNATURES.md §7):
@@ -228,7 +243,15 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
   // collision (55). Module-level scope (`export const` above this function)
   // so `moduleAttributions`'s `ambiguousOwnerHash` flag and
   // `src/export/substitute.ts`'s `own(P)` gate reuse the identical number.
-  const isUnambiguous = (hash: string): boolean => (hashOwnerNames.get(hash)?.size ?? 1) < AMBIGUOUS_OWNER_THRESHOLD;
+  // TARGET_GENERIC_COPIES: generic when the target holds the hash at least
+  // that often AND more than twice as often as this package itself does.
+  const ownCopies = new Map<string, number>();
+  for (const f of pkg.functions) if (!foreign.functions.has(f.index)) ownCopies.set(schemeKey(pkg, f.exactHash), (ownCopies.get(schemeKey(pkg, f.exactHash)) ?? 0) + 1);
+  const isGenericInTarget = (hash: string): boolean => {
+    const n = targetCopies.get(hash) ?? 0;
+    return !pkg.toolchainBaseline && n >= TARGET_GENERIC_COPIES && n > 2 * (ownCopies.get(hash) ?? 0);
+  };
+  const isUnambiguous = (hash: string): boolean => (hashOwnerNames.get(hash)?.size ?? 1) < AMBIGUOUS_OWNER_THRESHOLD && !isGenericInTarget(hash);
 
   let exactHits = 0;
   let exactHitInstrSum = 0;
@@ -329,6 +352,10 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
   for (const h of legacyExact) targetExact.add(LEGACY_PREFIX + h);
   for (const h of legacyFuzzy) targetFuzzy.add(LEGACY_PREFIX + h);
   const targetStringHash = buildIndex(inventory.functions, "stringSetHash");
+  // How many target functions carry each exact hash (TARGET_GENERIC_COPIES).
+  const targetCopies = new Map<string, number>();
+  for (const h of inventory.functions.map((f) => f.exactHash)) targetCopies.set(h, (targetCopies.get(h) ?? 0) + 1);
+  for (const h of legacyExact) targetCopies.set(LEGACY_PREFIX + h, (targetCopies.get(LEGACY_PREFIX + h) ?? 0) + 1);
 
   const eligibleDbs = dbs.filter((d) => d.file.hbcVersion === inventory.hbcVersion);
 
@@ -404,7 +431,7 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
   const packages: PackageScore[] = [];
   const scoreByOwner = new Map<string, PackageScore>();
   for (const entry of eligibleDbs) {
-    const score = scorePackage(entry, inventory, targetExact, targetFuzzy, targetStringHash, minInstr, hashOwnerNames);
+    const score = scorePackage(entry, inventory, targetExact, targetFuzzy, targetStringHash, minInstr, hashOwnerNames, targetCopies);
     if (score === null) continue;
     packages.push(score);
     scoreByOwner.set(`${entry.file.package}@${entry.file.version}`, score);
