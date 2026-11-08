@@ -100,7 +100,7 @@ export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promis
 
   const layers = resolveDbLayers({ ...(opts.out !== undefined ? { outDir: opts.out } : {}), ...(opts.sigdb !== undefined ? { sigdb: opts.sigdb } : {}), noSharedDb: opts.noSharedDb === true });
   const otherHbcPackages = new Set<string>();
-  const dbs = loadSignatures(layers, opts.exhaustive === true ? {} : { candidates: deriveCandidatePackages(layers, inventory), hbcVersion: inventory.hbcVersion, otherHbcPackages, slim: true });
+  const dbs = loadSignatures(layers, opts.exhaustive === true ? { slim: true } : { candidates: deriveCandidatePackages(layers, inventory), hbcVersion: inventory.hbcVersion, otherHbcPackages, slim: true });
   const matchReport = matchInventory(inventory, dbs, opts.minInstr !== undefined ? { minInstr: opts.minInstr } : {});
 
   const apkHints = apkEvidence !== null ? apkHintsFromEvidence(apkEvidence) : undefined;
