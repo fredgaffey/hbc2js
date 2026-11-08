@@ -347,3 +347,15 @@ test("private-fields R-PF1 def-use: fixtures 90/94/95 are PASS under T2 at v98 a
   assert.equal(report.results.length, 6);
   for (const r of report.results) assert.equal(r.verdict, VERDICT.PASS, `${r.fixture.name}: ${r.oracles.map((o) => `${o.oracle}=${o.verdict} ${o.detail ?? ""}`).join(" ")}`);
 });
+
+test("private-fields R-PF1 def-use: a class in a nested list refuses when the frame reads the register OUTSIDE that list", async () => {
+  const { foldAll } = (await import("../../../src/passes/private-fields/match.ts")) as Any;
+  // The driver matches every statement list (fixture 93's `L0: { ... }`), but
+  // a register is frame-wide: a read after the labelled block still sees the
+  // symbol. Before the def-use refinement R-PF1 only counted mentions inside
+  // the matched list and folded here.
+  const list = oneHopBefore();
+  const fnBody = [{ k: "labeled", label: "L0", body: list }, leak("r5")];
+  assert.deepEqual(foldAll(list, { fnBody }).folded, []);
+  assert.deepEqual(foldAll(list, { fnBody: list }).folded, ["#x"]);
+});

@@ -6,6 +6,6 @@ import type { Match, PassContext } from "../types.ts";
 import type { PrivateFieldsGroup } from "./match.ts";
 import { foldAll } from "./match.ts";
 
-export function rewrite(m: Match<readonly Stmt[], PrivateFieldsGroup>, _ctx: PassContext): readonly Stmt[] {
-  return foldAll(m.nodes[0]!).after;
+export function rewrite(m: Match<readonly Stmt[], PrivateFieldsGroup>, ctx: PassContext): readonly Stmt[] {
+  return foldAll(m.nodes[0]!, { fnBody: ctx.fnBody }).after;
 }
