@@ -1801,6 +1801,21 @@ recall 22.4% to 18.4%) and requiring the package's entry module to match
 file paths in signatures (extraction plan step 1) are the fix for that
 mechanism.
 
+On the cleaned DB (`db-v3-clean`, 71,222 files) the same fix takes Expensify
+from 137 confirmed / 55 FP / precision 59.9% / recall 28.5% to 121 / 41 /
+66.1% / 27.8%. react-navigation-example stays at 15 confirmed, 0 FP, recall
+19.7%. The generic-word false positives in the db-match tier on the other
+truth apps (`translate`, `random`, `cubic`, `persona`, `gradient`, `bucket`,
+`data`, `focused`, `availability`, `reduce`) come from the embedded-copy
+mechanism above. On Expensify their matched modules are `@babel/runtime`
+helpers (`bucket`, `persona`, `random`, `focused`, `translate`, `data`),
+lodash/date-fns (`cubic`, `availability`), `object-keys` (`reduce`) and
+`color` (`gradient`). A bare string equal to a common word makes them
+candidates. The embedded copy is what lifts them to "high". This fix does
+not cover them. The generic words in the guessed tier (`focus`, `reject`,
+`round`, `event`...) are a separate mechanism in `guess.ts` and were not
+examined here.
+
 **Shipping.** Per D17c, the DB itself is never committed — the v2 build
 lives on a build host in `db-v2` (dependency-subtracted,
 353-file-quarantined) and is packaged the same way round 1's first archive
