@@ -52,7 +52,7 @@ export const DEFAULT_HAIKU_MODEL = "claude-haiku-4-5-20251001";
  *  2026-11-09: sonnet 75% vs haiku 53% lenient, cheaper per named register). The
  *  alias is for `claude -p`; the id is the HTTP backend's equivalent. */
 export const DEFAULT_MODEL_ALIAS = "sonnet";
-export const DEFAULT_SONNET_MODEL = "claude-sonnet-4-5-20250929";
+export const DEFAULT_SONNET_MODEL = "claude-sonnet-5-5";
 /** Env var holding the model id override. */
 export const MODEL_ENV = "HBC2JS_LLM_MODEL";
 /** Env var holding the per-run token budget. */
