@@ -300,8 +300,18 @@ hbc2js deps <bundle.hbc|app.apk> [--out <dir>] [--confirm] [--confirm-cache] [--
    `<user-cache>/confirm-fp/` keyed by package@version + hbc + hash scheme + RN
    version, so a re-confirm (new target, wiped project DB) does no npm, Metro
    or hermesc work. Not done: batching many candidates into one bundle (it
-   would mix shared dependencies into every signature and change verdicts) and
-   a parallel worker pool (needs one scratch project per worker).
+   would mix shared dependencies into every signature and change verdicts).
+
+   *Worker pool (CONFPOOL1).* `--confirm-jobs N` (default `min(4, cpus/2)`;
+   1 = serial) runs N workers, each with its own scratch RN project: worker 0
+   is the usual scratch dir, workers 1..N-1 are `<scratch>-w<i>` siblings
+   copied from the ready scaffold once and reused across runs (npm install
+   into one dir is not concurrency-safe, so a dir is only ever used by one
+   worker). With N>1 each worker also gets its own `TMPDIR` (Metro's cache
+   location) inside its scratch dir. npm/Metro/hermesc run asynchronously;
+   candidates are pulled from a shared queue, results land in candidate
+   order (output identical to N=1), a failing candidate fails alone, and the
+   500 ms registry rate limit is one shared throttle across workers.
 
 5. **Report** (`src/deps/report.ts`): the human table / `--json` shape, plus
    `<out>/package.json` when confident. `DepsReport.moduleOwnership` is the
@@ -1953,3 +1963,25 @@ set) stops being read automatically.
   — the same, held-out app, sweep-gated + skips (INCONCLUSIVE) if the
   gitignored fixture isn't seeded locally. Numbers: "Informed confirm mode"
   above.
+
+### Generic-word guesses (corpus-guess-generic)
+
+The guessed tier carried common words as package names across the 22-app
+corpus (`focus`, `any`, `reject`, `fallback`, `point`, `event`, `round`,
+`regex`, `sections`, `fixed`): a bundle string literal equal to some npm
+package name became a `package-name-string` guess (step 3b of
+`src/deps/guess.ts`), and the npm-search fallback (step 5) seeded queries
+from the same kind of string. A bare single-token string is a common
+identifier, not package-identifying evidence. The rule is structural, with
+no word list: a bare string counts as `package-name-string` evidence only
+when it carries a package separator (`-`, `.`, `/`, `@`), or is one of the
+curated native-module/host package names; the npm-search lead string needs
+a separator too. `name@version` literals and native-module/url-host evidence
+are unaffected. Cost: a real single-word package seen only as a bare string
+(`debounce`, `invariant`, `nanoid`) is no longer guessed by that clue; it
+can still be confirmed by signature, or guessed by native-module, host or
+dependency-edge evidence. Measured offline against `db-v3-clean`:
+Expensify guessed tier 14 reported / 3 TP / 11 FP became 8 / 2 TP / 6 FP
+(`debounce` lost; `test-renderer` and `@react-native-community/checkbox`
+newly surfaced as FP); react-navigation-example 5 / 4 TP / 1 FP became
+4 / 4 TP / 0 FP. Tests: `tests/gate/deps/guess.test.ts` (`corpus-guess-generic`).

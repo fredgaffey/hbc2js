@@ -215,3 +215,33 @@ test("npm-search queries are deduped: two modules with the same lead string call
   assert.equal(guesses[0]!.candidates[0]!.package, "found-package");
   assert.equal(guesses[1]!.candidates[0]!.package, "found-package");
 });
+
+// corpus-guess-generic: a bare package-name string is the weakest evidence
+// there is; a single-token name (no '-', '.', '/', '@') that merely equals a
+// known package must not become a guess ("focus", "event", "round", ...).
+test("corpus-guess-generic: single-word known-package string is not a guess", async () => {
+  const mod = invModule({ factoryFunctionIndex: 1, localModuleId: 1, stringConstants: ["focus", "event", "fallback", "round"] });
+  const { inventory, matchReport } = makeInventoryAndReport([mod], [attribution({ factoryFunctionIndex: 1, localModuleId: 1 })]);
+  const knownPackages = new Set(["focus", "event", "fallback", "round"]);
+  const guesses = await guessModules(inventory, matchReport, { offline: true, knownPackages });
+  assert.equal(guesses.length, 0);
+});
+
+test("corpus-guess-generic: separator-shaped known-package string and name@version still guess", async () => {
+  const mod = invModule({ factoryFunctionIndex: 1, localModuleId: 1, stringConstants: ["react-native-fancy", "focus@1.2.3"] });
+  const { inventory, matchReport } = makeInventoryAndReport([mod], [attribution({ factoryFunctionIndex: 1, localModuleId: 1 })]);
+  const knownPackages = new Set(["react-native-fancy", "focus"]);
+  const guesses = await guessModules(inventory, matchReport, { offline: true, knownPackages });
+  const names = guesses[0]!.candidates.map((c) => c.package).sort();
+  assert.deepEqual(names, ["focus", "react-native-fancy"]);
+});
+
+test("corpus-guess-generic: npm-search lead requires a package-shaped (separator) string", async () => {
+  const mod = invModule({ factoryFunctionIndex: 1, localModuleId: 1, stringConstants: ["regex", "sections"] });
+  const { inventory, matchReport } = makeInventoryAndReport([mod], [attribution({ factoryFunctionIndex: 1, localModuleId: 1 })]);
+  const queries: string[] = [];
+  const search = async (q: string) => { queries.push(q); return [{ name: q, version: "1.0.0", description: "" }]; };
+  const guesses = await guessModules(inventory, matchReport, { search });
+  assert.equal(guesses.length, 0);
+  assert.deepEqual(queries, []);
+});

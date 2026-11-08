@@ -95,6 +95,11 @@ const HOST_TO_PACKAGE: ReadonlyMap<string, string> = new Map(Object.entries({
 // A conservative shape for "this string looks like an npm package name" —
 // used only to seed a search query, never emitted as a candidate on its own.
 const PACKAGE_NAME_LIKE = /^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/;
+// A bare single-token string ("focus", "event", "round") that merely equals
+// some npm package name is a common identifier, not package-identifying
+// evidence. Package-identifying shapes carry a separator ('-', '.', '/', '@').
+// Structural rule, no word list (docs/DEPS.md "Generic-word guesses").
+const PACKAGE_SEPARATOR = /[-./@]/;
 const STOPWORD_LIKE_NAMES = new Set(["true", "false", "null", "undefined", "default", "index", "main", "src"]);
 
 // A single string literal shaped like `<package-name>@<semver>` — some
@@ -265,7 +270,7 @@ export async function guessModules(inventory: ModuleInventory, matchReport: Matc
     // release, which is what makes a lone hit of this kind eligible for the
     // `hint` tier (`isHintEligibleEvidence` above).
     for (const s of strings) {
-      if (CURATED_PACKAGE_NAMES.has(s) || opts.knownPackages?.has(s) === true) {
+      if (CURATED_PACKAGE_NAMES.has(s) || (opts.knownPackages?.has(s) === true && PACKAGE_SEPARATOR.test(s))) {
         mergeCandidate(candidates, s, null, { kind: "package-name-string", detail: s, weight: 0.3 });
         continue;
       }
@@ -298,7 +303,7 @@ export async function guessModules(inventory: ModuleInventory, matchReport: Matc
     // package-name-shaped string) and the caller allows network.
     if (candidates.size === 0 && opts.offline !== true) {
       const nameLead = sawNativeModule !== null ? guessPackageNameFromNativeModule(sawNativeModule) : null;
-      const stringLead = strings.find((s) => s.length >= 3 && s.length <= 40 && PACKAGE_NAME_LIKE.test(s) && !STOPWORD_LIKE_NAMES.has(s));
+      const stringLead = strings.find((s) => s.length >= 3 && s.length <= 40 && PACKAGE_NAME_LIKE.test(s) && PACKAGE_SEPARATOR.test(s) && !STOPWORD_LIKE_NAMES.has(s));
       const query = nameLead ?? stringLead ?? null;
       if (query !== null) {
         try {
