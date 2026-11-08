@@ -425,6 +425,10 @@ interface ScoredEntry {
 //    the path-bearing one (its hits are its own files), else a declared
 //    dependency of another high package, else the one with more distinct
 //    hits, else the first by name.
+//    One-sided too: a package whose hits that share covers, inside a
+//    path-bearing package with more hits that outranks it (fork
+//    source-map-js: 40 hits, all among source-map's 46, too few of them
+//    for mutual cover and under the embedded ratio).
 function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInventory, legacyExact: readonly string[]): readonly ScoredEntry[] {
   const high = (): ScoredEntry[] => scored.filter((s) => s.score.tier === "high" && !s.score.isBaseline && s.hitKeys.size > 0);
   const demote = (s: ScoredEntry, rule: NonNullable<PackageScore["demotion"]>["rule"], by?: string): void => {
@@ -520,8 +524,14 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
     for (const q of twins) {
       if (q === s || q.score.tier !== "high" || q.score.package === s.score.package || (!pathBearing(s) && !pathBearing(q))) continue;
       const n = shared(s.hitKeys, q.hitKeys);
-      if (n < EXPLAINED_EVIDENCE_SHARE * s.hitKeys.size || n < EXPLAINED_EVIDENCE_SHARE * q.hitKeys.size) continue;
-      if (better(s, q)) demote(q, "twin", s.score.package);
+      const sCovered = n >= EXPLAINED_EVIDENCE_SHARE * s.hitKeys.size;
+      const qCovered = n >= EXPLAINED_EVIDENCE_SHARE * q.hitKeys.size;
+      // One-sided (corpus-twin-sourcemap): a fork whose hits all sit inside
+      // a path-bearing original's larger set (source-map-js in source-map).
+      const sInQ = sCovered && !qCovered && q.hitKeys.size > s.hitKeys.size && pathBearing(q) && better(q, s);
+      const qInS = qCovered && !sCovered && s.hitKeys.size > q.hitKeys.size && pathBearing(s) && better(s, q);
+      if (!(sCovered && qCovered) && !sInQ && !qInS) continue;
+      if (sCovered && qCovered ? better(s, q) : qInS) demote(q, "twin", s.score.package);
       else {
         demote(s, "twin", q.score.package);
         break;
