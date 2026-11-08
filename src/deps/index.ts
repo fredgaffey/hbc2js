@@ -100,7 +100,7 @@ export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promis
 
   const layers = resolveDbLayers({ ...(opts.out !== undefined ? { outDir: opts.out } : {}), ...(opts.sigdb !== undefined ? { sigdb: opts.sigdb } : {}), noSharedDb: opts.noSharedDb === true });
   const otherHbcPackages = new Set<string>();
-  const dbs = loadSignatures(layers, opts.exhaustive === true ? {} : { candidates: deriveCandidatePackages(layers, inventory), hbcVersion: inventory.hbcVersion, otherHbcPackages });
+  const dbs = loadSignatures(layers, opts.exhaustive === true ? {} : { candidates: deriveCandidatePackages(layers, inventory), hbcVersion: inventory.hbcVersion, otherHbcPackages, slim: true });
   const matchReport = matchInventory(inventory, dbs, opts.minInstr !== undefined ? { minInstr: opts.minInstr } : {});
 
   const apkHints = apkEvidence !== null ? apkHintsFromEvidence(apkEvidence) : undefined;
@@ -220,7 +220,7 @@ export function runInformedDeps(inputPath: string, known: readonly KnownPackage[
   const { inventory } = readInputInventory(inputPath);
   const layers = resolveDbLayers({ ...(opts.out !== undefined ? { outDir: opts.out } : {}), ...(opts.sigdb !== undefined ? { sigdb: opts.sigdb } : {}), noSharedDb: opts.noSharedDb === true });
   const candidateNames = new Set(known.map((k) => k.name));
-  const dbs = loadSignatures(layers, { candidates: candidateNames });
+  const dbs = loadSignatures(layers, { candidates: candidateNames, slim: true });
   const matchReport = matchInventory(inventory, dbs, opts.minInstr !== undefined ? { minInstr: opts.minInstr } : {});
   // Classification (D17h/D17i, library-vs-custom-code WITHOUT naming) is
   // independent of which candidate names were loaded -- run it the same way

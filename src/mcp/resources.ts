@@ -435,7 +435,7 @@ export class McpResources {
       const bytes = readFileSync(hbcPath);
       const { inventory } = buildInventory(bytes);
       const layers = resolveDbLayers({ outDir: this.artifactDir });
-      const dbs = loadSignatures(layers, { candidates: deriveCandidatePackages(layers, inventory) });
+      const dbs = loadSignatures(layers, { candidates: deriveCandidatePackages(layers, inventory), slim: true });
       const matchReport = matchInventory(inventory, dbs);
       const knownPackages = new Set(dbs.map((d) => d.file.package));
       const guesses = await guessModules(inventory, matchReport, { offline: true, knownPackages });
