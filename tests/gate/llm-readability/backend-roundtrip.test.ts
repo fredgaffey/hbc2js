@@ -47,14 +47,13 @@ test("spec 28: a suggest-name job round-trips skill + context through a fake bac
 });
 
 test("spec 28: abstaining is a valid answer, not a failure", () => {
-  const parsed = parseReadabilityResult(JSON.stringify({ names: [], abstained: true }));
+  const parsed = parseReadabilityResult(JSON.stringify({ names: [], abstained: true, reason: "no evidence" }));
   assert.ok(parsed.ok, parsed.ok ? "" : parsed.error);
   assert.equal(parsed.result.abstained, true);
   assert.equal(parsed.result.names.length, 0);
-  // An empty answer with no explicit flag is still an abstention.
-  const implicit = parseReadabilityResult(JSON.stringify({ names: [] }));
-  assert.ok(implicit.ok, implicit.ok ? "" : implicit.error);
-  assert.equal(implicit.result.abstained, true);
+  // An abstention (explicit or implied by an empty answer) must say why.
+  assert.equal(parseReadabilityResult(JSON.stringify({ names: [] })).ok, false);
+  assert.equal(parseReadabilityResult(JSON.stringify({ names: [], abstained: true })).ok, false);
 });
 
 test("spec 28: malformed model output is a rejected candidate, never a thrown run", () => {
@@ -106,7 +105,7 @@ test("parseReadabilityResult: a markdown code fence around the JSON is presentat
 });
 
 test("parseReadabilityResult: prose before or after the fenced JSON is dropped with the fence (observed from claude -p on 2026-09-11)", () => {
-  const inner = '{"names":[],"abstained":true}';
+  const inner = '{"names":[],"abstained":true,"reason":"none"}';
   const chatty = "```json\n" + inner + "\n```\n\nThe binding at `{fn: 1, reg: 1}` is `r1`, which receives parameter `a1`.";
   const plain = parseReadabilityResult(inner);
   assert.equal(plain.ok, true);
