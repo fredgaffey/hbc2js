@@ -349,6 +349,30 @@ threw on every construction, and the checker did not notice (it re-derives
 the fold, it does not run it). Only the expected.txt run caught it. Any other
 brand test on `this` ahead of the install refuses the name.
 
+**Functions declared in a member (2026-11-09).** `foldInBody` used to leave
+a nested `function` statement in a member untouched, so its `o[_eD_S]` reads
+survived and R-PF1 refused the whole name -- the largest part of the
+`defining-body-escape` residue on react-navigation (section 9.5). Such a
+function is lexically inside the class, so `#x` is in scope there; it is a
+separate Hermes frame, so none of the member's register aliases reach it, and
+it is folded as its own body starting from the slot alone (installs refuse).
+It refuses the name when it names any other live alias of the member (an env
+slot copy the fold would delete) or is a `sameFrame` closure. A function that
+captures nothing is hoisted by hermesc into the *defining* frame, outside the
+class body, where `#x` is not valid syntax; it keeps its mention and R-PF1
+still refuses (fixture 101-private-field-hoisted-function). Two smaller
+changes were needed to fold fixture 100. (1) When the matched list is a
+labelled block placed directly in the function body, the register scan no
+longer refuses for any mention outside the list. That block runs once per
+call. So statements before it cannot observe the symbol, and the statements
+after it (where its end and every `break` out of it continue) must kill the
+register before reading it, by the same top-level rule. (2) The checker's
+free-name obligation is scope-naive. A folded constructor's `let r3 = _eD_S`
+was the only "declaration" of `r3` inside the matched list, so the frame's
+own register `r3` read as newly free. A name now passes when the function body
+declares it at top level and no mention of it is left inside a nested function
+or class.
+
 ### 1.8 Corpus reach
 
 `tests/fixtures/bundles/rn-template-0.72/index.android.hbc` is v94 (layout C), so it has
@@ -813,6 +837,14 @@ A region starts at a header whose class operand holds a *class token*: the
 register a `C = class {...}` store wrote, or an env slot `classBindingSlots`
 (spec 28) proves holds that class for the module's life. Base header H-B
 needs a class with no `extends`, derived H-D one with `extends`.
+
+H-B also accepts a receiver register different from the prototype's
+(`P = C.prototype; X = Object.create(P === null ? ...)`, fixture
+100-private-field-nested-function's second `new`). P is then one more
+register the region wrote: it holds `C.prototype`, which nothing in
+`X = new C(args)` stores, so section 9.2 (5) must prove it dead after the
+region or re-store it from a name that still holds the value, exactly as for
+any other register; otherwise R-IN5.
 
 ### 9.2 Soundness: lock-step comparison over value tokens
 
