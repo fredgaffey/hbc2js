@@ -9,7 +9,6 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-// @ts-expect-error plain .mjs tool with a .d.mts sibling
 import { runBundleJob, sweepStaleWorkDirs } from "../../../tools/pkgsig/bulk/transplant-lib.mjs";
 
 function leftovers(root: string): string[] {
@@ -42,20 +41,20 @@ test("bugs-2026-11-09-sigpaths-tmp-leak: no sigpaths-* after a forced bundler fa
       bundle(work: string) { writeFileSync(join(work, "partial"), "x"); throw new Error("metro exploded"); },
       perFile() { return {}; },
     }, { tmpRoot: root });
-    assert.equal(bad[0].ok, false);
-    assert.match(String(bad[0].reason), /^bundle: .*metro exploded/);
+    assert.equal(bad[0]!.ok, false);
+    assert.match(String(bad[0]!.reason), /^bundle: .*metro exploded/);
     const bad2 = runBundleJob(["a__hbc98.json"], {
       install() {},
       bundle() { return {}; },
       perFile() { throw new Error("hermesc failed"); },
     }, { tmpRoot: root });
-    assert.match(String(bad2[0].reason), /hermesc failed/);
+    assert.match(String(bad2[0]!.reason), /hermesc failed/);
     const bad3 = runBundleJob(["a__hbc98.json"], {
       install() { throw new Error("npm install failed"); },
       bundle() { return {}; },
       perFile() { return {}; },
     }, { tmpRoot: root });
-    assert.match(String(bad3[0].reason), /npm install failed/);
+    assert.match(String(bad3[0]!.reason), /npm install failed/);
     assert.deepEqual(leftovers(root), []);
   });
 });
