@@ -200,7 +200,7 @@ export function reconstructFingerprint(db, fpId) {
   const functions = db
     .prepare(
       `SELECT ff.fn_index AS idx, s.exact_hash, s.fuzzy_hash, s.string_set_hash, s.name,
-              s.param_count, s.instr_count, s.string_count
+              s.param_count, s.instr_count, s.string_count, ff.module_id
        FROM fingerprint_functions ff JOIN function_shapes s ON s.shape_id = ff.shape_id
        WHERE ff.fp_id = ? ORDER BY ff.fn_index`,
     )
@@ -214,6 +214,7 @@ export function reconstructFingerprint(db, fpId) {
       fuzzyHash: hexOf(r.fuzzy_hash),
       stringSetHash: hexOf(r.string_set_hash),
       stringCount: r.string_count,
+      ...(r.module_id != null ? { moduleId: r.module_id } : {}),
     }));
 
   const modules = db
@@ -229,10 +230,13 @@ export function reconstructFingerprint(db, fpId) {
       nestedFunctionCount: r.nested_function_count,
       functionSetHash: hexOf(r.function_set_hash),
       factoryIsBaseline: !!r.factory_is_baseline,
+      ...(fp.module_paths != null ? { path: r.path ?? null } : {}),
     }));
 
   return {
     schema: fp.source_schema,
+    ...(fp.hash_scheme != null ? { hashScheme: fp.hash_scheme } : {}),
+    ...(fp.module_paths != null ? { modulePaths: fp.module_paths } : {}),
     package: fp.pkg_name,
     version: fp.pv_version,
     hbcVersion: fp.hbc_version,
