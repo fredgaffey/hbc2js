@@ -2215,6 +2215,17 @@ After the overlay the bottleneck moves: the Expensify ceiling is 224/288
 the bar; only 8 truth packages lack a signature. react-navigation's
 ceiling is 47/76.
 
+**Fork originals (orchestrator check).** The overlay includes
+`source-map@0.6.1` and `whatwg-url-without-unicode@8.0.0-3`, the originals of
+the Expensify false positives `source-map-js` and `whatwg-url`. Both
+originals become true positives on both DBs. With the overlay,
+`whatwg-url` is no longer confirmed on db-v4-paths-partial (FPs 7 -> 6:
+`source-map-js`, `lodash-es`, `ky`, `ai`, `culori`, `swiper`) but stays on
+db-v3-clean, whose `whatwg-url` file is pathless. `source-map-js` stays a
+false positive on both, although its db-v4-paths-partial file
+(`1.2.1`, hbc98) has paths. Its matched functions were not traced, so it is
+unknown why the twin rule does not demote it.
+
 **Version tolerance is not the lever.** Matching is already by package name
 across every loaded version, so other-version signatures were already
 scoring: of the 68 Expensify packages with other versions only, building the
