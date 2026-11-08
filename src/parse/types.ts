@@ -298,6 +298,9 @@ export interface HbcModule {
 export interface ParseOptions {
   readonly layout?: LayoutClass;
   readonly opcodeTable?: OpcodeTableId;
+  /** Refuse (E_LAYOUT_AMBIGUOUS) instead of defaulting to `hbc98-late` when a v98
+   *  file's opcode table cannot be decided (D8 strict mode). */
+  readonly strictLayout?: boolean;
   readonly verifyFooter?: boolean;
   readonly onDiagnostic?: (d: Diagnostic) => void;
   readonly maxBodyBytes?: number;

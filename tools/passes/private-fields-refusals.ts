@@ -78,7 +78,7 @@ function installsOnForeignReceiver(body: readonly Stmt[], envName: string): bool
  *  scope, and why it did (or did not) fold -- re-deriving `foldOne`'s own
  *  decision tree one step at a time so each refusal gets its real cause
  *  instead of one opaque "refused". */
-function diagnose(before: readonly Stmt[], functionIndex: number): readonly Refusal[] {
+function diagnose(before: readonly Stmt[], functionIndex: number, fnBody?: readonly Stmt[]): readonly Refusal[] {
   const out: Refusal[] = [];
   const candidates = findCandidates(before);
   if (candidates.length === 0) return out;
@@ -133,7 +133,7 @@ function diagnose(before: readonly Stmt[], functionIndex: number): readonly Refu
     // hermesc INLINING a construction of this very class into the defining
     // frame, which installs the field by symbol on an object that never ran
     // the real constructor.
-    if (foldOne(before, c) === null) {
+    if (foldOne(before, c, { fnBody, list: before }) === null) {
       // Sub-shape, identifier-free: is the surviving mention the INLINED
       // construction R-PF1 exists for (`Reflect.construct(...)` in the
       // defining frame plus a symbol-keyed install on a non-`this` receiver
@@ -159,7 +159,7 @@ export function classify(bytes: Uint8Array, moduleName: string): readonly Refusa
   const spy = privateFields as unknown as { match: typeof privateFields.match };
   const original = spy.match;
   spy.match = (before, ctx) => {
-    records.push(...diagnose(before, ctx.functionIndex));
+    records.push(...diagnose(before, ctx.functionIndex, ctx.fnBody));
     return original(before, ctx);
   };
   try {

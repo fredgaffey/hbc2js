@@ -14,6 +14,30 @@ locals: `{ fn: <bytecode function index>, reg: <register number> }`. Env slots
 (`{fn,env}`) and function names (`{fn}`) are reserved in the id shape but
 deferred to `closure-naming` / `fn-naming` (spec §8) and are refused for now.
 
+**Live ranges (`{fn, reg, web}`, key `reg:F:R:W`).** hermesc reuses one
+register for unrelated values, and `reg-split` already renders each disjoint
+live range as its own binding (`r4`, `r4_2`, ...), but a `{fn,reg}` name has
+to fit every range at once (the readability loop's "r4 is the require
+function, then StyleSheet" abstentions). A register `reg-split` split is
+therefore named per web: `web` is reg-split's own range number, so web 1 is the
+range rendered `rN` and web W >= 2 the range rendered `rN_W`
+(`registerIdent`). Web numbers follow reg-split's first-occurrence order over
+the post-structure-recovery tree, so they are stable across re-decompilation
+by the same decompiler but may renumber when an upstream pass changes shape;
+a web name whose ident is no longer live is skipped, never misapplied. Web
+names apply AFTER reg-split and BEFORE var-naming (the `beforeVarNaming`
+interposition of `astPassHook`), as the same guarded alpha-rename; the gate
+for a web checks name validity and that the web is live in the post-split
+body (one def-web by construction, so the register-wide reuse gate does not
+apply), and `{fn,reg,1}` is accepted only when the register really was split.
+**Old overlays stay valid unchanged:** a whole-register `reg:F:R` record is
+still applied to the raw frame before stage B, exactly as before; it renames
+every range (and, as before, protects the register from inlining), and any web
+names for that register then find no ident and are skipped. Unsplit registers
+keep the whole-register id; readability targets, the nameable denominator
+(`NameableIndex.bindings`, `<app>.nameable.json` entries `R` or `"R:W"`) and
+the `hbc-name` skill (v5) all speak the same identity.
+
 ## The store
 
 A versioned JSON sidecar, one per bundle — by default `<input.hbc>.names.json`,

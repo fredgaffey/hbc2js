@@ -1,0 +1,51 @@
+; hbc2js disassembly of 99-reg-reuse-closure-captured/v84.hbc
+; version=84 layout=B opcodeTable=hbc84 functions=3 strings=9 globalCodeIndex=0
+function #0 "global"  params=1 frame=12 env=0 flags=dbg  @0x00000118 size=56
+  0000  DeclareGlobalVar     s7 "counter"
+  0005  CreateEnvironment    r0
+  0007  CreateClosure        r1, r0, f1 "counter"
+  000c  GetGlobalObject      r0
+  000e  PutById              r0, r1, #c1, s7 "counter"
+  0014  TryGetById           r2, r0, #c1, s8 "print"
+  001a  GetByIdShort         r3, r0, #c2, s7 "counter"
+  001f  LoadConstUndefined   r1
+  0021  LoadConstUInt8       r0, 3
+  0024  Call2                r3, r3, r1, r0
+  0029  LoadConstString      r0, s0 "final "
+  002d  Add                  r0, r0, r3
+  0031  Call2                r0, r2, r1, r0
+  0036  Ret                  r0
+
+function #1 "counter"  params=2 frame=16 env=1 flags=dbg  @0x00000150 size=109
+  0000  CreateEnvironment    r3
+  0002  LoadParam            r5, 1
+  0005  StoreToEnvironment   r3, 0, r5
+  0009  CreateClosure        r1, r3, f2 "get"
+  000e  GetGlobalObject      r4
+  0010  TryGetById           r6, r4, #c1, s8 "print"
+  0016  LoadConstUndefined   r0
+  0018  Call1                r7, r1, r0
+  001c  LoadConstString      r2, s1 "first "
+  0020  Add                  r2, r2, r7
+  0024  Call2                r2, r6, r0, r2
+  0029  LoadConstUInt8       r2, 5
+  002c  Add                  r5, r5, r2
+  0030  StoreToEnvironment   r3, 0, r5
+  0034  TryGetById           r6, r4, #c1, s8 "print"
+  003a  Call1                r7, r1, r0
+  003e  LoadConstString      r2, s4 "second "
+  0042  Add                  r2, r2, r7
+  0046  Call2                r2, r6, r0, r2
+  004b  LoadConstString      r2, s5 "x"
+  004f  Add                  r2, r2, r5
+  0053  TryGetById           r4, r4, #c1, s8 "print"
+  0059  Call2                r4, r4, r0, r2
+  005e  GetByIdShort         r2, r2, #c2, s6 "length"
+  0063  StoreToEnvironment   r3, 0, r2
+  0067  Call1                r0, r1, r0
+  006b  Ret                  r0
+
+function #2 "get"  params=1 frame=1 env=0 flags=none  @0x000001bd size=9
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r0, r0, 0
+  0007  Ret                  r0

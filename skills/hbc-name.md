@@ -1,7 +1,7 @@
 ---
 id: hbc-name
 kind: suggest-name
-version: 4
+version: 5
 ---
 
 # hbc-name -- naming registers and functions in decompiled Hermes bytecode
@@ -31,6 +31,11 @@ You are given, and may use, only what is in the request:
   it individually. A request with no `targets` field is the single-register
   form: propose at most one name, for the one binding `source`/`summary`
   describe.
+  A target may also be a LIVE RANGE `{fn,reg,web}`: the decompiler split a
+  reused register into one variable per unrelated value, rendered `rN` for
+  web 1 and `rN_W` for web W (so `{12,4,3}` is the variable `r4_3` in the
+  source). Each live range is a separate binding: name it for the one value
+  it holds, never for the other ranges of the same register.
 
 You never fetch anything else. If the evidence you need is absent, abstain.
 
@@ -81,7 +86,8 @@ was missing); an answer that abstains without one is rejected:
 { "names": [], "abstained": true, "reason": "no string literals, callees or property names to anchor a role" }
 ```
 
-- `bindingId` is echoed back from the request, unchanged -- when `targets` is
+- `bindingId` is echoed back from the request, unchanged (keep `web` when the
+  target has one: `{ "fn": 12, "reg": 4, "web": 3 }`) -- when `targets` is
   present, one that matches exactly one entry of it. A `bindingId` that is
   not in `targets` is dropped by the caller and never written, so do not
   invent one.

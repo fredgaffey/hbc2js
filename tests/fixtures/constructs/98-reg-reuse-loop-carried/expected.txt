@@ -1,0 +1,8 @@
+acc 20
+n=5
+half 10
+10
+acc 0
+n=0
+half 0
+0

@@ -1,0 +1,59 @@
+; hbc2js disassembly of 97-reg-reuse-if-merge/v84.hbc
+; version=84 layout=B opcodeTable=hbc84 functions=2 strings=10 globalCodeIndex=0
+function #0 "global"  params=1 frame=17 env=0 flags=dbg  @0x00000104 size=80
+  0000  DeclareGlobalVar     s8 "pick"
+  0005  CreateEnvironment    r0
+  0007  CreateClosure        r1, r0, f1 "pick"
+  000c  GetGlobalObject      r0
+  000e  PutById              r0, r1, #c1, s8 "pick"
+  0014  TryGetById           r3, r0, #c1, s9 "print"
+  001a  GetByIdShort         r6, r0, #c2, s8 "pick"
+  001f  LoadConstUndefined   r2
+  0021  LoadConstTrue        r1
+  0023  LoadConstUInt8       r5, 4
+  0026  LoadConstUInt8       r4, 9
+  0029  Call4                r1, r6, r2, r1, r5, r4
+  0030  Call2                r1, r3, r2, r1
+  0035  TryGetById           r1, r0, #c1, s9 "print"
+  003b  GetByIdShort         r3, r0, #c2, s8 "pick"
+  0040  LoadConstFalse       r0
+  0042  Call4                r0, r3, r2, r0, r5, r4
+  0049  Call2                r0, r1, r2, r0
+  004e  Ret                  r0
+
+function #1 "pick"  params=4 frame=17 env=0 flags=dbg  @0x00000154 size=125
+  0000  LoadParam            r6, 1
+  0003  LoadConstString      r3, s2 "yes"
+  0007  LoadConstString      r5, s1 "no"
+  000b  JmpTrue              L1, r6
+  000e  LoadParam            r1, 3
+  0011  LoadConstUInt8       r0, 1
+  0014  Add                  r0, r1, r0
+  0018  Jmp                  L2
+L1:
+  001a  LoadParam            r2, 2
+  001d  LoadConstUInt8       r1, 2
+  0020  Mul                  r0, r2, r1
+L2:
+  0024  GetGlobalObject      r2
+  0026  TryGetById           r7, r2, #c1, s9 "print"
+  002c  LoadConstUndefined   r4
+  002e  LoadConstString      r1, s4 "v="
+  0032  Add                  r1, r1, r0
+  0036  Call2                r1, r7, r4, r1
+  003b  TryGetById           r1, r2, #c2, s6 "String"
+  0041  Call2                r1, r1, r4, r0
+  0046  GetByIdShort         r1, r1, #c3, s7 "length"
+  004b  TryGetById           r8, r2, #c1, s9 "print"
+  0051  LoadConstString      r7, s5 "w="
+  0055  Add                  r7, r7, r1
+  0059  Call2                r7, r8, r4, r7
+  005e  JmpFalse             L3, r6
+  0061  Mov                  r5, r3
+L3:
+  0064  TryGetById           r3, r2, #c1, s9 "print"
+  006a  LoadConstString      r2, s3 "s="
+  006e  Add                  r2, r2, r5
+  0072  Call2                r2, r3, r4, r2
+  0077  Add                  r0, r0, r1
+  007b  Ret                  r0

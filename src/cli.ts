@@ -169,7 +169,8 @@ Options (decompile):
   --overwrite               with --split: allow overwriting an existing
                             artifact directory (default: refuse, §1.3 E4)
   --opcode-table=<id>       force an opcode table instead of probing
-  --force-v98-table         resolve E_LAYOUT_AMBIGUOUS by forcing hbc98-late
+  --strict-layout           refuse (E_LAYOUT_AMBIGUOUS) instead of assuming hbc98-late when a v98 opcode table is undecidable
+  --force-v98-table         (legacy; now the default, kept for compatibility) resolve E_LAYOUT_AMBIGUOUS by forcing hbc98-late
   --lenient-env             don't refuse the module when an environment access
                             cannot be resolved statically; emit a loud
                             __hbc_unresolved_env(...) marker per site instead
@@ -628,6 +629,7 @@ interface DecompileArgs {
   readonly overwrite: boolean;
   readonly opcodeTable: OpcodeTableId | undefined;
   readonly forceV98: boolean;
+  readonly strictLayout: boolean;
   readonly stats: boolean;
   /** `--lenient-env`: markers instead of `E_ENV_UNRESOLVED` (review M4-H2). */
   readonly lenientEnv: boolean;
@@ -652,6 +654,7 @@ function parseDecompileArgs(argv: readonly string[]): DecompileArgs {
   let overwrite = false;
   let opcodeTable: OpcodeTableId | undefined;
   let forceV98 = false;
+  let strictLayout = false;
   let stats = false;
   let lenientEnv = false;
   let jsx = false;
@@ -676,6 +679,7 @@ function parseDecompileArgs(argv: readonly string[]): DecompileArgs {
     else if (a === "--split") split = argv[++i];
     else if (a === "--overwrite") overwrite = true;
     else if (a === "--force-v98-table") forceV98 = true;
+    else if (a === "--strict-layout") strictLayout = true;
     else if (a === "--stats") stats = true;
     else if (a === "--lenient-env") lenientEnv = true;
     else if (a === "--jsx") jsx = true;
@@ -685,7 +689,7 @@ function parseDecompileArgs(argv: readonly string[]): DecompileArgs {
   }
   input = positional[0];
   if (outPath === undefined) outPath = positional[1];
-  return { help, input, outPath, functionIndex, scopedFn, verify, emitTree, emitAst, nodeCheck: check, split, overwrite, opcodeTable, forceV98, stats, lenientEnv, jsx, returnAnnotations, passes: { none: passesNone, skip: skipPasses, optIn: jsx ? ["jsx-recover"] : [] } };
+  return { help, input, outPath, functionIndex, scopedFn, verify, emitTree, emitAst, nodeCheck: check, split, overwrite, opcodeTable, forceV98, strictLayout, stats, lenientEnv, jsx, returnAnnotations, passes: { none: passesNone, skip: skipPasses, optIn: jsx ? ["jsx-recover"] : [] } };
 }
 
 function warnIfHeapTooSmall(inputBytes: number, name: string): void {
@@ -719,6 +723,7 @@ function runDecompile(argv: readonly string[]): void {
       moduleName: basename(args.input),
       verify: args.verify,
       resolveV98Ambiguity: args.forceV98,
+      strictLayout: args.strictLayout,
       strictEnv: !args.lenientEnv,
       passes: args.passes,
       ...(args.jsx || !args.returnAnnotations ? { emit: { ...(args.jsx ? { jsx: true } : {}), ...(!args.returnAnnotations ? { returnAnnotations: false } : {}) } } : {}),

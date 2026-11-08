@@ -82,6 +82,8 @@ function usage(): never {
 export interface Target {
   readonly fn: number;
   readonly reg: number;
+  /** One reg-split live range (docs/RENAME.md); absent = the whole register. */
+  readonly web?: number;
 }
 
 /** Every nameable, unnamed `{fn,reg}` in `allowedFns` (or the whole bundle
@@ -113,11 +115,19 @@ export function collectTargets(
     if (nameable.length === 0) continue;
     // Spec 28 section 7: only registers the rendered source binds to a local
     // identifier are asked about (src/readability/nameable.ts).
-    const bound = nameableFilter === undefined ? undefined : new Set(nameableFilter.of(fn));
+    // A register reg-split split is asked about once per bound web
+    // (`{fn,reg,web}`), so one name never has to fit unrelated values.
+    const bindings = nameableFilter === undefined ? undefined : nameableFilter.bindings(fn);
     for (const reg of nameable) {
       if (reg.named !== null) continue;
-      if (bound !== undefined && !bound.has(reg.reg)) continue;
-      targets.push({ fn, reg: reg.reg });
+      if (bindings === undefined) {
+        targets.push({ fn, reg: reg.reg });
+        continue;
+      }
+      for (const b of bindings) {
+        if (b.reg !== reg.reg || store.getName(b) !== null) continue;
+        targets.push(b.web === undefined ? { fn, reg: reg.reg } : { fn, reg: reg.reg, web: b.web });
+      }
     }
   }
   return targets;
@@ -300,7 +310,7 @@ async function main(): Promise<void> {
         process.stderr.write(`${diagnostics[diagnostics.length - 1]!}\n`);
         continue;
       }
-      const id = regId(fn, reg);
+      const id = regId(fn, reg, target.web);
       const context = { target: shortForm(id), fn, reg, source };
       const key = cacheKey({
         kind: "suggest-name",
@@ -353,7 +363,7 @@ async function main(): Promise<void> {
         process.stderr.write(`${diagnostics[diagnostics.length - 1]!}\n`);
         continue;
       }
-      const ids = regs.map((r) => regId(fn, r.reg));
+      const ids = regs.map((r) => regId(fn, r.reg, r.web));
       const context = { fn, targets: ids.map((id) => shortForm(id)), source };
       const key = cacheKey({
         kind: "suggest-name",

@@ -15,7 +15,7 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import type { BindingId } from "./id.ts";
-import { bindingKey, parseKey } from "./id.ts";
+import { bindingKey, parseKey, registerIdent } from "./id.ts";
 import { RevisionStore } from "../project/revision-store.ts";
 import type { Revision } from "../project/revision-store.ts";
 
@@ -247,8 +247,23 @@ export class OverlayStore {
     for (const r of this.engine.allRecords()) {
       if (!r.active) continue;
       const id = parseKey(r.target);
-      if (id.kind !== "reg" || id.fn !== fn) continue;
+      if (id.kind !== "reg" || id.fn !== fn || id.web !== undefined) continue;
       out.set(id.reg, toNameRecord(r));
+    }
+    return out;
+  }
+
+  /** Every active live-range ("web") name for function `fn`, keyed by the
+   *  web's post-`reg-split` ident (`rN` for web 1, `rN_W`) -- what `render`
+   *  applies between `reg-split` and `var-naming` (docs/RENAME.md). Whole-
+   *  register names are in `activeNamesForFn`, not here. */
+  activeWebNamesForFn(fn: number): ReadonlyMap<string, NameRecord> {
+    const out = new Map<string, NameRecord>();
+    for (const r of this.engine.allRecords()) {
+      if (!r.active) continue;
+      const id = parseKey(r.target);
+      if (id.kind !== "reg" || id.fn !== fn || id.web === undefined) continue;
+      out.set(registerIdent(id), toNameRecord(r));
     }
     return out;
   }

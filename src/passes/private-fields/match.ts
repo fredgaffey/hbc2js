@@ -30,7 +30,7 @@
 // which would (wrongly) call a register that held a *different* private name
 // earlier in the same list an alias of this one too.
 import type { Expr, Stmt } from "../ast.ts";
-import { identUses, identUsesMany, mapStmts, walk } from "../ast.ts";
+import { identUses, identUsesMany, isHelperCall, mapStmts, walk } from "../ast.ts";
 import type { Match, PassContext } from "../types.ts";
 
 export interface PrivateFieldsGroup {
@@ -301,6 +301,11 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
         }
         const hasOwnArgs = hasOwnCall(n);
         if (hasOwnArgs !== null && isIdent(hasOwnArgs[1]!) && aliases.has((hasOwnArgs[1] as Ident).name)) {
+          // A brand test on `this` in the constructor ahead of the install
+          // (and not the double-init guard `fold` drops with it) would read
+          // `#x in this` after the field declaration already added the field:
+          // a different answer. Refuse the name.
+          if (allowInstall && installs === 0 && isThisArg(hasOwnArgs[0]!, regs)) escaped = true;
           consumed.add(hasOwnArgs[1]!);
           return;
         }
@@ -411,7 +416,29 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
     let aliases = aliasesIn;
     let regs = regsIn;
     const out: Stmt[] = [];
-    for (const s of stmts) {
+    for (let i = 0; i < stmts.length; i++) {
+      const s = stmts[i]!;
+      // hermesc's own double-initialisation guard in front of a field's
+      // install (`if (hasOwnProperty.call(this, sym)) throwTypeError("Cannot
+      // initialize private field twice.")`, the bytecode's `PrivateIsIn` +
+      // throw before `AddOwnPrivateBySym`). Once the install becomes a real
+      // field declaration, that declaration's own PrivateFieldAdd performs
+      // exactly this check natively (ES2024 7.3.31: a TypeError when the
+      // object already has the private name), so the guard is part of the
+      // install and goes with it -- left behind it would read `#x in this`
+      // AFTER the field already exists and always throw (fixtures 90, 94).
+      // Only when the install it guards follows (`guardsNextInstall`).
+      if (allowInstall && s.k === "if" && !isIdent(s.test) && isDoubleInitGuard(s, undefined, aliases, regs) && guardsNextInstall(stmts, i + 1, aliases, regs)) continue;
+      // The v98 spelling: `rT = hasOwnProperty.call(this, sym); if (rT) {...}`.
+      // The store goes with the guard, but only when `rT` is dead after it
+      // (its first later mention is a plain overwrite, or there is none), so
+      // nothing can observe that the brand test no longer ran.
+      const next = stmts[i + 1];
+      if (allowInstall && next !== undefined && next.k === "if" && isIdent(next.test) && isDoubleInitGuard(next, s, aliases, regs) && guardsNextInstall(stmts, i + 2, aliases, regs) && deadAfter(stmts, i + 2, next.test.name)) {
+        if (s.k === "init") droppedInits.push(s.name); // re-declared if still used (`redeclare`)
+        i++;
+        continue;
+      }
       if (s.k === "labeled") {
         const inner = fold(s.body, aliases, regs);
         aliases = inner.aliasesOut;
@@ -432,6 +459,70 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
       if (stmt !== null) out.push(stmt);
     }
     return { stmts: out, aliasesOut: aliases, regsOut: regs };
+  }
+
+  /** `if (<brand test>) { <throw the double-init TypeError> }`. The test is
+   *  `hasOwnProperty.call(this, <alias>)` directly or (v98, derived bodies)
+   *  a register the immediately preceding store set to exactly that; the
+   *  then-arm only stores literals into registers, calls the emitter's
+   *  TypeError helper with "Cannot initialize private field twice." (directly
+   *  or through one of those registers) and throws. */
+  function isDoubleInitGuard(s: Stmt, prev: Stmt | undefined, aliases: ReadonlySet<string>, regs: ReadonlyMap<string, Expr>): boolean {
+    if (s.k !== "if" || s.else.length !== 0 || s.then.length === 0) return false;
+    let test: Expr = s.test;
+    if (isIdent(test)) {
+      const store = prev === undefined ? null : simpleStore(prev);
+      if (store === null || store.name !== test.name) return false;
+      test = store.value;
+    }
+    const args = hasOwnCall(test);
+    if (args === null || !isIdent(args[1]!) || !aliases.has(args[1].name) || !isThisArg(args[0]!, regs)) return false;
+    const MSG = '"Cannot initialize private field twice."';
+    const lits = new Map<string, string>();
+    let helperWithMsg = false;
+    const helperOk = (e: Expr): boolean => {
+      if (!isHelperCall(e, "__hbc_b_throwTypeError") || e.args.length !== 1) return false;
+      const m = e.args[0]!;
+      if ((m.k === "lit" && m.text === MSG) || (isIdent(m) && lits.get(m.name) === MSG)) helperWithMsg = true;
+      return true;
+    };
+    for (const t of s.then) {
+      if (t.k === "throw") continue;
+      if (t.k === "expr" && helperOk(t.expr)) continue;
+      const store = simpleStore(t);
+      if (store === null || !/^r\d+$/.test(store.name) || aliases.has(store.name)) return false;
+      if (store.value.k === "lit") lits.set(store.name, store.value.text);
+      else if (!helperOk(store.value)) return false;
+    }
+    return helperWithMsg && s.then[s.then.length - 1]!.k === "throw";
+  }
+  /** `reg`'s first mention in `stmts[from..]` is a plain overwrite that does
+   *  not read it (or there is none): the value before `from` is dead. */
+  function deadAfter(stmts: readonly Stmt[], from: number, reg: string): boolean {
+    for (let j = from; j < stmts.length; j++) {
+      const u = identUses([stmts[j]!], reg);
+      if (u.reads + u.writes + u.nested === 0) continue;
+      const store = simpleStore(stmts[j]!);
+      return store !== null && store.name === reg && u.reads === 0;
+    }
+    return true;
+  }
+  /** The guarded install follows, past nothing but silent stores (an
+   *  identifier or literal copied into a register that is not an alias: no
+   *  user code runs, so the native check at the field's declaration and the
+   *  guard observe the same object state). */
+  function guardsNextInstall(stmts: readonly Stmt[], from: number, aliases: ReadonlySet<string>, regs: ReadonlyMap<string, Expr>): boolean {
+    for (let j = from; j < stmts.length; j++) {
+      const t = stmts[j]!;
+      if (t.k === "decl") continue;
+      if (t.k === "expr") {
+        const defineArgs = objectCall(t.expr, "defineProperty");
+        if (defineArgs !== null && defineArgs.length === 3 && isIdent(defineArgs[1]!) && aliases.has(defineArgs[1].name) && isThisArg(defineArgs[0]!, regs) && privateInstallValue(defineArgs) !== null) return true;
+      }
+      const store = simpleStore(t);
+      if (store === null || aliases.has(store.name) || !(isIdent(store.value) || store.value.k === "lit")) return false;
+    }
+    return false;
   }
 
   const result = fold(body, new Set([envName]), new Map());
@@ -463,7 +554,7 @@ function redeclare(body: readonly Stmt[], droppedInits: readonly string[]): read
  *  the new tree, or `null` (refuse this one name; `before` is untouched).
  *  Exported for `tools/passes/private-fields-refusals.ts`, which needs the
  *  final arbiter (R-PF1 below) to classify a refusal honestly. */
-export function foldOne(before: readonly Stmt[], candidate: PrivateFieldCandidate): readonly Stmt[] | null {
+export function foldOne(before: readonly Stmt[], candidate: PrivateFieldCandidate, scope?: FoldScope): readonly Stmt[] | null {
   const { envName, displayName, regName } = candidate;
   const cls = findClass(before);
   if (cls === null) return null;
@@ -496,43 +587,125 @@ export function foldOne(before: readonly Stmt[], candidate: PrivateFieldCandidat
   // (`<envName> = <regName>`) both become dead once the field is a real
   // declaration.
   const createdIn = regName ?? envName;
-  const withoutDecl = before.filter((s) => {
-    const store = simpleStore(s);
-    if (store === null) return true;
-    if (store.name === createdIn && privateSymbolName(store.value) !== null) return false;
-    return !(regName !== null && store.name === envName && isIdent(store.value) && store.value.name === regName);
-  });
-  const dead = new Set([envName, createdIn]);
-  const trimmed = withoutDecl.map((s) => (s.k === "decl" ? { ...s, names: s.names.filter((n) => !dead.has(n)) } : s)).filter((s) => !(s.k === "decl" && s.names.length === 0));
-  const after = mapStmts(trimmed, (s) => s, fx);
+  const isCreation = (st: Stmt): boolean => {
+    const store = simpleStore(st);
+    return store !== null && store.name === createdIn && privateSymbolName(store.value) !== null;
+  };
+  const isHop = (st: Stmt): boolean => {
+    const store = simpleStore(st);
+    return regName !== null && store !== null && store.name === envName && isIdent(store.value) && store.value.name === regName;
+  };
 
-  // R-PF1 (defining-body escape). Every reference to this private name inside
-  // the class has just been rewritten into `#name` syntax, and the symbol's
-  // own creation has been deleted -- so ANY surviving mention of the slot or
-  // of the register it came through is a reference this rung has no shape for
-  // and must not strand. It is not merely a dangling name: a native `#name`
-  // field only exists on objects branded during their own `[[Construct]]`,
-  // and the shape that puts such a mention here is hermesc INLINING a
-  // construction of this very class into the defining frame
-  // (`r4 = Reflect.construct(Object.getPrototypeOf(B), [...], B);
-  //   Object.defineProperty(r4, r5, {...});`) -- an object that never runs the
-  // real constructor, so folding the class's accessors to `this.#x` while that
-  // copy keeps the symbol-keyed install makes `r4.x` throw where the unfolded
-  // shape does not. That is the same hazard `isThisArg` above refuses inside
-  // the constructor, one frame out; fixture 81 is exactly it. Refuse the name.
-  const surviving = identUsesMany(after, dead);
-  for (const n of dead) {
+  // R-PF1 (defining-frame escape), checked on `before` BEFORE anything is
+  // deleted. Every reference to this private name inside the class is about
+  // to become `#name` syntax and the symbol's own creation is about to be
+  // deleted -- so a surviving READ of the symbol VALUE in the defining frame
+  // is a reference this rung has no shape for and must not strand. It is not
+  // merely a dangling name: a native `#name` field only exists on objects
+  // branded during their own `[[Construct]]`, and the shape that leaves such a
+  // read here is hermesc INLINING a construction of this very class into the
+  // defining frame (`r4 = Reflect.construct(Object.getPrototypeOf(B), [...],
+  // B); Object.defineProperty(r4, r5, {...});`) that inline-new could not
+  // rebuild -- an object that never runs the real constructor, so folding the
+  // class's accessors to `this.#x` while that copy keeps the symbol-keyed
+  // install makes `r4.x` throw where the unfolded shape does not. That is the
+  // same hazard `isThisArg` above refuses inside the constructor, one frame
+  // out; fixtures 81 and 95 are exactly it.
+  //
+  // What counts as such a read (spec 24 section 1.7, "R-PF1 is def-use"):
+  // * The env SLOT: any surviving mention at all, nested closures included. A
+  //   slot is a frame-shared binding a closure may read at any time, so no
+  //   intra-frame ordering argument covers it; and hermesc gives every binding
+  //   its own slot, so a slot is never recycled for an unrelated value anyway.
+  // * The REGISTER: only a read the symbol's own store still reaches
+  //   (`registerReadReached`). A register is this frame's private temporary --
+  //   no closure can name it -- and hermesc recycles it freely once the symbol
+  //   is dead, so after inline-new has rebuilt the inlined construction that
+  //   last read it, the register's later writes and reads are unrelated values
+  //   (fixtures 90, 94). Those keep the register, and its declaration.
+  const slotNames = [envName, createdIn].filter((n) => ENV_SLOT.test(n));
+  if (!ENV_SLOT.test(createdIn) && registerReadReached(before, createdIn, isCreation, isHop, scope)) return null;
+
+  const recycled = (() => {
+    const u = identUses(before, createdIn);
+    return u.reads + u.writes > (regName !== null ? 2 : 1);
+  })();
+  const withoutDecl = before.flatMap((st): Stmt[] => {
+    if (isHop(st)) return [];
+    if (!isCreation(st)) return [st];
+    // A `let rN = Symbol(...)` whose register the frame recycles keeps its
+    // declaration; the value it held is gone with the field declaration.
+    return st.k === "init" && recycled ? [{ k: "decl", kind: st.kind, names: [createdIn] }] : [];
+  });
+  const mapped = mapStmts(withoutDecl, (st) => st, fx);
+  const surviving = identUsesMany(mapped, [envName, createdIn]);
+  for (const n of slotNames) {
     const u = surviving.get(n)!;
     if (u.reads + u.writes + u.nested > 0) return null;
   }
-  return after;
+  // Names nothing mentions any more lose their `let`; a recycled register
+  // (still written and read, as unrelated values) keeps it.
+  const dead = new Set([envName, createdIn].filter((n) => {
+    const u = surviving.get(n)!;
+    return u.reads + u.writes + u.nested === 0;
+  }));
+  return mapped.map((st) => (st.k === "decl" ? { ...st, names: st.names.filter((n) => !dead.has(n)) } : st)).filter((st) => !(st.k === "decl" && st.names.length === 0));
 }
 
-export function foldAll(before: readonly Stmt[]): { readonly after: readonly Stmt[]; readonly folded: readonly string[] } {
+/** Does any read of `reg` in the defining frame observe the value the
+ *  candidate's creation store put there (`isCreation`), other than the one
+ *  hop into the env slot (`isHop`)? Conservative def-use over the frame's
+ *  top-level list, which is straight-line: a statement at a later index runs
+ *  only after every earlier one has completed (no loop or jump at that level;
+ *  a `break` out of a labelled block only moves forward), so a top-level
+ *  plain store `reg = e` whose `e` does not read `reg` kills the symbol for
+ *  every later statement. Anything else that mentions `reg` between the
+ *  creation and that kill -- a read, or a write inside a nested `if`/loop that
+ *  only kills on some paths -- counts as reached (`true`). A mention BEFORE
+ *  the creation counts too, because the list may be a loop body re-entered
+ *  with the symbol still in the register; and when `before` is not the whole
+ *  function body, any mention of `reg` outside it does, because the register
+ *  is frame-wide. Registers never appear inside a nested function (a closure
+ *  reads the frame through env slots only; `identUses` never credits one). */
+function registerReadReached(before: readonly Stmt[], reg: string, isCreation: (s: Stmt) => boolean, isHop: (s: Stmt) => boolean, scope: FoldScope | undefined): boolean {
+  const at = before.findIndex(isCreation);
+  if (at < 0) return true;
+  const mentions = (s: Stmt): boolean => {
+    const u = identUses([s], reg);
+    return u.reads + u.writes + u.nested > 0;
+  };
+  for (let i = 0; i < at; i++) if (before[i]!.k !== "decl" && mentions(before[i]!)) return true;
+  if (scope?.fnBody !== undefined && scope.list !== undefined && scope.fnBody !== scope.list) {
+    const whole = identUses(scope.fnBody, reg);
+    const here = identUses(scope.list, reg);
+    if (whole.reads + whole.writes !== here.reads + here.writes) return true;
+  }
+  for (let i = at + 1; i < before.length; i++) {
+    const s = before[i]!;
+    if (isHop(s)) continue;
+    if (!mentions(s)) continue;
+    const store = simpleStore(s);
+    if (store !== null && store.name === reg && identUses([s], reg).reads === 0) return false; // killed
+    return true;
+  }
+  return false;
+}
+
+/** Where `before` sits: `fnBody` is the whole function body the driver is
+ *  folding (`ctx.fnBody`); omitted, `before` IS the whole body (unit tests,
+ *  hand-built trees). */
+export interface FoldScope {
+  readonly fnBody?: readonly Stmt[] | undefined;
+  /** The statement list the driver matched (`before` of `foldAll`), which
+   *  `fnBody` contains when it is a nested list. */
+  readonly list?: readonly Stmt[] | undefined;
+}
+
+export function foldAll(before: readonly Stmt[], scope?: FoldScope): { readonly after: readonly Stmt[]; readonly folded: readonly string[] } {
   let tree = before;
   const folded: string[] = [];
   for (const c of findCandidates(before)) {
-    const next = foldOne(tree, c);
+    const next = foldOne(tree, c, scope === undefined ? undefined : { fnBody: scope.fnBody, list: before });
     if (next !== null) {
       tree = next;
       folded.push(c.displayName);
@@ -542,7 +715,7 @@ export function foldAll(before: readonly Stmt[]): { readonly after: readonly Stm
 }
 
 export function match(before: readonly Stmt[], ctx: PassContext): Match<readonly Stmt[], PrivateFieldsGroup> | null {
-  const { folded } = foldAll(before);
+  const { folded } = foldAll(before, { fnBody: ctx.fnBody });
   if (folded.length === 0) return null;
   return { root: before, nodes: [before], data: { folded }, at: { functionIndex: ctx.functionIndex, offset: 0 } };
 }

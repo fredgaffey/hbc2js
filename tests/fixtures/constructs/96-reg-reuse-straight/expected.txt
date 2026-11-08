@@ -1,0 +1,5 @@
+mod m:styles
+sheet 60x7
+w=60
+total 67
+result 67

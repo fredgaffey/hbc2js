@@ -1,0 +1,37 @@
+; hbc2js disassembly of 99-reg-reuse-closure-captured/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=2 strings=8 globalCodeIndex=0
+function #0 "global"  params=1 frame=14 env=0 flags=dbg,overflowed  @0x000000f8 size=54
+  0000  DeclareGlobalVar     s6 "counter"
+  0005  GetGlobalObject      r2
+  0007  LoadConstUndefined   r1
+  0009  CreateClosure        r3, r1, f1 "counter"
+  000e  PutByIdLoose         r2, r3, #c0, s6 "counter"
+  0014  TryGetById           r3, r2, #c0, s7 "print"
+  001a  GetByIdShort         r2, r2, #c1, s6 "counter"
+  001f  LoadConstUInt8       r0, 3
+  0022  Call2                r4, r2, r1, r0
+  0027  LoadConstString      r2, s0 "final "
+  002b  Add                  r2, r2, r4
+  002f  Call2                r2, r3, r1, r2
+  0034  Ret                  r2
+
+function #1 "counter"  params=2 frame=15 env=0 flags=dbg,overflowed  @0x0000012e size=78
+  0000  LoadParam            r2, 1
+  0003  GetGlobalObject      r3
+  0005  TryGetById           r5, r3, #c0, s7 "print"
+  000b  LoadConstString      r4, s1 "first "
+  000f  Add                  r4, r4, r2
+  0013  LoadConstUndefined   r1
+  0015  Call2                r4, r5, r1, r4
+  001a  LoadConstUInt8       r0, 5
+  001d  Add                  r4, r2, r0
+  0021  TryGetById           r5, r3, #c0, s7 "print"
+  0027  LoadConstString      r2, s3 "second "
+  002b  Add                  r2, r2, r4
+  002f  Call2                r2, r5, r1, r2
+  0034  LoadConstString      r2, s4 "x"
+  0038  Add                  r2, r2, r4
+  003c  TryGetById           r3, r3, #c0, s7 "print"
+  0042  Call2                r3, r3, r1, r2
+  0047  GetByIdShort         r2, r2, #c1, s5 "length"
+  004c  Ret                  r2

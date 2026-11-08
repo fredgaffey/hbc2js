@@ -25,7 +25,7 @@ import { renameIdents } from "../passes/fn-naming/rewrite.ts";
 import { isRegisterName } from "../passes/ast.ts";
 import { renameRegistersInFrame } from "../passes/var-naming/rewrite.ts";
 import type { RegisterId } from "./id.ts";
-import { regId } from "./id.ts";
+import { parseWebIdent, regId } from "./id.ts";
 import { frameHasRegister } from "./gate.ts";
 import type { OverlayStore } from "./store.ts";
 
@@ -103,6 +103,46 @@ export function applyOverlayNames(
   return { body: renameRegistersInFrame(body, mapping), collisions, mapping };
 }
 
+/** Live-range ("web") names, keyed by the web's post-`reg-split` ident (`rN`
+ *  for web 1, `rN_W`) -- `OverlayStore.activeWebNamesForFn`, docs/RENAME.md. */
+export type ActiveWebNames = ReadonlyMap<string, { readonly name: string }>;
+
+/** Apply web names to a POST-`reg-split` frame body (the `beforeVarNaming`
+ *  interposition point), as the same guarded alpha-rename `applyOverlayNames`
+ *  uses. Idents are taken in (reg, web) order so disambiguation is
+ *  deterministic; an ident not live in the body (a web the passes inlined
+ *  away, or a register a whole-register name already renamed) is skipped. */
+export function applyWebNames(
+  fnIndex: number,
+  body: readonly Stmt[],
+  names: ActiveWebNames,
+): { readonly body: readonly Stmt[]; readonly collisions: CollisionFlag[]; readonly mapping: ReadonlyMap<string, string> } {
+  if (names.size === 0) return { body, collisions: [], mapping: new Map() };
+  const taken = new Set<string>([...freeNames(body), ...declaredNames(body)]);
+  const mapping = new Map<string, string>();
+  const collisions: CollisionFlag[] = [];
+  const order = (ident: string): [number, number] => {
+    const w = parseWebIdent(ident);
+    return w !== null ? [w.reg, w.web] : [Number(ident.slice(1)), 1];
+  };
+  const idents = [...names.keys()].sort((a, b) => {
+    const [ra, wa] = order(a), [rb, wb] = order(b);
+    return ra - rb || wa - wb;
+  });
+  for (const from of idents) {
+    if (!isRegisterName(from) || !frameHasRegister(body, from)) continue;
+    taken.delete(from);
+    const wanted = names.get(from)!.name;
+    const rendered = disambiguate(wanted, taken);
+    mapping.set(from, rendered);
+    taken.add(rendered);
+    const [reg, web] = order(from);
+    if (rendered !== wanted) collisions.push({ id: regId(fnIndex, reg, web), wanted, rendered });
+  }
+  if (mapping.size === 0) return { body, collisions, mapping };
+  return { body: renameRegistersInFrame(body, mapping), collisions, mapping };
+}
+
 /** Apply the store's active register names to one raw frame body, returning the
  *  overlaid body plus any collisions that needed a suffix. Registers are taken
  *  in ascending numeric order so disambiguation is deterministic. */
@@ -137,7 +177,7 @@ export function renderFrame(
   node: Stmt,
   cfg: FunctionCfg,
   names: ActiveNames,
-  opts: { readonly indent?: string; readonly fnIdents?: ReadonlyMap<string, string> } = {},
+  opts: { readonly indent?: string; readonly fnIdents?: ReadonlyMap<string, string>; readonly webNames?: ActiveWebNames } = {},
 ): { readonly code: string; readonly collisions: readonly CollisionFlag[]; readonly mapping: ReadonlyMap<string, string>; readonly lineMap: readonly LineMapEntry[] } {
   if (node.k !== "func") return { code: "", collisions: [], mapping: new Map(), lineMap: [] };
   // Accepted `fn:N` names first, as a module-scoped alpha-rename of the
@@ -148,12 +188,25 @@ export function renderFrame(
   // register overlay is: `fn-naming`'s heuristic filter then leaves it alone.
   const named = renameFnIdents(node, opts.fnIdents);
   const applied = applyOverlayNames(cfg.functionIndex, named.body, names);
-  const out = hook({ ...named, body: applied.body }, cfg);
+  // Live-range names fill reg-split's webs right before var-naming.
+  const webCollisions: CollisionFlag[] = [];
+  const webMapping = new Map<string, string>();
+  const webNames = opts.webNames;
+  const extras = webNames === undefined || webNames.size === 0 ? undefined : {
+    beforeVarNaming: (b: readonly Stmt[]): readonly Stmt[] => {
+      const w = applyWebNames(cfg.functionIndex, b, webNames);
+      webCollisions.push(...w.collisions);
+      for (const [k, v] of w.mapping) webMapping.set(k, v);
+      return w.body;
+    },
+  };
+  const out = hook({ ...named, body: applied.body }, cfg, extras);
+  const mapping = webMapping.size === 0 ? applied.mapping : new Map([...applied.mapping, ...webMapping]);
   // §16: the line map is collected from the SAME print that produces `code`,
   // so its line numbers are the served text's own by construction.
   const collector = lineMapCollector();
   const code = printProgram([out.fn], { indent: opts.indent ?? "  ", onStmtLine: collector.onStmtLine });
-  return { code, collisions: applied.collisions, mapping: applied.mapping, lineMap: collector.rows() };
+  return { code, collisions: [...applied.collisions, ...webCollisions], mapping, lineMap: collector.rows() };
 }
 
 /** The ident each nameable register of `body` ends up as in the rendered
@@ -192,7 +245,15 @@ export function render(analysis: ModuleAnalysis, store: OverlayStore, opts: Rend
       if (fn.k !== "func") return realHook(fn, cfg);
       const applied = applyOverlay(cfg.functionIndex, fn.body, store);
       collisions.push(...applied.collisions);
-      const out = realHook({ ...fn, body: applied.body }, cfg);
+      const webNames = store.activeWebNamesForFn(cfg.functionIndex);
+      const extras = webNames.size === 0 ? undefined : {
+        beforeVarNaming: (b: readonly Stmt[]): readonly Stmt[] => {
+          const w = applyWebNames(cfg.functionIndex, b, webNames);
+          collisions.push(...w.collisions);
+          return w.body;
+        },
+      };
+      const out = realHook({ ...fn, body: applied.body }, cfg, extras);
       if (out.fn.k === "func") bodies.set(cfg.functionIndex, out.fn);
       return out;
     },

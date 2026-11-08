@@ -1,0 +1,51 @@
+; hbc2js disassembly of 98-reg-reuse-loop-carried/v94.hbc
+; version=94 layout=C opcodeTable=hbc94 functions=2 strings=6 globalCodeIndex=0
+function #0 "global"  params=1 frame=13 env=0 flags=dbg  @0x000000e4 size=71
+  0000  DeclareGlobalVar     s5 "sumTo"
+  0005  CreateEnvironment    r0
+  0007  CreateClosure        r1, r0, f1 "sumTo"
+  000c  GetGlobalObject      r0
+  000e  PutById              r0, r1, #c1, s5 "sumTo"
+  0014  TryGetById           r3, r0, #c1, s4 "print"
+  001a  GetByIdShort         r4, r0, #c2, s5 "sumTo"
+  001f  LoadConstUndefined   r2
+  0021  LoadConstUInt8       r1, 5
+  0024  Call2                r1, r4, r2, r1
+  0029  Call2                r1, r3, r2, r1
+  002e  TryGetById           r1, r0, #c1, s4 "print"
+  0034  GetByIdShort         r3, r0, #c2, s5 "sumTo"
+  0039  LoadConstZero        r0
+  003b  Call2                r0, r3, r2, r0
+  0040  Call2                r0, r1, r2, r0
+  0045  Ret                  r0
+
+function #1 "sumTo"  params=2 frame=15 env=0 flags=dbg  @0x0000012b size=101
+  0000  LoadParam            r5, 1
+  0003  LoadConstZero        r3
+  0005  LoadConstUInt8       r2, 2
+  0008  LoadConstZero        r1
+  000a  LoadConstZero        r0
+  000c  JNotLess             L2, r0, r5
+L1:
+  0010  Mul                  r4, r1, r2
+  0014  Add                  r3, r3, r4
+  0018  Inc                  r1, r1
+  001b  Mov                  r0, r3
+  001e  JLess                L1, r1, r5
+L2:
+  0022  GetGlobalObject      r1
+  0024  TryGetById           r6, r1, #c1, s4 "print"
+  002a  LoadConstUndefined   r3
+  002c  LoadConstString      r4, s0 "acc "
+  0030  Add                  r4, r4, r0
+  0034  Call2                r4, r6, r3, r4
+  0039  LoadConstString      r4, s3 "n="
+  003d  Add                  r5, r4, r5
+  0041  TryGetById           r4, r1, #c1, s4 "print"
+  0047  Call2                r4, r4, r3, r5
+  004c  Div                  r0, r0, r2
+  0050  TryGetById           r2, r1, #c1, s4 "print"
+  0056  LoadConstString      r1, s2 "half "
+  005a  Add                  r1, r1, r0
+  005e  Call2                r1, r2, r3, r1
+  0063  Ret                  r0

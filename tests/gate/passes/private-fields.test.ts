@@ -267,3 +267,95 @@ for (const version of ["v98", "v99"] as const) {
     assert.doesNotMatch(code, /could not decompile/);
   });
 }
+
+// ---------------------------------------------------------------------------
+// R-PF1 def-use refinement (docs/BUGS.md "E2E tier 1 -- bucket
+// `diff:GetOwnPrivateBySym/GetByVal`", spec 24 sections 1.7 / 9.5 item (b)).
+// R-PF1 used to count ANY surviving mention of the symbol's register, so a
+// register hermesc recycles for unrelated values after the symbol's last read
+// (once inline-new has rebuilt the inlined construction that read it) refused
+// the fold. Only a read the symbol's own store still reaches is an escape.
+// ---------------------------------------------------------------------------
+const id = (name: string): Any => ({ k: "ident", name });
+const setReg = (name: string, value: Any): Any => ({ k: "expr", expr: { k: "assign", target: id(name), value } });
+const leak = (name: string): Any => ({ k: "expr", expr: { k: "call", callee: id("leak"), args: [id(name)] } });
+
+test("private-fields R-PF1 def-use: a register reused for an unrelated value after the symbol's last read folds, and stays declared", async () => {
+  const { foldAll } = (await import("../../../src/passes/private-fields/match.ts")) as Any;
+  const { folded, after } = foldAll(oneHopBefore([setReg("r5", { k: "lit", text: "1" }), leak("r5")]));
+  assert.deepEqual(folded, ["#x"]);
+  const printed = JSON.stringify(after);
+  assert.ok(printed.includes('"kind":"field"'), "expected a #x field member");
+  assert.equal(printed.includes('"Symbol"'), false, "the Symbol() creation must be gone");
+  assert.ok(printed.includes('{"k":"decl","kind":"let","names":["r5"]}'), "the recycled register must keep a declaration");
+});
+
+test("private-fields R-PF1 def-use: refuses every read the symbol's store still reaches", async () => {
+  const { foldAll } = (await import("../../../src/passes/private-fields/match.ts")) as Any;
+  const cases: Record<string, Any[]> = {
+    "read before the reuse": [leak("r5"), setReg("r5", { k: "lit", text: "1" })],
+    "reuse only on one path": [{ k: "if", test: id("c"), then: [setReg("r5", { k: "lit", text: "1" })], else: [] }, leak("r5")],
+    "the overwrite itself reads the symbol": [setReg("r5", { k: "call", callee: id("f"), args: [id("r5")] }), leak("r5")],
+    "stored elsewhere first": [setReg("r9", id("r5")), setReg("r5", { k: "lit", text: "1" }), leak("r9")],
+    "env slot read later, even after a slot write": [setReg("_e0_0", { k: "lit", text: "1" }), leak("_e0_0")],
+  };
+  for (const [what, extra] of Object.entries(cases)) {
+    const { folded } = foldAll(oneHopBefore(extra));
+    assert.deepEqual(folded, [], `${what}: must refuse`);
+  }
+});
+
+const fixtureJs = (fixture: string, version: "v98" | "v99", mode: "on" | "none"): string =>
+  decompile(new Uint8Array(readFileSync(join(repoRoot(), "tests", "fixtures", "constructs", fixture, `${version}.hbc`))), {
+    resolveV98Ambiguity: true,
+    passes: mode === "none" ? { none: true } : {},
+  }).code;
+const runPrint = async (code: string): Promise<string> => {
+  const { runInNewContext } = await import("node:vm");
+  const out: string[] = [];
+  runInNewContext(code, { print: (...a: unknown[]) => out.push(a.map(String).join(" ")) });
+  return out.join("\n") + "\n";
+};
+
+for (const version of ["v98", "v99"] as const) {
+  for (const [fixture, name] of [["90-inlined-new", "#balance"], ["94-private-field-register-reuse", "#n"]] as const) {
+    test(`private-fields R-PF1 def-use: ${fixture} ${version} folds ${name} after inline-new (recycled register is not an escape)`, () => {
+      const on = fixtureJs(fixture, version, "on");
+      assert.doesNotMatch(on, /Symbol\("#/, `${name} must fold`);
+      assert.match(on, new RegExp(`${name}( = \\w+)?;`));
+      assert.match(on, new RegExp(`this\\.${name}`));
+    });
+  }
+  test(`private-fields R-PF1 def-use: 95-private-field-inlined-escape ${version} still refuses #open (a foreign install the symbol's store reaches)`, () => {
+    const on = fixtureJs("95-private-field-inlined-escape", version, "on");
+    assert.match(on, /Symbol\("#open"\)/);
+    assert.doesNotMatch(on, /#open = false/);
+    assert.doesNotMatch(on, /could not decompile/);
+  });
+  for (const fixture of ["90-inlined-new", "94-private-field-register-reuse", "95-private-field-inlined-escape"]) {
+    const expected = readFileSync(join(repoRoot(), "tests", "fixtures", "constructs", fixture, "expected.txt"), "utf8");
+    for (const mode of ["none", "on"] as const) {
+      test(`private-fields R-PF1 def-use: ${fixture} ${version} --passes=${mode} prints expected.txt`, async () => assert.equal(await runPrint(fixtureJs(fixture, version, mode)), expected));
+    }
+  }
+}
+
+test("private-fields R-PF1 def-use: fixtures 90/94/95 are PASS under T2 at v98 and v99", async () => {
+  const { runTier, hbc2jsDecompiler } = await import("../../../src/harness/tiers.ts");
+  const { VERDICT } = await import("../../../src/harness/ladder.ts");
+  const report = await runTier({ tier: "gate", decompiler: hbc2jsDecompiler, versions: [98, 99], only: ["90-inlined-new", "94-private-field-register-reuse", "95-private-field-inlined-escape"] });
+  assert.equal(report.results.length, 6);
+  for (const r of report.results) assert.equal(r.verdict, VERDICT.PASS, `${r.fixture.name}: ${r.oracles.map((o) => `${o.oracle}=${o.verdict} ${o.detail ?? ""}`).join(" ")}`);
+});
+
+test("private-fields R-PF1 def-use: a class in a nested list refuses when the frame reads the register OUTSIDE that list", async () => {
+  const { foldAll } = (await import("../../../src/passes/private-fields/match.ts")) as Any;
+  // The driver matches every statement list (fixture 93's `L0: { ... }`), but
+  // a register is frame-wide: a read after the labelled block still sees the
+  // symbol. Before the def-use refinement R-PF1 only counted mentions inside
+  // the matched list and folded here.
+  const list = oneHopBefore();
+  const fnBody = [{ k: "labeled", label: "L0", body: list }, leak("r5")];
+  assert.deepEqual(foldAll(list, { fnBody }).folded, []);
+  assert.deepEqual(foldAll(list, { fnBody: list }).folded, ["#x"]);
+});
