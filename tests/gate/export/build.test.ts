@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { loadConfig, runBuild } from "metro";
 import { requireSweep } from "../../support/tiers.ts";
 import { repoRoot } from "../../support/paths.ts";
+import { offlineBundle } from "../../../src/export/offline-check.ts";
 import { cleanup, exportTo, IMPLEMENTED } from "./support.ts";
 
 const SKIP = { skip: IMPLEMENTED ? false : "docs/specs/29-export.md not implemented yet" };
@@ -59,6 +60,29 @@ test("spec 29 §0: the exported held-out app bundles with Metro, offline", SKIP,
     assert.ok(stat.size > 1000, `bundle is suspiciously small: ${stat.size} bytes`);
     const bundle = readFileSync(bundleOut, "utf8");
     assert.match(bundle, /__d\(/, "bundle has no Metro module registrations (__d(...))");
+  } finally {
+    cleanup(out);
+  }
+});
+
+// Item 6d2: an app targeting an RN minor older than the installed toolchain
+// (the RN 0.72 template: its tree names metro-react-native-babel-preset 0.77 /
+// metro 0.76, neither installed) must still bundle offline, via the installed
+// preset. The tree keeps the original names; only the check is redirected.
+test("spec 29 §4.6: an RN 0.72 export bundles offline via the installed preset", SKIP, async (t) => {
+  if (!requireSweep(t)) return;
+  const release = join(repoRoot(), "tests", "fixtures", "bundles", "rn-template-0.72", "index.android.hbc");
+  const { out, run } = exportTo(release, ["--tier", "flat", "--substitute", "none"]);
+  try {
+    assert.equal(run.status, 0, `export failed: ${run.stderr}`);
+    assert.match(readFileSync(join(out, "babel.config.js"), "utf8"), /metro-react-native-babel-preset/,
+      "the tree stays faithful to the original toolchain");
+    const t0 = Date.now();
+    const { bundlePath } = await offlineBundle(out, repoRoot());
+    const bundle = readFileSync(bundlePath, "utf8");
+    console.log(`6d2 bundle: ${statSync(bundlePath).size} bytes, ${Date.now() - t0} ms`);
+    assert.ok(bundle.length > 1000);
+    assert.match(bundle, /__d\(/);
   } finally {
     cleanup(out);
   }
