@@ -191,3 +191,29 @@ count grew between retries (1,196 -> 1,213). So the bundle is not
 byte-reproducible across runs; the committed truth is valid for the pinned
 `.hbc` sha only. The package set is expected to be stable (same lockfile).
 No secrets or `.env` needed. The built bundle/map/hbc are not committed.
+
+## fetch.sh status (2026-11-09) and reproducibility finding
+
+`fetch.sh` now follows the J3 recipe: shallow-fetch of the pinned commit into a
+temp dir (never inside the repo), `npx npm@11.12.1 ci --ignore-scripts` with
+engine-strict off, a 6x retry loop around `react-native bundle` (worklets
+SHA-1 race; no watchman needed; on macOS the first 2 attempts failed, the
+3rd succeeded), `--sourcemap-output` (writes `index.android.bundle.map`,
+~113 MB, gitignored), and the app's own `hermes-compiler` hermesc
+(`osx-bin` / `linux64-bin`; falls back to `tools/get-hermesc.sh 98`). It
+finishes by comparing the `.hbc` sha256 with the `deps-truth.json` pins.
+
+Measured on macOS (arm64, node 25.9): the **bundle is byte-identical to the
+deb build** (`7ac18b3d...febc5`, 38,610,703 bytes), so the "not
+byte-reproducible" caveat above applies to run-to-run worklets file counts,
+not to a retried clean build at the pinned commit. The `.hbc` still differs by
+host: the macOS `osx-bin` hermesc emits 45,613,742 bytes
+(`1e7be038...16c201d6`) vs 45,613,654 bytes from `linux64-bin`
+(`48ff06dd...da7c`) for the same bundle. `deps-truth.json` therefore pins both
+(`hbcSha256s` values; module ids come from the bundle, so the truth applies to
+either). The `.debug.hbc` and `tools/hermesc/v98` output are not pinned
+(different hermesc build, different sha). Any other sha reports the
+`shaGuardMessage` mismatch rather than a silent pass. No release-asset
+mechanism for the exact artifacts exists in the repo; none is created here.
+The only fixture test (`tests/gate/deps/truth-expensify-fixture`) reads the
+committed truth only and needs no bundle, so nothing needed a skip.
