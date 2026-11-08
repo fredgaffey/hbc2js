@@ -1,0 +1,6 @@
+plain: 3 3 6 A3 true
+fields: 8 2 f 6 f6
+arrow: 5 5 6 11
+before super 12
+before: 13 12 13:12
+cond: 7 7 + 8 -8 -
