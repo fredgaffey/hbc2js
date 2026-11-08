@@ -268,6 +268,17 @@ hbc2js deps <bundle.hbc|app.apk> [--out <dir>] [--confirm] [--offline] \
    the pick flagged (`usedPrereleaseVersion`) on the `ConfirmResult` — when a
    package has shipped no stable release at all.
 
+   *Speed (CONFSPEED1).* Measured on an RN 0.76.5 scratch: `--reset-cache`
+   made every Metro run re-transform all of React Native (10-19 s per
+   candidate vs 2.3-5.5 s without; npm install 1.5-3.7 s, hermesc 0.4-4 s), so
+   Metro now keeps its content-keyed transform cache (verdict-neutral). A built
+   candidate's raw (pre-baseline-subtraction) fingerprint is also cached under
+   `<user-cache>/confirm-fp/` keyed by package@version + hbc + hash scheme + RN
+   version, so a re-confirm (new target, wiped project DB) does no npm, Metro
+   or hermesc work. Not done: batching many candidates into one bundle (it
+   would mix shared dependencies into every signature and change verdicts) and
+   a parallel worker pool (needs one scratch project per worker).
+
 5. **Report** (`src/deps/report.ts`): the human table / `--json` shape, plus
    `<out>/package.json` when confident. `DepsReport.moduleOwnership` is the
    module-id -> package mapping the M6 emitter needs (see "For M6" below).
