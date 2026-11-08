@@ -9,7 +9,7 @@
 // Usage:
 //   node tools/readability/record.ts <input.hbc> <output.recording.json> \
 //     [--limit N] [--backend claude-cli|haiku|fake] [--only src] \
-//     [--sample N [--seed S]] [--resume] [--per-register]
+//     [--sample N [--seed S]] [--labelled sample.json] [--resume] [--per-register]
 //
 // Default: ONE backend call per FUNCTION (spec 28 section 9.1, "one model
 // call per function, not per register") -- the request's `context.targets`
@@ -53,6 +53,8 @@ import { backendForId, resolveBackendId, BackendSelectionError } from "../../src
 import { cacheKey, parseReadabilityResult, resolveClaudeCliConfig, resolveHaikuConfig, SKILL_FOR_KIND } from "../../src/readability/types.ts";
 import { loadSkill } from "../../src/readability/skills.ts";
 import { computeSrcScope } from "../../src/readability/scope.ts";
+import { nameableIndex } from "../../src/readability/nameable.ts";
+import type { NameableIndex } from "../../src/readability/nameable.ts";
 import { loadRecording } from "../../src/workers/backends/replay.ts";
 import type { ModuleAnalysis } from "../../src/cfg/types.ts";
 import type { Stmt } from "../../src/emit/ast.ts";
@@ -101,14 +103,20 @@ export function collectTargets(
   frames: ReadonlyMap<number, readonly Stmt[]>,
   store: OverlayStore,
   allowedFns: ReadonlySet<number> | null,
+  filterIndex?: NameableIndex,
 ): readonly Target[] {
   const targets: Target[] = [];
   for (let fn = 0; fn < analysis.module.functions.length; fn++) {
     if (allowedFns !== null && !allowedFns.has(fn)) continue;
     const nameable = listNameable(frames, fn, store);
+    const nameableFilter = filterIndex;
     if (nameable.length === 0) continue;
+    // Spec 28 section 7: only registers the rendered source binds to a local
+    // identifier are asked about (src/readability/nameable.ts).
+    const bound = nameableFilter === undefined ? undefined : new Set(nameableFilter.of(fn));
     for (const reg of nameable) {
       if (reg.named !== null) continue;
+      if (bound !== undefined && !bound.has(reg.reg)) continue;
       targets.push({ fn, reg: reg.reg });
     }
   }
@@ -244,11 +252,22 @@ async function main(): Promise<void> {
   // Cheap: no `render()` call anywhere in `collectTargets` (see its own
   // comment) -- safe to run over the WHOLE selected scope before any model
   // call or `--sample`, even on the ~15k-function held-out bundle.
-  let allTargets = collectTargets(analysis, frames, store, srcFns);
+  let allTargets = collectTargets(analysis, frames, store, srcFns, nameableIndex(analysis, { strictEnv: false }));
   const selectedFns = new Set(allTargets.map((t) => t.fn));
   process.stderr.write(
     `record: ${String(allTargets.length)} target(s) across ${String(selectedFns.size)} function(s) selected\n`,
   );
+
+  // `--labelled <sample.json>`: keep only functions that contain at least one
+  // register the labelled sample grades (an accuracy-measurement recording).
+  const labelledFlag = argv.indexOf("--labelled");
+  if (labelledFlag >= 0) {
+    const labelled = JSON.parse(readFileSync(argv[labelledFlag + 1]!, "utf8")) as { targets: { kind: string; binding?: { fn: number; reg: number } }[] };
+    const want = new Set(labelled.targets.flatMap((t) => (t.kind === "register" && t.binding !== undefined ? [`${String(t.binding.fn)},${String(t.binding.reg)}`] : [])));
+    const keepFns = new Set(allTargets.filter((t) => want.has(`${String(t.fn)},${String(t.reg)}`)).map((t) => t.fn));
+    allTargets = allTargets.filter((t) => keepFns.has(t.fn));
+    process.stderr.write(`record: --labelled kept ${String(keepFns.size)} function(s) with a labelled register\n`);
+  }
 
   if (sample !== null) {
     allTargets = perRegister ? seededSample(allTargets, sample, seed) : sampleTargetsByFunction(allTargets, sample, seed);
