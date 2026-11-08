@@ -6,8 +6,8 @@
 
 import type { LoadedSig } from "./db.ts";
 import type { ModuleInventory } from "./inventory.ts";
-import type { SigDbFile, SigModule } from "./sigdb-types.ts";
-import { foreignSets, isOwnModulePath } from "./module-paths.ts";
+import type { SigDbFile } from "./sigdb-types.ts";
+import { foreignSets, isOwnModulePath, viaDependencyCounts } from "./module-paths.ts";
 
 export type ConfidenceTier = "high" | "medium" | "low" | "none";
 
@@ -625,21 +625,20 @@ function promoteViaDependency(scored: readonly ScoredEntry[], inventory: ModuleI
   for (const s of scored) {
     const file = s.entry.file;
     if (s.score.tier === "high" || s.score.demotion !== undefined || s.score.isBaseline || (file.modulePaths ?? 0) < 1 || (file.hashScheme ?? 1) < 2) continue;
-    const sById = new Map(file.modules.map((m) => [m.localModuleId, m]));
-    const fnByIndex = new Map(file.functions.map((f) => [f.index, f]));
-    // The own code proper: functions of modules whose path is under the
-    // package (the pathless bundle prelude and entry stub are neutral for
-    // scoring but say nothing about this package).
+    // Counts over the full file (a slimmed file carries them precomputed:
+    // slimming drops the functions that are not in the app).
+    const graph = viaDependencyCounts(file, minInstr);
+    const ownPathDistinct = file.slim?.ownPathDistinct ?? graph.ownPathDistinct;
+    const ownFuzzyCount = (id: number): number => file.slim?.ownFuzzy?.[id] ?? graph.ownFuzzy[id] ?? 0;
+    // exact form: every distinct eligible hash of the own path-bearing
+    // functions is a hit (the pathless prelude and entry stub say nothing).
     const ownPathIds = new Set(file.modules.filter((m) => typeof m.path === "string" && isOwnModulePath(file.package, m.path)).map((m) => m.localModuleId));
-    const ownHashes = new Set(file.functions.filter((f) => f.instrCount >= minInstr && f.moduleId !== undefined && ownPathIds.has(f.moduleId)).map((f) => schemeKey(file, f.exactHash)));
-    const complete = ownHashes.size >= MIN_DISTINCT_EVIDENCE_HASHES - 1 && [...ownHashes].every((k) => s.hitKeys.has(k));
+    const ownHit = new Set(file.functions.filter((f) => f.instrCount >= minInstr && f.moduleId !== undefined && ownPathIds.has(f.moduleId) && s.hitKeys.has(schemeKey(file, f.exactHash))).map((f) => f.exactHash));
+    const complete = ownPathDistinct >= MIN_DISTINCT_EVIDENCE_HASHES - 1 && ownHit.size >= ownPathDistinct;
     let found: PackageScore["viaDependency"];
-    for (const own of file.modules) {
+    for (const own of graph.wrappers) {
       if (found !== undefined) break;
-      if (own.path === null || own.path === undefined || own.localModuleId === null || !isOwnModulePath(file.package, own.path)) continue;
-      const depMods = (own.depIds ?? []).map((d) => sById.get(d)).filter((d): d is SigModule => d !== undefined && typeof d.path === "string" && !isOwnModulePath(file.package, d.path));
-      if (depMods.length === 0) continue;
-      // exact: the whole own code is present and this file's factory is an app module.
+      const depMods = graph.depsOf(own);
       if (complete && own.factoryExactHash !== null) {
         for (const t of tByFactory.get(own.factoryExactHash) ?? []) {
           const tDeps = depsOf(t);
@@ -651,18 +650,18 @@ function promoteViaDependency(scored: readonly ScoredEntry[], inventory: ModuleI
         }
         if (found !== undefined) break;
       }
-      // fuzzy: an app module shaped like this own file requires a confirmed dependency's code.
-      const ownFuzzy = new Set<string>();
-      for (const f of file.functions) if (f.moduleId === own.localModuleId && f.instrCount >= minInstr) ownFuzzy.add(f.fuzzyHash);
-      const fac = fnByIndex.get(own.factoryFunctionIndex);
-      if (fac !== undefined && fac.instrCount >= minInstr) ownFuzzy.add(fac.fuzzyHash);
-      if (ownFuzzy.size < MIN_DISTINCT_EVIDENCE_HASHES) continue;
+      // fuzzy form: an app module shaped like this own file requires a
+      // confirmed dependency's code.
+      const total = ownFuzzyCount(own.localModuleId!);
+      if (total < MIN_DISTINCT_EVIDENCE_HASHES) continue;
       const confirmedDeps = depMods.map((d) => packageOfPath(d.path!)).filter((p) => p !== file.package && highByName.has(p));
       if (confirmedDeps.length === 0) continue;
+      const ownFuzzy = new Set<string>();
+      for (const f of file.functions) if (f.moduleId === own.localModuleId && f.instrCount >= minInstr) ownFuzzy.add(f.fuzzyHash);
       const counts = new Map<ModuleInventory["modules"][number], number>();
       for (const h of ownFuzzy) for (const t of fuzzyIndex.get(h) ?? []) counts.set(t, (counts.get(t) ?? 0) + 1);
       for (const [t, n] of counts) {
-        if (n < MIN_DISTINCT_EVIDENCE_HASHES || n < 0.5 * ownFuzzy.size || n < 0.5 * (tFuzzy.get(t)?.size ?? 0)) continue;
+        if (n < MIN_DISTINCT_EVIDENCE_HASHES || n < 0.5 * total || n < 0.5 * (tFuzzy.get(t)?.size ?? 0)) continue;
         const tDeps = depsOf(t);
         const by = confirmedDeps.find((p) => tDeps.some((td) => holdsHits(td, highByName.get(p)!)));
         if (by !== undefined) {

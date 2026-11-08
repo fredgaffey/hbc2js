@@ -23,6 +23,7 @@ import { fingerprintModule, SIG_HASH_SCHEME } from "../../../src/deps/fingerprin
 import { decodeFunction } from "../../../src/disasm/decode.ts";
 import { parseHbc } from "../../../src/parse/module.ts";
 import { attachModulePaths } from "../../../src/deps/module-paths.ts";
+import { slimSigFile, slimTargetFor } from "../../../src/deps/slim-sigs.ts";
 import type { LoadedSig } from "../../../src/deps/db.ts";
 import type { SigDbFile } from "../../../src/deps/sigdb-types.ts";
 
@@ -71,6 +72,15 @@ function signature(hermesc: string, pkg: string, mods: readonly { body: string; 
 
 const loaded = (files: readonly SigDbFile[]): LoadedSig[] => files.map((file) => ({ file, layer: "shared", path: `<${file.package}>` }));
 const scoreOf = (report: ReturnType<typeof matchInventory>, p: string) => report.packages.find((s) => s.package === p);
+// The real pipeline loads slimmed records (deps-slim-sigs); the rule must
+// judge them exactly as the full files.
+function matchBoth(target: ReturnType<typeof buildInventory>["inventory"], files: readonly SigDbFile[]): ReturnType<typeof matchInventory> {
+  const full = matchInventory(target, loaded(files));
+  const intern = new Map<string, string>();
+  const slim = matchInventory(target, loaded(files.map((f) => slimSigFile(f, intern, slimTargetFor(target)))));
+  assert.deepEqual(slim.packages, full.packages.map((p) => ({ ...p })), "slimmed records score the same");
+  return full;
+}
 const APP = `var c = 1; for (var w = 0; w < 19; w++) { c = (c * 31 + w) % 1000003; } module.exports = function appOnly(v) { return c ^ v; };`;
 const DEP = moduleOf("d", 6, 900); // the dependency: six helpers, confirmed on its own
 
@@ -84,7 +94,7 @@ test("corpus-path-recall: a wrapper whose own file is compiled differently is co
   // literals, so no exact hash matches, mnemonics unchanged), requiring
   // the app's dep-d module.
   const target = buildInventory(compile(h.path, bundle([{ body: APP }, { body: DEP }, { body: wrapperOf("wq", 4, 10), deps: [1] }]))).inventory;
-  const report = matchInventory(target, loaded([dep, wrap]));
+  const report = matchBoth(target, ([dep, wrap]));
   assert.equal(scoreOf(report, "dep-d")?.tier, "high", "the dependency is confirmed on its own code");
   assert.equal(scoreOf(report, "wrap-p")?.exactHits, 0, "no own-file exact hit");
   assert.equal(scoreOf(report, "wrap-p")?.tier, "high", `the module-graph edge confirms the wrapper: ${JSON.stringify(scoreOf(report, "wrap-p"))}`);
@@ -98,7 +108,7 @@ test("corpus-path-recall: the same wrapper-shaped module without the edge to the
   const wrap = signature(h.path, "wrap-p", [{ body: wrapperOf("wp", 4, 10), deps: [1], path: "wrap-p/index.js" }, { body: DEP, path: "dep-d/index.js" }]);
   // The wrapper-shaped module requires an app module, not dep-d's.
   const target = buildInventory(compile(h.path, bundle([{ body: APP }, { body: DEP }, { body: wrapperOf("wq", 4, 10), deps: [0] }]))).inventory;
-  const report = matchInventory(target, loaded([dep, wrap]));
+  const report = matchBoth(target, ([dep, wrap]));
   assert.equal(scoreOf(report, "dep-d")?.tier, "high");
   assert.notEqual(scoreOf(report, "wrap-p")?.tier, "high", JSON.stringify(scoreOf(report, "wrap-p")));
 });
@@ -113,7 +123,7 @@ test("corpus-path-recall: an impostor matched only through its copy of a confirm
   const impostor = signature(h.path, "impostor-s", [{ body: wrapperOf("im", 4, 70), deps: [1], path: "impostor-s/index.js" }, { body: DEP, path: "dep-d/index.js" }]);
   const appUser = `var dep = require(dependencyMap[0]); module.exports = function useDep(v) { return dep.d0(v, 3) + dep.d2(v, 4); };`;
   const target = buildInventory(compile(h.path, bundle([{ body: APP }, { body: DEP }, { body: appUser, deps: [1] }]))).inventory;
-  const report = matchInventory(target, loaded([dep, impostor]));
+  const report = matchBoth(target, ([dep, impostor]));
   assert.equal(scoreOf(report, "dep-d")?.tier, "high");
   assert.notEqual(scoreOf(report, "impostor-s")?.tier, "high", JSON.stringify(scoreOf(report, "impostor-s")));
   assert.equal(scoreOf(report, "impostor-s")?.viaDependency, undefined);
@@ -127,11 +137,11 @@ test("corpus-path-recall: a small own file fully present, requiring the dependen
   const nested = moduleOf("ri", 2, 500);
   const small = signature(h.path, "small-h", [{ body: wrapperOf("sh", 2, 40), deps: [1], path: "small-h/index.js" }, { body: nested, path: "small-h/node_modules/nest-r/index.js" }]);
   const withEdge = buildInventory(compile(h.path, bundle([{ body: APP }, { body: nested }, { body: wrapperOf("sh", 2, 40), deps: [1] }]))).inventory;
-  const report = matchInventory(withEdge, loaded([small]));
+  const report = matchBoth(withEdge, ([small]));
   assert.equal(scoreOf(report, "small-h")?.tier, "high", JSON.stringify(scoreOf(report, "small-h")));
   assert.deepEqual(scoreOf(report, "small-h")?.viaDependency, { by: "nest-r", edge: "exact" });
   // Without the edge (the module requires an app module) it stays medium.
   const noEdge = buildInventory(compile(h.path, bundle([{ body: APP }, { body: nested }, { body: wrapperOf("sh", 2, 40), deps: [0] }]))).inventory;
-  const r2 = matchInventory(noEdge, loaded([small]));
+  const r2 = matchBoth(noEdge, ([small]));
   assert.notEqual(scoreOf(r2, "small-h")?.tier, "high", JSON.stringify(scoreOf(r2, "small-h")));
 });
