@@ -260,6 +260,23 @@ variant and needs no D8-style layout-class branching — only the one
 `DirectEval` operand-shape difference plus the (independently existing)
 `hasIndices` RegExp flag change (regex bytecode payload only, not an opcode).
 
+### v98 VM (`tools/build-hermes-vm.sh 98`)
+
+The VM pin for "v98" is facebook/hermes `09373fc61ba3f8735a40a15065f9fb55b1223df8`
+(static_h, 2025-08-28, the day before `hermes-compiler@250829098.0.x`). It was
+chosen empirically: its `hermesc` compiles a construct source **byte-identically**
+to `tools/hermesc/v98/hermesc` (the public `250829098.0.10`) and its `hermes`
+runs the public bytecode (RN 0.85.3 and 0.86.0 bundles both come from this
+compiler, so one VM serves both held-out apps). It still has `CacheNewObject` in
+the opcode table. Do **not** use `639e5d6afb16` (Feb 2026, the nominal commit of
+`third_party/hermes/hbc98-late`): it shares `hbc99-feb2026`'s table, emits
+different bytes, and fails public v98 files at run time ("Class constructor
+invoked without new"). `98-early` (class D, `c00cc5759`, opcode table
+`hbc98-2024`) builds to `tools/hermes-vm/v98-early/`; no public producer is
+known. Discovery (`hermesVmKey` / `findHermesVm(version, opcodeTable)` in
+`src/harness/hermes-vm.ts`) maps `hbc98-2024` to `v98-early` and everything else
+to `v98`. Build took ~10 min on Apple Silicon (-j hw.ncpu).
+
 ## v98: which header layout does the public package emit?
 
 `docs/HBC-FORMAT.md` sec 0/0.1 (D8) documents that a file reporting HBC
@@ -380,13 +397,14 @@ prebuilt `hermes` **VM/interpreter** available on npm is bundled with
 refuses newer bytecode (`Error deserializing bytecode: Wrong bytecode version.
 Expected 89 but got 94`). `docs/EQUIVALENCE.md` §5 needs a VM for v94, v96 and
 v99 to use as the ground-truth oracle (D14) instead of Node, so
-`tools/build-hermes-vm.sh <94|96|99>` builds `hermes` (+ `hermesc`, `hbcdump`)
+`tools/build-hermes-vm.sh <94|96|98|98-early|99>` builds `hermes` (+ `hermesc`, `hbcdump`)
 from source at the facebook/hermes commit that produced each version.
 
 ```sh
 tools/build-hermes-vm.sh 94   # → tools/hermes-vm/v94/bin/{hermes,hermesc,hbcdump}
 tools/build-hermes-vm.sh 96   # → tools/hermes-vm/v96/bin/{hermes,hermesc,hbcdump}
 tools/build-hermes-vm.sh 99   # → tools/hermes-vm/v99/bin/{hermes,hermesc,hbcdump}
+tools/build-hermes-vm.sh 98   # → tools/hermes-vm/v98/bin/{hermes,hermesc,hbcdump}
 tools/hermes-vm/v94/bin/hermes -b tests/fixtures/hermes-dec-sample/v94.hbc
 ```
 

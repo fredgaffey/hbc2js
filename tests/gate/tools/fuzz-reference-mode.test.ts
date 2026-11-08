@@ -45,8 +45,8 @@ test("referenceEngineBanner: non-hermes-vm engine is flagged loudly, per-version
 // full-ladder-no-vm when treated as a (hypothetically) traced version, never
 // full-ladder.
 test("integration: real chooseReference for a no-VM version composes to full-ladder-no-vm", () => {
-  const reference = chooseReference({ name: "99-does-not-exist-and-is-not-divergent" }, 98);
+  const reference = chooseReference({ name: "99-does-not-exist-and-is-not-divergent" }, 89);
   assert.equal(reference.engine, "expected-txt");
   assert.equal(modeForCell(true, reference.engine), "full-ladder-no-vm");
-  assert.match(referenceEngineBanner(98, reference), /no Hermes VM found/);
+  assert.match(referenceEngineBanner(89, reference), /no Hermes VM found/);
 });

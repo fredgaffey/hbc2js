@@ -28,7 +28,7 @@ test("rule 1 applies regardless of known-divergence status (no VM caveat needed)
 });
 
 test("rule 2: no VM, not a known-divergence construct -> expected-txt, no caveat", () => {
-  const choice = chooseReference({ name: "99-does-not-exist-and-is-not-divergent" }, 98);
+  const choice = chooseReference({ name: "99-does-not-exist-and-is-not-divergent" }, 89);
   assert.equal(choice.engine, "expected-txt");
   assert.deepEqual(choice.knownDivergences, []);
 });

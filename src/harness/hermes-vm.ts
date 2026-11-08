@@ -48,17 +48,32 @@ export function hbcVersion(file: string): number {
  *  interpreter alongside `hermesc`, not just the hermes-engine-cli v84
  *  package spec 06 §3.1 names) and this discovery order picks it up without
  *  special-casing — see the status notes and this milestone's report. */
-export function findHermesVm(version: number): HermesVm | null {
-  const envVar = process.env[`HERMES_VM_V${version}`];
+export function findHermesVm(version: number, opcodeTable?: string): HermesVm | null {
+  const key = hermesVmKey(version, opcodeTable);
+  const envVar = process.env[`HERMES_VM_V${key.replace("-", "_").toUpperCase()}`];
   if (envVar !== undefined && fs.existsSync(envVar)) return { hbcVersion: version, path: envVar };
-  const candidates = [
-    path.join(repoRoot(), "tools", "hermes-vm", `v${version}`, "bin", "hermes"),
-    path.join(repoRoot(), "tools", "hermesc", `v${version}`, "hermes"),
-  ];
-  for (const c of candidates) {
+  for (const c of hermesVmCandidates(version, opcodeTable)) {
     if (fs.existsSync(c)) return { hbcVersion: version, path: c };
   }
   return null;
+}
+
+/** VM directory key for a bundle: v98 splits into "98" (v98-late, class E,
+ *  what every public hermes-compiler@250829098.0.x emits; the default) and
+ *  "98-early" (class D, opcode table `hbc98-2024`). Every other version's
+ *  key is its number. `opcodeTable` is the id chosen by `probeLayout`. */
+export function hermesVmKey(version: number, opcodeTable?: string): string {
+  if (version === 98 && opcodeTable === "hbc98-2024") return "98-early";
+  return String(version);
+}
+
+/** On-disk candidate paths for a VM, in discovery order. */
+export function hermesVmCandidates(version: number, opcodeTable?: string): string[] {
+  const key = hermesVmKey(version, opcodeTable);
+  return [
+    path.join(repoRoot(), "tools", "hermes-vm", `v${key}`, "bin", "hermes"),
+    path.join(repoRoot(), "tools", "hermesc", `v${key}`, "hermes"),
+  ];
 }
 
 /** Every version this repo currently ships an on-disk VM for (used to report
