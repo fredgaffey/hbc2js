@@ -26,13 +26,15 @@
 // Output is aggregate counts plus up to 3 identifier-free `--show <reason>`
 // samples (a one-line shape description, never a bundle-derived name), so it
 // is safe to quote in docs.
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Expr, Stmt } from "../../src/emit/ast.ts";
 import { walk } from "../../src/passes/ast.ts";
 import { privateFields } from "../../src/passes/private-fields/index.ts";
 import { ctorBody, findCandidates, findClass, foldInBody, foldOne } from "../../src/passes/private-fields/match.ts";
+import { printProgram } from "../../src/emit/print.ts";
+import { foldAll } from "../../src/passes/inline-new/match.ts";
 import { splitProject } from "../../src/split/index.ts";
 
 interface Refusal {
@@ -40,6 +42,10 @@ interface Refusal {
   /** One line, identifier-free: e.g. "static: install on non-this receiver". */
   readonly detail: string;
   readonly functionIndex: number;
+  /** defining-body-escape only: inline-new's refusal codes on this frame. */
+  readonly inlineNew?: string;
+  readonly why?: readonly string[];
+  readonly mention?: string;
 }
 
 function isIdent(e: Expr): e is Extract<Expr, { k: "ident" }> {
@@ -141,7 +147,94 @@ function diagnose(before: readonly Stmt[], functionIndex: number, fnBody?: reado
       const inlined = installsOnForeignReceiver(before, c.envName) || (c.regName !== null && installsOnForeignReceiver(before, c.regName));
       let construct = false;
       walk(before, { expr: (e) => { if (e.k === "call" && e.callee.k === "member" && !e.callee.computed && e.callee.obj.k === "ident" && e.callee.obj.name === "Reflect") construct = true; } });
-      out.push({ reason: "defining-body-escape", detail: `foreign install in defining frame: ${inlined ? "yes" : "no"}; Reflect.construct there: ${construct ? "yes" : "no"}`, functionIndex });
+      const survClass = (): string => {
+        const k = new Set<string>();
+        for (const m of cls.members) {
+          if (m.value === null || m.value.k !== "func") continue;
+          const isCtor = m.kind === "method" && !m.static && m.key.k === "ident" && m.key.name === "constructor";
+          const o = foldInBody(m.value.body, c.envName, c.displayName, isCtor);
+          if (o === null) continue;
+          let loop = false, fn = false, other = false;
+          const sv = (n: unknown, inLoop: boolean, inFn: boolean): void => {
+            if (Array.isArray(n)) { for (const x of n) sv(x, inLoop, inFn); return; }
+            if (n === null || typeof n !== "object") return;
+            const q = n as { k?: string; name?: string };
+            if (q.k === "ident" && q.name === c.envName) { if (inFn) fn = true; else if (inLoop) loop = true; else other = true; }
+            for (const x of Object.values(q)) if (x !== null && typeof x === "object") sv(x, inLoop || (q.k !== undefined && ["while", "do-while", "for", "for-in", "for-of"].includes(q.k)), inFn || q.k === "func");
+          };
+          sv(o.body, false, false);
+          if (loop) k.add("loop"); if (fn) k.add("fn"); if (other) k.add("other");
+        }
+        return `class-surv:${[...k].sort().join("+") || "none"}`;
+      };
+      const locClass = (): string => {
+        const out: string[] = [];
+        const v = (n: unknown, inClass: boolean, depth: number): void => {
+          if (Array.isArray(n)) { for (const x of n) v(x, inClass, depth); return; }
+          if (n === null || typeof n !== "object") return;
+          const o = n as { k?: string; name?: string };
+          if (o.k === "ident" && o.name === c.envName) out.push(`${inClass ? "class" : "frame"}@${Math.min(depth, 1)}`);
+          for (const x of Object.values(o)) if (x !== null && typeof x === "object") v(x, inClass || o.k === "class", o.k === "func" ? depth + 1 : depth);
+        };
+        v(fnBody ?? before, false, 0);
+        return [...new Set(out)].sort().join("+");
+      };
+      // Why `inline-new` (which ran before this rung) left the inlined
+      // construction in place: re-run its matcher on this frame and collect
+      // its counted R-IN codes plus the header-shaped statements it skipped
+      // before any code applies (spec 24 section 9.3).
+      const why = new Set<string>();
+      foldAll(fnBody ?? before, (r) => why.add(`${r.code}: ${r.reason}`), (w) => why.add(`skip ${w}`));
+      const code = why.size === 0 ? `no-header ${locClass()} ${survClass()}` : [...why].map((w) => w.split(":")[0]!.replace(/ \(.*$/, "")).sort().join("+");
+      // Every printed line of the frame that names the slot or the register.
+      const names = [c.envName, c.regName].filter((n): n is string => n !== null);
+      const re = new RegExp(`\\b(${names.join("|")})\\b`);
+      // Where the surviving mentions sit: inside the class node or not, and
+      // how many function boundaries deep (0 = the defining frame itself).
+      const where = new Map<string, number>();
+      const visit = (n: unknown, inClass: boolean, depth: number): void => {
+        if (Array.isArray(n)) { for (const x of n) visit(x, inClass, depth); return; }
+        if (n === null || typeof n !== "object") return;
+        const o = n as { k?: string; name?: string };
+        if (o.k === "ident" && (o.name === c.envName || o.name === c.regName)) { const key = `${inClass ? "class" : "frame"}@${depth}`; where.set(key, (where.get(key) ?? 0) + 1); }
+        const ic = inClass || o.k === "class";
+        const d = o.k === "func" ? depth + 1 : depth;
+        for (const v of Object.values(o)) if (v !== null && typeof v === "object") visit(v, ic, d);
+      };
+      visit(fnBody ?? before, false, 0);
+      // Inside the class: which member bodies still mention the slot after
+      // `foldInBody` returned (it does not descend into loops or nested
+      // functions), and under what kind of node.
+      const surv = new Set<string>();
+      for (const m of cls.members) {
+        if (m.value === null || m.value.k !== "func") continue;
+        const isCtor = m.kind === "method" && !m.static && m.key.k === "ident" && m.key.name === "constructor";
+        const o = foldInBody(m.value.body, c.envName, c.displayName, isCtor);
+        if (o === null) continue;
+        const sv = (n: unknown, ctxk: string): void => {
+          if (Array.isArray(n)) { for (const x of n) sv(x, ctxk); return; }
+          if (n === null || typeof n !== "object") return;
+          const q = n as { k?: string; name?: string };
+          if (q.k === "ident" && q.name === c.envName) surv.add(`${m.static ? "static " : ""}${isCtor ? "ctor" : "member"}:${ctxk}`);
+          const nk = q.k === "func" ? (ctxk === "" ? "func" : `${ctxk}>func`) : q.k !== undefined && ["while", "do-while", "for", "for-in", "for-of"].includes(q.k) && !ctxk.includes("loop") ? (ctxk === "" ? "loop" : `${ctxk}>loop`) : ctxk;
+          for (const x of Object.values(q)) if (x !== null && typeof x === "object") sv(x, nk);
+        };
+        sv(o.body, "");
+      }
+      // Outside the class, below the frame: the first printed line per function.
+      const outside: string[] = [];
+      const ov = (n: unknown, inClass: boolean, depth: number): void => {
+        if (Array.isArray(n)) { for (const x of n) ov(x, inClass, depth); return; }
+        if (n === null || typeof n !== "object") return;
+        const q = n as { k?: string; name?: string };
+        if (q.k === "func" && !inClass && depth === 0 && (JSON.stringify(q).includes(`"${c.envName}"`))) outside.push(printProgram([q.k === "func" && "params" in q && "body" in q && (q as { name?: unknown }).name !== undefined ? (q as unknown as Stmt) : (q as unknown as Stmt)]).split("\n").filter((l) => l.includes(c.envName)).slice(0, 3).map((l) => l.trim().slice(0, 120)).join(" / "));
+        for (const x of Object.values(q)) if (x !== null && typeof x === "object") ov(x, inClass || q.k === "class", q.k === "func" ? depth + 1 : depth);
+      };
+      ov(fnBody ?? before, false, 0);
+      const loc = `surv[${[...surv].sort().join(",")}] outside[${outside.join(" || ").slice(0, 300)}] ` + [...where].sort().map(([k, v]) => `${k}:${v}`).join(",");
+      if (process.env.PF_DUMP !== undefined && Number(process.env.PF_DUMP) === functionIndex) writeFileSync(`${process.env.PF_DUMP_DIR ?? "."}/fn${functionIndex}-${c.displayName.replace(/\W/g, "")}.js`, printProgram(fnBody ?? before));
+      const mention = `loc ${loc}\n    ` + printProgram(fnBody ?? before).split("\n").filter((l) => re.test(l)).map((l) => l.trim().slice(0, 160)).slice(0, 12).join("\n    ");
+      out.push({ reason: "defining-body-escape", detail: `foreign install in defining frame: ${inlined ? "yes" : "no"}; Reflect.construct there: ${construct ? "yes" : "no"}`, functionIndex, inlineNew: code, why: [...why], mention });
       continue;
     }
     out.push({ reason: "folded", detail: `#${c.displayName.length} char name`, functionIndex });
@@ -213,11 +306,13 @@ async function main(argv: readonly string[]): Promise<void> {
   let corpus: string | undefined;
   let bucket = "";
   let show: string | undefined;
+  let inlineNewTable = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (a === "--corpus") corpus = String(argv[++i]);
     else if (a === "--bucket") bucket = String(argv[++i]);
     else if (a === "--show") show = String(argv[++i]);
+    else if (a === "--inline-new") inlineNewTable = true;
     else positional.push(a);
   }
   const bundle = positional[0];
@@ -234,6 +329,19 @@ async function main(argv: readonly string[]): Promise<void> {
     rowsForShow = hotRows;
   }
   if (show !== undefined) process.stdout.write(samples(rowsForShow, show, 3) + "\n");
+  if (inlineNewTable) {
+    const esc = rowsForShow.filter((r) => r.inlineNew !== undefined);
+    const byCode = new Map<string, Refusal[]>();
+    for (const r of esc) byCode.set(r.inlineNew!, [...(byCode.get(r.inlineNew!) ?? []), r]);
+    const out = [`\n## inline-new on the ${esc.length} defining-body-escape frame(s)`, "", "| inline-new outcome | count |", "|---|---|"];
+    const sorted = [...byCode].sort((a, b) => b[1].length - a[1].length);
+    for (const [k, rs] of sorted) out.push(`| \`${k}\` | ${rs.length} |`);
+    for (const [k, rs] of sorted) {
+      out.push(`\n### ${k}`);
+      for (const r of rs.slice(0, 3)) out.push(`- fn#${r.functionIndex}: ${(r.why ?? []).join(" | ")}\n  mention: ${r.mention}`);
+    }
+    process.stdout.write(out.join("\n") + "\n");
+  }
 }
 
 if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1]) {

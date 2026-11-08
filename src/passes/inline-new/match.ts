@@ -107,7 +107,7 @@ export interface FoldResult { readonly after: readonly Stmt[]; readonly folded: 
 /** Section 9: rebuild every provable inlined construction in `root` (the
  *  frame that defines the classes) and in the functions declared directly in
  *  it. Pure: `check` re-runs it on `before` and requires the same answer. */
-export function foldAll(root: readonly Stmt[], onRefuse?: (r: Refusal) => void): FoldResult {
+export function foldAll(root: readonly Stmt[], onRefuse?: (r: Refusal) => void, onSkip?: (why: string) => void): FoldResult {
   const toks = new Tokens();
   const classes = new Map<string, ClassInfo>();
   const keepSlots = new Set<string>();
@@ -147,7 +147,7 @@ export function foldAll(root: readonly Stmt[], onRefuse?: (r: Refusal) => void):
   straight(root, new Map());
   let folded = 0;
   const run = (frame: Frame, env0: Env): readonly Stmt[] => {
-    if (hasKind(frame.body, new Set(["try"]), false)) return frame.body; // R-IN6, silent: no candidate is examined
+    if (hasKind(frame.body, new Set(["try"]), false)) { onSkip?.("R-IN6 frame has try"); return frame.body; } // R-IN6, silent: no candidate is examined
     const scan = (list: readonly Stmt[], env: Env, chain: readonly Level[]): readonly Stmt[] => {
       const out: Stmt[] = [];
       let i = 0;
@@ -221,24 +221,33 @@ export function foldAll(root: readonly Stmt[], onRefuse?: (r: Refusal) => void):
       const proto = h0.value;
       if (proto.k === "member" && !proto.computed && proto.prop.k === "lit" && proto.prop.text === "prototype" && proto.obj.k === "ident") {
         // Base header (section 9.1, H-B).
+        // The receiver register X is usually the prototype's own register P,
+        // but hermesc may allocate a second one (`P = C.prototype; X =
+        // Object.create(P ...)`); then P is one more register the region
+        // wrote, holding C.prototype, and section 9.2 (5) proves it dead or
+        // re-stores it like any other.
         const t = tokOf(env, proto.obj);
-        if (t === null || !classes.has(t) || classes.get(t)!.cls.superClass !== null) return null;
-        if (!isObjectCreateOf(list[i + 1], h0.name)) return null;
-        clsTok = t; cExpr = proto.obj; x = h0.name; j = i + 2; info = classes.get(t)!;
+        const hdr = createdFrom(list[i + 1], h0.name);
+        if (t === null || !classes.has(t)) { if (hdr !== null) onSkip?.(`H-B class operand is not a class token (${t ?? "null"})`); return null; }
+        if (classes.get(t)!.cls.superClass !== null) return null;
+        if (hdr === null) return null;
+        clsTok = t; cExpr = proto.obj; x = hdr; j = i + 2; info = classes.get(t)!;
+        if (hdr !== h0.name) { toks.write(env, h0.name); written.add(h0.name); }
         toks.write(env, x, OBJ); written.add(x);
       } else if (proto.k === "call" && isMemberCall(proto.callee, "Object", "getPrototypeOf") && proto.args.length === 1 && isIdent(proto.args[0])) {
         // Derived header (section 9.1, H-D).
         const t = tokOf(env, proto.args[0]!);
-        if (t === null || !classes.has(t) || classes.get(t)!.cls.superClass === null) return null;
+        if (t === null || !classes.has(t)) { onSkip?.(`H-D class operand is not a class token (${t ?? "null"})`); return null; }
+        if (classes.get(t)!.cls.superClass === null) return null;
         info = classes.get(t)!; clsTok = t; cExpr = proto.args[0]!;
         const pTok = toks.fresh();
         toks.write(env, h0.name, pTok); written.add(h0.name);
         j = i + 1;
         while (j < list.length && silent(list[j]!)) j = applyCaller(list[j]!, env, j);
         const rc = store(list[j]);
-        if (rc === null || rc.decl || rc.value.k !== "call" || !isMemberCall(rc.value.callee, "Reflect", "construct")) return null;
+        if (rc === null || rc.decl || rc.value.k !== "call" || !isMemberCall(rc.value.callee, "Reflect", "construct")) { onSkip?.("H-D no Reflect.construct after the getPrototypeOf store"); return null; }
         const [p, arr, nt] = rc.value.args;
-        if (rc.value.args.length !== 3 || p === undefined || arr === undefined || arr.k !== "array" || nt === undefined || tokOf(env, p) !== pTok || tokOf(env, nt) !== clsTok) return null;
+        if (rc.value.args.length !== 3 || p === undefined || arr === undefined || arr.k !== "array" || nt === undefined || tokOf(env, p) !== pTok || tokOf(env, nt) !== clsTok) { onSkip?.(`H-D Reflect.construct operands differ (args ${rc.value.args.length}, arr ${arr?.k}, p ${tokOf(env, p!) === pTok}, nt ${nt === undefined ? "-" : tokOf(env, nt) === clsTok ? "ok" : nt.k})`); return null; }
         // The template, up to its own super(...): silent stores only.
         checkTemplate(body());
         while (ti < body().length && (skippable(body()[ti]!) || silent(body()[ti]!))) { if (!skippable(body()[ti]!)) applyTemplate(body()[ti]!); ti++; }
@@ -410,11 +419,13 @@ export function foldAll(root: readonly Stmt[], onRefuse?: (r: Refusal) => void):
 function isMemberCall(callee: Expr, obj: string, prop: string): boolean {
   return callee.k === "member" && !callee.computed && isIdent(callee.obj, obj) && callee.prop.k === "lit" && callee.prop.text === prop;
 }
-/** `X = Object.create(X === null ? null : typeof X === "object" ? X : Object.prototype);` */
-function isObjectCreateOf(s: Stmt | undefined, x: string): boolean {
+/** `X = Object.create(P === null ? null : typeof P === "object" ? P : Object.prototype);`
+ *  (X and P the same register or not): the receiver register X, or `null`. */
+function createdFrom(s: Stmt | undefined, p: string): string | null {
   const st = store(s);
-  if (st === null || st.decl || st.name !== x) return false;
-  const v = st.value;
+  return st !== null && !st.decl && isObjectCreateOf(st.value, p) ? st.name : null;
+}
+function isObjectCreateOf(v: Expr, x: string): boolean {
   if (v.k !== "call" || !isMemberCall(v.callee, "Object", "create") || v.args.length !== 1) return false;
   const want: Expr = { k: "cond", test: { k: "bin", op: "===", left: ident(x), right: { k: "lit", text: "null" } } as Expr, then: { k: "lit", text: "null" }, else: { k: "cond", test: { k: "bin", op: "===", left: { k: "unary", op: "typeof ", arg: ident(x) }, right: { k: "lit", text: '"object"' } } as Expr, then: ident(x), else: { k: "member", obj: ident("Object"), prop: { k: "lit", text: "prototype" }, computed: false } } };
   return sameShape(v.args[0]!, want);
