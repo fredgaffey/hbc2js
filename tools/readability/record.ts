@@ -43,7 +43,7 @@
 // cache-key fields).
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { decompileFunction, parseForDecompile } from "../../src/decompile.ts";
+import { decompileFunction, parseForDecompile, prepareModule } from "../../src/decompile.ts";
 import { analyseModule } from "../../src/cfg/index.ts";
 import { rawFrameBodies } from "../../src/name-overlay/frames.ts";
 import { OverlayStore, bindingKey, regId, shortForm } from "../../src/name-overlay/index.ts";
@@ -226,10 +226,11 @@ async function main(): Promise<void> {
   // O(whole-bundle) per call"): that re-emits every function in the bundle
   // to answer one function's source. `decompileFunction` costs the parse +
   // module analysis (paid once by `analysis` above, re-derived internally
-  // per call since `decompile()` always re-parses `bytes`) plus that
+  // per call unless `prepared` is passed, as here) plus that
   // function's own closure subtree -- proportional to the requested
   // function, never to the bundle's total function count.
-  const renderFn = (fn: number): string => decompileFunction(bytes, fn, { strictEnv: false }).code;
+  const preparedForRender = prepareModule(bytes, { strictEnv: false });
+  const renderFn = (fn: number): string => decompileFunction(bytes, fn, { strictEnv: false, prepared: preparedForRender }).code;
 
   // Cheap: no `render()` call anywhere in `collectTargets` (see its own
   // comment) -- safe to run over the WHOLE selected scope before any model

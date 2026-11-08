@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Diagnostic } from "./errors.ts";
 import { ErrorCode, Hbc2jsError } from "./errors.ts";
-import { analyseModule } from "./cfg/index.ts";
+import { analyseModule, type ModuleAnalysis } from "./cfg/index.ts";
 import type { AnalysisOptions, FunctionCfg } from "./cfg/types.ts";
 import { emitModule } from "./emit/index.ts";
 import type { EmitOptions } from "./emit/index.ts";
@@ -27,7 +27,20 @@ import type { Stmt } from "./emit/ast.ts";
 import { resolveWorkerCount, runStageAPool } from "./parallel/pool.ts";
 import type { StageAResult } from "./parallel/types.ts";
 
+/** Parse + analysis done once by `prepareModule`, passed back via
+ *  `DecompileOptions.prepared` so a loop over functions does not re-parse and
+ *  re-analyse the whole bytecode file per call. The caller must pass the same
+ *  `strictEnv`/`analysis`/`opcodeTable` options to `prepareModule` that it
+ *  uses on the calls; `bytes` is then ignored. */
+export interface PreparedModule {
+  readonly module: HbcModule;
+  readonly forced: boolean;
+  readonly analysis: ModuleAnalysis;
+}
+
 export interface DecompileOptions {
+  /** Reuse a `prepareModule` result instead of parsing + analysing `bytes`. */
+  readonly prepared?: PreparedModule;
   readonly moduleName?: string;
   readonly opcodeTable?: OpcodeTableId;
   /**
@@ -115,13 +128,18 @@ function printTimings(label: string, marks: Record<string, number>): void {
   process.stderr.write(`[hbc2js timings] ${label}: ${line} total=${total.toFixed(1)}ms\n`);
 }
 
+export function prepareModule(bytes: Uint8Array, opts: DecompileOptions = {}): PreparedModule {
+  const { module, forced } = parseForDecompile(bytes, opts);
+  const analysis = analyseModule(module, { strictEnv: opts.strictEnv ?? true, ...opts.analysis });
+  return { module, forced, analysis };
+}
+
 export function decompile(bytes: Uint8Array, opts: DecompileOptions = {}): DecompileResult {
   const timings = timingsEnabled();
   const t0 = timings ? performance.now() : 0;
-  const { module, forced } = parseForDecompile(bytes, opts);
-  const t1 = timings ? performance.now() : 0;
   const strictEnv = opts.strictEnv ?? true;
-  const analysis = analyseModule(module, { strictEnv, ...opts.analysis });
+  const { module, forced, analysis } = opts.prepared ?? prepareModule(bytes, opts);
+  const t1 = t0;
   const t2 = timings ? performance.now() : 0;
   // `analysis.envGraph` is a lazy getter (src/cfg/index.ts): it pushes its own
   // diagnostics (`W_AMBIGUOUS_CLOSURE_ENV`, `W_ORPHAN_FUNCTION`, …) into

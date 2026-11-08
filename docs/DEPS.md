@@ -654,6 +654,68 @@ signature still contains (baseline-subtraction gap). The `-g` residue (19
 unattributed) is string-less factories under 16 instructions, where the
 fuzzy+string fallback is deliberately not trusted.
 
+## Real-world measurement
+
+The fixture numbers in "Ground truth (D17d)" above are a controlled baseline:
+a small app built from source with an exact dependency tree. They are
+the right numbers for regression-testing `hbc2js deps`, and they are
+optimistic about real-world performance: published apps carry patched
+dependencies, workspace-internal forks and generated code, and a store
+bundle comes from a toolchain this tool does not control. The real-world
+numbers below lead; per-app counts are in `docs/METRICS.md`.
+
+Three open-source apps were rebuilt from the upstream version matching
+the store APK and scored against Metro source-map truth (`tools/deps-truth.mjs`),
+offline against db-v3:
+
+| app | truth packages (direct) | own build: confirmed / precision / recall | store bundle: confirmed / precision / recall | recall gap |
+|---|---|---|---|---|
+| bluesky-social/social-app | 198 (198) | 44 / 68.2% / 15.2% | 37 / 67.6% / 12.6% | -2.6 pt |
+| rainbow-me/rainbow | 518 (211) | 136 / 64.7% / 17.0% | 121 / 64.5% / 15.1% | -1.9 pt |
+| MetaMask/metamask-mobile | 749 (306) | 172 / 72.7% / 16.7% | 144 / 70.8% / 13.6% | -3.1 pt |
+
+- Real-world recall is 13.6% to 17.0% of true dependencies, far below
+  the fixture's. The own-build to store gap is small (1.9 to 3.1 points); the large gap is
+  fixture to real app, which is signature coverage: these apps have 198 to 749
+  true dependencies and db-v3 has no usable signature for most of them.
+- `--confirm` added 0 to 4 confirmed packages per measurement across six
+  measurements (three apps, own build and store). Recall never moved and
+  precision dropped slightly in five of six. The remaining 79 to 85% recall gap is a
+  signature-coverage problem, not a confirm-stage problem.
+- A separate `--confirm` sweep over real bundles saw `react-native bundle`
+  candidate-build failures on 10 to 48% of candidates per app, and timed
+  out on 3 apps at the 900 s cap. The precision proxy over the wider corpus was not run.
+- 27-APK sweep: 22 apps have a Hermes bundle, 18 give a module inventory
+  (mean 292 confirmed and 13 guessed dependencies per app, about 22 s each,
+  offline); 5 have no Hermes bundle; 4 report `totalModules: 0`
+  (docs/BUGS.md `corpus-B4`).
+
+Harness defects found by this measurement are fixed with tests
+`corpus-B1` (bundle entries over 64 MiB), `corpus-B3` (`deps-truth.mjs`
+silently scored 0 truth packages for `__d((function...),id,[deps])`
+wrappers) and `corpus-B5` (custom-named `assets/*.bundle`).
+
+### Next deps items (loss categories)
+
+Misses (in truth, not in `confirmedDeps`) fall into three categories. The scorer
+does not yet tag misses by cause, so the sizes below are by inspection.
+
+1. **No signature in db-v3.** The large majority of misses (for example, the
+   MetaMask run: 306 direct dependencies, 172 confirmed, most of the gap being
+   workspace-internal packages and polyfills with no published tarball).
+   Next: a monorepo-aware signature source that fingerprints packages
+   from a workspace checkout (`packages/<name>`), as `deps-truth.mjs --root`
+   already resolves them for truth.
+2. **Proposed but not confirmed.** Real evidence below the confirmed bar
+   (14 to 29 guessed and 9 to 17 hinted per ground-truth app). Next: re-examine the
+   Medium/Low tier thresholds (`docs/PACKAGE-SIGNATURES.md` 5.4) against this
+   real population; they were tuned on the fixture.
+3. **Lost at the confirm bar.** Smallest: `--confirm` never moved recall.
+   Least urgent.
+
+Order: first make `deps-truth.mjs` tag each miss with its category;
+then the workspace signature source; then the threshold re-tuning.
+
 ## Shared DB size
 
 `tools/pkgsig/db` is ~16 MB as of this task (40 signature files + baselines,
