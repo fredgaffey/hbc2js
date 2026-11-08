@@ -171,6 +171,9 @@ Own build scored against the package lockfile truth. Offline and `--confirm` giv
 | bluesky own build (scattered rule, offline) | see DEPS.md | partial 32 / 90.6%; clean 43 / 79.1% | partial 29 / 100% / 14.6%; clean 42 / 81.0% / 17.2% (corpus-precision-residual) | not run | n/a |
 | rainbow own build (scattered rule, offline, either DB) | see DEPS.md | 106 / 77.4% / 15.8% | 104 / 78.8% / 15.8% (corpus-precision-residual) | not run | n/a |
 | metamask own build (scattered rule, offline, either DB) | see DEPS.md | 169 / 78.1% / 17.6% | unchanged (corpus-precision-residual) | not run | n/a |
+| Expensify/App 12a92bd (J3, + exact-version overlay `db-overlay-recall` 264 files, db-v3-clean offline) | 288 (91) | 131 / 67.9% / 30.9% (precision rules) | 207 / 80.7% / 58.0% (direct 80.2%; deps-recall-nosig; overlay population taken from this truth file, see DEPS.md) | not run | n/a |
+| Expensify/App 12a92bd (J3, + exact-version overlay, db-v4-paths-partial offline) | 288 (91) | 94 / 92.6% / 30.2% (precision rules) | 170 / 96.5% / 56.9% (direct 82.4%; deps-recall-nosig) | not run | n/a |
+| react-navigation-example 0.85.3 (held out, + exact-version overlay) | 76 (60) | partial 10 / 100% / 13.2%; clean 14 / 100% / 18.4% | partial 15 / 100% / 19.7%; clean 18 / 100% / 23.7% (deps-recall-nosig) | not run | n/a |
 
 Store-bundle scoring was not repeated in this measurement.
 
@@ -191,3 +194,24 @@ The precision proxy (10 confirmed packages sampled per app, checked against bund
 - The 2 `totalModules: 0` apps are webpack or multi-bundle shapes (`corpus-B4`, open).
 - Store-bundle ground-truth numbers and the precision proxy on the other 12 apps were not re-measured.
 - Guessed-tier entries for generic English words (for example `focus`, `any`, `reject`) are still present offline; the minimum-evidence rule acts on the confirm tier.
+
+## db-v4-paths ship readiness (2026-11-09, partial rebuild, offline)
+
+Partial rebuild: 29,885 of 71,222 files had paths when measured; the v4 column is that DB layered over db-v3-clean for the rest (so it is a lower bound). Code: main plus the ship tooling (new demotion rules included). Same bundles and truth files as above.
+
+Validator on the 28,557 files then done: 0 errors, all `hashScheme` 2, hbc98 14,220 / hbc99 14,337, module path coverage 89.9% (5,019,382 of 5,584,113), function `moduleId` coverage 60.9% (36.96M of 60.68M; deeper-than-factory or baseline functions have none), 261 files with under half their modules pathed.
+
+| app | db | confirmed | TP | FP | precision | recall |
+|---|---|---|---|---|---|---|
+| Expensify | v3-clean | 131 | 89 | 42 | 0.679 | 0.309 |
+| Expensify | v4 partial | 102 | 88 | 14 | 0.863 | 0.306 |
+| react-navigation | v3-clean | 14 | 14 | 0 | 1.000 | 0.184 |
+| react-navigation | v4 partial | 11 | 11 | 0 | 1.000 | 0.145 |
+| bluesky | v3-clean | 43 | 34 | 9 | 0.791 | 0.172 |
+| bluesky | v4 partial | 39 | 32 | 7 | 0.821 | 0.162 |
+| rainbow | v3-clean | 106 | 82 | 24 | 0.774 | 0.158 |
+| rainbow | v4 partial | 106 | 82 | 24 | 0.774 | 0.158 |
+| metamask | v3-clean | 169 | 132 | 37 | 0.781 | 0.176 |
+| metamask | v4 partial | 169 | 132 | 37 | 0.781 | 0.176 |
+
+Rainbow and metamask are unchanged because none of their false-positive owners was rebuilt yet; re-measure after DONE (`ship-meas/meas.sh`-style run with the final DB).
