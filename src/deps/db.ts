@@ -18,6 +18,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { packageNameFromSigFilename } from "./candidates.ts";
 import { hexHash, insertFingerprint, newShapeCache, openSigDb, type ShapeCache } from "./sigdb-sql.ts";
 import type { SigDbFile, SigDbIndex, SigDbIndexEntry } from "./sigdb-types.ts";
+import { slimSigFile, type SlimTarget } from "./slim-sigs.ts";
 
 export type DbLayerName = "project" | "user" | "shared";
 
@@ -288,46 +289,13 @@ export interface LoadSignaturesOptions {
    *  matcher/scorer/ownership indexes actually read (`slimSigFile`), hashes
    *  interned across files, and release the parsed JSON. `matchInventory`
    *  results are identical (tests/gate/deps/slim-sigs-equivalence.test.ts).
+   *  Passing a `SlimTarget` (`slimTargetFor(inventory)`) additionally drops
+   *  every function/module the match against THAT target can never read,
+   *  keeping only precomputed counts (`slim-sigs.ts`).
    *  Callers that only match and read `file.package` (deps, MCP) set it. */
-  readonly slim?: boolean;
+  readonly slim?: boolean | SlimTarget;
 }
 
-/** The fields of a signature file `matchInventory`/`scorePackage`/
- *  `foreignSets`/supersession read, and nothing else: per function
- *  `index, instrCount, exactHash, fuzzyHash, stringSetHash, stringCount,
- *  moduleId`; per module `factoryFunctionIndex, localModuleId,
- *  factoryExactHash, factoryFuzzyHash, factoryIsBaseline,
- *  factoryIsDependency, path`; per file `package, version, hbcVersion,
- *  toolchainBaseline, hashScheme, modulePaths` and the PRESENCE of
- *  `subtractedDependencies` (an empty array). Dropped: names, param counts,
- *  owners, dep ids, nested counts, function-set hashes, provenance,
- *  subtractedBaselines, totalFunctions. The result is cast to `SigDbFile`
- *  for type compatibility and must not be written back to disk. */
-export function slimSigFile(f: SigDbFile, intern: Map<string, string>): SigDbFile {
-  const s = (x: string): string => {
-    const hit = intern.get(x);
-    if (hit !== undefined) return hit;
-    intern.set(x, x);
-    return x;
-  };
-  const sn = (x: string | null): string | null => (x === null ? null : s(x));
-  const functions = f.functions.map((fn) => {
-    const o: Record<string, unknown> = { index: fn.index, instrCount: fn.instrCount, exactHash: s(fn.exactHash), fuzzyHash: s(fn.fuzzyHash), stringSetHash: s(fn.stringSetHash), stringCount: fn.stringCount };
-    if (fn.moduleId !== undefined) o.moduleId = fn.moduleId;
-    return o;
-  });
-  const modules = f.modules.map((m) => {
-    const o: Record<string, unknown> = { factoryFunctionIndex: m.factoryFunctionIndex, localModuleId: m.localModuleId, factoryExactHash: sn(m.factoryExactHash), factoryFuzzyHash: sn(m.factoryFuzzyHash), factoryIsBaseline: m.factoryIsBaseline };
-    if (m.factoryIsDependency !== undefined) o.factoryIsDependency = m.factoryIsDependency;
-    if (m.path !== undefined) o.path = m.path === null ? null : s(m.path);
-    return o;
-  });
-  const out: Record<string, unknown> = { package: s(f.package), version: f.version, hbcVersion: f.hbcVersion, toolchainBaseline: f.toolchainBaseline, functions, modules };
-  if (f.hashScheme !== undefined) out.hashScheme = f.hashScheme;
-  if (f.modulePaths !== undefined) out.modulePaths = f.modulePaths;
-  if (f.subtractedDependencies !== undefined) out.subtractedDependencies = [];
-  return out as unknown as SigDbFile;
-}
 
 /**
  * Load every signature file across the given layers, in priority order,
@@ -340,6 +308,7 @@ export function loadSignatures(layers: readonly DbLayer[], opts: LoadSignaturesO
   const out: LoadedSig[] = [];
   const stubs = new Set<LoadedSig>();
   const intern = new Map<string, string>();
+  const slimTarget = typeof opts.slim === "object" ? opts.slim : undefined;
   for (const layer of layers) {
     // §4 layer detection: a `sigdb.sqlite` in the layer directory (or the
     // layer dir itself naming a `.sqlite` file, for callers that pass one
@@ -354,7 +323,7 @@ export function loadSignatures(layers: readonly DbLayer[], opts: LoadSignaturesO
         const key = keyOf(file);
         if (seen.has(key)) continue;
         seen.add(key);
-        out.push({ file: opts.slim === true ? slimSigFile(file, intern) : file, layer: layer.name, path: sqlitePath });
+        out.push({ file: opts.slim !== undefined && opts.slim !== false ? slimSigFile(file, intern, slimTarget) : file, layer: layer.name, path: sqlitePath });
       }
       continue;
     }
@@ -377,7 +346,7 @@ export function loadSignatures(layers: readonly DbLayer[], opts: LoadSignaturesO
         out.push(entry);
         continue;
       }
-      out.push({ file: opts.slim === true ? slimSigFile(file, intern) : file, layer: layer.name, path });
+      out.push({ file: opts.slim !== undefined && opts.slim !== false ? slimSigFile(file, intern, slimTarget) : file, layer: layer.name, path });
     }
   }
   // J4 v1/v2 compatibility (docs/DECISIONS.md D17c): a package with at

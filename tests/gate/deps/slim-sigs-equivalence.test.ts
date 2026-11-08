@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { loadSignatures, type DbLayer } from "../../../src/deps/db.ts";
+import { slimTargetFor } from "../../../src/deps/slim-sigs.ts";
 import { matchInventory } from "../../../src/deps/match.ts";
 import type { ModuleInventory } from "../../../src/deps/inventory.ts";
 import type { SigDbFile, SigFunction, SigModule } from "../../../src/deps/sigdb-types.ts";
@@ -30,7 +31,7 @@ function sig(pkg: string, version: string, hbc: number, tags: string[], extra: P
   };
 }
 const files: SigDbFile[] = [
-  sig("alpha", "1.0.0", 96, ["a1", "a2", "a3", "shared"]),
+  sig("alpha", "1.0.0", 96, ["a1", "a2", "a3", "shared", "dec1", "dec2", "dec3"]),
   sig("beta", "1.0.0", 96, ["b1", "b2", "shared"], { hashScheme: 2 }),
   sig("gamma", "2.0.0", 96, ["g1", "g2", "g3", "g4"], { subtractedDependencies: [] }),
   sig("gamma", "1.0.0", 96, ["g1", "g2"]), // superseded by v2 gamma
@@ -51,6 +52,20 @@ const inventory: ModuleInventory = {
 };
 
 describe("deps-slim-sigs", () => {
+  it("target-prefiltered slim records (dropping unreadable functions/modules) give deep-equal matchInventory results", () => {
+    for (const minInstr of [8, 41]) {
+      const full = loadSignatures(layers, { hbcVersion: 96 });
+      const slim = loadSignatures(layers, { hbcVersion: 96, slim: slimTargetFor(inventory, minInstr) });
+      const a = matchInventory(inventory, full, { minInstr });
+      assert.deepEqual(matchInventory(inventory, slim, { minInstr }), a);
+      const alphaFull = full.find((x) => x.file.package === "alpha")!.file;
+      const alphaSlim = slim.find((x) => x.file.package === "alpha")!.file;
+      assert.ok(alphaSlim.functions.length < alphaFull.functions.length, "decoy functions dropped");
+      assert.ok(a.moduleAttributions.some((m) => m.owners.length > 0));
+    }
+    assert.throws(() => matchInventory(inventory, loadSignatures(layers, { hbcVersion: 96, slim: slimTargetFor(inventory, 8) }), { minInstr: 9 }));
+  });
+
   it("matchInventory over slim records deep-equals the full-load path (hbcVersion filter included)", () => {
     const fullOther = new Set<string>();
     const slimOther = new Set<string>();

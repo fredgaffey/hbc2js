@@ -24,6 +24,7 @@ import { ErrorCode, Hbc2jsError } from "../errors.ts";
 import { computeLeads, searchFunctions, searchSource, searchSourceAsync, LEADS_CAPS, type LeadsResult, type SearchOptions, type SearchPage, type FunctionMatch, type SourceMatch } from "./leads.ts";
 import { buildInventory } from "../deps/inventory.ts";
 import { resolveDbLayers, loadSignatures } from "../deps/db.ts";
+import { slimTargetFor } from "../deps/slim-sigs.ts";
 import { deriveCandidatePackages } from "../deps/candidates.ts";
 import { matchInventory, type MatchReport } from "../deps/match.ts";
 import { guessModules, type ModuleGuess } from "../deps/guess.ts";
@@ -435,7 +436,7 @@ export class McpResources {
       const bytes = readFileSync(hbcPath);
       const { inventory } = buildInventory(bytes);
       const layers = resolveDbLayers({ outDir: this.artifactDir });
-      const dbs = loadSignatures(layers, { candidates: deriveCandidatePackages(layers, inventory), slim: true });
+      const dbs = loadSignatures(layers, { candidates: deriveCandidatePackages(layers, inventory), slim: slimTargetFor(inventory) });
       const matchReport = matchInventory(inventory, dbs);
       const knownPackages = new Set(dbs.map((d) => d.file.package));
       const guesses = await guessModules(inventory, matchReport, { offline: true, knownPackages });

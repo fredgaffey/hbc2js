@@ -14,6 +14,7 @@ import { classifyInventory, loadCommonalityIndex, DEFAULT_COMMONALITY_INDEX_PATH
 import type { ClassificationReport } from "./classify.ts";
 import { confirmCandidates, defaultConfirmJobs, detectRnVersionFromBaselineFilenames } from "./confirm.ts";
 import type { ConfirmResult } from "./confirm.ts";
+import { slimTargetFor } from "./slim-sigs.ts";
 import { resolveDbLayers, loadSignatures, defaultSharedDbDir, projectDbDir as projectDbDirFor, userCacheDbDir as userCacheDbDirDefault } from "./db.ts";
 import { guessModules } from "./guess.ts";
 import type { ModuleGuess } from "./guess.ts";
@@ -100,7 +101,7 @@ export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promis
 
   const layers = resolveDbLayers({ ...(opts.out !== undefined ? { outDir: opts.out } : {}), ...(opts.sigdb !== undefined ? { sigdb: opts.sigdb } : {}), noSharedDb: opts.noSharedDb === true });
   const otherHbcPackages = new Set<string>();
-  const dbs = loadSignatures(layers, opts.exhaustive === true ? { slim: true } : { candidates: deriveCandidatePackages(layers, inventory), hbcVersion: inventory.hbcVersion, otherHbcPackages, slim: true });
+  const dbs = loadSignatures(layers, opts.exhaustive === true ? { slim: slimTargetFor(inventory, opts.minInstr) } : { candidates: deriveCandidatePackages(layers, inventory), hbcVersion: inventory.hbcVersion, otherHbcPackages, slim: slimTargetFor(inventory, opts.minInstr) });
   const matchReport = matchInventory(inventory, dbs, opts.minInstr !== undefined ? { minInstr: opts.minInstr } : {});
 
   const apkHints = apkEvidence !== null ? apkHintsFromEvidence(apkEvidence) : undefined;
@@ -220,7 +221,7 @@ export function runInformedDeps(inputPath: string, known: readonly KnownPackage[
   const { inventory } = readInputInventory(inputPath);
   const layers = resolveDbLayers({ ...(opts.out !== undefined ? { outDir: opts.out } : {}), ...(opts.sigdb !== undefined ? { sigdb: opts.sigdb } : {}), noSharedDb: opts.noSharedDb === true });
   const candidateNames = new Set(known.map((k) => k.name));
-  const dbs = loadSignatures(layers, { candidates: candidateNames, slim: true });
+  const dbs = loadSignatures(layers, { candidates: candidateNames, slim: slimTargetFor(inventory, opts.minInstr) });
   const matchReport = matchInventory(inventory, dbs, opts.minInstr !== undefined ? { minInstr: opts.minInstr } : {});
   // Classification (D17h/D17i, library-vs-custom-code WITHOUT naming) is
   // independent of which candidate names were loaded -- run it the same way
