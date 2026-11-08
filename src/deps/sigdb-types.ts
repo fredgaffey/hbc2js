@@ -28,7 +28,8 @@ export interface SigModule {
   readonly factoryExactHash: string | null;
   readonly factoryFuzzyHash: string | null;
   readonly nestedFunctionCount: number;
-  /** Not persisted to disk (recomputed at fingerprint time); present on the
+  /** Not in the JSON files (recomputed at fingerprint time); the sqlite layer
+   *  keeps it when present (rev 3). Present on the
    *  in-memory result from `fingerprintModule` for callers (e.g. `guess.ts`)
    *  that need the actual nested indices, not just a count. */
   readonly nestedFunctionIndices?: readonly number[];
@@ -98,10 +99,25 @@ export interface SigDbFile {
    *  then scores the package on its OWN files only. Absent = no paths:
    *  scored exactly as before. */
   readonly modulePaths?: number;
+  /** Bulk-build marker (`build-one.mjs`): 1 on every file built after the
+   *  D17c foundation-subtraction fix. Absent on older files. */
+  readonly bulkBuildFixVersion?: number;
   /** deps-slim-sigs, in-memory only (`slim-sigs.ts`): this record was
    *  prefiltered against one match target; `eligible`/`moduleTotal` are the
    *  counts `scorePackage` would compute from the full file at `minInstr`. */
-  readonly slim?: { readonly minInstr: number; readonly eligible: number; readonly moduleTotal: number; readonly distinctEligible?: number };
+  readonly slim?: {
+    readonly minInstr: number;
+    readonly eligible: number;
+    readonly moduleTotal: number;
+    readonly distinctEligible?: number;
+    /** corpus-path-recall: distinct eligible exact hashes of the functions
+     *  in own path-bearing modules, and per own module that requires another
+     *  package's module, its distinct eligible fuzzy hashes (by
+     *  localModuleId) — what `promoteViaDependency` needs from the
+     *  functions slimming drops. */
+    readonly ownPathDistinct?: number;
+    readonly ownFuzzy?: Readonly<Record<number, number>>;
+  };
 }
 
 export interface SigDbIndexEntry {
