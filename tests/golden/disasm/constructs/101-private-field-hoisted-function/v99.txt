@@ -1,0 +1,101 @@
+; hbc2js disassembly of 101-private-field-hoisted-function/v99.hbc
+; version=99 layout=E opcodeTable=hbc99-mar2026 functions=5 strings=12 globalCodeIndex=0
+function #0 "global"  params=1 frame=20 env=0 flags=dbg,overflowed  @0x0000015c size=191
+  0000  CreateFunctionEnvironment r3, 1
+  0003  CreatePrivateName    r8, s7 "#n"
+  0009  StoreToEnvironment   r3, 0, r8
+  000d  CreateBaseClass      r7, r4, r3, 1
+  0013  Mov                  r5, r4
+  0016  LoadConstString      r4, s6 "total"
+  001a  CreateClosure        r3, r3, f2 "total"
+  001f  DefineOwnByVal       r5, r3, r4, 0
+  0024  GetByIdShort         r3, r7, #c0, s10 "prototype"
+  0029  NewObjectWithParent  r6, r3
+  002c  PrivateIsIn          r1, r8, r6, r0
+  0031  JmpTrueLong          L3, r1
+  0037  LoadConstUndefined   r1
+  0039  AddOwnPrivateBySym   r6, r1, r8
+  003d  LoadConstUInt8       r0, 1
+  0040  PutOwnPrivateBySym   r6, r0, 1, r8
+  0045  GetGlobalObject      r3
+  0047  TryGetById           r5, r3, #c1, s9 "print"
+  004d  GetByIdShort         r4, r6, #c2, s6 "total"
+  0052  GetByIdShort         r3, r7, #c0, s10 "prototype"
+  0057  NewObjectWithParent  r9, r3
+  005a  PrivateIsIn          r2, r8, r9, r2
+  005f  JmpTrue              L2, r2
+  0062  AddOwnPrivateBySym   r9, r1, r8
+  0066  LoadConstUInt8       r0, 2
+  0069  PutOwnPrivateBySym   r9, r0, 1, r8
+  006e  NewArray             r3, 2
+  0072  DefineOwnInDenseArray r3, r9, 0
+  0076  GetByIdShort         r7, r7, #c0, s10 "prototype"
+  007b  NewObjectWithParent  r7, r7
+  007e  PrivateIsIn          r2, r8, r7, r3
+  0083  JmpTrue              L1, r2
+  0086  AddOwnPrivateBySym   r7, r1, r8
+  008a  LoadConstUInt8       r0, 5
+  008d  PutOwnPrivateBySym   r7, r0, 1, r8
+  0092  DefineOwnInDenseArray r3, r7, 1
+  0096  Call2                r4, r4, r6, r3
+  009b  LoadConstString      r3, s3 "total:"
+  009f  Call3                r3, r5, r1, r3, r4
+  00a5  Ret                  r3
+L1:
+  00a7  LoadConstString      r11, s4 "Cannot initialize private field …"
+  00ab  CallBuiltin          r3, b44 "throwTypeError", 2
+L2:
+  00af  LoadConstString      r11, s4 "Cannot initialize private field …"
+  00b3  CallBuiltin          r3, b44 "throwTypeError", 2
+L3:
+  00b7  LoadConstString      r11, s4 "Cannot initialize private field …"
+  00bb  CallBuiltin          r3, b44 "throwTypeError", 2
+
+function #1 "Bag"  params=2 frame=13 env=0 flags=strict,dbg,overflowed,ctor  @0x0000021b size=49
+  0000  GetNewTarget         r1
+  0002  GetByIdShort         r1, r1, #c0, s10 "prototype"
+  0007  NewObjectWithParent  r1, r1
+  000a  GetParentEnvironment r2, 0
+  000d  LoadFromEnvironment  r3, r2, 0
+  0011  PrivateIsIn          r0, r3, r1, r0
+  0016  JmpTrue              L1, r0
+  0019  LoadConstUndefined   r0
+  001b  AddOwnPrivateBySym   r1, r0, r3
+  001f  LoadParam            r2, 1
+  0022  PutOwnPrivateBySym   r1, r2, 1, r3
+  0027  Ret                  r1
+L1:
+  0029  LoadConstString      r4, s4 "Cannot initialize private field …"
+  002d  CallBuiltin          r1, b44 "throwTypeError", 2
+
+function #2 "total"  params=2 frame=16 env=0 flags=strict,dbg,overflowed,nc  @0x0000024c size=64
+  0000  NewArray             r4, 1
+  0004  LoadParam            r2, 0
+  0007  DefineOwnInDenseArray r4, r2, 0
+  000b  LoadConstUInt8       r5, 1
+  000e  LoadParam            r6, 1
+  0011  Mov                  r7, r4
+  0014  CallBuiltin          r0, b48 "arraySpread", 4
+  0018  GetByIdShort         r3, r4, #c0, s8 "map"
+  001d  GetParentEnvironment r2, 0
+  0020  CreateClosure        r2, r2, f3 "get"
+  0025  Call2                r4, r3, r4, r2
+  002a  GetByIdShort         r3, r4, #c1, s11 "reduce"
+  002f  LoadConstZero        r0
+  0031  LoadConstUndefined   r1
+  0033  CreateClosure        r2, r1, f4 ""
+  0038  Call3                r2, r3, r4, r2, r0
+  003e  Ret                  r2
+
+function #3 "get"  params=2 frame=2 env=0 flags=strict,dbg,overflowed  @0x0000028c size=17
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r1, r0, 0
+  0007  LoadParam            r0, 1
+  000a  GetOwnPrivateBySym   r0, r0, 0, r1
+  000f  Ret                  r0
+
+function #4 ""  params=3 frame=2 env=0 flags=strict,dbg,overflowed  @0x0000029d size=12
+  0000  LoadParam            r1, 2
+  0003  LoadParam            r0, 1
+  0006  Add                  r0, r0, r1
+  000a  Ret                  r0

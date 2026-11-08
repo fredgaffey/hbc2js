@@ -906,7 +906,7 @@ another frame stays (it is sound, and the warning is the lowering's); (b) FIXED 
 fixture 90 `private-fields` refused R-PF1 after the rebuild because the
 symbol's register is reused later in the defining frame; R-PF1 is now def-use
 for the register (section 1.7);
-(c) on 93 `private-fields` refuses `ambiguous-multiple-classes`; (d) a class
+(c) on 93 `private-fields` refuses `ambiguous-multiple-classes`; (f) 2026-11-09: on react-navigation the `defining-body-escape` residue is mostly private reads in functions, not inlined constructions (docs/BUGS.md row; 6 of 68 are R-IN1); (d) a class
 whose only prototype member is installed through `C.prototype` directly
 (fixture 91's `Base`, 92's `Point` with one method) is refused `no-members`
 by class-recover; (e) fixture 89's env-IIFE class is not reached (the class

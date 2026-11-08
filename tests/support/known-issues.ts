@@ -25,6 +25,10 @@ export const KNOWN_AMBIGUOUS_V98: readonly string[] = [
   // `--opcode-table=hbc98-late` resolves it the same way. Nothing about the
   // fixture's own construct is special here.
   "64-computed-method-names",
+  // Added 2026-11-09 with the fixture itself (private-fields nested-function
+  // twin): same src/parse/** ambiguity, resolved by hbc98-late. Drop this
+  // entry when v98-layout-default (W_LAYOUT_ASSUMED) is merged.
+  "101-private-field-hoisted-function",
   // Added 2026-09-21 with the fixture itself (the finally-dedup R-FD2b fix).
   // Its v98 build hits the same src/parse/** opcode-table ambiguity as every
   // entry above and `--opcode-table=hbc98-late` resolves it identically; the
