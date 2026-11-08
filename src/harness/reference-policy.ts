@@ -67,9 +67,8 @@ type Measurement = "diverges" | "matches-spec";
  * by HBC version. Measured at 84 and 89 originally; confirmed unchanged at 94
  * and 99 by `the work log`'s `tools/build-hermes-vm.sh` entry (ten
  * fixtures including all four of these, run under both new VMs against
- * `expected.txt`). 96 and 98 have no VM to measure with — their absence from
- * a fixture's version map is deliberate, not an oversight; `chooseReference`
- * still applies rule 3 to them because the fixture is named here at all.
+ * `expected.txt`). 96 and 98 were measured once VMs for them were pinned
+ * (fixtures-expected-vm); all four diverge from Node at every version.
  *
  * This table is machine-readable data, not prose (spec 06 §4): it is the fix
  * for docs/EQUIVALENCE.md §9 item 2, "without this the harness reports 4
@@ -79,8 +78,12 @@ const MEASURED_AT_ALL_FOUR: Readonly<Record<number, Measurement>> = {
   84: "diverges",
   89: "diverges",
   94: "diverges",
+  // 96, 98 measured with the pinned VMs (fixtures-expected-vm): the ORIGINAL
+  // vNN.hbc under tools/hermes-vm/v96, v98 differs from Node's expected.txt
+  // identically to v94/v99, so they are no longer "unmeasured".
+  96: "diverges",
+  98: "diverges",
   99: "diverges",
-  // 96, 98: deliberately absent — unmeasured (no VM built/available).
 };
 
 /**
