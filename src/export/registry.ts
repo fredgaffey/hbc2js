@@ -108,10 +108,15 @@ export function buildRegistryJs(substitutions: ReadonlyMap<number, string> = new
     lines.push(`    throw e;`);
     lines.push(`  }`);
     lines.push(`  if (__hbc_probe !== null) __hbc_probe("exit", id, mod.exports);`);
-    lines.push(`  var __hbc_dt = __hbc_now() - __hbc_t0;`);
-    lines.push(`  var __hbc_ring = globalThis.__HBC_BOOT_TIMINGS__;`);
-    lines.push(`  __hbc_ring.push({ id: id, t0: __hbc_t0, dt: __hbc_dt });`);
-    lines.push(`  if (__hbc_ring.length >= __HBC_BOOT_RING_CAPACITY__) __hbc_flushBootTimings();`);
+    // Under the probe host the timing ring stays silent: a flush is a
+    // console.log, i.e. a nativeLoggingHook call the original never makes
+    // (export-boot L4), and the probe already observes every factory.
+    lines.push(`  if (__hbc_probe === null) {`);
+    lines.push(`    var __hbc_dt = __hbc_now() - __hbc_t0;`);
+    lines.push(`    var __hbc_ring = globalThis.__HBC_BOOT_TIMINGS__;`);
+    lines.push(`    __hbc_ring.push({ id: id, t0: __hbc_t0, dt: __hbc_dt });`);
+    lines.push(`    if (__hbc_ring.length >= __HBC_BOOT_RING_CAPACITY__) __hbc_flushBootTimings();`);
+    lines.push(`  }`);
   } else {
     lines.push(`  entry.factory(globalThis, requireFn, importDefault, importAll, mod, mod.exports, entry.deps);`);
   }
