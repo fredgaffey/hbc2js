@@ -5,14 +5,14 @@
 // dev machines, and any CI job that adds the install step per docs/UI.md),
 // a red suite fails the gate for real.
 //
-// Isolated port base + throwaway root (ui/e2e/prepare-fixture.mjs's own
-// concurrency knobs) so this test running inside two agents' `npm run
+// Isolation is built into `npm run e2e` (ui/e2e/run.mjs + select.mjs: free ports,
+// mkdtemp root) so this test running inside two agents' `npm run
 // test:gate` at once, or alongside a human's interactive `cd ui && npm run
 // e2e`, does not collide on :7341/:7342 or the default throwaway tmp dir.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { repoRoot } from "../../support/paths.ts";
@@ -62,18 +62,11 @@ test(
         : "Playwright's Chromium is not installed under its cache dir (run `npx playwright install chromium` in ui/) — this environment cannot run a real browser",
   },
   () => {
-    // A port/root distinct from every documented default (7341/7342, the
-    // live rig's 4173/7331) and from every other concurrent caller of this
-    // same file, best-effort via pid — collisions are still possible under
-    // heavy concurrent-agent load, same as any other shared-box port choice
-    // in this repo (docs/UI.md's own note on HBC2JS_E2E_PORT_BASE).
-    const portBase = 7400 + (process.pid % 190);
-    const root = join(tmpdir(), `hbc2js-ui-e2e-gate-${process.pid}`);
+    // `npm run e2e` (ui/e2e/run.mjs) picks free ports + a mkdtemp root per run.
     const r = spawnSync("npm", ["run", "e2e"], {
       cwd: ui(),
       encoding: "utf8",
       shell: false,
-      env: { ...process.env, HBC2JS_E2E_PORT_BASE: String(portBase), HBC2JS_E2E_ROOT: root },
     });
     const tail = (s: string): string => s.slice(Math.max(0, s.length - 4000));
     assert.equal(
