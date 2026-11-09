@@ -266,7 +266,8 @@ function buildIndex<K extends "exactHash" | "fuzzyHash" | "stringSetHash">(funct
 /** corpus-db-growth (docs/DEPS.md "DB growth must not cost true
  *  positives"): the DB's module paths attribute an exact hash to the
  *  packages whose files hold it under their own name in another file's
- *  foreign module. A claimant outside that set (a pathless file carrying a
+ *  foreign module, kept only for attributed packages whose own loaded
+ *  signature also holds it. A claimant outside that set (a pathless file carrying a
  *  copy, a path-bearing dist file that inlined it) holds a copy: the hash is
  *  neither its evidence nor an owner. `copies` is that set per file (beyond
  *  `foreignSets`), empty when no loaded file attributes any of its hashes. */
@@ -802,6 +803,32 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
       let set = attributed.get(key);
       if (set === undefined) attributed.set(key, (set = new Set()));
       set.add(name);
+    }
+  }
+  // Only an attributed package that itself claims the hash (its own
+  // signature holds it as own code) takes it from the others: a path naming
+  // a fork, or a package whose own file inlined it, with no such signature
+  // loaded, says nothing about who else owns it (measured: hasown and color
+  // lost to attributions to unloaded names).
+  if (attributed.size > 0) {
+    const claimed = new Map<string, Set<string>>();
+    for (const entry of eligibleDbs) {
+      if (entry.file.toolchainBaseline) continue;
+      const foreign = foreignSets(entry.file);
+      for (const fn of entry.file.functions) {
+        if (foreign.functions.has(fn.index)) continue;
+        const key = schemeKey(entry.file, fn.exactHash);
+        const a = attributed.get(key);
+        if (a === undefined || !a.has(entry.file.package)) continue;
+        let set = claimed.get(key);
+        if (set === undefined) claimed.set(key, (set = new Set()));
+        set.add(entry.file.package);
+      }
+    }
+    for (const key of [...attributed.keys()]) {
+      const c = claimed.get(key);
+      if (c === undefined) attributed.delete(key);
+      else attributed.set(key, c);
     }
   }
   const views = new Map<SigDbFile, OwnView>();

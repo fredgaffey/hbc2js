@@ -130,3 +130,18 @@ test("corpus-db-growth: a package's own path-bearing file keeps the code its own
   assert.equal(tierOf(r, "x-real")?.tier, "high", JSON.stringify(tierOf(r, "x-real")));
   assert.equal(tierOf(r, "y-real")?.tier, "high");
 });
+
+test("corpus-db-growth: path attribution to a package with no signature claiming the code does not take it from its claimant", (t) => {
+  const h = requireHermesc(t, 96);
+  if (h === null) return;
+  // A path-bearing file names x-real's code as `x-fork/...` (a fork, or a
+  // package whose own file inlined it), and no loaded x-fork signature holds
+  // it. Measured: on Expensify + pop this took hasown, es-define-property and
+  // define-properties, and on bluesky color, react-native-svg and
+  // react-native-gesture-handler. Only a claimant the attribution names
+  // makes the others copies.
+  const { x, target } = fixture(h.path);
+  const forkWrapper = signature(h.path, "fork-wrapper", [moduleOf("fw", 6, 9101), moduleOf("xq", 12, 11)], { paths: ["fork-wrapper/index.js", "x-fork/index.js"] });
+  const r = matchInventory(target, loaded([x, forkWrapper]));
+  assert.equal(tierOf(r, "x-real")?.tier, "high", JSON.stringify(tierOf(r, "x-real")));
+});
