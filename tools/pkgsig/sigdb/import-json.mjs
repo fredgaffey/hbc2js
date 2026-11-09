@@ -200,7 +200,7 @@ export function reconstructFingerprint(db, fpId) {
   const functions = db
     .prepare(
       `SELECT ff.fn_index AS idx, s.exact_hash, s.fuzzy_hash, s.string_set_hash, s.name,
-              s.param_count, s.instr_count, s.string_count, ff.module_id
+              s.param_count, s.instr_count, s.string_count, ff.module_id, ff.owner_json
        FROM fingerprint_functions ff JOIN function_shapes s ON s.shape_id = ff.shape_id
        WHERE ff.fp_id = ? ORDER BY ff.fn_index`,
     )
@@ -214,6 +214,7 @@ export function reconstructFingerprint(db, fpId) {
       fuzzyHash: hexOf(r.fuzzy_hash),
       stringSetHash: hexOf(r.string_set_hash),
       stringCount: r.string_count,
+      ...(r.owner_json != null ? { owner: JSON.parse(r.owner_json) } : {}),
       ...(r.module_id != null ? { moduleId: r.module_id } : {}),
     }));
 
@@ -228,8 +229,10 @@ export function reconstructFingerprint(db, fpId) {
       factoryExactHash: r.factory_exact_hash != null ? hexOf(r.factory_exact_hash) : null,
       factoryFuzzyHash: r.factory_fuzzy_hash != null ? hexOf(r.factory_fuzzy_hash) : null,
       nestedFunctionCount: r.nested_function_count,
+      ...(r.nested_function_indices != null ? { nestedFunctionIndices: JSON.parse(r.nested_function_indices) } : {}),
       functionSetHash: hexOf(r.function_set_hash),
       factoryIsBaseline: !!r.factory_is_baseline,
+      ...(r.factory_is_dependency != null ? { factoryIsDependency: !!r.factory_is_dependency } : {}),
       ...(fp.module_paths != null ? { path: r.path ?? null } : {}),
     }));
 
@@ -237,6 +240,8 @@ export function reconstructFingerprint(db, fpId) {
     schema: fp.source_schema,
     ...(fp.hash_scheme != null ? { hashScheme: fp.hash_scheme } : {}),
     ...(fp.module_paths != null ? { modulePaths: fp.module_paths } : {}),
+    ...(fp.bulk_build_fix_version != null ? { bulkBuildFixVersion: fp.bulk_build_fix_version } : {}),
+    ...(fp.subtracted_dependencies != null ? { subtractedDependencies: JSON.parse(fp.subtracted_dependencies) } : {}),
     package: fp.pkg_name,
     version: fp.pv_version,
     hbcVersion: fp.hbc_version,

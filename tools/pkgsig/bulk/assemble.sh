@@ -62,6 +62,8 @@ if [ ! -d "$DB_DIR" ]; then
 fi
 
 mkdir -p "$DIST_DIR"
+# bsdtar (macOS) has no --ignore-failed-read
+TAR_IGN=""; tar --help 2>&1 | grep -q -e --ignore-failed-read && TAR_IGN="--ignore-failed-read"
 
 WORK="$(mktemp -d "$DIST_DIR/.assemble.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
@@ -197,12 +199,13 @@ cp "$INDEX_TMP" "$STAGE/index.json"
 if [ "$FORMAT" = "zstd" ]; then
   ARCHIVE="$DIST_DIR/sigdb-${DATE_TAG}-${TAG}.tar.zst"
   ARCHIVE_TMP="$WORK/out.tar.zst"
-  tar --ignore-failed-read -cf - -C "$DB_DIR" -T "$FILELIST_TMP" -C "$STAGE" index.json \
-    | zstd -T0 -q -o "$ARCHIVE_TMP"
+  (cd "$DB_DIR" && tar $TAR_IGN -cf "$WORK/out.tar" -T "$FILELIST_TMP") && tar -rf "$WORK/out.tar" -C "$STAGE" index.json \
+    && zstd -T0 -q -o "$ARCHIVE_TMP" "$WORK/out.tar"
 else
   ARCHIVE="$DIST_DIR/sigdb-${DATE_TAG}-${TAG}.tar.gz"
   ARCHIVE_TMP="$WORK/out.tar.gz"
-  tar --ignore-failed-read -czf "$ARCHIVE_TMP" -C "$DB_DIR" -T "$FILELIST_TMP" -C "$STAGE" index.json
+  (cd "$DB_DIR" && tar $TAR_IGN -cf "$WORK/out.tar" -T "$FILELIST_TMP") && tar -rf "$WORK/out.tar" -C "$STAGE" index.json \
+    && gzip -c "$WORK/out.tar" > "$ARCHIVE_TMP"
 fi
 
 # Atomic-ish publish: same filesystem, so mv is a rename, not a copy - a

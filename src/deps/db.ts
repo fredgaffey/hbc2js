@@ -151,7 +151,7 @@ function loadSqliteSignatures(dbPath: string): SigDbFile[] {
       `SELECT f.fp_id, f.hbc_version, f.source_schema, f.total_functions, f.raw_function_count,
               f.toolchain_baseline, f.package_sha256, f.metro_version, f.react_native_version,
               f.hermesc_version, f.hermesc_rn_era, f.repo_commit, f.built_at,
-              f.hash_scheme, f.module_paths, pv.version AS pv_version, p.name AS pkg_name
+              f.hash_scheme, f.module_paths, f.subtracted_dependencies, f.bulk_build_fix_version, pv.version AS pv_version, p.name AS pkg_name
        FROM fingerprints f
        JOIN package_versions pv ON pv.pv_id = f.pv_id
        JOIN packages p ON p.pkg_id = pv.pkg_id
@@ -173,6 +173,8 @@ function loadSqliteSignatures(dbPath: string): SigDbFile[] {
     built_at: string;
     hash_scheme: number | null;
     module_paths: number | null;
+    subtracted_dependencies: string | null;
+    bulk_build_fix_version: number | null;
     pv_version: string;
     pkg_name: string;
   }>;
@@ -186,7 +188,7 @@ function loadSqliteSignatures(dbPath: string): SigDbFile[] {
       db
         .prepare(
           `SELECT ff.fn_index AS idx, s.exact_hash, s.fuzzy_hash, s.string_set_hash, s.name,
-                  s.param_count, s.instr_count, s.string_count, ff.module_id
+                  s.param_count, s.instr_count, s.string_count, ff.module_id, ff.owner_json
            FROM fingerprint_functions ff JOIN function_shapes s ON s.shape_id = ff.shape_id
            WHERE ff.fp_id = ? ORDER BY ff.fn_index`,
         )
@@ -200,6 +202,7 @@ function loadSqliteSignatures(dbPath: string): SigDbFile[] {
         instr_count: number;
         string_count: number;
         module_id: number | null;
+        owner_json: string | null;
       }>
     ).map((r) => ({
       index: r.idx,
@@ -210,6 +213,7 @@ function loadSqliteSignatures(dbPath: string): SigDbFile[] {
       fuzzyHash: hexHash(r.fuzzy_hash),
       stringSetHash: hexHash(r.string_set_hash),
       stringCount: r.string_count,
+      ...(r.owner_json != null ? { owner: JSON.parse(r.owner_json) as string | null } : {}),
       ...(r.module_id != null ? { moduleId: r.module_id } : {}),
     }));
 
@@ -223,7 +227,9 @@ function loadSqliteSignatures(dbPath: string): SigDbFile[] {
         factory_fuzzy_hash: Uint8Array | null;
         nested_function_count: number;
         function_set_hash: Uint8Array;
+        nested_function_indices: string | null;
         factory_is_baseline: number;
+        factory_is_dependency: number | null;
         path: string | null;
       }>
     ).map((r) => ({
@@ -234,8 +240,10 @@ function loadSqliteSignatures(dbPath: string): SigDbFile[] {
       factoryExactHash: r.factory_exact_hash != null ? hexHash(r.factory_exact_hash) : null,
       factoryFuzzyHash: r.factory_fuzzy_hash != null ? hexHash(r.factory_fuzzy_hash) : null,
       nestedFunctionCount: r.nested_function_count,
+      ...(r.nested_function_indices != null ? { nestedFunctionIndices: JSON.parse(r.nested_function_indices) as number[] } : {}),
       functionSetHash: hexHash(r.function_set_hash),
       factoryIsBaseline: !!r.factory_is_baseline,
+      ...(r.factory_is_dependency != null ? { factoryIsDependency: !!r.factory_is_dependency } : {}),
       ...(fp.module_paths != null ? { path: r.path ?? null } : {}),
     }));
 
@@ -243,6 +251,8 @@ function loadSqliteSignatures(dbPath: string): SigDbFile[] {
       schema: fp.source_schema as 2,
       ...(fp.hash_scheme != null ? { hashScheme: fp.hash_scheme } : {}),
       ...(fp.module_paths != null ? { modulePaths: fp.module_paths } : {}),
+      ...(fp.bulk_build_fix_version != null ? { bulkBuildFixVersion: fp.bulk_build_fix_version } : {}),
+      ...(fp.subtracted_dependencies != null ? { subtractedDependencies: JSON.parse(fp.subtracted_dependencies) as string[] } : {}),
       package: fp.pkg_name,
       version: fp.pv_version,
       hbcVersion: fp.hbc_version,

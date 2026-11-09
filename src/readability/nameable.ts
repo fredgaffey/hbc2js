@@ -16,12 +16,10 @@ import type { ModuleAnalysis } from "../cfg/types.ts";
 import type { Stmt } from "../emit/ast.ts";
 import type { RegisterId } from "../name-overlay/id.ts";
 import { parseWebIdent, regId } from "../name-overlay/id.ts";
-import { classifyAll } from "../passes/var-naming/match.ts";
-import { renderedRegisterNames } from "../name-overlay/render.ts";
 import { rawFrames } from "../name-overlay/frames.ts";
 import { astPassHook } from "../passes/index.ts";
 import type { AstPassHook } from "../passes/index.ts";
-import { freeNames, isRegisterName, registerUses } from "../passes/ast.ts";
+import { freeNames, isRegisterName, mapStmts, registerUses } from "../passes/ast.ts";
 import { declaredNames } from "../passes/var-naming/match.ts";
 
 export interface NameableIndex {
@@ -47,26 +45,28 @@ export function nameableIndex(analysis: ModuleAnalysis, opts: { readonly strictE
         const regs: number[] = [];
         for (const n of registerUses(frame.node.body).keys()) if (isRegisterName(n)) regs.push(Number(n.slice(1)));
         regs.sort((a, b) => a - b);
-        // The UI's own reg -> rendered-ident join (var-naming's heuristic
-        // choice, else `rN`), then the ident must survive as a declared
-        // binding of the frame after the real stage-B pipeline ran with NO
-        // overlay: inlined temporaries and the implicit receiver vanish there.
-        const rendered = renderedRegisterNames(fn, frame.node.body, new Map(), { varNaming: true });
         // The interposition is the identity: it only observes the post-
         // reg-split body (the webs), so `res` is the ordinary render.
         let split: readonly Stmt[] = [];
         const res = hook(frame.node, frame.cfg, { beforeVarNaming: (b) => (split = b) });
         // Declarations are placed after the pass pipeline, so a binding shows up
         // here as an assigned/read identifier or as an explicit declaration.
-        const bound = res.fn.k === "func" ? new Set([...declaredNames([res.fn]), ...freeNames([res.fn])]) : new Set<string>();
+        // Own scope only: a nested closure prints its own `rN`s, which are other
+        // registers, so its bodies are emptied before collecting identifiers.
+        let bound = new Set<string>();
+        if (res.fn.k === "func") {
+          const own = { ...res.fn, body: mapStmts(res.fn.body, (st) => (st.k === "func" ? { ...st, params: [], body: [] } : st), (e) => (e.k === "func" ? { ...e, params: [], body: [] } : e)) };
+          bound = new Set([...declaredNames([own]), ...freeNames([own])]);
+        }
         // `renderedRegisterNames` is best effort for the heuristic half (it
         // classifies the raw body), so the register's own `rN` also counts.
-        out = regs.filter((r) => bound.has(`r${String(r)}`) || bound.has(rendered.get(r) ?? `r${String(r)}`));
+        // id-match: ONLY the literal `rN` counts. A register var-naming prints
+        // under a heuristic name has no `rN` in the body the model is shown, so
+        // asking for `rN` is a question it cannot map (it already has a name).
+        out = regs.filter((r) => bound.has(`r${String(r)}`));
         // Live ranges: the post-split idents, each joined to var-naming's
         // heuristic name for it (classified on the same post-split body
         // var-naming itself sees), must survive as a binding.
-        const heuristic = new Map<string, string>();
-        for (const c of classifyAll(split)) if (c.result.ok) heuristic.set(c.name, c.result.to);
         const splitIdents = [...registerUses(split).keys()].filter(isRegisterName);
         const webs = new Map<number, number[]>();
         for (const n of splitIdents) {
@@ -76,7 +76,7 @@ export function nameableIndex(analysis: ModuleAnalysis, opts: { readonly strictE
           list.push(w.web);
           webs.set(w.reg, list);
         }
-        const isBound = (ident: string): boolean => bound.has(ident) || bound.has(heuristic.get(ident) ?? ident);
+        const isBound = (ident: string): boolean => bound.has(ident);
         const present = new Set(splitIdents);
         for (const r of regs) {
           const ws = webs.get(r);

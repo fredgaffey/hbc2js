@@ -10,6 +10,7 @@ import { selectBundleInventory } from "./bundles.ts";
 import type { BundleSummary } from "./bundles.ts";
 import type { ApkEvidence } from "./apk.ts";
 import { deriveCandidatePackages } from "./candidates.ts";
+import { hashIndexHint } from "./hash-index.ts";
 import { classifyInventory, loadCommonalityIndex, DEFAULT_COMMONALITY_INDEX_PATH } from "./classify.ts";
 import type { ClassificationReport } from "./classify.ts";
 import { confirmCandidates, defaultConfirmJobs, detectRnVersionFromBaselineFilenames } from "./confirm.ts";
@@ -75,6 +76,8 @@ export interface DepsRunResult {
   readonly confirmResults: readonly ConfirmResult[];
   readonly apkEvidence: ApkEvidence | null;
   readonly classification: ClassificationReport | null;
+  /** Informational one-liners (e.g. missing candidate hash index); verbose only. */
+  readonly hints: readonly string[];
 }
 
 function readInputInventory(inputPath: string): { inventory: ModuleInventory; apkEvidence: ApkEvidence | null; bundles: readonly BundleSummary[] | null } {
@@ -171,7 +174,7 @@ export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promis
   const nativeChannel = extname(inputPath).toLowerCase() === ".apk" ? nativeChannelForApk(inputPath, reportWithoutNativeChannel) : null;
   const reportWithBundles = bundles === null ? reportWithoutNativeChannel : { ...reportWithoutNativeChannel, bundles };
   const report = nativeChannel === null ? reportWithBundles : { ...reportWithBundles, nativeChannel };
-  return { report, inventory, matchReport, guesses, confirmResults, apkEvidence, classification };
+  return { report, inventory, matchReport, guesses, confirmResults, apkEvidence, classification, hints: [hashIndexHint(layers, inventory.hbcVersion)].filter((h): h is string => h !== null) };
 }
 
 // `--known` gives the tool a candidate list (names + versions) up front --
