@@ -124,3 +124,25 @@ test("corpus-ambiguity-cutoff: a unique hit the target holds generically does no
   const grown = matchInventory(target, loaded([g, ...carriers(h.path, "other-", AMBIGUOUS_OWNER_THRESHOLD + 5)]));
   assert.ok((scoreOf(grown, "g-generic")?.exactHits ?? 0) < 6, "X stays ambiguous for g: " + JSON.stringify(scoreOf(grown, "g-generic")));
 });
+
+// deps-land-1110: MetaMask +pop2 confirmed ent, is-date-object and eventid
+// (all false positives) on get-intrinsic-era code that 20-22 loaded
+// packages hold. The hbc96 DB has no get-intrinsic or call-bound, so no
+// claimant is the code's owner; removing the dependents left 9-15
+// mutually independent carriers, and every one kept the code because
+// fewer than 20 remained. Removing dependents only says something about a
+// claimant the removed dependents depend on (their code is its code). An
+// unsupported claimant nobody depends on gains nothing from it: for it the
+// hash is as ambiguous as before.
+test("deps-land-1110: independent carriers of an absent package's code do not share it once dependents are removed", (t) => {
+  const h = requireHermesc(t, 96);
+  if (h === null) return;
+  const target = buildInventory(compile(h.path, bundle([APP, X()]))).inventory;
+  // Five independent carriers, the first with many dependents; nobody in
+  // the DB is X's real package.
+  const owners = carriers(h.path, "car-", 5, []);
+  const deps = carriers(h.path, "dep-", AMBIGUOUS_OWNER_THRESHOLD, ["car-0"]);
+  const r = matchInventory(target, loaded([...owners, ...deps]));
+  for (const p of ["car-1", "car-4"]) assert.notEqual(scoreOf(r, p)?.tier, "high", p + ": " + JSON.stringify(scoreOf(r, p)));
+  assert.equal(scoreOf(r, "car-1")?.exactHits, 0, "X stays ambiguous for an independent carrier: " + JSON.stringify(scoreOf(r, "car-1")));
+});
