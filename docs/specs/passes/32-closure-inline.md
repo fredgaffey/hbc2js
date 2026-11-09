@@ -79,6 +79,9 @@ module, so one match cost declarations times bundle size. It now makes one
 per `FunctionCfg` too, since `match` and `check` both ask on every driver
 iteration. `tests/gate/passes/closure-inline-hang.test.ts` counts node
 visits and driver iterations, not wall time.
+Measured on deb, react-navigation-example v98 passes-on, same tree with
+and without closure-inline: IDENTICAL 7807 -> 7880 of 14437,
+`diff:GetGlobalObject/CreateClosure` 214 -> 199, wall 3:22 -> 3:30.
 
 **Printer side fix.** A function expression in callee position
 (`_fn3(a, b)` -> `(function _fn3() {...})(a, b)`) printed as
