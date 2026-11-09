@@ -226,18 +226,18 @@ test("object-literal refuses a computed-key store whose value reads the half-bui
 // Negatives.
 // ---------------------------------------------------------------------------
 
-// docs/BUGS.md `object-literal-putbyid`: a `PutById`-family run on a FRESH
-// object, where nothing in the run has had a chance to reach
-// `Object.prototype`, IS observably a define for plain data keys.
-test("object-literal folds a PutById run on a fresh object for plain data keys", () => {
+// docs/DECISIONS.md D27a (supersedes the 2026-09-05 `object-literal-putbyid`
+// resolution, which this test used to assert the other way round): a
+// `PutById`-family store is a full `[[Set]]` and never folds, even on a
+// fresh object with nothing else in the run -- an accessor installed on
+// `Object.prototype` before the object existed would run on `[[Set]]` and
+// not on a literal's own define (constructs/390-putbyid-fold-inherited-setter).
+test("object-literal refuses a PutById run on a fresh object even for plain data keys", () => {
   const list = [def("r0", []), store("r0", "a", false, id("r1"), "PutByIdLoose"), store("r0", "b", false, id("r2"), "PutByIdLoose")];
-  const after = fold(list);
-  assert.ok(after !== null);
-  const props = ((after![0] as { expr: { value: Expr } }).expr.value as Extract<Expr, { k: "object" }>).props;
-  assert.deepEqual(
-    props.map((p) => ("k" in p ? "…" : p.key)),
-    ["a", "b"],
-  );
+  assert.equal(match(list, ctxFor()), null);
+  for (const op of ["PutById", "PutByIdStrict", "TryPutById"]) {
+    assert.equal(match([def("r0", []), store("r0", "a", false, id("r1"), op)], ctxFor()), null, op);
+  }
 });
 
 test("object-literal refuses a PutById store's __proto__ key even on a fresh object", () => {
@@ -246,9 +246,9 @@ test("object-literal refuses a PutById store's __proto__ key even on a fresh obj
 });
 
 test("object-literal refuses a PutById store once an earlier value in the run could have reached Object.prototype", () => {
-  // The first store is an own-define (never prototype-sensitive), but its
-  // own value is a call — which could itself have redefined a property on
-  // `Object.prototype` before the *second* store's `[[Set]]` runs.
+  // The first store is an own-define (never prototype-sensitive) and folds;
+  // the second is a `PutById` and is refused (D27a: always, not only after a
+  // call like this one).
   const list = [def("r0", []), store("r0", "a", false, { k: "call", callee: id("f"), args: [] }), store("r0", "b", false, id("r2"), "PutByIdLoose")];
   const after = fold(list);
   assert.ok(after !== null);
@@ -392,11 +392,11 @@ for (const version of ["v84", "v94", "v96", "v98", "v99"]) {
 
   test(`object-literal refuses the fixture's negative controls at ${version}`, () => {
     const on = js(version);
-    // D: `.a` is a `PutById`-family store on a fresh object with nothing
-    // else in the run (docs/BUGS.md `object-literal-putbyid`), so it now
-    // folds into the literal; `.b` reads the half-built object (precondition
-    // 6) and still stays a separate store.
-    assert.match(on, /= \{a: [^\n]*\};\n\s*\w+\.b = \w+\.a /);
+    // D: `.a` is a `PutById`-family store, which never folds (DECISIONS
+    // D27a, superseding the 2026-09-05 `object-literal-putbyid` fold); `.b`
+    // reads the half-built object (precondition 6) and stays a store too.
+    assert.match(on, /= \{\};\n(?:\s*(?:let |const |var )?\w+ = [^\n]*;\n)?\s*\w+\.a = [^\n]*;\n\s*\w+\.b = \w+\.a /);
+    assert.doesNotMatch(on, /= \{a: /);
     // E: the accessor still goes through Object.defineProperty, and the
     // property after it is still a separate store.
     assert.match(on, /Object\.defineProperty\([^\n]*"doubled"/);

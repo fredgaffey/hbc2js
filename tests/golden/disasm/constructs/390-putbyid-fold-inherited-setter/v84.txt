@@ -1,0 +1,71 @@
+; hbc2js disassembly of 390-putbyid-fold-inherited-setter/v84.hbc
+; version=84 layout=B opcodeTable=hbc84 functions=4 strings=20 globalCodeIndex=0
+function #0 "global"  params=1 frame=17 env=0 flags=dbg  @0x000001b4 size=211
+  0000  DeclareGlobalVar     s5 "log"
+  0005  DeclareGlobalVar     s13 "r"
+  000a  DeclareGlobalVar     s15 "make"
+  000f  CreateEnvironment    r1
+  0011  CreateClosure        r2, r1, f1 "make"
+  0016  GetGlobalObject      r0
+  0018  PutById              r0, r2, #c1, s15 "make"
+  001e  NewArray             r2, 0
+  0022  PutById              r0, r2, #c2, s5 "log"
+  0028  TryGetById           r5, r0, #c1, s10 "Object"
+  002e  GetByIdShort         r4, r5, #c2, s8 "defineProperty"
+  0033  TryGetById           r2, r0, #c1, s10 "Object"
+  0039  GetByIdShort         r3, r2, #c3, s18 "prototype"
+  003e  NewObject            r2
+  0040  LoadConstTrue        r6
+  0042  PutNewOwnByIdShort   r2, r6, s11 "configurable"
+  0046  CreateClosure        r6, r1, f2 "set"
+  004b  PutNewOwnByIdShort   r2, r6, s9 "set"
+  004f  CreateClosure        r1, r1, f3 "get"
+  0054  PutNewOwnByIdShort   r2, r1, s14 "get"
+  0058  LoadConstString      r1, s12 "extra"
+  005c  Call4                r1, r4, r5, r3, r1, r2
+  0063  GetByIdShort         r1, r0, #c4, s15 "make"
+  0068  LoadConstUndefined   r4
+  006a  Call1                r1, r1, r4
+  006e  PutById              r0, r1, #c3, s13 "r"
+  0074  TryGetById           r1, r0, #c1, s10 "Object"
+  007a  GetByIdShort         r1, r1, #c3, s18 "prototype"
+  007f  DelById              r1, r1, s12 "extra"
+  0084  TryGetById           r3, r0, #c5, s17 "print"
+  008a  GetByIdShort         r5, r0, #c6, s5 "log"
+  008f  GetByIdShort         r2, r5, #c7, s7 "join"
+  0094  LoadConstString      r1, s1 ";"
+  0098  Call2                r2, r2, r5, r1
+  009d  GetByIdShort         r1, r0, #c8, s13 "r"
+  00a2  GetByIdShort         r1, r1, #c9, s6 "a"
+  00a7  TryGetById           r6, r0, #c1, s10 "Object"
+  00ad  GetByIdShort         r5, r6, #c10, s16 "keys"
+  00b2  GetByIdShort         r0, r0, #c8, s13 "r"
+  00b7  Call2                r6, r5, r6, r0
+  00bc  GetByIdShort         r5, r6, #c7, s7 "join"
+  00c1  LoadConstString      r0, s0 ","
+  00c5  Call2                r0, r5, r6, r0
+  00ca  Call4                r0, r3, r4, r2, r1, r0
+  00d1  Ret                  r0
+
+function #1 "make"  params=1 frame=2 env=0 flags=dbg  @0x00000287 size=20
+  0000  NewObject            r0
+  0002  LoadConstUInt8       r1, 1
+  0005  PutNewOwnByIdShort   r0, r1, s6 "a"
+  0009  LoadConstUInt8       r1, 2
+  000c  PutById              r0, r1, #c1, s12 "extra"
+  0012  Ret                  r0
+
+function #2 "set"  params=2 frame=12 env=0 flags=dbg  @0x0000029b size=32
+  0000  GetGlobalObject      r0
+  0002  GetByIdShort         r2, r0, #c1, s5 "log"
+  0007  GetByIdShort         r1, r2, #c2, s19 "push"
+  000c  LoadConstString      r3, s4 "proto-set "
+  0010  LoadParam            r0, 1
+  0013  Add                  r0, r3, r0
+  0017  Call2                r0, r1, r2, r0
+  001c  LoadConstUndefined   r0
+  001e  Ret                  r0
+
+function #3 "get"  params=1 frame=1 env=0 flags=none  @0x000002bb size=6
+  0000  LoadConstString      r0, s3 "inherited"
+  0004  Ret                  r0

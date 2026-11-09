@@ -1,0 +1,85 @@
+; hbc2js disassembly of 261-literal-slot-fill-observable-store/v99.hbc
+; version=99 layout=E opcodeTable=hbc99-mar2026 functions=5 strings=20 globalCodeIndex=0
+function #0 "global"  params=1 frame=21 env=0 flags=dbg,overflowed  @0x0000019c size=192
+  0000  DeclareGlobalVar     s7 "log"
+  0005  DeclareGlobalVar     s18 "use"
+  000a  DeclareGlobalVar     s19 "viaOwnSetter"
+  000f  DeclareGlobalVar     s14 "r"
+  0014  GetGlobalObject      r1
+  0016  LoadConstUndefined   r0
+  0018  CreateClosure        r2, r0, f1 "use"
+  001d  PutByIdLoose         r1, r2, #c0, s18 "use"
+  0023  CreateClosure        r2, r0, f2 "viaOwnSetter"
+  0028  PutByIdLoose         r1, r2, #c1, s19 "viaOwnSetter"
+  002e  NewArray             r2, 0
+  0032  PutByIdLoose         r1, r2, #c2, s7 "log"
+  0038  GetByIdShort         r3, r1, #c0, s19 "viaOwnSetter"
+  003d  NewObject            r2
+  003f  Call2                r2, r3, r0, r2
+  0044  PutByIdLoose         r1, r2, #c3, s14 "r"
+  004a  TryGetById           r5, r1, #c1, s16 "print"
+  0050  GetByIdShort         r4, r1, #c2, s7 "log"
+  0055  GetByIdShort         r3, r4, #c3, s15 "join"
+  005a  LoadConstString      r2, s1 ";"
+  005e  Call2                r4, r3, r4, r2
+  0063  GetByIdShort         r2, r1, #c4, s14 "r"
+  0068  GetByIdShort         r3, r2, #c5, s9 "k"
+  006d  TryGetById           r7, r1, #c6, s12 "Object"
+  0073  GetByIdShort         r6, r7, #c7, s10 "keys"
+  0078  GetByIdShort         r2, r1, #c4, s14 "r"
+  007d  Call2                r7, r6, r7, r2
+  0082  GetByIdShort         r6, r7, #c3, s15 "join"
+  0087  LoadConstString      r2, s0 ","
+  008b  Call2                r10, r6, r7, r2
+  0090  TryGetById           r8, r1, #c6, s12 "Object"
+  0096  GetByIdShort         r7, r8, #c8, s13 "getOwnPropertyDescriptor"
+  009b  GetByIdShort         r6, r1, #c4, s14 "r"
+  00a0  LoadConstString      r1, s9 "k"
+  00a4  Call3                r1, r7, r8, r6, r1
+  00aa  GetByIdShort         r1, r1, #c9, s11 "set"
+  00af  TypeOf               r9, r1
+  00b2  LoadConstUndefined   r13
+  00b4  Mov                  r12, r4
+  00b7  Mov                  r11, r3
+  00ba  Call                 r1, r5, 5
+  00be  Ret                  r1
+
+function #1 "use"  params=3 frame=1 env=0 flags=none  @0x0000025c size=5
+  0000  LoadParam            r0, 2
+  0003  Ret                  r0
+
+function #2 "viaOwnSetter"  params=2 frame=19 env=0 flags=dbg,overflowed  @0x00000261 size=70
+  0000  LoadParam            r4, 1
+  0003  GetGlobalObject      r2
+  0005  GetByIdShort         r3, r2, #c0, s18 "use"
+  000a  TryGetById           r2, r2, #c1, s12 "Object"
+  0010  GetByIdShort         r5, r4, #c2, s8 "get"
+  0015  JmpTrue              L1, r5
+  0018  NewObject            r5
+  001a  LoadConstString      r8, s9 "k"
+  001e  LoadConstUndefined   r1
+  0020  CreateClosure        r7, r1, f4 "set k"
+  0025  CreateClosure        r6, r1, f3 "get k"
+  002a  DefineOwnGetterSetterByVal r5, r8, r6, r7, 1
+  0030  LoadConstUInt8       r0, 1
+  0033  PutByIdLoose         r5, r0, #c0, s9 "k"
+  0039  Mov                  r4, r5
+L1:
+  003c  LoadConstUndefined   r1
+  003e  Call3                r2, r3, r1, r2, r4
+  0044  Ret                  r2
+
+function #3 "get k"  params=1 frame=1 env=0 flags=none  @0x000002a7 size=6
+  0000  LoadConstString      r0, s4 "own"
+  0004  Ret                  r0
+
+function #4 "set k"  params=2 frame=14 env=0 flags=dbg,overflowed  @0x000002ad size=32
+  0000  GetGlobalObject      r1
+  0002  GetByIdShort         r3, r1, #c0, s7 "log"
+  0007  GetByIdShort         r2, r3, #c1, s17 "push"
+  000c  LoadConstString      r4, s5 "own-set "
+  0010  LoadParam            r1, 1
+  0013  Add                  r1, r4, r1
+  0017  Call2                r1, r2, r3, r1
+  001c  LoadConstUndefined   r0
+  001e  Ret                  r0
