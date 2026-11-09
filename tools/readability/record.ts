@@ -263,6 +263,16 @@ async function main(): Promise<void> {
   // Cheap: no `render()` call anywhere in `collectTargets` (see its own
   // comment) -- safe to run over the WHOLE selected scope before any model
   // call or `--sample`, even on the ~15k-function held-out bundle.
+  // `--labelled`: restrict the scope to functions holding a labelled register
+  // BEFORE collecting targets. collectTargets runs the pass pipeline per
+  // function (nameableIndex), which on a 50k-function app dominates the whole
+  // run; the later --labelled filter keeps the same set, only cheaper.
+  const labelledEarly = argv.indexOf("--labelled");
+  if (labelledEarly >= 0) {
+    const l = JSON.parse(readFileSync(argv[labelledEarly + 1]!, "utf8")) as { targets: { kind: string; binding?: { fn: number } }[] };
+    const lf = new Set(l.targets.flatMap((t) => (t.kind === "register" && t.binding !== undefined ? [t.binding.fn] : [])));
+    srcFns = srcFns === null ? lf : new Set([...srcFns].filter((f) => lf.has(f)));
+  }
   let allTargets = collectTargets(analysis, frames, store, srcFns, nameableIndex(analysis, { strictEnv: false }));
   const selectedFns = new Set(allTargets.map((t) => t.fn));
   process.stderr.write(
