@@ -1208,3 +1208,40 @@ rest is each app's long tail (wallet SDKs, `@metamask/*`, app-specific
 forks), which no download- or SDK-ranked list reaches. The truth-chosen
 wishlist would cover all 1,235 by construction; that number would say
 nothing about a new app.
+
+**Batch 1** (deb, 2026-11-10): the first 480 jobs of the `--top 5000`
+plan (declared names, then the top-download names to about rank 250, all
+phase 1, 345 package-versions; 342 at hbc96 and 138 at hbc98, because
+`db-overlay-pop{,2}` already hold most top names at hbc98). Built with
+`worker.sh` (6 jobs, 3 slots per family, `nice 10`), `dep-subtract.mjs`
+against the v4 farm's hbc96/98 files, into `~/_hbc2js/db-v4-honest`
+(348 files, 47 MB). Built 348 of 480 (hbc96 228 of 335, hbc98 120 of 145; the
+first attempt lost 752 jobs to poisoned scaffold slots, docs/BUGS.md
+2026-11-10, and was re-run with a per-job slot reset). Failed 132:
+`Unable to resolve module` 70 (mostly SDK-56..58 Expo modules on the RN
+0.72 scaffold that serves hbc96), `@expo/require-utils` dynamic `import()` 16
+(node-only Expo tooling), other bundle errors 43, platform-only binaries 2,
+hermesc 1. Measured offline (`meas2.mjs`, branch code, sha pins matched).
+"+ honest" = `cp -al` of `deps-rm/f-v4` plus the batch; "+ pop" also
+links `db-overlay-pop{,2}` (an earlier app-blind population, never in
+f-v4). Confirmed / TP / FP, precision, recall:
+
+| app | f-v4 | + honest | + honest + pop |
+|---|---|---|---|
+| Expensify (hbc98) | 107 / 102 / 5, 95.3%, 35.4% | 115 / 109 / 6, 94.8%, 37.8% | 150 / 137 / 13, 91.3%, 47.6% |
+| react-navigation (hbc98) | 22 / 22 / 0, 100%, 28.9% | 22 / 22 / 0, 100%, 28.9% | 25 / 25 / 0, 100%, 32.9% |
+| bluesky (hbc98) | 47 / 46 / 1, 97.9%, 23.2% | 52 / 49 / 3, 94.2%, 24.7% | 60 / 56 / 4, 93.3%, 28.3% |
+| rainbow (hbc96) | 116 / 109 / 7, 94.0%, 21.0% | 123 / 115 / 8, 93.5%, 22.2% | 130 / 119 / 11, 91.5%, 23.0% |
+| MetaMask (hbc96) | 179 / 165 / 14, 92.2%, 22.0% | 196 / 181 / 15, 92.3%, 24.2% | 202 / 184 / 18, 91.1%, 24.6% |
+
+Batch 1: +32 TPs, no TP lost, 6 new FPs, 1 gone (`p-map` on MetaMask).
+New FPs (not traced to hit owners): `source-map-js` (Expensify, MetaMask;
+a fork of `source-map`, the twin class), `esquery` (rainbow, MetaMask; ships
+a prebuilt dist that embeds `estraverse`, the bundled-dist class),
+`expo-router` and `sentry-expo` (bluesky; wrappers whose code is mostly
+the `@react-navigation/*` and `@sentry/*` packages the app also has, the
+copies class). The pop overlays add another +28 TPs and +12 FPs; those
+FPs are the ones docs/DEPS.md "Population widening" lists, plus the
+`@sentry/*` subpackages.
+Next by cost: the hbc96 Expo failures need a newer hbc96 scaffold, not
+more jobs; phase 1 has 5,266 jobs left.
