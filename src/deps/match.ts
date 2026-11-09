@@ -281,7 +281,7 @@ interface OwnView {
   readonly copies: ForeignSets;
 }
 
-function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Set<string>, targetFuzzy: Set<string>, targetStringHash: Set<string>, minInstr: number, hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetCopies: ReadonlyMap<string, number>, view: OwnView): { readonly score: PackageScore; readonly hitKeys: ReadonlySet<string>; readonly distinctEligible: number } | null {
+function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Set<string>, targetFuzzy: Set<string>, targetStringHash: Set<string>, minInstr: number, ownsHash: (hash: string, pkg: string) => boolean, targetCopies: ReadonlyMap<string, number>, view: OwnView): { readonly score: PackageScore; readonly hitKeys: ReadonlySet<string>; readonly distinctEligible: number } | null {
   const pkg: SigDbFile = entry.file;
   if (pkg.hbcVersion !== target.hbcVersion) return null;
   // corpus-embedded-copy (module paths v1, docs/PACKAGE-SIGNATURES.md §7):
@@ -334,7 +334,7 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
     const n = targetCopies.get(hash) ?? 0;
     return !pkg.toolchainBaseline && n >= TARGET_GENERIC_COPIES && n > 2 * (ownCopies.get(hash) ?? 0);
   };
-  const isUnambiguous = (hash: string): boolean => (hashOwnerNames.get(hash)?.size ?? 1) < AMBIGUOUS_OWNER_THRESHOLD && !isGenericInTarget(hash);
+  const isUnambiguous = (hash: string): boolean => ownsHash(hash, pkg.package) && !isGenericInTarget(hash);
 
   let exactHits = 0;
   let exactHitInstrSum = 0;
@@ -770,6 +770,71 @@ export interface MatchOptions {
   readonly minInstr?: number;
 }
 
+/** corpus-ambiguity-cutoff (docs/DEPS.md "Ambiguity counts independent
+ *  owners"): whether `pkg`'s claim on a target hash is its own evidence.
+ *  Below `AMBIGUOUS_OWNER_THRESHOLD` claimant names, every claimant keeps
+ *  it (unchanged). At or above it, the raw count is a sample of the loaded
+ *  candidates, so DB growth alone pushed true packages' hashes over it. The
+ *  count then takes only independent owners: a claimant whose recorded
+ *  dependency closure (loaded files' `subtractedDependencies`, transitive)
+ *  contains another claimant carries that claimant's code and is not an
+ *  owner. An owner keeps the hash while fewer than the threshold owners
+ *  remain. An owner the target supports by a hash no other loaded package
+ *  claims also keeps it while fewer than the threshold SUPPORTED owners
+ *  remain: candidates loaded with no evidence of their own in the target
+ *  are not competing owners, so loading more of them changes nothing. */
+function independentOwnerRule(dbs: readonly LoadedSig[], hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetExact: ReadonlySet<string>, minInstr: number): (hash: string, pkg: string) => boolean {
+  const variant = process.env.HBC2JS_AMBIG_VARIANT ?? "v2";
+  if (variant === "off") return (hash) => (hashOwnerNames.get(hash)?.size ?? 1) < AMBIGUOUS_OWNER_THRESHOLD;
+  const direct = new Map<string, Set<string>>();
+  const evidenced = new Set<string>();
+  for (const { file } of dbs) {
+    if (file.toolchainBaseline) continue;
+    let d = direct.get(file.package);
+    if (d === undefined) direct.set(file.package, (d = new Set()));
+    for (const dep of file.subtractedDependencies ?? []) {
+      const m = /^(.*)@[^@]+__hbc\d+\.json$/.exec(dep);
+      if (m !== null) d.add(m[1]!.replace(/__/g, "/"));
+    }
+    if (!evidenced.has(file.package)) for (const fn of file.functions) {
+      if (fn.instrCount < minInstr) continue;
+      const k = schemeKey(file, fn.exactHash);
+      if (targetExact.has(k) && hashOwnerNames.get(k)?.size === 1) {
+        evidenced.add(file.package);
+        break;
+      }
+    }
+  }
+  const closures = new Map<string, ReadonlySet<string>>();
+  const closureOf = (p: string): ReadonlySet<string> => {
+    let c = closures.get(p);
+    if (c !== undefined) return c;
+    const seen = new Set<string>();
+    const stack = [...(direct.get(p) ?? [])];
+    while (stack.length > 0) {
+      const q = stack.pop()!;
+      if (q === p || seen.has(q)) continue;
+      seen.add(q);
+      stack.push(...(direct.get(q) ?? []));
+    }
+    closures.set(p, seen);
+    return seen;
+  };
+  const memo = new Map<string, { readonly owners: ReadonlySet<string>; readonly supported: number }>();
+  return (hash, pkg) => {
+    const names = hashOwnerNames.get(hash);
+    if (names === undefined || names.size < AMBIGUOUS_OWNER_THRESHOLD) return true;
+    let r = memo.get(hash);
+    if (r === undefined) {
+      const owners = new Set([...names].filter((c) => ![...closureOf(c)].some((d) => d !== c && names.has(d))));
+      const supported = variant === "v1" ? owners.size : [...owners].filter((c) => evidenced.has(c)).length;
+      memo.set(hash, (r = { owners, supported }));
+    }
+    if (!r.owners.has(pkg)) return false;
+    return r.owners.size < AMBIGUOUS_OWNER_THRESHOLD || (variant !== "v1" && evidenced.has(pkg) && r.supported < AMBIGUOUS_OWNER_THRESHOLD);
+  };
+}
+
 export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedSig[], opts: MatchOptions = {}): MatchReport {
   const minInstr = opts.minInstr ?? 8;
   const targetExact = buildIndex(inventory.functions, "exactHash");
@@ -922,6 +987,8 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
     }
   }
 
+  const ownsHash = independentOwnerRule(eligibleDbs, hashOwnerNames, targetExact, minInstr);
+
   // Pass 2: score every package now that `hashOwnerNames` is complete —
   // ambiguity-aware, so a package's own tier never rests on evidence another
   // distinct package equally claims (§6.7 above).
@@ -929,7 +996,7 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
   const scoreByOwner = new Map<string, PackageScore>();
   const scoredEntries: ScoredEntry[] = [];
   for (const entry of eligibleDbs) {
-    const scored = scorePackage(entry, inventory, targetExact, targetFuzzy, targetStringHash, minInstr, hashOwnerNames, targetCopies, viewOf(entry.file));
+    const scored = scorePackage(entry, inventory, targetExact, targetFuzzy, targetStringHash, minInstr, ownsHash, targetCopies, viewOf(entry.file));
     if (scored === null) continue;
     scoredEntries.push({ entry, ...scored });
   }
