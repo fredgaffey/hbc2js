@@ -1,0 +1,548 @@
+; hbc2js disassembly of 395-generator-no-yield/v96.hbc
+; version=96 layout=C opcodeTable=hbc96 functions=30 strings=76 globalCodeIndex=0
+function #0 "global"  params=1 frame=17 env=0 flags=exc,dbg  @0x00000638 size=1106
+  .try T1..T2 -> L1 ; handler 0
+  0000  DeclareGlobalVar     s57 "it"
+  0005  DeclareGlobalVar     s43 "r"
+  000a  DeclareGlobalVar     s69 "r2"
+  000f  DeclareGlobalVar     s56 "log"
+  0014  DeclareGlobalVar     s72 "it3"
+  0019  DeclareGlobalVar     s54 "made"
+  001e  DeclareGlobalVar     s59 "p"
+  0023  DeclareGlobalVar     s71 "hasNativeConstructor"
+  0028  DeclareGlobalVar     s47 "empty"
+  002d  DeclareGlobalVar     s48 "onlyReturn"
+  0032  DeclareGlobalVar     s49 "sideEffect"
+  0037  DeclareGlobalVar     s42 "asyncEmpty"
+  003c  DeclareGlobalVar     s44 "asyncReturn"
+  0041  DeclareGlobalVar     s45 "asyncThrow"
+  0046  DeclareGlobalVar     s50 "strictGen"
+  004b  DeclareGlobalVar     s46 "strictAsync"
+  0050  DeclareGlobalVar     s55 "describe"
+  0055  CreateEnvironment    r1
+  0057  CreateClosure        r2, r1, f1 "hasNativeConstructor"
+  005c  GetGlobalObject      r0
+  005e  PutById              r0, r2, #c1, s71 "hasNativeConstructor"
+  0064  CreateGeneratorClosure r2, r1, f2 "empty"
+  0069  PutById              r0, r2, #c2, s47 "empty"
+  006f  CreateGeneratorClosure r2, r1, f4 "onlyReturn"
+  0074  PutById              r0, r2, #c3, s48 "onlyReturn"
+  007a  CreateGeneratorClosure r2, r1, f6 "sideEffect"
+  007f  PutById              r0, r2, #c4, s49 "sideEffect"
+  0085  CreateAsyncClosure   r2, r1, f8 "asyncEmpty"
+  008a  PutById              r0, r2, #c5, s42 "asyncEmpty"
+  0090  CreateAsyncClosure   r2, r1, f11 "asyncReturn"
+  0095  PutById              r0, r2, #c6, s44 "asyncReturn"
+  009b  CreateAsyncClosure   r2, r1, f14 "asyncThrow"
+  00a0  PutById              r0, r2, #c7, s45 "asyncThrow"
+  00a6  CreateGeneratorClosure r2, r1, f17 "strictGen"
+  00ab  PutById              r0, r2, #c8, s50 "strictGen"
+  00b1  CreateAsyncClosure   r2, r1, f19 "strictAsync"
+  00b6  PutById              r0, r2, #c9, s46 "strictAsync"
+  00bc  CreateClosure        r2, r1, f22 "describe"
+  00c1  PutById              r0, r2, #c10, s55 "describe"
+  00c7  GetByIdShort         r5, r0, #c1, s55 "describe"
+  00cc  LoadConstUndefined   r2
+  00ce  LoadConstString      r4, s7 "anon"
+  00d2  CreateGeneratorClosure r3, r1, f23 ""
+  00d7  Call3                r3, r5, r2, r4, r3
+  00dd  GetByIdShort         r5, r0, #c1, s55 "describe"
+  00e2  GetByIdShort         r4, r0, #c2, s47 "empty"
+  00e7  LoadConstString      r3, s47 "empty"
+  00eb  Call3                r3, r5, r2, r3, r4
+  00f1  GetByIdShort         r5, r0, #c1, s55 "describe"
+  00f6  GetByIdShort         r4, r0, #c3, s48 "onlyReturn"
+  00fb  LoadConstString      r3, s48 "onlyReturn"
+  00ff  Call3                r3, r5, r2, r3, r4
+  0105  GetByIdShort         r5, r0, #c1, s55 "describe"
+  010a  GetByIdShort         r4, r0, #c4, s49 "sideEffect"
+  010f  LoadConstString      r3, s49 "sideEffect"
+  0113  Call3                r3, r5, r2, r3, r4
+  0119  GetByIdShort         r5, r0, #c1, s55 "describe"
+  011e  GetByIdShort         r4, r0, #c5, s42 "asyncEmpty"
+  0123  LoadConstString      r3, s42 "asyncEmpty"
+  0127  Call3                r3, r5, r2, r3, r4
+  012d  GetByIdShort         r5, r0, #c1, s55 "describe"
+  0132  GetByIdShort         r4, r0, #c6, s44 "asyncReturn"
+  0137  LoadConstString      r3, s44 "asyncReturn"
+  013b  Call3                r3, r5, r2, r3, r4
+  0141  GetByIdShort         r5, r0, #c1, s55 "describe"
+  0146  GetByIdShort         r4, r0, #c7, s45 "asyncThrow"
+  014b  LoadConstString      r3, s45 "asyncThrow"
+  014f  Call3                r3, r5, r2, r3, r4
+  0155  GetByIdShort         r5, r0, #c1, s55 "describe"
+  015a  GetByIdShort         r4, r0, #c8, s50 "strictGen"
+  015f  LoadConstString      r3, s50 "strictGen"
+  0163  Call3                r3, r5, r2, r3, r4
+  0169  GetByIdShort         r5, r0, #c1, s55 "describe"
+  016e  GetByIdShort         r4, r0, #c9, s46 "strictAsync"
+  0173  LoadConstString      r3, s46 "strictAsync"
+  0177  Call3                r3, r5, r2, r3, r4
+  017d  TryGetById           r4, r0, #c10, s74 "print"
+  0183  GetByIdShort         r3, r0, #c8, s50 "strictGen"
+  0188  Call1                r5, r3, r2
+  018c  GetByIdShort         r3, r5, #c11, s41 "next"
+  0191  Call1                r3, r3, r5
+  0195  GetByIdShort         r5, r3, #c12, s75 "value"
+  019a  LoadConstString      r3, s26 "strictGen this "
+  019e  Add                  r3, r3, r5
+  01a2  Call2                r3, r4, r2, r3
+  01a7  GetByIdShort         r3, r0, #c9, s46 "strictAsync"
+  01ac  Call1                r5, r3, r2
+  01b0  GetByIdShort         r4, r5, #c13, s67 "then"
+  01b5  CreateClosure        r3, r1, f25 ""
+  01ba  Call2                r3, r4, r5, r3
+  01bf  GetByIdShort         r3, r0, #c2, s47 "empty"
+  01c4  Call1                r3, r3, r2
+  01c8  PutById              r0, r3, #c11, s57 "it"
+  01ce  TryGetById           r4, r0, #c10, s74 "print"
+  01d4  GetByIdShort         r3, r0, #c14, s57 "it"
+  01d9  GetByIdShort         r3, r3, #c11, s41 "next"
+  01de  LoadConstString      r5, s40 "typeof next "
+  01e2  TypeOf               r3, r3
+  01e5  Add                  r3, r5, r3
+  01e9  Call2                r3, r4, r2, r3
+  01ee  GetByIdShort         r4, r0, #c14, s57 "it"
+  01f3  GetByIdShort         r3, r4, #c11, s41 "next"
+  01f8  Call1                r3, r3, r4
+  01fc  PutById              r0, r3, #c12, s43 "r"
+  0202  TryGetById           r4, r0, #c10, s74 "print"
+  0208  GetByIdShort         r3, r0, #c15, s43 "r"
+  020d  GetByIdShort         r5, r3, #c12, s75 "value"
+  0212  LoadConstString      r3, s21 "empty next "
+  0216  Add                  r3, r3, r5
+  021a  GetByIdShort         r5, r0, #c15, s43 "r"
+  021f  GetByIdShort         r5, r5, #c16, s58 "done"
+  0224  LoadConstString      r6, s2 " "
+  0228  Add                  r3, r3, r6
+  022c  Add                  r3, r3, r5
+  0230  Call2                r3, r4, r2, r3
+  0235  GetByIdShort         r4, r0, #c3, s48 "onlyReturn"
+  023a  LoadConstUInt8       r3, 21
+  023d  Call2                r4, r4, r2, r3
+  0242  GetByIdShort         r3, r4, #c11, s41 "next"
+  0247  Call1                r3, r3, r4
+  024b  PutById              r0, r3, #c13, s69 "r2"
+  0251  TryGetById           r4, r0, #c10, s74 "print"
+  0257  GetByIdShort         r3, r0, #c17, s69 "r2"
+  025c  GetByIdShort         r5, r3, #c12, s75 "value"
+  0261  LoadConstString      r3, s23 "onlyReturn next "
+  0265  Add                  r3, r3, r5
+  0269  GetByIdShort         r5, r0, #c17, s69 "r2"
+  026e  GetByIdShort         r5, r5, #c16, s58 "done"
+  0273  Add                  r3, r3, r6
+  0277  Add                  r3, r3, r5
+  027b  GetByIdShort         r7, r0, #c3, s48 "onlyReturn"
+  0280  LoadConstUInt8       r5, 1
+  0283  Call2                r7, r7, r2, r5
+  0288  GetByIdShort         r5, r7, #c11, s41 "next"
+  028d  Call1                r5, r5, r7
+  0291  GetByIdShort         r5, r5, #c16, s58 "done"
+  0296  Add                  r3, r3, r6
+  029a  Add                  r3, r3, r5
+  029e  Call2                r3, r4, r2, r3
+  02a3  NewArray             r3, 0
+  02a7  PutById              r0, r3, #c14, s56 "log"
+  02ad  GetByIdShort         r4, r0, #c4, s49 "sideEffect"
+  02b2  GetByIdShort         r3, r0, #c18, s56 "log"
+  02b7  Call2                r3, r4, r2, r3
+  02bc  PutById              r0, r3, #c15, s72 "it3"
+  02c2  TryGetById           r4, r0, #c10, s74 "print"
+  02c8  GetByIdShort         r3, r0, #c18, s56 "log"
+  02cd  GetByIdShort         r5, r3, #c19, s66 "length"
+  02d2  LoadConstString      r3, s32 "lazy "
+  02d6  Add                  r3, r3, r5
+  02da  Call2                r3, r4, r2, r3
+  02df  GetByIdShort         r4, r0, #c20, s72 "it3"
+  02e4  GetByIdShort         r3, r4, #c11, s41 "next"
+  02e9  Call1                r3, r3, r4
+  02ed  TryGetById           r4, r0, #c10, s74 "print"
+  02f3  GetByIdShort         r3, r0, #c18, s56 "log"
+  02f8  GetByIdShort         r5, r3, #c19, s66 "length"
+  02fd  LoadConstString      r3, s1 "after next "
+  0301  Add                  r3, r3, r5
+  0305  Call2                r3, r4, r2, r3
+  030a  TryGetById           r4, r0, #c10, s74 "print"
+  0310  GetByIdShort         r5, r0, #c14, s57 "it"
+  0315  TryGetById           r3, r0, #c21, s65 "Symbol"
+  031b  GetByIdShort         r3, r3, #c22, s73 "iterator"
+  0320  GetByVal             r3, r5, r3
+  0324  Call1                r6, r3, r5
+  0328  GetByIdShort         r3, r0, #c14, s57 "it"
+  032d  LoadConstString      r5, s33 "iter self "
+  0331  StrictEq             r3, r6, r3
+  0335  Add                  r3, r5, r3
+  0339  Call2                r3, r4, r2, r3
+  033e  TryGetById           r4, r0, #c10, s74 "print"
+  0344  GetByIdShort         r3, r0, #c2, s47 "empty"
+  0349  GetByIdShort         r3, r3, #c23, s62 "prototype"
+  034e  LoadConstString      r5, s38 "proto obj "
+  0352  TypeOf               r3, r3
+  0355  Add                  r3, r5, r3
+  0359  Call2                r3, r4, r2, r3
+T1:
+  035e  GetByIdShort         r3, r0, #c2, s47 "empty"
+  0363  GetByIdShort         r4, r3, #c23, s62 "prototype"
+  0368  CreateThis           r4, r4, r3
+  036c  Mov                  r10, r4
+  036f  Construct            r3, r3, 1
+  0373  SelectObject         r3, r4, r3
+  0377  PutById              r0, r3, #c16, s54 "made"
+  037d  TryGetById           r4, r0, #c10, s74 "print"
+  0383  GetByIdShort         r3, r0, #c24, s54 "made"
+  0388  LoadConstString      r5, s36 "new ok "
+  038c  TypeOf               r3, r3
+  038f  Add                  r3, r5, r3
+  0393  Call2                r3, r4, r2, r3
+T2:
+  0398  Jmp                  L2
+L1:
+  039a  Catch                r5
+  039c  TryGetById           r4, r0, #c10, s74 "print"
+  03a2  TryGetById           r3, r0, #c25, s60 "TypeError"
+  03a8  InstanceOf           r5, r5, r3
+  03ac  LoadConstString      r3, s35 "new "
+  03b0  Add                  r3, r3, r5
+  03b4  Call2                r3, r4, r2, r3
+L2:
+  03b9  GetByIdShort         r3, r0, #c5, s42 "asyncEmpty"
+  03be  Call1                r3, r3, r2
+  03c2  PutById              r0, r3, #c17, s59 "p"
+  03c8  TryGetById           r4, r0, #c10, s74 "print"
+  03ce  GetByIdShort         r5, r0, #c26, s59 "p"
+  03d3  TryGetById           r3, r0, #c27, s64 "Promise"
+  03d9  InstanceOf           r5, r5, r3
+  03dd  LoadConstString      r3, s37 "promise "
+  03e1  Add                  r3, r3, r5
+  03e5  Call2                r3, r4, r2, r3
+  03ea  GetByIdShort         r3, r0, #c5, s42 "asyncEmpty"
+  03ef  Call1                r5, r3, r2
+  03f3  GetByIdShort         r4, r5, #c13, s67 "then"
+  03f8  CreateClosure        r3, r1, f26 ""
+  03fd  Call2                r3, r4, r5, r3
+  0402  GetByIdShort         r4, r0, #c6, s44 "asyncReturn"
+  0407  LoadConstUInt8       r3, 4
+  040a  Call2                r5, r4, r2, r3
+  040f  GetByIdShort         r4, r5, #c13, s67 "then"
+  0414  CreateClosure        r3, r1, f27 ""
+  0419  Call2                r3, r4, r5, r3
+  041e  GetByIdShort         r4, r0, #c7, s45 "asyncThrow"
+  0423  LoadConstString      r3, s30 "boom"
+  0427  Call2                r5, r4, r2, r3
+  042c  GetByIdShort         r4, r5, #c13, s67 "then"
+  0431  CreateClosure        r3, r1, f28 ""
+  0436  CreateClosure        r1, r1, f29 ""
+  043b  Call3                r1, r4, r5, r3, r1
+  0441  TryGetById           r1, r0, #c10, s74 "print"
+  0447  LoadConstString      r0, s34 "sync end"
+  044b  Call2                r0, r1, r2, r0
+  0450  Ret                  r0
+
+function #1 "hasNativeConstructor"  params=3 frame=11 env=0 flags=dbg  @0x00000a8a size=63
+  0000  GetGlobalObject      r0
+  0002  TryGetById           r2, r0, #c1, s63 "Object"
+  0008  GetByIdShort         r1, r2, #c2, s53 "getPrototypeOf"
+  000d  LoadParam            r0, 1
+  0010  Call2                r1, r1, r2, r0
+  0015  Not                  r2, r1
+  0018  Not                  r0, r2
+  001b  JmpTrue              L1, r2
+  001e  GetByIdShort         r2, r1, #c3, s68 "constructor"
+  0023  Not                  r2, r2
+  0026  Not                  r0, r2
+L1:
+  0029  JmpFalse             L2, r0
+  002c  GetByIdShort         r1, r1, #c3, s68 "constructor"
+  0031  GetByIdShort         r2, r1, #c4, s51 "name"
+  0036  LoadParam            r1, 2
+  0039  StrictEq             r0, r2, r1
+L2:
+  003d  Ret                  r0
+
+function #2 "empty"  params=1 frame=1 env=0 flags=nc  @0x00000ac9 size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f3 "?anon_0_empty"
+  0007  Ret                  r0
+
+function #3 "?anon_0_empty"  params=1 frame=2 env=0 flags=none  @0x00000ad2 size=15
+  0000  StartGenerator
+  0001  ResumeGenerator      r0, r1
+  0004  JmpTrue              L1, r1
+  0007  LoadConstUndefined   r1
+  0009  CompleteGenerator
+  000a  Ret                  r1
+L1:
+  000c  CompleteGenerator
+  000d  Ret                  r0
+
+function #4 "onlyReturn"  params=2 frame=1 env=0 flags=nc  @0x00000ae1 size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f5 "?anon_0_onlyReturn"
+  0007  Ret                  r0
+
+function #5 "?anon_0_onlyReturn"  params=2 frame=3 env=0 flags=dbg  @0x00000aea size=23
+  0000  StartGenerator
+  0001  ResumeGenerator      r0, r1
+  0004  JmpTrue              L1, r1
+  0007  LoadParam            r2, 1
+  000a  LoadConstUInt8       r1, 2
+  000d  Mul                  r1, r2, r1
+  0011  CompleteGenerator
+  0012  Ret                  r1
+L1:
+  0014  CompleteGenerator
+  0015  Ret                  r0
+
+function #6 "sideEffect"  params=2 frame=1 env=0 flags=nc  @0x00000b01 size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f7 "?anon_0_sideEffect"
+  0007  Ret                  r0
+
+function #7 "?anon_0_sideEffect"  params=2 frame=12 env=0 flags=dbg  @0x00000b0a size=32
+  0000  StartGenerator
+  0001  LoadParam            r3, 1
+  0004  ResumeGenerator      r0, r1
+  0007  JmpTrue              L1, r1
+  000a  GetByIdShort         r2, r3, #c1, s70 "push"
+  000f  LoadConstString      r1, s39 "ran"
+  0013  Call2                r1, r2, r3, r1
+  0018  LoadConstUndefined   r1
+  001a  CompleteGenerator
+  001b  Ret                  r1
+L1:
+  001d  CompleteGenerator
+  001e  Ret                  r0
+
+function #8 "asyncEmpty"  params=1 frame=15 env=0 flags=dbg,nc  @0x00000b2a size=30
+  0000  LoadConstUndefined   r4
+  0002  LoadConstUndefined   r0
+  0004  ReifyArguments       r0
+  0006  Mov                  r3, r0
+  0009  GetBuiltinClosure    r2, b52 "spawnAsync"
+  000c  CreateEnvironment    r0
+  000e  CreateGeneratorClosure r1, r0, f9 "?anon_0_asyncEmpty"
+  0013  LoadThisNS           r0
+  0015  Call4                r0, r2, r4, r1, r0, r3
+  001c  Ret                  r0
+
+function #9 "?anon_0_asyncEmpty"  params=1 frame=1 env=0 flags=nc  @0x00000b48 size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f10 "?anon_0_?anon_0_asyncEmpty"
+  0007  Ret                  r0
+
+function #10 "?anon_0_?anon_0_asyncEmpty"  params=1 frame=2 env=0 flags=none  @0x00000ad2 size=15
+  0000  StartGenerator
+  0001  ResumeGenerator      r0, r1
+  0004  JmpTrue              L1, r1
+  0007  LoadConstUndefined   r1
+  0009  CompleteGenerator
+  000a  Ret                  r1
+L1:
+  000c  CompleteGenerator
+  000d  Ret                  r0
+
+function #11 "asyncReturn"  params=2 frame=15 env=0 flags=dbg,nc  @0x00000b51 size=30
+  0000  LoadConstUndefined   r4
+  0002  LoadConstUndefined   r0
+  0004  ReifyArguments       r0
+  0006  Mov                  r3, r0
+  0009  GetBuiltinClosure    r2, b52 "spawnAsync"
+  000c  CreateEnvironment    r0
+  000e  CreateGeneratorClosure r1, r0, f12 "?anon_0_asyncReturn"
+  0013  LoadThisNS           r0
+  0015  Call4                r0, r2, r4, r1, r0, r3
+  001c  Ret                  r0
+
+function #12 "?anon_0_asyncReturn"  params=2 frame=1 env=0 flags=nc  @0x00000b6f size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f13 "?anon_0_?anon_0_asyncReturn"
+  0007  Ret                  r0
+
+function #13 "?anon_0_?anon_0_asyncReturn"  params=2 frame=3 env=0 flags=dbg  @0x00000b78 size=23
+  0000  StartGenerator
+  0001  ResumeGenerator      r0, r1
+  0004  JmpTrue              L1, r1
+  0007  LoadParam            r2, 1
+  000a  LoadConstUInt8       r1, 1
+  000d  Add                  r1, r2, r1
+  0011  CompleteGenerator
+  0012  Ret                  r1
+L1:
+  0014  CompleteGenerator
+  0015  Ret                  r0
+
+function #14 "asyncThrow"  params=2 frame=15 env=0 flags=dbg,nc  @0x00000b8f size=30
+  0000  LoadConstUndefined   r4
+  0002  LoadConstUndefined   r0
+  0004  ReifyArguments       r0
+  0006  Mov                  r3, r0
+  0009  GetBuiltinClosure    r2, b52 "spawnAsync"
+  000c  CreateEnvironment    r0
+  000e  CreateGeneratorClosure r1, r0, f15 "?anon_0_asyncThrow"
+  0013  LoadThisNS           r0
+  0015  Call4                r0, r2, r4, r1, r0, r3
+  001c  Ret                  r0
+
+function #15 "?anon_0_asyncThrow"  params=2 frame=1 env=0 flags=nc  @0x00000bad size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f16 "?anon_0_?anon_0_asyncThrow"
+  0007  Ret                  r0
+
+function #16 "?anon_0_?anon_0_asyncThrow"  params=2 frame=12 env=0 flags=dbg  @0x00000bb6 size=43
+  0000  StartGenerator
+  0001  ResumeGenerator      r0, r1
+  0004  JmpTrue              L1, r1
+  0007  GetGlobalObject      r1
+  0009  TryGetById           r3, r1, #c1, s61 "Error"
+  000f  GetByIdShort         r1, r3, #c2, s62 "prototype"
+  0014  CreateThis           r2, r1, r3
+  0018  LoadParam            r4, 1
+  001b  Mov                  r5, r2
+  001e  Construct            r1, r3, 2
+  0022  SelectObject         r1, r2, r1
+  0026  Throw                r1
+L1:
+  0028  CompleteGenerator
+  0029  Ret                  r0
+
+function #17 "strictGen"  params=1 frame=1 env=0 flags=strict,nc  @0x00000be1 size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f18 "?anon_0_strictGen"
+  0007  Ret                  r0
+
+function #18 "?anon_0_strictGen"  params=1 frame=3 env=0 flags=strict  @0x00000bea size=22
+  0000  StartGenerator
+  0001  ResumeGenerator      r0, r1
+  0004  JmpTrue              L1, r1
+  0007  LoadParam            r2, 0
+  000a  LoadConstUndefined   r1
+  000c  StrictEq             r1, r2, r1
+  0010  CompleteGenerator
+  0011  Ret                  r1
+L1:
+  0013  CompleteGenerator
+  0014  Ret                  r0
+
+function #19 "strictAsync"  params=1 frame=15 env=0 flags=strict,dbg,nc  @0x00000c00 size=31
+  0000  LoadConstUndefined   r4
+  0002  LoadConstUndefined   r0
+  0004  ReifyArguments       r0
+  0006  Mov                  r3, r0
+  0009  GetBuiltinClosure    r2, b52 "spawnAsync"
+  000c  CreateEnvironment    r0
+  000e  CreateGeneratorClosure r1, r0, f20 "?anon_0_strictAsync"
+  0013  LoadParam            r0, 0
+  0016  Call4                r0, r2, r4, r1, r0, r3
+  001d  Ret                  r0
+
+function #20 "?anon_0_strictAsync"  params=1 frame=1 env=0 flags=strict,nc  @0x00000c1f size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f21 "?anon_0_?anon_0_strictAsync"
+  0007  Ret                  r0
+
+function #21 "?anon_0_?anon_0_strictAsync"  params=1 frame=3 env=0 flags=strict  @0x00000bea size=22
+  0000  StartGenerator
+  0001  ResumeGenerator      r0, r1
+  0004  JmpTrue              L1, r1
+  0007  LoadParam            r2, 0
+  000a  LoadConstUndefined   r1
+  000c  StrictEq             r1, r2, r1
+  0010  CompleteGenerator
+  0011  Ret                  r1
+L1:
+  0013  CompleteGenerator
+  0014  Ret                  r0
+
+function #22 "describe"  params=3 frame=16 env=0 flags=dbg  @0x00000c28 size=115
+  0000  LoadParam            r5, 2
+  0003  GetGlobalObject      r1
+  0005  TryGetById           r2, r1, #c1, s74 "print"
+  000b  LoadParam            r3, 1
+  000e  LoadConstString      r0, s13 " gen="
+  0012  Add                  r4, r3, r0
+  0016  GetByIdShort         r6, r1, #c2, s71 "hasNativeConstructor"
+  001b  LoadConstUndefined   r0
+  001d  LoadConstString      r3, s29 "GeneratorFunction"
+  0021  Call3                r3, r6, r0, r5, r3
+  0027  Add                  r6, r4, r3
+  002b  GetByIdShort         r4, r1, #c2, s71 "hasNativeConstructor"
+  0030  LoadConstString      r3, s27 "AsyncFunction"
+  0034  Call3                r4, r4, r0, r5, r3
+  003a  LoadConstString      r3, s3 " async="
+  003e  Add                  r3, r6, r3
+  0042  Add                  r4, r3, r4
+  0046  TryGetById           r3, r1, #c3, s63 "Object"
+  004c  GetByIdShort         r1, r3, #c4, s53 "getPrototypeOf"
+  0051  Call2                r1, r1, r3, r5
+  0056  GetByIdShort         r1, r1, #c5, s68 "constructor"
+  005b  GetByIdShort         r3, r1, #c6, s51 "name"
+  0060  LoadConstString      r1, s9 " ctor="
+  0064  Add                  r1, r4, r1
+  0068  Add                  r1, r1, r3
+  006c  Call2                r1, r2, r0, r1
+  0071  Ret                  r0
+
+function #23 ""  params=1 frame=1 env=0 flags=nc  @0x00000c9b size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f24 "?anon_0_"
+  0007  Ret                  r0
+
+function #24 "?anon_0_"  params=1 frame=2 env=0 flags=none  @0x00000ad2 size=15
+  0000  StartGenerator
+  0001  ResumeGenerator      r0, r1
+  0004  JmpTrue              L1, r1
+  0007  LoadConstUndefined   r1
+  0009  CompleteGenerator
+  000a  Ret                  r1
+L1:
+  000c  CompleteGenerator
+  000d  Ret                  r0
+
+function #25 ""  params=2 frame=11 env=0 flags=dbg  @0x00000ca4 size=28
+  0000  GetGlobalObject      r0
+  0002  TryGetById           r2, r0, #c1, s74 "print"
+  0008  LoadConstString      r1, s19 "strictAsync this "
+  000c  LoadParam            r0, 1
+  000f  Add                  r1, r1, r0
+  0013  LoadConstUndefined   r0
+  0015  Call2                r1, r2, r0, r1
+  001a  Ret                  r0
+
+function #26 ""  params=2 frame=11 env=0 flags=dbg  @0x00000cc0 size=28
+  0000  GetGlobalObject      r0
+  0002  TryGetById           r2, r0, #c1, s74 "print"
+  0008  LoadConstString      r1, s8 "asyncEmpty "
+  000c  LoadParam            r0, 1
+  000f  Add                  r1, r1, r0
+  0013  LoadConstUndefined   r0
+  0015  Call2                r1, r2, r0, r1
+  001a  Ret                  r0
+
+function #27 ""  params=2 frame=11 env=0 flags=dbg  @0x00000cdc size=28
+  0000  GetGlobalObject      r0
+  0002  TryGetById           r2, r0, #c1, s74 "print"
+  0008  LoadConstString      r1, s12 "asyncReturn "
+  000c  LoadParam            r0, 1
+  000f  Add                  r1, r1, r0
+  0013  LoadConstUndefined   r0
+  0015  Call2                r1, r2, r0, r1
+  001a  Ret                  r0
+
+function #28 ""  params=1 frame=11 env=0 flags=dbg  @0x00000cf8 size=21
+  0000  GetGlobalObject      r0
+  0002  TryGetById           r2, r0, #c1, s74 "print"
+  0008  LoadConstUndefined   r0
+  000a  LoadConstString      r1, s28 "no"
+  000e  Call2                r1, r2, r0, r1
+  0013  Ret                  r0
+
+function #29 ""  params=2 frame=11 env=0 flags=dbg  @0x00000d0d size=33
+  0000  GetGlobalObject      r0
+  0002  TryGetById           r2, r0, #c1, s74 "print"
+  0008  LoadParam            r0, 1
+  000b  GetByIdShort         r1, r0, #c2, s52 "message"
+  0010  LoadConstString      r0, s16 "asyncThrow "
+  0014  Add                  r1, r0, r1
+  0018  LoadConstUndefined   r0
+  001a  Call2                r1, r2, r0, r1
+  001f  Ret                  r0
