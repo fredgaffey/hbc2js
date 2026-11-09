@@ -14,7 +14,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acquireBootSource, bootTrace } from "./boot-equiv.ts";
 import type { BootTraceResult } from "./boot-equiv.ts";
-import { findAllHermesVms } from "./hermes-vm.ts";
+import { findAllHermesVms, findHermesVm } from "./hermes-vm.ts";
+import { findHermesc as findHermescVersion } from "./roundtrip.ts";
 import type { Trace, TraceRecord } from "./trace.ts";
 
 export const EXPORT_BOOT_SCHEMA = "export-boot/1" as const;
@@ -110,6 +111,9 @@ export interface ExportBootOptions {
   readonly firstNative?: number;
   readonly vm?: string;
   readonly timeoutMs?: number;
+  /** Force the export side into source mode (default: bytecode when a
+   *  `hermesc` + same-version VM pair exists). */
+  readonly exportExec?: "source" | "bytecode";
   /** Repo whose node_modules supplies the offline Metro toolchain. */
   readonly repoRoot?: string;
 }
@@ -167,6 +171,38 @@ export function pickBootVm(exportDir: string): string | undefined {
   return (exact ?? vms.reduce((x, y) => (y.hbcVersion > x.hbcVersion ? y : x))).path;
 }
 
+export interface BootCompiler {
+  readonly version: number;
+  /** The pinned `hermesc` (spec 33 §1). */
+  readonly hermesc: string;
+  /** A VM of the same HBC version, to run its output with `hermes -b`. */
+  readonly vm: string;
+}
+
+const COMPILER_VERSIONS = [84, 94, 96, 98, 99];
+
+/** Spec 33 §1 (L2): the export side's compiler, a `hermesc` paired with a VM
+ *  of the same HBC version. Prefers `version` (the bundle's own), else the
+ *  newest pair found. Null when no pair exists: the export side then runs in
+ *  source mode and the result says `exportExec:"source"`. */
+export function findHermesc(version?: number): BootCompiler | null {
+  const order = [...(version !== undefined ? [version] : []), ...[...COMPILER_VERSIONS].reverse()];
+  for (const v of order) {
+    const c = findHermescVersion(v);
+    const vm = findHermesVm(v);
+    if (c !== null && vm !== null) return { version: v, hermesc: c.path, vm: vm.path };
+  }
+  return null;
+}
+
+function manifestVersion(exportDir: string): number | undefined {
+  try {
+    return (JSON.parse(readFileSync(join(exportDir, "EXPORT.json"), "utf8")) as ExportManifestShape).source?.hbcVersion;
+  } catch {
+    return undefined;
+  }
+}
+
 function defaultRepoRoot(): string {
   return join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 }
@@ -221,10 +257,20 @@ export async function exportBootProof(original: string, exportDir: string, opts:
     return { ...inconclusive(""), verdict: "DIVERGENT", divergence: { index: 0, a: null, b: null }, reason: `the export does not bundle offline: ${e instanceof Error ? e.message : String(e)}` };
   }
   if (!existsSync(bundlePath)) return inconclusive(`offline bundle missing at ${bundlePath}`);
-  const b = bootTrace(readFileSync(bundlePath, "utf8"), { ...traceOpts, wrapFactories: false });
+  // §1: the export side is compiled with the pinned hermesc (prelude
+  // prepended first) and run with `hermes -b`; source mode without one. An
+  // explicit `vm` override keeps both sides on that VM, in source mode.
+  const compiler = opts.vm === undefined && opts.exportExec !== "source" ? findHermesc(manifestVersion(exportDir)) : null;
+  const exportExec = compiler !== null ? "bytecode" as const : "source" as const;
+  const bOpts = compiler !== null ? { ...traceOpts, vm: compiler.vm, hermesc: compiler.hermesc } : traceOpts;
+  const b = bootTrace(readFileSync(bundlePath, "utf8"), { ...bOpts, wrapFactories: false });
   const pb = projectBootTrace(b.trace, projOpts());
-  const common = { ...base, appKeys: { a: keys(pa), b: keys(pb) }, factories: { a: enters(pa), b: enters(pb) }, masked: maskedCount };
-  if (!b.ran) return inconclusive(`the export side produced no boot trace: ${errText(b)}`, pb);
+  const common = { ...base, exportExec, appKeys: { a: keys(pa), b: keys(pb) }, factories: { a: enters(pa), b: enters(pb) }, masked: maskedCount };
+  if (!b.ran && compiler !== null && (b.why ?? "").startsWith("hermesc")) {
+    // The export's own code does not compile to bytecode: a real failure.
+    return { ...common, verdict: "DIVERGENT", divergence: { index: 0, a: null, b: null, exportThrow: b.why }, reason: b.why };
+  }
+  if (!b.ran) return { ...inconclusive(`the export side produced no boot trace: ${errText(b)}`, pb), exportExec };
 
   const bThrowRec = b.trace.records.find((r) => r.k === "call" && r.fn === PROBE_FN && r.args[0] === "throw");
   const exportThrow = bThrowRec !== undefined && bThrowRec.k === "call"

@@ -166,7 +166,7 @@ test("spec 33 test 6: code outside any tracked factory and substituted ids are e
   assert.ok(!masked.some((e) => / 2$/.test(e)), "a substituted id is masked out");
 });
 
-test("spec 33 test 7: the export side runs as hermesc-compiled bytecode when hermesc is available", TODO, async () => {
+test("spec 33 test 7: the export side runs as hermesc-compiled bytecode when hermesc is available", async () => {
   if (!IMPLEMENTED) return;
   const { exportBootProof, findHermesc } = await load();
   const { out, run } = exportTo(RN_HBC, GATE_EXPORT);
@@ -180,7 +180,7 @@ test("spec 33 test 7: the export side runs as hermesc-compiled bytecode when her
   }
 });
 
-test("spec 33 test 8: `equiv --boot <original> <export-dir> --json` prints export-boot/1 and exits 0", TODO, async () => {
+test("spec 33 test 8: `equiv --boot <original> <export-dir> --json` prints export-boot/1 and exits 0", async () => {
   if (!IMPLEMENTED) return;
   const { out, run } = exportTo(RN_HBC, GATE_EXPORT);
   try {

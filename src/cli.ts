@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // docs/specs/00-project-skeleton.md §6.3 — the only place in the codebase allowed to
 // touch stdout/stderr or call process.exit.
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync, writeSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import v8 from "node:v8";
@@ -92,6 +92,8 @@ Usage:
   hbc2js equiv normalise <a.hbc> <b.hbc>  normalised-disassembly diff (D3)
   hbc2js equiv --boot <a> <b> [--first-native N] [--seed N] [--vm <path>]
                                    whole-bundle boot-trace oracle (spec 31)
+  hbc2js equiv --boot <original> <export-dir> [--phase register|run] [--horizon-ms N] [--export-exec source|bytecode] [--json]
+                                   export boot proof (spec 33; prints export-boot/1)
   hbc2js gate [options]            run the gate tier (spec 06 §7)
   hbc2js sweep [options]           run the sweep tier (spec 06 §7)
   hbc2js deps <bundle.hbc|.apk>    identify npm dependencies (D17/D17a/D17b)
@@ -394,6 +396,9 @@ interface EquivArgs {
   readonly relax: readonly string[];
   readonly firstNative: number;
   readonly vm: string | undefined;
+  readonly phase: string;
+  readonly horizonMs: number | undefined;
+  readonly exportExec: string | undefined;
   readonly positional: string[];
 }
 
@@ -408,6 +413,9 @@ function parseEquivArgs(argv: readonly string[]): EquivArgs {
   let relax: string[] = ["fn-names"];
   let firstNative = DEFAULT_FIRST_NATIVE;
   let vm: string | undefined;
+  let phase = "register";
+  let horizonMs: number | undefined;
+  let exportExec: string | undefined;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
@@ -422,9 +430,12 @@ function parseEquivArgs(argv: readonly string[]): EquivArgs {
     else if (a === "--relax") relax = String(argv[++i]).split(",").filter((s) => s.length > 0);
     else if (a === "--first-native") firstNative = Number(argv[++i]);
     else if (a === "--vm") vm = argv[++i];
+    else if (a === "--phase") phase = String(argv[++i]);
+    else if (a === "--horizon-ms") horizonMs = Number(argv[++i]);
+    else if (a === "--export-exec") exportExec = String(argv[++i]);
     else positional.push(a);
   }
-  return { help, hbc, boot, json, timeout, seed, fuzz, relax, firstNative, vm, positional };
+  return { help, hbc, boot, json, timeout, seed, fuzz, relax, firstNative, vm, phase, horizonMs, exportExec, positional };
 }
 
 function equivCode(v: string): number {
@@ -518,6 +529,47 @@ function runEquivBoot(a: string, b: string, o: EquivArgs): number {
   return equivCode(cmp.verdict);
 }
 
+// docs/specs/33-export-boot.md §1/§3: `equiv --boot <original> <export-dir>`.
+// A directory holding EXPORT.json switches to the boot projection; the
+// comparison lives in `src/harness/export-boot.ts`, this is presentation.
+function isExportDir(p: string): boolean {
+  try {
+    return statSync(p).isDirectory() && existsSync(join(p, "EXPORT.json"));
+  } catch {
+    return false;
+  }
+}
+
+async function runEquivExportBoot(a: string, dir: string, o: EquivArgs): Promise<number> {
+  if (o.phase !== "register" && o.phase !== "run") {
+    process.stderr.write(`hbc2js equiv --boot: --phase must be register or run, not ${o.phase}\n`);
+    return 3;
+  }
+  if (o.exportExec !== undefined && o.exportExec !== "source" && o.exportExec !== "bytecode") {
+    process.stderr.write(`hbc2js equiv --boot: --export-exec must be source or bytecode\n`);
+    return 3;
+  }
+  const { exportBootProof } = await import("./harness/export-boot.ts");
+  let r: Awaited<ReturnType<typeof exportBootProof>>;
+  try {
+    r = await exportBootProof(a, dir, {
+      phase: o.phase,
+      seed: o.seed,
+      ...(o.firstNative !== DEFAULT_FIRST_NATIVE ? { firstNative: o.firstNative } : {}),
+      ...(o.horizonMs !== undefined ? { horizonMs: o.horizonMs } : {}),
+      ...(o.vm !== undefined ? { vm: o.vm } : {}),
+      ...(o.exportExec !== undefined ? { exportExec: o.exportExec as "source" | "bytecode" } : {}),
+      timeoutMs: Math.max(o.timeout, 60000),
+    });
+  } catch (e) {
+    process.stderr.write(`hbc2js equiv --boot: ${e instanceof Error ? e.message : String(e)}\n`);
+    return 3;
+  }
+  if (o.json) process.stdout.write(JSON.stringify(r, null, 2) + "\n");
+  else process.stdout.write(`${r.verdict} (${r.phase}, export ${r.exportExec}) — ${r.reason ?? `app keys ${r.appKeys.a.join(", ")}; ${r.factories.a} factories`}\n`);
+  return equivCode(r.verdict);
+}
+
 async function runEquiv(argv: readonly string[]): Promise<number> {
   const o = parseEquivArgs(argv);
   if (o.help || o.positional.length === 0) {
@@ -537,6 +589,7 @@ async function runEquiv(argv: readonly string[]): Promise<number> {
     process.stderr.write(`equiv needs two files\n\n${USAGE}`);
     return 3;
   }
+  if (o.boot && isExportDir(b)) return runEquivExportBoot(a, b, o);
   if (o.boot) return runEquivBoot(a, b, o);
   if (o.hbc || a.endsWith(".hbc")) return runEquivHermes(a, b, o);
 

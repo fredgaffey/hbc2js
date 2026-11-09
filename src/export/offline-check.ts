@@ -35,7 +35,10 @@ export async function offlineBundle(tree: string, repoRoot: string): Promise<Off
     const rnDefaults = (createRequire(join(repoNodeModules, "noop.js"))("@react-native/metro-config") as { getDefaultConfig(root: string): { serializer: Partial<typeof serializer> } }).getDefaultConfig(tree).serializer;
     serializer = { ...serializer, ...(rnDefaults.getPolyfills !== undefined ? { getPolyfills: rnDefaults.getPolyfills } : {}), ...(rnDefaults.getModulesRunBeforeMainModule !== undefined ? { getModulesRunBeforeMainModule: rnDefaults.getModulesRunBeforeMainModule } : {}) };
   }
-  const config = { ...loaded, serializer, transformer: { ...loaded.transformer, babelTransformerPath: OFFLINE_TRANSFORMER } };
+  // Spec 33 L2: a silent reporter (Metro's banner and progress went to
+  // stdout, corrupting `equiv --boot --json`) and no watchman (a one-shot
+  // build gains nothing from it, and a recrawling watchman cost ~85 s).
+  const config = { ...loaded, serializer, reporter: { update: (): void => {} }, resolver: { ...loaded.resolver, useWatchman: false }, transformer: { ...loaded.transformer, babelTransformerPath: OFFLINE_TRANSFORMER } };
   const bundlePath = join(tree, "android.bundle.js");
   await runBuild(config, { entry: "index.js", platform: "android", dev: false, minify: false, out: bundlePath });
   return { bundlePath };

@@ -13,6 +13,7 @@
 // `print()` line prefixed with `TRACE_PREFIX`, and `bootTrace` parses that
 // NDJSON-shaped stream back into `TraceRecord`s — the same one-record-per-line
 // contract `runner.ts` already uses for the Node sandbox's child process.
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -65,6 +66,12 @@ export interface BootTraceOptions {
    *  false: there `__d` carries Metro's re-bundle ids, and the export's own
    *  registry calls the probe with original ids instead (§4(b)). */
   readonly wrapFactories?: boolean;
+  /** Spec 33 §1 (L2): compile prelude+bundle with this `hermesc` and run the
+   *  result with `hermes -b` instead of source mode. Compiling *after*
+   *  concatenation is how the prelude reaches the bytecode path (the no-
+   *  prelude limit above applies to an already-compiled `.hbc`). `vm` must
+   *  then be a VM of the same HBC version as this compiler. */
+  readonly hermesc?: string;
 }
 
 export interface BootTraceResult {
@@ -454,8 +461,9 @@ function buildBootSource(bundleSource: string, seed: number, firstNative: number
 const NO_VM_MESSAGE = "no Hermes VM found (tools/hermesc/v<N>/hermes or tools/hermes-vm/v<N>/bin/hermes); the boot oracle runs entirely in source mode, so any discovered VM works regardless of its own HBC version";
 
 /** Boots one bundle source under the stub host and returns its trace (spec
- *  §8). Never `hermes -b` (spec §1): always concatenates the prelude with
- *  `bundleSource` and runs `hermes <file.js>` in source mode. */
+ *  §8). Always concatenates the prelude with `bundleSource`; runs
+ *  `hermes <file.js>` in source mode, or, with `opts.hermesc` (spec 33 L2),
+ *  compiles that concatenation and runs `hermes -b` on the result. */
 export function bootTrace(bundleSource: string, opts: BootTraceOptions = {}): BootTraceResult {
   const seed = opts.seed ?? 0;
   const firstNative = opts.firstNative ?? DEFAULT_FIRST_NATIVE;
@@ -470,7 +478,15 @@ export function bootTrace(bundleSource: string, opts: BootTraceOptions = {}): Bo
   try {
     const file = join(dir, "boot.js");
     writeFileSync(file, buildBootSource(bundleSource, seed, firstNative, opts.wrapFactories ?? true));
-    raw = runHermes(vm.path, file, { timeout, bytecode: false });
+    if (opts.hermesc !== undefined) {
+      const hbc = join(dir, "boot.hbc");
+      const c = spawnSync(opts.hermesc, ["-emit-binary", `-out=${hbc}`, file], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: Math.max(timeout, 120000) });
+      if (c.status !== 0) {
+        const why = `hermesc could not compile the prelude+bundle: ${excerpt(c.stderr !== "" ? c.stderr : String(c.error ?? c.status))}`;
+        return { trace: { kind: "full", records: [] }, reachedEnd: false, bootError: null, vm, ran: false, why };
+      }
+      raw = runHermes(vm.path, hbc, { timeout, bytecode: true });
+    } else raw = runHermes(vm.path, file, { timeout, bytecode: false });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

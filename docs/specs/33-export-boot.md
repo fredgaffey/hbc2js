@@ -179,3 +179,15 @@ parse the BigInt literals decompiled code may contain.
 (docs/BUGS.md export-boot L1, Resolved; construct fixture
 `395-generator-no-yield`): module 87's `function* () {}` decompiles to
 `function*`, and test 1 is a real test with B1 EQUIVALENT on rn-template.
+
+**L2 (2026-11-10).** The export side is compiled: `findHermesc(version)`
+pairs a `hermesc` with a same-version VM (the export's own HBC version first,
+else the newest pair), `bootTrace({hermesc})` compiles prelude + bundle with
+`-emit-binary` and runs `hermes -b`. No pair, an explicit `--vm`, or
+`exportExec:"source"` keeps source mode. A `hermesc` compile failure of the
+export is DIVERGENT (the export does not build), not INCONCLUSIVE. rn-template
+B1 is EQUIVALENT in bytecode mode (v94; 107 factories each side). `equiv
+--boot <original> <export-dir>` switches on `EXPORT.json`, accepts `--phase`,
+`--horizon-ms`, `--export-exec`, and prints `export-boot/1` with `--json`.
+`offlineBundle` now uses a silent Metro reporter (the banner went to stdout and
+broke the JSON) and no watchman (a recrawling watchman cost ~85 s per bundle).
