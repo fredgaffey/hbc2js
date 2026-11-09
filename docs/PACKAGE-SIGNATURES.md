@@ -826,7 +826,14 @@ are still absent are installed with `--legacy-peer-deps` at their declared range
 `build-one` uninstalls them again with the package. (3) The bundle child runs with
 `CI=true`: Metro's file map only watches when `!ci-info.isCI`, so no inotify
 watches are created (no sysctl change). (4) `confirm.ts` child processes get a
-1 GiB `maxBuffer` (`build-one` already had it). Rejected: rewriting package code
+1 GiB `maxBuffer` (`build-one` already had it). (5) `build-one` also installs a bare module Metro reports unresolved (undeclared or
+optional peer such as `tslib`, `drizzle-orm`) and retries, at most 3 rounds, repeating
+the target spec because `--no-save` installs prune earlier `--no-save` packages.
+Measured on deb (40 previously failed population jobs, RN 0.87 / hbc98, load average
+about 60): 28 of 40 now build (Node built-ins 18/20, peers 9/12, other 1/4, timeouts
+0/4: all four are `npx`/`npm` 180 s or 120 s limits under the machine load, not
+fixed). Still failing: dynamic `import(variable)` (Metro rejects it), a package whose
+only entry is missing, genuinely absent files. Rejected: rewriting package code
 to drop the `require`; Metro `resolver.extraNodeModules` (cannot express the
 `node:` prefix or the "only on failure" rule).
 
