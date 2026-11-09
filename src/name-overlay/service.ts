@@ -16,8 +16,8 @@ import type { GateRefusal } from "./gate.ts";
 import type { BindingId } from "./id.ts";
 import { OverlayStore } from "./store.ts";
 import type { Confidence, NameRecord, NameQuery, SetResult, Source } from "./store.ts";
-import { render } from "./render.ts";
-import type { RenderOptions, RenderResult } from "./render.ts";
+import { buildRenderHooks, render } from "./render.ts";
+import type { RenderHooks, RenderOptions, RenderResult } from "./render.ts";
 
 export interface SetNameInput {
   readonly confidence: Confidence;
@@ -41,6 +41,7 @@ export class NameService {
   private frames: Map<number, readonly Stmt[]> | null = null;
   private frameNodes: Map<number, RawFrame> | null = null;
   private hook: AstPassHook | null = null;
+  private renderHooks: RenderHooks | null = null;
   private readonly splitBodies = new Map<number, readonly Stmt[]>();
 
   constructor(analysis: ModuleAnalysis, store: OverlayStore, opts: { readonly passes?: PassPipelineOptions; readonly strictEnv?: boolean } = {}) {
@@ -107,6 +108,8 @@ export class NameService {
   }
 
   render(opts: RenderOptions = {}): RenderResult {
-    return render(this.analysis, this.store, { ...(this.passes !== undefined ? { passes: this.passes } : {}), strictEnv: this.strictEnv, ...opts });
+    // Hooks (each builds a whole-module view) are built once and kept warm.
+    if (this.renderHooks === null) this.renderHooks = buildRenderHooks(this.analysis, this.passes);
+    return render(this.analysis, this.store, { ...(this.passes !== undefined ? { passes: this.passes } : {}), strictEnv: this.strictEnv, hooks: this.renderHooks, ...opts });
   }
 }
