@@ -373,7 +373,7 @@ own register `r3` read as newly free. A name now passes when the function body
 declares it at top level and no mention of it is left inside a nested function
 or class.
 
-### 1.7.1 Private methods (2026-11-09, spec only -- not yet folded)
+### 1.7.1 Private methods (2026-11-09, folded)
 
 **Problem.** The 46 react-navigation `defining-body-escape` refusals that
 section 9.5 (f) and the BUGS row put down to "a function hermesc hoisted into
@@ -478,6 +478,88 @@ the conservative rule needs no join. Fixture 112-private-field-loop-copy
 `tests/gate/passes/private-fields-loop.test.ts` adds hand-built refusals
 (back-edge carried, carried out of the loop, `continue` before the kill,
 entry alias overwritten).
+
+**Hosted slot escape (2026-11-09, pf-hosted-r1).** R-PF1's slot rule says
+"any mention left anywhere", but `foldOne` only scanned the list it matched.
+When hermesc hosts the class in a labelled block placed in the function body,
+a function declared in a member that captures nothing of it is hoisted to the
+body's top level, outside that block, and still reads the slot
+(`return a1[_e0_0];`). The fold deleted the slot's only store, so that
+function read `o[undefined]`: fixture `180-private-field-hosted-hoisted-escape`
+printed `sum: NaN` at v98 and v99 with passes on. Only the checker's parse of
+the list alone had hidden the gap, and only when the block held a `break` to
+its own label. `foldOne` now also counts the slot's mentions in the function
+body outside the matched list (nested functions included) and refuses if
+there are any. The hosted private-method path passes the brand's fold a frame
+without the method functions it is moving into the class. Otherwise the new
+check would count `#m`'s own brand test as an escape (fixture
+`181-private-method-hosted`, which folds at v98/v99; `182-private-method-
+register-hop` folds `#step` through a recycled hop register at v99, and at
+v98 stays refused because `pm-undominated-call`, where hermesc inlines
+`#step` into `bump`). The shape is real. In react-navigation fn#142, the class
+`t extends Error` (`#r`, `#e`) sits in `L0: {...}` and a top-level `clone`
+inlines `Reflect.construct` of it with symbol-keyed installs on an object that
+never ran the constructor, which is fixture 81's hazard. `foldOne` used to fold
+`#e` there, and only the parse failure on `break L0` stopped it. Measured
+(before = the merge of origin/main into passes-private-methods, clean
+worktrees): refusal table `folded` 61 -> 60, `defining-body-escape` 22 -> 23
+(that frame, now classified R-IN1), `pm-folded` 2, `pm-slot-escape` 3, both
+unchanged; `roundtrip-corpus --passes on` IDENTICAL 6590 -> 6590 of 14437,
+DIFFERENT 7847, bucket `diff:GetOwnPrivateBySym/GetByVal` 116 -> 116 (no
+output changes). The 3 `pm-slot-escape` rows (fn#1566 twice, fn#1572) are
+method-slot reads in two places. Some are in closures nested in a member
+whose receiver is `this` read back through an env slot (`r3 = _eK_6`).
+Others are in an async member's generator dispatch, where the slot load and
+its `Reflect.apply` sit in different blocks. Folding either needs a new
+argument (a slot that holds `this` is stable, or dominance through the
+dispatch loop), so both stay refused.
+
+Spec 27 §11 (closure creator placement) later emitted a closure created in
+one member inside that member, so the original fixture-180 `pick` (declared
+in `sum`) stopped escaping and the fold there became sound. The test no
+longer had anything to catch. Fixture 180 now creates `pick` in the `sum`
+computed key (`[(pickRef = function pick(o) { return o.#v; }, "sum")]`). Its
+only creation site is the global frame, which is the slot's home, so §11
+never moves it and it stays at the body's top level. `static peek` (and
+its `inner`) is emitted there too. With `mentionedOutsideList` disabled the
+fixture prints `peek: NaN` / `sum: NaN` (trace DIVERGENT) at v98 and v99.
+
+**As implemented (`src/passes/private-fields/methods.ts`, run first inside
+`foldAll`).** The method slot store may go through one register
+(`r3 = _fnK; ...; M = r3;`, the register read nowhere else), the same one-hop
+rule as a symbol. Dominance is a forward scan per frame (each member body and
+each function nested in one, which has its own registers): a brand-check
+block (`L: { ...; t = hasOwn(recv, B); if (t) { break L; } (literal stores)*;
+[x =] throwTypeError(...); break L; }`, no other exit from `L` before the
+check, B direct or through a register the block's prefix proves holds it)
+adds `recv` to the proven set once the block completes; after an `if` or a
+labelled block the state is the meet of every way out (arm ends and every
+`break` to the label); a loop, `try` or `switch` is entered with every fact it
+might kill already killed. A register that held a method through a dropped
+store on some but not all paths is "maybe", and any read of it refuses. The
+brand is folded by `foldOne` itself (candidate flag `brand`), so it gets the
+field fold's own install/guard handling and R-PF1; the field declaration that
+produces is discarded, and the fold must not add any `.#m` member (B is never
+a property key). The **hosted shape** (class and slot stores inside a labelled
+block placed directly in the function body, method functions at the body's
+top level) is matched on the whole-body visit (`foldHosted`), which then runs
+the field fold on the new block and requires no mention of a method slot,
+the brand or a folded field slot anywhere else in the frame. Refusal codes
+(all-or-nothing per class; `tools/passes/private-fields-refusals.ts` lists
+them as `pm-*` rows): `pm-no-class`, `pm-no-constructor`, `pm-no-brand`,
+`pm-method-escape` (a `#` function not stored once into a slot beside the
+class, or its hop register read again), `pm-slot-rewritten`, `pm-inner-name`,
+`pm-undominated-call`, `pm-slot-escape`, `pm-brand-escape`. Observed and NOT
+folded: a static private method -- hermesc checks the brand on the class but
+passes `0` as the `Reflect.apply` receiver (the body never reads `this`), so
+no check dominates the call (`pm-undominated-call`); a private getter was
+inlined by hermesc in every probe. Fixture `103-private-method-escape` (the
+method also read as a value through a getter) stays refused and runs.
+Measured on react-navigation-example-0.85.3 (before = 022e26b, clean
+worktrees; `private-fields-refusals.ts --inline-new`): candidates 142 -> 132
+(method-frame rows now classify after the fold), `folded` 36 -> 51,
+`defining-body-escape` 64 -> 34, new rows `pm-folded` 2 (frames), `pm-slot-escape`
+3; `roundtrip-corpus --passes on` IDENTICAL 6272 -> 6272 of 14437 (43.44 percent; no function flips to IDENTICAL yet: the folded classes' other differences remain), DIFFERENT 8165, bucket `diff:GetOwnPrivateBySym/GetByVal` 140 -> 130.
 
 ### 1.8 Corpus reach
 

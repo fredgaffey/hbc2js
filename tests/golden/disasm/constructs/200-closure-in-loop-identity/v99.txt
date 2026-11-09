@@ -1,0 +1,62 @@
+; hbc2js disassembly of 200-closure-in-loop-identity/v99.hbc
+; version=99 layout=E opcodeTable=hbc99-mar2026 functions=4 strings=9 globalCodeIndex=0
+function #0 "global"  params=1 frame=19 env=0 flags=dbg,overflowed  @0x00000110 size=135
+  0000  DeclareGlobalVar     s5 "H"
+  0005  DeclareGlobalVar     s6 "fs"
+  000a  GetGlobalObject      r3
+  000c  LoadConstUndefined   r1
+  000e  CreateClosure        r4, r1, f1 "H"
+  0013  PutByIdLoose         r3, r4, #c0, s5 "H"
+  0019  GetByIdShort         r4, r3, #c0, s5 "H"
+  001e  LoadConstUInt8       r0, 5
+  0021  Call2                r4, r4, r1, r0
+  0026  LoadConstUInt8       r0, 2
+  0029  Call2                r4, r4, r1, r0
+  002e  PutByIdLoose         r3, r4, #c1, s6 "fs"
+  0034  TryGetById           r5, r3, #c1, s7 "print"
+  003a  GetByIdShort         r4, r3, #c2, s6 "fs"
+  003f  GetByIndex           r7, r4, 0
+  0043  GetByIdShort         r4, r3, #c2, s6 "fs"
+  0048  GetByIndex           r6, r4, 1
+  004c  LoadConstString      r4, s2 "distinct:"
+  0050  StrictNeq            r2, r7, r6
+  0054  Call3                r4, r5, r1, r4, r2
+  005a  TryGetById           r6, r3, #c1, s7 "print"
+  0060  GetByIdShort         r5, r3, #c2, s6 "fs"
+  0065  GetByIndex           r4, r5, 0
+  0069  Call1                r5, r4, r5
+  006d  GetByIdShort         r4, r3, #c2, s6 "fs"
+  0072  GetByIndex           r3, r4, 1
+  0076  Call1                r4, r3, r4
+  007a  LoadConstString      r3, s4 "values:"
+  007e  Call4                r3, r6, r1, r3, r5, r4
+  0085  Ret                  r3
+
+function #1 "H"  params=2 frame=2 env=0 flags=none  @0x00000197 size=17
+  0000  CreateFunctionEnvironment r0, 1
+  0003  LoadParam            r1, 1
+  0006  StoreToEnvironment   r0, 0, r1
+  000a  CreateClosure        r0, r0, f2 "C"
+  000f  Ret                  r0
+
+function #2 "C"  params=2 frame=18 env=0 flags=dbg,overflowed  @0x000001a8 size=47
+  0000  GetParentEnvironment r6, 0
+  0003  LoadParam            r5, 1
+  0006  NewArray             r4, 0
+  000a  LoadConstZero        r0
+  000c  Less                 r3, r0, r5
+  0010  LoadConstUInt8       r1, 1
+  0013  JmpFalse             L2, r3
+L1:
+  0016  GetByIdShort         r8, r4, #c0, s8 "push"
+  001b  CreateClosure        r7, r6, f3 ""
+  0020  Call2                r7, r8, r4, r7
+  0025  AddN                 r0, r0, r1
+  0029  JLess                L1, r0, r5
+L2:
+  002d  Ret                  r4
+
+function #3 ""  params=1 frame=1 env=0 flags=none  @0x000001d7 size=9
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r0, r0, 0
+  0007  Ret                  r0

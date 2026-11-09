@@ -4,7 +4,7 @@
 // shape (`CreatePrivateName` -> `Symbol("#x")`, `AddOwnPrivateBySym` ->
 // `Object.defineProperty(obj, sym, {value, writable:true, ...})`,
 // `Get/PutOwnPrivateBySym` -> `obj[sym]`, `PrivateIsIn` ->
-// `Object.prototype.hasOwnProperty.call(obj, sym)`) so the pipeline stays
+// `Reflect.getOwnPropertyDescriptor(obj, sym) !== undefined`) so the pipeline stays
 // behaviour-preserving even where no later rung recognises the shape. This
 // rung runs after `class-recover` has already raised the `CreateBaseClass`/
 // `CreateDerivedClass` group into a `class` node (F24-1) and folds every
@@ -32,6 +32,7 @@
 import type { Expr, Stmt } from "../ast.ts";
 import { identUses, identUsesMany, isHelperCall, mapStmts, walk } from "../ast.ts";
 import type { Match, PassContext } from "../types.ts";
+import { brandSymbolName, foldMethods, methodFns } from "./methods.ts";
 
 export interface PrivateFieldsGroup {
   /** Display name (with the leading `#`) of every candidate this rung
@@ -58,7 +59,7 @@ function privateSymbolName(e: Expr): string | null {
 /** A statement that stores a value into a single named variable, whichever
  *  of the two shapes the emitter used (`k:"init"` the first time a name is
  *  written, `k:"expr"`+`assign` every time after). */
-function simpleStore(s: Stmt): { readonly name: string; readonly value: Expr } | null {
+export function simpleStore(s: Stmt): { readonly name: string; readonly value: Expr } | null {
   if (s.k === "init") return { name: s.name, value: s.value };
   if (s.k === "expr" && s.expr.k === "assign" && isIdent(s.expr.target)) return { name: s.expr.target.name, value: s.expr.value };
   return null;
@@ -68,7 +69,7 @@ function simpleStore(s: Stmt): { readonly name: string; readonly value: Expr } |
  *  shape `src/passes/super-call/match.ts`'s own `ENV_SLOT` matches. A slot is
  *  the frame's shared binding, so it is what a class member's body reads;
  *  a register is this frame's own temporary and means nothing inside one. */
-const ENV_SLOT = /^_e\d+_\d+$/;
+export const ENV_SLOT = /^_e\d+_\d+$/;
 
 /** One private name this rung may try to fold.
  *
@@ -82,6 +83,9 @@ export interface PrivateFieldCandidate {
   readonly envName: string;
   readonly displayName: string;
   readonly regName: string | null;
+  /** Spec 24 section 1.7.1: a private-method brand (`Symbol("Class")`), folded
+   *  by `./methods.ts` through `foldOne`; its creation has no `#`. */
+  readonly brand?: true;
 }
 
 /** Every top-level private-name creation in `before` -- the emitter's lowering
@@ -105,7 +109,7 @@ export interface PrivateFieldCandidate {
  *  again before the slot store, so a register that held a *different* value by
  *  then is never followed (the position-blind mistake this file's header
  *  comment already warns about, in its store-scanning half). */
-export function findCandidates(before: readonly Stmt[]): readonly PrivateFieldCandidate[] {
+export function findCandidates(before: readonly Stmt[], pick: (e: Expr) => string | null = privateSymbolName): readonly PrivateFieldCandidate[] {
   const out: { envName: string; displayName: string; regName: string | null }[] = [];
   // Register -> the candidate it currently holds, live only while nothing has
   // overwritten it and it has not already been followed into a slot.
@@ -113,7 +117,7 @@ export function findCandidates(before: readonly Stmt[]): readonly PrivateFieldCa
   for (const s of before) {
     const store = simpleStore(s);
     if (store === null) continue;
-    const displayName = privateSymbolName(store.value);
+    const displayName = pick(store.value);
     if (displayName !== null) {
       const c = { envName: store.name, displayName, regName: null };
       out.push(c);
@@ -155,15 +159,14 @@ function objectCall(e: Expr, name: string): readonly Expr[] | null {
   return p.k === "lit" && p.text === name ? e.args : null;
 }
 
-/** `Object.prototype.hasOwnProperty.call(obj, key)` -- `hasOwn()` in
- *  `src/emit/lower.ts`, `PrivateIsIn`'s lowering. */
-function hasOwnCall(e: Expr): readonly Expr[] | null {
-  if (e.k !== "call" || e.callee.k !== "member" || e.callee.computed || e.callee.prop.k !== "lit" || e.callee.prop.text !== "call") return null;
-  const target = e.callee.obj;
-  if (target.k !== "member" || target.computed || target.prop.k !== "lit" || target.prop.text !== "hasOwnProperty") return null;
-  const proto = target.obj;
-  if (proto.k !== "member" || proto.computed || proto.prop.k !== "lit" || proto.prop.text !== "prototype") return null;
-  return proto.obj.k === "ident" && proto.obj.name === "Object" && e.args.length === 2 ? e.args : null;
+/** `Reflect.getOwnPropertyDescriptor(obj, key) !== undefined` --
+ *  `privateIsIn()` in `src/emit/lower.ts`, `PrivateIsIn`'s lowering (a
+ *  primitive `obj` throws, as `#x in obj` does; review-1109-2). */
+export function hasOwnCall(e: Expr): readonly Expr[] | null {
+  if (e.k !== "bin" || e.op !== "!==" || !((e.right.k === "lit" && e.right.text === "undefined") || (e.right.k === "ident" && e.right.name === "undefined"))) return null;
+  const c = e.left;
+  if (c.k !== "call" || c.callee.k !== "member" || c.callee.computed || c.callee.prop.k !== "lit" || c.callee.prop.text !== "getOwnPropertyDescriptor") return null;
+  return c.callee.obj.k === "ident" && c.callee.obj.name === "Reflect" && c.args.length === 2 ? c.args : null;
 }
 
 /** `AddOwnPrivateBySym`'s exact descriptor (`defineProperty()` in
@@ -666,7 +669,7 @@ export function foldOne(before: readonly Stmt[], candidate: PrivateFieldCandidat
   const createdIn = regName ?? envName;
   const isCreation = (st: Stmt): boolean => {
     const store = simpleStore(st);
-    return store !== null && store.name === createdIn && privateSymbolName(store.value) !== null;
+    return store !== null && store.name === createdIn && (candidate.brand === true ? brandSymbolName(store.value) : privateSymbolName(store.value)) !== null;
   };
   const isHop = (st: Stmt): boolean => {
     const store = simpleStore(st);
@@ -701,6 +704,12 @@ export function foldOne(before: readonly Stmt[], candidate: PrivateFieldCandidat
   //   last read it, the register's later writes and reads are unrelated values
   //   (fixtures 90, 94). Those keep the register, and its declaration.
   const slotNames = [envName, createdIn].filter((n) => ENV_SLOT.test(n));
+  // The slot rule is frame-wide. When the matched list is nested in the
+  // function body (a class hosted in `L0: {...}`), a function hermesc hoisted
+  // to the body's top level -- outside the list -- may still read the slot
+  // (fixture 180-private-field-hosted-hoisted-escape); the scan of `mapped`
+  // below never sees it, so count the frame's mentions outside the list too.
+  for (const n of slotNames) if (mentionedOutsideList(scope, n)) return null;
   if (!ENV_SLOT.test(createdIn) && registerReadReached(before, createdIn, isCreation, isHop, scope)) return null;
 
   const recycled = (() => {
@@ -729,6 +738,16 @@ export function foldOne(before: readonly Stmt[], candidate: PrivateFieldCandidat
   return mapped.map((st) => (st.k === "decl" ? { ...st, names: st.names.filter((n) => !dead.has(n)) } : st)).filter((st) => !(st.k === "decl" && st.names.length === 0));
 }
 
+/** Is `name` mentioned anywhere in the function body OUTSIDE the matched
+ *  list (`scope.list`, which `scope.fnBody` contains)? Nested functions
+ *  count: an env slot is read by closures. */
+function mentionedOutsideList(scope: FoldScope | undefined, name: string): boolean {
+  if (scope?.fnBody === undefined || scope.list === undefined || scope.fnBody === scope.list) return false;
+  const whole = identUses(scope.fnBody, name);
+  const here = identUses(scope.list, name);
+  return whole.reads + whole.writes + whole.nested !== here.reads + here.writes + here.nested;
+}
+
 /** Does any read of `reg` in the defining frame observe the value the
  *  candidate's creation store put there (`isCreation`), other than the one
  *  hop into the env slot (`isHop`)? Conservative def-use over the frame's
@@ -744,7 +763,7 @@ export function foldOne(before: readonly Stmt[], candidate: PrivateFieldCandidat
  *  function body, any mention of `reg` outside it does, because the register
  *  is frame-wide. Registers never appear inside a nested function (a closure
  *  reads the frame through env slots only; `identUses` never credits one). */
-function registerReadReached(before: readonly Stmt[], reg: string, isCreation: (s: Stmt) => boolean, isHop: (s: Stmt) => boolean, scope: FoldScope | undefined): boolean {
+export function registerReadReached(before: readonly Stmt[], reg: string, isCreation: (s: Stmt) => boolean, isHop: (s: Stmt) => boolean, scope: FoldScope | undefined): boolean {
   const at = before.findIndex(isCreation);
   if (at < 0) return true;
   const mentions = (s: Stmt): boolean => {
@@ -801,16 +820,60 @@ export interface FoldScope {
 }
 
 export function foldAll(before: readonly Stmt[], scope?: FoldScope): { readonly after: readonly Stmt[]; readonly folded: readonly string[] } {
-  let tree = before;
-  const folded: string[] = [];
-  for (const c of findCandidates(before)) {
-    const next = foldOne(tree, c, scope === undefined ? undefined : { fnBody: scope.fnBody, list: before });
+  if (scope?.fnBody === undefined || scope.fnBody === before) {
+    const hosted = foldHosted(before);
+    if (hosted !== null) return hosted;
+  }
+  // Spec 24 section 1.7.1: private methods first, so the field fold below
+  // reaches a method body as an ordinary member (`./methods.ts`).
+  const pm = foldMethods(before, scope === undefined ? undefined : { fnBody: scope.fnBody, list: before });
+  const tree = pm !== null && "tree" in pm ? pm.tree : before;
+  const folded: string[] = pm !== null && "tree" in pm ? [...pm.methods] : [];
+  return foldFields(tree, before, scope === undefined ? null : scope.fnBody, folded);
+}
+
+function foldFields(start: readonly Stmt[], list: readonly Stmt[], fnBody: readonly Stmt[] | undefined | null, folded: string[]): { readonly after: readonly Stmt[]; readonly folded: readonly string[] } {
+  let tree = start;
+  for (const c of findCandidates(list)) {
+    const next = foldOne(tree, c, fnBody === null ? undefined : { fnBody, list });
     if (next !== null) {
       tree = next;
       folded.push(c.displayName);
     }
   }
   return { after: tree, folded };
+}
+
+/** Section 1.7.1's hosted shape, matched on the whole function body: the
+ *  method functions are declared at its top level, the class and the slot
+ *  stores inside a labelled block placed directly in it. The methods step
+ *  runs on that block (the declarations go from the body), then the field
+ *  fold on the new block -- the innermost-first driver already visited the
+ *  block itself and found nothing to fold there. No method slot, brand slot
+ *  or folded field slot may be mentioned anywhere else in the frame. */
+export function foldHosted(fnBody: readonly Stmt[]): { readonly after: readonly Stmt[]; readonly folded: readonly string[]; readonly hostedList: readonly Stmt[]; readonly originalList: readonly Stmt[]; readonly frame: readonly Stmt[] } | null {
+  const fns = methodFns(fnBody);
+  if (fns.size === 0) return null;
+  const i = fnBody.findIndex((s) => s.k === "labeled" && s.body.some((t) => { const st = simpleStore(t); return st !== null && st.value.k === "ident" && fns.has(st.value.name); }));
+  if (i < 0) return null;
+  const lab = fnBody[i] as Extract<Stmt, { k: "labeled" }>;
+  const pm = foldMethods(lab.body, { fnBody, list: lab.body }, fns);
+  if (pm === null || "refused" in pm) return null;
+  const gone = new Set(pm.fnNames);
+  const slots = new Set(pm.slots);
+  const newLab: Stmt = { ...lab, body: pm.tree };
+  const frame = fnBody.flatMap((x, j): Stmt[] => {
+    if (j === i) return [newLab];
+    if (x.k === "func" && gone.has(x.name)) return [];
+    if (x.k === "decl" && x.names.some((n) => slots.has(n))) { const names = x.names.filter((n) => !slots.has(n)); return names.length === 0 ? [] : [{ ...x, names }]; }
+    return [x];
+  });
+  const fields = foldFields(pm.tree, pm.tree, frame, [...pm.methods]);
+  const after = frame.map((x) => (x === newLab ? { ...lab, body: fields.after } : x));
+  const fieldSlots = findCandidates(pm.tree).filter((c) => fields.folded.includes(c.displayName)).map((c) => c.envName);
+  const left = identUsesMany(after, [...slots, ...fieldSlots]);
+  for (const u of left.values()) if (u.reads + u.writes + u.nested > 0) return null;
+  return { after, folded: fields.folded, hostedList: pm.tree, originalList: lab.body, frame };
 }
 
 export function match(before: readonly Stmt[], ctx: PassContext): Match<readonly Stmt[], PrivateFieldsGroup> | null {

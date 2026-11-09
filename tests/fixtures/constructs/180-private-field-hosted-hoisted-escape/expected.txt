@@ -1,0 +1,4 @@
+plus: 7 7
+has: true false false
+peek: 6
+sum: 7

@@ -15,6 +15,8 @@ import { hasDestOperand0, writtenRegisters } from "../cfg/reg-effects.ts";
 import { children } from "../structure/ir.ts";
 import type { LabelId, Stmt, StructuredFunction } from "../structure/ir.ts";
 import { postOrder } from "./driver.ts";
+import { getBuiltinTable } from "../tables/registry.ts";
+import { argSlotBase } from "../emit/semantics.ts";
 import type { PassContext } from "./types.ts";
 
 export type { BlockId } from "../cfg/types.ts";
@@ -433,3 +435,18 @@ export type { Restructure } from "./restructure.ts";
 // section 3 -- the generator-shape analysis both generator rungs share.
 export { makeCheck, makeMatch, recover, rewriteGeneratorGroup } from "./generator-shape.ts";
 export type { RecoverOptions, Recovered, Recovery, Refusal, Refused, YieldSite } from "./generator-shape.ts";
+
+/** The builtin's name for `CallBuiltin`/`JmpBuiltinIs` operand `n` in this
+ *  module's builtin table, or `null` (no table / out of range). */
+export function builtinNameFor(ctx: PassContext, n: number): string | null {
+  const id = ctx.analysis.module.layout.builtinTable;
+  if (id === undefined) return null;
+  return getBuiltinTable(id).builtins[n]?.name ?? null;
+}
+
+/** `src/emit/semantics.ts`'s `argSlotBase` for the function `ctx` is on: the
+ *  register holding `arg[0]` (`this`) of a long-form `Call`. */
+export function argSlotBaseFor(ctx: PassContext): number {
+  const frameSize = ctx.analysis.module.functions[ctx.functionIndex]!.header.frameSize;
+  return argSlotBase(ctx.hbcVersion, frameSize);
+}

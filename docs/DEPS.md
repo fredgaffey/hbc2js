@@ -521,7 +521,7 @@ shape from the human table.
 | `reactNativeVersion` | `string \| null` | Best-guess RN version, from the highest-confidence matched `react-native`/`react-native-foundation` signature; `null` if none matched at all. |
 | `reactNativeVersionConsistentWithHbc` | `boolean \| null` | F4 (issue #14): `null` when `reactNativeVersion` is `null` (nothing to reconcile) or the parsed `hbcVersion` has no documented RN range; otherwise whether `reactNativeVersion` falls inside the range `docs/TOOLCHAIN.md`'s table documents for this `hbcVersion` (e.g. HBC96 → RN 0.72.x-0.81.x, widened from 0.73.x-0.81.x 2026-09-18 -- see "RN version reconciliation (F4)" below). |
 | `reactNativeVersionExpectedRange` | `string \| null` | Human-readable RN range for this `hbcVersion` (populated whenever one is known, not only on a mismatch), e.g. `"RN 0.72.x-0.81.x"`. |
-| `confirmedDeps` | `ConfirmedDep[]` | `{ package, version, confidence, modulesCovered, moduleTotal, source }` — `package` (not `.name`), High-tier or `--confirm`-verified. Written into `package.json`. |
+| `confirmedDeps` | `ConfirmedDep[]` | `{ package, version, confidence, modulesCovered, moduleTotal, source }` — `package` (not `.name`), High-tier or `--confirm`-verified. Written into `package.json`. Optional `forkOf` / `forkEvidence` (corpus-fork-relabel): `package` is a fork the bundle names, `forkOf` the upstream whose signature matched, `version` that upstream's version. |
 | `guessedDeps` | `GuessedDep[]` | `{ package, version, confidence, modules, evidence }` — evidence-scored leads clearing the precision rules (≥2 independent evidence kinds, confidence ≥0.5). Never written into `package.json`. |
 | `hintedDeps` | `HintedDep[]` | `{ package, version, confidence, evidenceKind, evidence }` — single-evidence-kind leads kept only when that one kind is high-specificity. Reported for visibility only. |
 | `suppressedGuesses` | `SuppressedGuess[]` | `{ package, confidence, evidence, reason }` — what the precision rules weighed and dropped, and why. |
@@ -2705,11 +2705,46 @@ rule should have caught it:
 | pathless signature holding its dependencies' code; the matched version is pathless because its v4 rebuild failed (listed in `db-v4-paths.failed.txt`) | `d3-geo` (hits in `d3-array`), `jszip` (`pako`), `typeorm`, `wagmi` (`viem`, `@tanstack/*`, `@noble/curves`) | `fast-json-patch`, `is-array-buffer`, `is-regex` (es-shim chain), `jszip`, `mammoth` (`@xmldom/xmldom`), `p-map`, `reactotron-react-native`, `rpc-websockets` (`@babel/runtime`), `typeorm`, `wagmi` | open: needs those builds fixed, not a rule |
 | fork or rename whose counterpart has no matching signature | `react-query` (`@tanstack/react-query`), `whatwg-url` (`whatwg-url-without-unicode`) | `react-query`, `source-map-js` (`source-map`), `superstruct` (`@metamask/superstruct`), `whatwg-url` | open (the known fork row above) |
 | small package inlined in another package's pre-built dist module | `async-lock` (`@rudderstack/rudder-sdk-react-native`), `preact` (`@sentry-internal/feedback`) | `resq` (inlines `fuse.js`) | fixed for the first two (below) |
-| module-graph promotion through the `react-native` hub, fuzzy edge | none | `@react-native-community/cookies`, `react-native-webview` | open: the hub caveat of "Path recall" |
+| module-graph promotion through the `react-native` hub, fuzzy edge | none | `@react-native-community/cookies`, `react-native-webview` | a fork, not the hub: the app ships `@react-native-cookies/cookies` and `@metamask/react-native-webview`, which hold the upstream code (deps-hub-edge, below) |
 | code moved between packages across versions | none | `fast-xml-builder` (in the app's `fast-xml-parser`) | open |
 | large file inlined in a renderer of about its size | none | `react-reconciler` (in `react-native`'s renderer) | open |
 | app-vendored copy (the code really is there, under app paths) | `d3-interpolate-path` | none | not a matcher error |
 | generic shapes spread over many packages | none | `@shopify/react-native-skia` | open |
+
+**The two hub-edge FPs are forks (deps-hub-edge, 2026-11-09).** Every
+`viaDependency` promotion on the five truth apps was dumped (full v4: 51
+promotions; `db-v3-clean` has none, since the rule needs path-bearing files):
+package, `by`, edge form, the matching own-file/app-module pairs with their
+fuzzy overlap, own-file size, the app module's requires and requirers, and
+which confirmed package explains each one. Metamask's two FPs are not wrong
+evidence. The source map puts the matched modules under
+`node_modules/@react-native-cookies/cookies/index.js` and
+`node_modules/@metamask/react-native-webview/src/{WebView.android,WebViewShared}.tsx`.
+Those are renames of the upstream packages, and the truth names the fork. The
+cookies module still holds the string
+`@react-native-community/cookies: Import libraries to android ...`, and the
+webview `WebViewShared` module has the same strings as rainbow's true
+`react-native-webview` 13.6.3. So nothing in the code separates them from
+the TPs, and none of the measured features has a margin. Fuzzy coverage of
+the own file is 0.60-0.67 for the FPs and 0.50-1.0 for the TPs
+(`react-native-permissions` 0.60, `@react-navigation/native` on metamask
+0.50). The FPs have 4, 7 and 12 distinct fuzzy hashes; the TPs go down to 3
+(`react-native-is-edge-to-edge`, `-worklets`). Own files are 89-339
+instructions; the TPs go down to 39. Neither FP's app module requires code
+of a confirmed package that the own file does not declare. Requirers are
+unexplained app modules for both FPs and TPs. Native-module strings are in
+both. Any cut on these loses TPs and keeps a fork reported under the
+upstream name it really carries, so no rule ships. They join the fork row
+above. The one promotion the dump shows riding on the wrong module *is*
+through the hub, but it is a TP: metamask's `react-native-permissions` index
+matches `react-native-reanimated`'s index (a generic re-export shape), and 12
+of the 13 explained requires of that module are reanimated, skia or
+worklets code, none of which permissions declares. A guard "reject a fuzzy
+pair whose app module has 3+ explained requires, most of them to confirmed
+packages the own file does not declare" rejects only that pair on all five
+apps. As measured that is one TP lost and no FP removed. It was not
+shipped: it is correct, but only worth adding together with a case where it
+removes an FP.
 
 A rule demoting a pathless package whose path-bearing sibling versions hit
 none of their own files was simulated and rejected: it would remove 7 FPs
@@ -2728,3 +2763,133 @@ are not told apart). `db-v3-clean` is pathless, so its numbers are
 unchanged by construction. TPs lost: 0 on all five apps.
 
 Test: `tests/gate/deps/corpus-precision-rainbow-mm.test.ts`.
+
+### Fork relabel (corpus-fork-relabel, 2026-11-09)
+
+**Problem.** One kind of false positive comes from an app that ships a fork or
+rename Q of an upstream package P. Q's code is P's code, so P's signature
+matches, but the truth (and the app's `package.json`) names Q. Known cases on
+the full-v4 farm: `@react-native-community/cookies` (Q
+`@react-native-cookies/cookies`), `react-native-webview`
+(`@metamask/react-native-webview`), `superstruct` (`@metamask/superstruct`),
+`react-query` (`@tanstack/react-query`), `whatwg-url`
+(`whatwg-url-without-unicode`), `source-map-js` (`source-map`).
+
+**Where Q's name is.** A dump of every string naming these families on
+metamask, rainbow and Expensify showed that Q is usually named outside P's
+matched code. The places are the app's own bundled `package.json` (metamask
+lists `@metamask/react-native-webview`, `@react-native-cookies/cookies` and
+`@tanstack/react-query`), a dependent's `package.json` (`react-native-url-polyfill`
+lists both `whatwg-url` and `whatwg-url-without-unicode`, and `css-tree`
+lists `source-map`), and error strings in other packages' code (`@metamask/utils`
+names `@metamask/superstruct`). Rainbow's `react-query` has no `@tanstack`
+string at all, so that case stays a false positive.
+
+**Choice** (`src/deps/fork-relabel.ts`, run after `matchInventory` in
+`runDeps`). A string "names" a package when the whole string is the name or
+`name@version`. A confirmed package P is reported as Q (`ConfirmedDep.forkOf: P`,
+`forkEvidence` quoting the strings, tier and version unchanged) when exactly
+one Q that the bundle names fits one of these rules:
+- `scoped-copy`: P is unscoped and Q is `@scope/P`.
+- `own-scope`: P and Q have the same basename, and Q's scope contains it
+  (`@react-native-cookies/cookies`).
+- `affix`: P and Q are in the same scope, and one is the other plus
+  `-word...` at either end. The shorter name must still contain a separator,
+  following the corpus-guess-generic rule. Q must have no signature in the DB.
+  Q must also be named in a `package.json`-shaped module: one function, no
+  requires, and the strings `name`, `version` and a dependency key.
+
+Guards: Q is not confirmed itself (if it is, the twin rules decide). `@types/*`
+never counts as a fork. Every module that names P must also name Q and name at
+most `FORK_CONTEXT_MAX_CONFIRMED` (4) other confirmed packages. In a small
+`package.json` the upstream name is a keyword or description. An app's own
+`package.json`, which lists everything, keeps P.
+
+**Rejected.**
+(1) Looking for Q only in P's matched modules: for 5 of the 6 families the
+name is in a `package.json` or in another package's code, not in P's code.
+(2) Requiring Q to have no signature for every rule: `@tanstack/react-query`
+has 19 signature files, none of which match the app.
+(3) Accepting affix names from code: React's renderer calls itself
+`react-native-renderer`, which made rn-template's `react-native` look like a
+fork. The guard tests in `truth.test.ts` caught it.
+(4) A hand-written list of rename families.
+
+Measured offline on deb (`deps-forks/run.sh` = `deps-rm/run.sh`, `meas2.mjs`
+`scoreAgainstTruth`). Before is this branch's merge base (deps-hub-edge + main),
+after is the relabel. Each cell is confirmed / TP / FP, precision:
+
+| app | db-v3-clean before | after | full v4 before | after |
+|---|---|---|---|---|
+| react-navigation-example | 16 / 16 / 0, 100% | unchanged | 21 / 21 / 0, 100% | unchanged |
+| bluesky | 45 / 37 / 8, 82.2% | unchanged | 46 / 45 / 1, 97.8% | unchanged |
+| rainbow | 129 / 106 / 23, 82.2% | unchanged (`test-renderer` FP relabelled to `react-test-renderer`, still an FP) | 115 / 108 / 7, 93.9% | unchanged |
+| metamask | 186 / 148 / 38, 79.6% | 186 / 151 / 35, 81.2% | 176 / 156 / 20, 88.6% | 176 / 162 / 14, 92.0% |
+| Expensify J3 | 135 / 96 / 39, 71.1% | 135 / 98 / 37, 72.6% | 107 / 100 / 7, 93.5% | 107 / 102 / 5, 95.3% |
+
+Converted FP to TP. On metamask v4: cookies, webview, `react-query`,
+`superstruct`, `source-map-js` and `whatwg-url`. On metamask v3:
+`superstruct`, `source-map-js` and `whatwg-url`. On Expensify, both DBs:
+`source-map-js` and `whatwg-url`. TP lost: 0. Recall rises by the same amount.
+Still open: rainbow's `react-query` (no `@tanstack` string) and rainbow's
+`whatwg-url`, where some guard holds (not traced). Metamask v3's `react-query`
+also stays an FP, also not traced.
+Test: `tests/gate/deps/corpus-fork-relabel.test.ts`.
+
+**Retry of the failed jobs** (deps-population-widen-3, 2026-11-09). The
+1,445 failed jobs were re-run on deb with main's builder fixes
+(`src/deps/builder-support.ts`: Node built-in shims, peer installs,
+unresolved-module retry, `CI=true` watcher), per-job npm/npx timeouts
+raised to 300 s, 6 slots with real scaffold copies (the first run's six
+slots were symlinks to one shared scaffold), into `db-overlay-pop2`
+(`dep-subtract` against db-v3-clean; `db-overlay-pop` untouched). Failure
+class, before (first full run, 2,347 jobs) and after (retry of the 1,445):
+
+| class | before | after retry |
+|---|---|---|
+| built (+ 43 reused) | 859 (+43) | 1,252 of 1,445 |
+| bundle, not a built-in or missing import | 1,160 | 132 |
+| bundle, Node built-in unresolved | 170 | 0 |
+| bundle, other unresolved module | 77 | 21 |
+| `npm install` | 26 | 15 |
+| hermesc | 3 | 24 |
+| npm/npx timeout | 7 | 1 |
+| other | 2 | 0 |
+
+Together 2,154 of 2,347 jobs have a build (92%). The 24 hermesc failures
+are new: shimmed or retried bundles that hermesc rejects (one example is a
+helper bundle with an invalid assignment left-hand side). Overlay
+`db-overlay-pop2`: 1,251 files, 202 MB (one built file had no subtract
+output).
+
+Measured with current main, offline, each layered directory a symlink copy
+with its own `build-candidate-hash-index.mjs` index; base = db-v3-clean,
++pop = base + `db-overlay-pop`, +pop2 = base + both overlays (confirmed / TP
+/ FP, recall all):
+
+| bundle | base | + pop | + pop + pop2 |
+|---|---|---|---|
+| Expensify | 135 / 96 / 39, 33.3% | 163 / 126 / 37, 43.8% | 169 / 125 / 44, 43.4% |
+| react-navigation | 16 / 16 / 0, 21.1% | 19 / 19 / 0, 25.0% | 19 / 19 / 0, 25.0% |
+| bluesky | 45 / 37 / 8, 18.7% | 53 / 45 / 8, 22.7% | 51 / 44 / 7, 22.2% |
+| rainbow | 129 / 106 / 23, 20.5% | 133 / 108 / 25, 20.8% | 135 / 109 / 26, 21.0% |
+| MetaMask | 186 / 148 / 38, 19.8% | 192 / 153 / 39, 20.4% | 188 / 149 / 39, 19.9% |
+
+The retry does not help: 1,251 more packages move the five apps by -1 to +1
+TP and add false positives. Expensify gains `@formatjs/intl-localematcher`
+and loses `js-base64` and `react-is`; new FPs `buffer-crc32`,
+`@sentry/{replay,replay-canvas,browser-utils,feedback}`, `smart-buffer`,
+`@vitest/pretty-format`, `@octokit/oauth-methods` (the `@sentry/*` ones are
+sub-packages whose modules overlap the SDK's own). MetaMask loses four TPs
+(`define-properties`, `es-define-property`, `has-symbols`, `hasown`) and
+gains `is-string`; rainbow and MetaMask gain `safe-array-concat`; bluesky
+gains `@sentry/feedback` and loses `color` and `react-native-gesture-handler`
+while gaining `esquery`. The lost TPs are small shim-like packages; the cause was not
+traced (the larger population probably changes candidate/subtraction context). Against the base, the first
+overlay's gains (Expensify +30 TP, bluesky +8, react-navigation +3) are
+unchanged and it still loses no TP. This mixes in no truth overlay
+(`db-overlay-recall`). Next: trace why those TPs are lost before building more.
+
+Reproduce (deb, `~/_hbc2js/pop2/`): jobs-retry.tsv = jobs-all.tsv minus the
+`ok` results of the first run; `drive.sh` (stops below 15 GB) via `xargs -P6`;
+`subtract.sh`, `after3.sh` (merge, index, `measure.sh <tag> <dir>`).

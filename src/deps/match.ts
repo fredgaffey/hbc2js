@@ -44,6 +44,11 @@ export interface PackageScore {
    *  the own file matches by mnemonic shape and `by` is a confirmed package
    *  whose evidence sits in the required module. */
   readonly viaDependency?: { readonly by: string; readonly edge: "exact" | "fuzzy" };
+  /** Set by `relabelForks` (corpus-fork-relabel, `src/deps/fork-relabel.ts`):
+   *  the bundle names `package`, a fork or rename of this package with no
+   *  confirmed signature of its own, and nothing names this one, so the
+   *  report names the fork. `evidence` quotes the strings that named it. */
+  readonly fork?: { readonly package: string; readonly rule: "scoped-copy" | "own-scope" | "affix"; readonly evidence: readonly string[] };
 }
 
 export interface ModuleAttribution {
