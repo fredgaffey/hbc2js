@@ -186,6 +186,12 @@ structure-recovery block.
   data property, no prototype walk (the §9.1 kind C argument). A literal with
   no prototype chain (`__proto__: null`) would also be sound; the rung does
   not build those.
+  Measured 2026-11-10 (passes-on, strong normalisation): react-navigation v98
+  8177 -> 8186 IDENTICAL of 14437 (`diff:NewObject/NewObjectWithBuffer`
+  10 -> 0: the old fold made hermesc recompile `{}` + stores as a buffer
+  literal); rn-template v94 2101 -> 2101, decompiled output byte-identical.
+  Readability cost: 24 literals in 19 react-navigation modules now print as
+  `{}`/a shorter literal followed by `o.k = v;` statements.
 * **An interleaved statement inside the run** (v98/v99 `NewObjectWithBuffer`
   computing a value *between* two stores, `63-object-literal` fn `table`) no
   longer ends the run outright: a **pure register def** (`rX = <expr>` with
