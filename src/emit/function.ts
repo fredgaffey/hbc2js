@@ -890,13 +890,23 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
     // never treat it as a register-frame boundary.
     return { k: "func", name, params, body: [...headerStmts, ...prologue, { k: "return", arg: { k: "func", name: null, params: [p("__sent"), p("__isReturn"), p("__isThrow")], body, sameFrame: true } }] };
   }
-  const rebuilt = reconstructIifes({
+  const iifeInput = {
     header: [...headerStmts, ...prologue],
     body,
     ownedEnvSlots: input.ownedEnvSlots,
     envParent: envParentMap(input.envGraph),
-    movableChild: (childName) => movableChild(input.envGraph, fn.index, childName),
-  });
+    movableChild: (childName: string) => movableChild(input.envGraph, fn.index, childName),
+  };
+  // Spec 27 section 10: an environment created at offset 0 is the function's
+  // own scope -- unless the function has none and starts with an inlined
+  // callee (fixture 79). Both readings are guard-checked and so sound; take
+  // the own-scope reading only when it reconstructs strictly more wrappers.
+  let rebuilt = reconstructIifes(iifeInput);
+  const ownEnv = ownEnvOf(input.envGraph, fn.index);
+  if (ownEnv !== undefined && input.ownedEnvSlots.length > 0) {
+    const asOwn = reconstructIifes({ ...iifeInput, ownEnv });
+    if (asOwn.wrapped.length > rebuilt.wrapped.length) rebuilt = asOwn;
+  }
   // One summary line per function, like F24-5's `W_NO_CAPTURE_HOSTED`: spec 27
   // wrapping (or refusing to wrap) is a placement statement, not a problem, and
   // it exists so the counts stay observable on a large bundle.
@@ -929,6 +939,19 @@ function movableChild(envGraph: EnvGraph, functionIndex: number, childName: stri
   if (sites === undefined || sites.size !== 1) return false;
   for (const key of sites.keys()) if (key.slice(0, key.indexOf(":")) !== String(functionIndex)) return false;
   return true;
+}
+
+/**
+ * Spec 27 section 10: the environment `functionIndex` creates for itself --
+ * hermesc emits a function's own `CreateFunctionEnvironment` as its first
+ * instruction, and an inlined callee's later, where the call was. Undefined
+ * when the function has no own environment (every one it owns is inlined).
+ */
+function ownEnvOf(envGraph: EnvGraph, functionIndex: number): number | undefined {
+  for (const node of envGraph.nodes) {
+    if (node.ownerFunction === functionIndex && node.createOffset === 0 && node.createOpcode === "CreateFunctionEnvironment") return node.id;
+  }
+  return undefined;
 }
 
 /** env id -> parent env id, for spec 27's "parent of a sibling" guard. */
