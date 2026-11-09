@@ -25,19 +25,50 @@
 //    the effect sequence after the move — this is expr-rebuild's own R1a
 //    adjacent case (02-expr-rebuild.md §4), which could not fire earlier
 //    because kind A's literal still stood between the two statements.
-import { identUses, isPureStmt, isRegisterName, opcodeAt, originOf, registerUses } from "../ast.ts";
+//
+//  C (slot fill in a sequence). Inside a sequence expression of one
+//    top-level statement, `rN = {..., k: <inert>, ...}` immediately followed
+//    by `rN.k = v` (v inert, k a plain data key the literal already owns)
+//    becomes `rN = {..., k: v, ...}`; then `(..., rN = L, rN)` with `rN`
+//    single-use becomes `(..., L)`. Hermes builds `{k: <non-constant>}` as a
+//    NewObjectWithBuffer placeholder plus PutOwnBySlotIdx, and a value-context
+//    branch (`d.get ? d : {get: f}`, a call argument) prints that fill as an
+//    assignment, which recompiles to a PutById. Sound for ANY store opcode:
+//    [[Set]] on an own writable data property of an ordinary object is
+//    OrdinarySetWithOwnDescriptor's plain value update — it never consults
+//    the prototype chain, runs no setter, and keeps the key's position — and
+//    the fresh literal (no accessor, spread, computed or __proto__ key, by
+//    `inert`) cannot have been altered in between (the two are adjacent).
+//    Both values are inert, so dropping the placeholder and evaluating `v`
+//    inside the literal reorders nothing observable.
+//
+//  D (closure into its literal slot). A top-level `function k() {...}` of
+//    this function, never assigned, whose ONLY mention anywhere (its own
+//    body included) is the value of a literal's plain `k:` property in a
+//    statement of the same top-level list, moves into that slot as
+//    `k: function () {...}`. Hermes creates a hoisted declaration's closure
+//    before the literal that uses it, and an inline expression's after it
+//    (NewObjectWithBuffer, CreateClosure, PutOwnBySlotIdx). Sound: creating
+//    a closure is unobservable and nothing can name it before the slot (it
+//    has no other reference); it captures the same function-level scope
+//    (the slot is in the top-level list, so no block binding intervenes);
+//    and its `name` stays `k` — an anonymous function expression as the
+//    value of property `k` is named `k` (SetFunctionName).
+import { identUses, isPureStmt, isRegisterName, isSafeIdentifier, mapExpr, mapStmts, opcodeAt, originOf, registerUses, walk } from "../ast.ts";
 import type { Expr, Stmt } from "../ast.ts";
 import type { Match, PassContext } from "../types.ts";
 
 const FRESH_OBJECT: ReadonlySet<string> = new Set(["NewObject", "NewObjectWithBuffer", "NewObjectWithBufferLong"]);
 
 export interface ArgInlineSite {
-  readonly kind: "literal-arg" | "callee-base";
+  readonly kind: "literal-arg" | "callee-base" | "slot-fill" | "closure-slot";
   readonly reg: string;
   readonly defIndex: number;
   /** The call statement the value moves into. */
   readonly useIndex: number;
   readonly value: Expr;
+  /** Kind C: the rewritten statement that replaces `list[defIndex]`. */
+  readonly stmt?: Stmt;
 }
 export type ArgInlineMatch = Match<readonly Stmt[], ArgInlineSite>;
 
@@ -135,7 +166,7 @@ const asStmt = (e: Expr): Stmt => ({ k: "expr", expr: e });
 export function match(list: readonly Stmt[], ctx: PassContext): ArgInlineMatch | null {
   const fnBody = ctx.fnBody;
   if (fnBody === undefined) return null;
-  return literalArg(list, fnBody, ctx) ?? calleeBase(list, fnBody, ctx);
+  return literalArg(list, fnBody, ctx) ?? calleeBase(list, fnBody, ctx) ?? slotFill(list, fnBody, ctx) ?? closureSlot(list, fnBody, ctx);
 }
 
 const atOf = (s: Stmt, ctx: PassContext) => ({ functionIndex: ctx.functionIndex, offset: originOf(s)?.start ?? 0 });
@@ -189,6 +220,111 @@ function calleeBase(list: readonly Stmt[], fnBody: readonly Stmt[], ctx: PassCon
     if (call === null || call.callee.k !== "member" || call.callee.obj.k !== "ident" || call.callee.obj.name !== def.reg) continue;
     if (identUses([list[j]!], def.reg).reads !== 1 || !deadAfterUse(list, fnBody, j - 1, def.reg)) continue;
     return { root: list, nodes: [list], data: { kind: "callee-base", reg: def.reg, defIndex: i, useIndex: j, value: def.value }, at: atOf(list[i]!, ctx) };
+  }
+  return null;
+}
+
+/** One kind-C step on a sequence's elements, or null. */
+function fillSeq(exprs: readonly Expr[], dead: (reg: string) => boolean, fns: ReadonlySet<string>): Expr | null {
+  for (let k = 0; k + 1 < exprs.length; k++) {
+    const d = exprs[k]!;
+    if (d.k !== "assign" || d.target.k !== "ident" || !isRegisterName(d.target.name) || d.value.k !== "object") continue;
+    const reg = d.target.name;
+    const lit = d.value;
+    if (!inert(lit, fns, [])) continue;
+    const st = exprs[k + 1]!;
+    // `(..., rN = L, rN)` at the end, rN read nowhere else: just `L`.
+    if (k + 2 === exprs.length && st.k === "ident" && st.name === reg && dead(reg)) {
+      return exprs.length === 2 ? lit : { k: "seq", exprs: [...exprs.slice(0, k), lit] };
+    }
+    if (st.k !== "assign" || st.target.k !== "member" || st.target.computed || st.target.obj.k !== "ident" || st.target.obj.name !== reg) continue;
+    if (st.target.prop.k !== "lit" || !isSafeIdentifier(st.target.prop.text) || st.target.prop.text === "__proto__") continue;
+    const key = st.target.prop.text;
+    const at = lit.props.flatMap((p, i) => (!("k" in p) && !p.computed && p.key === key ? [i] : []));
+    if (at.length !== 1) continue;
+    const regs: string[] = [];
+    if (!inert(st.value, fns, regs) || regs.includes(reg)) continue;
+    const props = lit.props.map((p, i) => (i === at[0] ? { key, computed: false, value: st.value } : p));
+    const filled: Expr = { ...d, value: { ...lit, props } };
+    return { k: "seq", exprs: [...exprs.slice(0, k), filled, ...exprs.slice(k + 2)] };
+  }
+  return null;
+}
+
+/** Kind C: the first top-level statement holding a fillable sequence. Nested
+ *  function bodies are other sites (their own registers and declarations),
+ *  so a statement containing a function or class expression is skipped. */
+function slotFill(list: readonly Stmt[], fnBody: readonly Stmt[], ctx: PassContext): ArgInlineMatch | null {
+  let fns: Set<string> | null = null;
+  for (let i = 0; i < list.length; i++) {
+    const s = list[i]!;
+    if (s.k !== "expr" && s.k !== "init" && s.k !== "return") continue;
+    let hasSeq = false;
+    let nested = false;
+    walk([s], { expr: (e) => { if (e.k === "seq") hasSeq = true; else if (e.k === "func" || e.k === "class") nested = true; } });
+    if (!hasSeq || nested) continue;
+    fns ??= stableFunctionNames(fnBody);
+    const f = fns;
+    // `rN` is read only by the sequence's last element: written and read once
+    // in this statement, and dead after it (D-b, or D-a local to `list`).
+    const dead = (reg: string): boolean => {
+      const here = identUses([s], reg);
+      return here.reads === 1 && here.writes === 1 && here.nested === 0 && deadAfterUse(list, fnBody, i - 1, reg);
+    };
+    let done = false;
+    const next = mapStmts([s], (x) => x, (e) => {
+      if (done || e.k !== "seq") return e;
+      const r = fillSeq(e.exprs, dead, f);
+      if (r === null) return e;
+      done = true;
+      return r;
+    });
+    if (!done) continue;
+    return { root: list, nodes: [list], data: { kind: "slot-fill", reg: "", defIndex: i, useIndex: i, value: { k: "lit", text: "0" }, stmt: next[0]! }, at: atOf(s, ctx) };
+  }
+  return null;
+}
+
+/** Kind D. */
+function closureSlot(list: readonly Stmt[], fnBody: readonly Stmt[], ctx: PassContext): ArgInlineMatch | null {
+  const module = ctx.module;
+  if (list !== fnBody || module === undefined) return null;
+  // `_fnN` -> the bytecode name of function N: the key the slot must have.
+  const decls = new Map<string, number>();
+  const keyOf = new Map<string, string>();
+  list.forEach((s, i) => {
+    const n = s.k === "func" ? /^_fn(\d+)$/.exec(s.name) : null;
+    if (s.k === "func" && n !== null) {
+      const key = module.functionName(Number(n[1]));
+      if (!isSafeIdentifier(key)) return;
+      keyOf.set(s.name, key);
+      const u = identUses(fnBody, s.name);
+      if (u.reads === 1 && u.writes === 0 && u.nested === 0) decls.set(s.name, i);
+    }
+  });
+  if (decls.size === 0) return null;
+  for (let i = 0; i < list.length; i++) {
+    const s = list[i]!;
+    if (s.k === "func" || s.k === "comment" || s.k === "decl") continue;
+    let hit: string | null = null;
+    const intoSlot = (e: Expr): Expr => {
+      if (hit !== null || e.k !== "object") return e;
+      const at = e.props.findIndex((p) => !("k" in p) && !p.computed && p.value.k === "ident" && p.value.global !== true && decls.has(p.value.name) && keyOf.get(p.value.name) === p.key);
+      if (at < 0) return e;
+      const prop = e.props[at] as { key: string; value: Extract<Expr, { k: "ident" }> };
+      const name = prop.value.name;
+      const fn = list[decls.get(name)!] as Extract<Stmt, { k: "func" }>;
+      hit = name;
+      const value: Expr = { k: "func", name: null, params: fn.params, body: fn.body, ...(fn.generator === true ? { generator: true as const } : {}), ...(fn.async === true ? { async: true as const } : {}) };
+      return { ...e, props: e.props.map((p, j) => (j === at ? { key: prop.key, computed: false, value } : p)) };
+    };
+    // Only a literal evaluated in a value-context branch or sequence: that is
+    // where hermesc's placement of the hoisted closure differs observably in
+    // the bytecode (a straight-line literal round-trips either way, so it
+    // keeps the declaration form).
+    const next = mapStmts([s], (x) => x, (e) => (hit === null && (e.k === "seq" || e.k === "cond" || e.k === "logical") ? mapExpr(e, intoSlot) : e));
+    if (hit === null) continue;
+    return { root: list, nodes: [list], data: { kind: "closure-slot", reg: hit, defIndex: decls.get(hit)!, useIndex: i, value: { k: "lit", text: "0" }, stmt: next[0]! }, at: atOf(s, ctx) };
   }
   return null;
 }

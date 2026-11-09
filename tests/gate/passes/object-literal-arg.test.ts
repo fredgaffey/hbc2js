@@ -33,6 +33,9 @@ const VERSIONS: readonly HbcVersion[] = [84, 94, 96, 98, 99];
 const CONSTRUCTS = join(repoRoot(), "tests", "fixtures", "constructs");
 const POSITIVE = join(CONSTRUCTS, "140-define-property-getter");
 const NEGATIVE = join(CONSTRUCTS, "141-define-property-observable-literal");
+const SLOT_FILL = join(CONSTRUCTS, "260-literal-slot-fill-in-sequence");
+const SLOT_FILL_NEG = join(CONSTRUCTS, "261-literal-slot-fill-observable-store");
+const PUTBYID_BUG = join(repoRoot(), "tests", "fixtures", "adversarial", "50-putbyid-fold-inherited-setter");
 const EMIT_BUG = join(repoRoot(), "tests", "fixtures", "adversarial", "49-method-read-before-getter-arg");
 
 function decompiled(bytes: Uint8Array): string {
@@ -52,12 +55,12 @@ function parse(bytes: Uint8Array) {
 }
 
 /** Normalised text of every function that reads `defineProperty`, in order. */
-function definers(bytes: Uint8Array): string[] {
+function definers(bytes: Uint8Array, wanted: (text: string) => boolean = (t) => t.includes("defineProperty")): string[] {
   const mod = parse(bytes);
   const out: string[] = [];
   for (let i = 0; i < mod.functions.length; i++) {
     const text = normaliseFunction(mod, decodeFunction(mod, i), { strong: true });
-    if (text.includes("defineProperty")) out.push(text);
+    if (wanted(text)) out.push(text);
   }
   return out;
 }
@@ -87,7 +90,10 @@ for (const version of VERSIONS) {
   test(`140-define-property-getter v${version}: the descriptor literal is inlined into the call`, () => {
     if (!existsSync(join(POSITIVE, `v${version}.hbc`))) return;
     const code = decompiled(new Uint8Array(readFileSync(join(POSITIVE, `v${version}.hbc`))));
-    const calls = code.split("\n").filter((l) => /Object\.defineProperty\([^)]*, \{enumerable: [^,]+, get: [^}]+\}\);$/.test(l));
+    // Kind D (passes-roundtrip-objlit2) moves each getter into its slot as
+    // `get: function () {`, which hermesc creates after the literal as the
+    // original did; a getter that stays a declaration is a plain name.
+    const calls = code.split("\n").filter((l) => /Object\.defineProperty\([^)]*, \{enumerable: [^,]+, get: (function \(\) \{$|[^}]+\}\);$)/.test(l));
     assert.equal(calls.length, 3, `expected three inline Object.defineProperty calls:\n${code}`);
   });
 
@@ -110,6 +116,50 @@ for (const version of VERSIONS) {
   // the emitter's method-call fusion, not this rung. Open.
   test(`adversarial/49-method-read-before-getter-arg v${version}: the method is read before the argument's getter`, { todo: "docs/BUGS.md 2026-11-09 method-read fusion" }, (t) => {
     vmRun(EMIT_BUG, version, t);
+  });
+}
+
+// passes-roundtrip-objlit2 (round-trip buckets `diff:NewObjectWithBuffer/CreateClosure`
+// and `diff:PutOwnBySlotIdx/PutById*`): kind C, a store into a key the fresh
+// literal already owns, inside a sequence expression, folds into the literal.
+for (const version of VERSIONS) {
+  // Before v97 hermesc does not pre-declare a non-constant key as a buffer
+  // placeholder: the store adds a NEW key, which a sequence element (no
+  // bytecode origin) cannot prove is an own define, so kind C stays out.
+  const placeholders = version >= 97 ? {} : { skip: "pre-v97: no NewObjectWithBuffer placeholders" };
+  test(`260-literal-slot-fill-in-sequence v${version}: slot fills fold into the literal`, placeholders, () => {
+    if (!existsSync(join(SLOT_FILL, `v${version}.hbc`))) return;
+    const code = decompiled(new Uint8Array(readFileSync(join(SLOT_FILL, `v${version}.hbc`))));
+    assert.doesNotMatch(code, /\.(get|scales|fileHashes) = /, `a slot fill was left as an assignment:\n${code}`);
+    assert.match(code, /scales: \[1\]/);
+    assert.match(code, /\{enumerable: true, get: function \(\) \{/);
+  });
+
+  test(`260-literal-slot-fill-in-sequence v${version}: the slot-fill functions round-trip IDENTICAL`, placeholders, (t) => {
+    if (!existsSync(join(SLOT_FILL, `v${version}.hbc`)) || !needHermesc(version, t)) return;
+    const original = new Uint8Array(readFileSync(join(SLOT_FILL, `v${version}.hbc`)));
+    // The two slot-fill functions (not the global code, which the decompiled
+    // module wraps in one more function).
+    const pick = (x: string) => x.includes('s#"getOwnPropertyDescriptor"') || /GetById\w* %\d+, %\d+, s#"register"/.test(x);
+    const want = definers(original, pick);
+    assert.equal(want.length, 2, "expected the exportStar callback and the asset factory");
+    const got = definers(recompile(version, decompiled(original)), pick);
+    assert.equal(got.length, want.length, "function count differs");
+    for (let i = 0; i < want.length; i++) assert.equal(got[i], want[i], `v${version}: slot-fill function ${i} differs after the round trip`);
+  });
+
+  test(`260-literal-slot-fill-in-sequence v${version}: behaviour is unchanged`, (t) => {
+    vmRun(SLOT_FILL, version, t);
+  });
+
+  test(`261-literal-slot-fill-observable-store v${version}: a store into an accessor key is not folded`, (t) => {
+    vmRun(SLOT_FILL_NEG, version, t);
+  });
+
+  // docs/BUGS.md 2026-11-10 "object-literal folds a PutById past an inherited
+  // setter": src/passes/object-literal, not this rung. Open.
+  test(`adversarial/50-putbyid-fold-inherited-setter v${version}: an inherited setter still runs`, { todo: "docs/BUGS.md 2026-11-10 object-literal PutById fold" }, (t) => {
+    vmRun(PUTBYID_BUG, version, t);
   });
 }
 
