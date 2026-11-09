@@ -5,7 +5,8 @@
 // `src/export/index.ts` exists (spec 29 §9). That keeps the test count stable
 // across the spec -> implementation boundary: the export implementation does not add gate
 // tests, it turns these green.
-import { existsSync, readdirSync, readFileSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, mkdtempSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
@@ -36,11 +37,57 @@ export function runCli(args: readonly string[]): CliRun {
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 
+const OUT_TOKEN = "\u0000OUT\u0000";
+let fingerprintMemo: string | undefined;
+
+/** sha1 of path+size+mtime of every file under src/ and third_party/ plus the
+ *  lockfile: any change to the exporter or its data tables invalidates the
+ *  export cache (see docs/TESTING.md "Test suite performance"). */
+function inputFingerprint(): string {
+  if (fingerprintMemo !== undefined) return fingerprintMemo;
+  const h = createHash("sha1");
+  const visit = (dir: string): void => {
+    if (!existsSync(dir)) return;
+    for (const e of readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) visit(p);
+      else { const st = statSync(p); h.update(`${p}:${st.size}:${st.mtimeMs}\n`); }
+    }
+  };
+  visit(join(repoRoot(), "src"));
+  visit(join(repoRoot(), "third_party"));
+  h.update(readFileSync(join(repoRoot(), "package-lock.json")));
+  fingerprintMemo = h.digest("hex");
+  return fingerprintMemo;
+}
+
 /** Export `bundle` into a fresh temp dir and return it. Callers pass the dir to
- *  `cleanup` when done. */
+ *  `cleanup` when done. Successful exports are memoised on disk (keyed by bundle
+ *  bytes + args + inputFingerprint) and each call gets its own fresh COPY of the
+ *  cached tree, so tests may still mutate or build inside `out`. The output path in
+ *  stdout/stderr is stored as a token and re-substituted on a hit. */
 export function exportTo(bundle: string, extra: readonly string[] = []): { out: string; run: CliRun } {
   const out = mkdtempSync(join(tmpdir(), "hbc2js-export-"));
+  const key = createHash("sha1").update(readFileSync(bundle)).update("\0").update(JSON.stringify(extra)).update("\0").update(inputFingerprint()).digest("hex");
+  const root = join(tmpdir(), "hbc2js-test-export-cache-v1", key);
+  try {
+    const meta = JSON.parse(readFileSync(join(root, "meta.json"), "utf8")) as CliRun;
+    cpSync(join(root, "tree"), out, { recursive: true });
+    const back = (x: string): string => x.split(OUT_TOKEN).join(out);
+    return { out, run: { status: meta.status, stdout: back(meta.stdout), stderr: back(meta.stderr) } };
+  } catch { /* miss: fall through */ }
   const run = runCli(["export", bundle, "--out", out, "--overwrite", ...extra]);
+  if (run.status === 0) {
+    const tmp = `${root}.tmp-${process.pid}-${Math.random().toString(36).slice(2)}`;
+    try {
+      mkdirSync(tmp, { recursive: true });
+      cpSync(out, join(tmp, "tree"), { recursive: true });
+      writeFileSync(join(tmp, "meta.json"), JSON.stringify({ status: run.status, stdout: run.stdout.split(out).join(OUT_TOKEN), stderr: run.stderr.split(out).join(OUT_TOKEN) }));
+      renameSync(tmp, root);
+    } catch {
+      rmSync(tmp, { recursive: true, force: true }); // lost a race or disk issue: cache is best-effort
+    }
+  }
   return { out, run };
 }
 
