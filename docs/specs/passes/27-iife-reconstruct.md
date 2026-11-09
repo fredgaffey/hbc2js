@@ -411,3 +411,17 @@ under `makeParser`; failed at v98/v99 before this section with
 `151-closure-created-in-two-fns` (the callback stays beside `left`/`right`).
 T2 under the real Hermes VMs: both fixtures' decompiled output matches
 `expected.txt` at v84, v94, v96, v98 and v99.
+
+**Measured** (`node tools/e2e/roundtrip-corpus.ts --only
+react-navigation-example-0.85.3 --passes on`, `1baaa7c` -> this section, same
+machine): IDENTICAL 6590 (45.65%) -> 7107 (49.23%) of 14437; 520 newly
+IDENTICAL, 3 newly DIFFERENT (module 821 / fn#14044, module 1537 / fn#13008,
+fn#13010: `diff:LoadFromEnvironment(imm)`, the parent's environment slots
+numbered in a different order). `tree:unmatched-closure(orig 1 vs recompiled
+0)` 453 -> 63, all `tree:unmatched-closure(...)` buckets together 924 -> 185;
+`diff:CreateFunctionEnvironment(imm)` 341 -> 183. Split diagnostics 4298 ->
+4278. Buckets that grew (`diff:GetParentEnvironment/LoadConst` 68 -> 114,
+`diff:GetParentEnvironment/GetGlobalObject` 227 -> 267,
+`diff:CreateGenerator/GetGlobalObject` 4 -> 32, `diff:GetById/
+NewObjectWithBuffer` 702 -> 740, and a few +25s) are functions that are now
+paired with their recompiled twin and differ later, not regressions.
