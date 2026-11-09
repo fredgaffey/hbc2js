@@ -32,6 +32,7 @@ import { dirname, join } from "node:path";
 import type { DbLayer } from "./db.ts";
 import type { ModuleInventory } from "./inventory.ts";
 import type { SigDbFile } from "./sigdb-types.ts";
+import { foreignSets } from "./module-paths.ts";
 
 export const HASH_INDEX_MAGIC = "#hbc2js-candidate-hash-index 1 ";
 export const DEFAULT_INDEX_MIN_INSTR = 8;
@@ -82,9 +83,13 @@ export function buildCandidateHashIndex(dir: string, hbcVersion: number, opts: B
       packages.push(file.package);
       ids.set(file.package, id);
     }
+    // sigdb-strip-embedded: a path-bearing file's copies of other packages'
+    // modules claim nothing (pathless files: empty set, as before).
+    const foreign = foreignSets(file).functions;
     for (const fn of file.functions) {
       if (fn.instrCount < minInstr) continue;
       if (fn.owner !== undefined && fn.owner !== null && fn.owner !== file.package) continue;
+      if (foreign.has(fn.index)) continue;
       const cur = owners.get(fn.exactHash);
       if (cur === null) continue;
       if (cur === undefined) owners.set(fn.exactHash, [id]);
@@ -152,9 +157,11 @@ export function buildCandidateStringSetIndex(dir: string, hbcVersion: number, op
     }
     // A baseline file blocks every set it has but is never itself proposed.
     const ownerId = file.toolchainBaseline ? -2 : id;
+    const foreign = foreignSets(file).functions;
     for (const fn of file.functions) {
       if (fn.stringCount < minStrings) continue;
       if (fn.owner !== undefined && fn.owner !== null && fn.owner !== file.package) continue;
+      if (foreign.has(fn.index)) continue;
       const cur = owner.get(fn.stringSetHash);
       if (cur === undefined) owner.set(fn.stringSetHash, ownerId);
       else if (cur !== ownerId) owner.set(fn.stringSetHash, -1);
