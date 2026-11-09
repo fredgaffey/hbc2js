@@ -479,7 +479,12 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
   legacyExact.forEach((h, i) => addOcc(LEGACY_PREFIX + h, i));
 
   for (const s of high()) {
-    const whole = Math.max(s.entry.file.totalFunctions ?? 0, s.entry.file.rawFunctionCount ?? 0, s.score.eligibleFunctions);
+    // Path-bearing: the builder bundle's toolchain/runtime modules are
+    // separate unowned files, so rawFunctionCount overstates the package
+    // (async-lock 21 vs 98, corpus-precision-rainbow-mm). Pathless: keep the
+    // larger, conservative size.
+    const raw = (s.entry.file.modulePaths ?? 0) >= 1 ? 0 : (s.entry.file.rawFunctionCount ?? 0);
+    const whole = Math.max(s.entry.file.totalFunctions ?? 0, raw, s.score.eligibleFunctions);
     let all = 0;
     let inside = 0;
     for (const k of s.hitKeys) {
