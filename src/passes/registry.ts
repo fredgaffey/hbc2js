@@ -33,6 +33,7 @@ import { jsxRecover } from "./jsx-recover/index.ts";
 import { templateLiteral } from "./template-literal/index.ts";
 import { tryClean } from "./try-clean/index.ts";
 import { finallyDedup } from "./finally-dedup/index.ts";
+import { fcallDiamond } from "./fcall-diamond/index.ts";
 import { tryShape } from "./try-shape/index.ts";
 import type { Pass, Stage } from "./types.ts";
 import { varNaming } from "./var-naming/index.ts";
@@ -105,6 +106,9 @@ export const REGISTRY: readonly Pass[] = [
   // -- fixture 16's duplicated finalizer sits inside a loop whose tail guard
   // `loop-cond` would otherwise claim first.
   finallyDedup as Pass,
+  // spec 04 section 8 (R3g): collapses the v98+ `f.call` diamond before any
+  // structure rung sees its `if`.
+  fcallDiamond as Pass,
   loopCond as Pass,
   forHeader as Pass,
   forIn as Pass,
