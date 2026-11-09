@@ -915,6 +915,7 @@ export interface MatchOptions {
 function independentOwnerRule(dbs: readonly LoadedSig[], hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetExact: ReadonlySet<string>, minInstr: number, targetCopies: ReadonlyMap<string, number>): (hash: string, pkg: string) => boolean {
   const direct = new Map<string, Set<string>>();
   const evidenced = new Set<string>();
+  const uniqueHits = new Map<string, Set<string>>();
   for (const { file } of dbs) {
     if (file.toolchainBaseline) continue;
     let d = direct.get(file.package);
@@ -923,6 +924,8 @@ function independentOwnerRule(dbs: readonly LoadedSig[], hashOwnerNames: Readonl
       const m = /^(.*)@[^@]+__hbc\d+\.json$/.exec(dep);
       if (m !== null) d.add(m[1]!.replace(/__/g, "/"));
     }
+    let unique = uniqueHits.get(file.package);
+    if (unique === undefined) uniqueHits.set(file.package, (unique = new Set()));
     if (!evidenced.has(file.package)) for (const fn of file.functions) {
       if (fn.instrCount < minInstr) continue;
       const k = schemeKey(file, fn.exactHash);
@@ -930,9 +933,15 @@ function independentOwnerRule(dbs: readonly LoadedSig[], hashOwnerNames: Readonl
       // generic in the target (TARGET_GENERIC_COPIES), that no loaded
       // package of another name holds (hashOwnerNames spans every loaded
       // file, index-less layers included).
+      // deps-land-1110: at least MIN_DISTINCT_EVIDENCE_HASHES distinct such
+      // hashes, over the package's loaded files (realm and victory-core
+      // were supported in bluesky by one and two).
       if (targetExact.has(k) && (targetCopies.get(k) ?? 0) < TARGET_GENERIC_COPIES && hashOwnerNames.get(k)?.size === 1) {
-        evidenced.add(file.package);
-        break;
+        unique.add(k);
+        if (unique.size >= MIN_DISTINCT_EVIDENCE_HASHES) {
+          evidenced.add(file.package);
+          break;
+        }
       }
     }
   }

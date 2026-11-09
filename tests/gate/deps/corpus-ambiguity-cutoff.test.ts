@@ -146,3 +146,20 @@ test("deps-land-1110: independent carriers of an absent package's code do not sh
   for (const p of ["car-1", "car-4"]) assert.notEqual(scoreOf(r, p)?.tier, "high", p + ": " + JSON.stringify(scoreOf(r, p)));
   assert.equal(scoreOf(r, "car-1")?.exactHits, 0, "X stays ambiguous for an independent carrier: " + JSON.stringify(scoreOf(r, "car-1")));
 });
+
+// deps-land-1110: bluesky +pop2 confirmed realm and victory-core (false
+// positives) on code 20+ loaded packages hold, kept because each had one or
+// two unique target hits (realm one 28-instruction function, victory-core
+// 8 and 13 instructions). Every bluesky true package that needs the
+// supported clause has dozens. Support is evidence of the package's own
+// presence, so it needs the few-distinct bar every other confirmation
+// needs: MIN_DISTINCT_EVIDENCE_HASHES distinct unique hits.
+test("deps-land-1110: one or two unique hits do not make a package supported", (t) => {
+  const h = requireHermesc(t, 96);
+  if (h === null) return;
+  const S = moduleOf("sq", 1, 3101);
+  const target = buildInventory(compile(h.path, bundle([APP, S, X()]))).inventory;
+  const s = signature(h.path, "s-thin", [S, X()]);
+  const r = matchInventory(target, loaded([s, ...carriers(h.path, "other-", AMBIGUOUS_OWNER_THRESHOLD + 5)]));
+  assert.ok((scoreOf(r, "s-thin")?.exactHits ?? 0) < 6, "X stays ambiguous for s-thin: " + JSON.stringify(scoreOf(r, "s-thin")));
+});
