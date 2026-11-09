@@ -4,6 +4,7 @@
 import { ErrorCode, Hbc2jsError } from "../errors.ts";
 import { argumentsForm } from "./arguments-form/index.ts";
 import { arrayLiteral } from "./array-literal/index.ts";
+import { valueJoin } from "./value-join/index.ts";
 import { asyncRecovery } from "./async-recovery/index.ts";
 import { literalForms } from "./literal-forms/index.ts";
 import { callShape } from "./call-shape/index.ts";
@@ -131,6 +132,9 @@ export const REGISTRY: readonly Pass[] = [
   // `object-literal`, registered immediately after it for the same reason
   // (same stage-B structure-recovery block, same `after`/`before`).
   arrayLiteral as Pass,
+  // docs/specs/passes/32-value-join.md: `||`/`&&`/`?:` value joins, after
+  // every narrower labelled-block idiom has claimed its sites.
+  valueJoin as Pass,
   yieldRecovery as Pass,
   // R15 (docs/specs/passes/29-yield-loop.md): the cyclic form of the same
   // idiom, straight after the acyclic rung and before `async-recovery`, whose
