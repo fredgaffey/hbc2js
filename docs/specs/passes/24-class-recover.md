@@ -479,6 +479,41 @@ the conservative rule needs no join. Fixture 112-private-field-loop-copy
 (back-edge carried, carried out of the loop, `continue` before the kill,
 entry alias overwritten).
 
+**Hosted slot escape (2026-11-09, pf-hosted-r1).** R-PF1's slot rule says
+"any mention left anywhere", but `foldOne` only scanned the list it matched.
+When hermesc hosts the class in a labelled block placed in the function body,
+a function declared in a member that captures nothing of it is hoisted to the
+body's top level, outside that block, and still reads the slot
+(`return a1[_e0_0];`). The fold deleted the slot's only store, so that
+function read `o[undefined]`: fixture `180-private-field-hosted-hoisted-escape`
+printed `sum: NaN` at v98 and v99 with passes on. Only the checker's parse of
+the list alone had hidden the gap, and only when the block held a `break` to
+its own label. `foldOne` now also counts the slot's mentions in the function
+body outside the matched list (nested functions included) and refuses if
+there are any. The hosted private-method path passes the brand's fold a frame
+without the method functions it is moving into the class. Otherwise the new
+check would count `#m`'s own brand test as an escape (fixture
+`181-private-method-hosted`, which folds at v98/v99; `182-private-method-
+register-hop` folds `#step` through a recycled hop register at v99, and at
+v98 stays refused because `pm-undominated-call`, where hermesc inlines
+`#step` into `bump`). The shape is real. In react-navigation fn#142, the class
+`t extends Error` (`#r`, `#e`) sits in `L0: {...}` and a top-level `clone`
+inlines `Reflect.construct` of it with symbol-keyed installs on an object that
+never ran the constructor, which is fixture 81's hazard. `foldOne` used to fold
+`#e` there, and only the parse failure on `break L0` stopped it. Measured
+(before = the merge of origin/main into passes-private-methods, clean
+worktrees): refusal table `folded` 61 -> 60, `defining-body-escape` 22 -> 23
+(that frame, now classified R-IN1), `pm-folded` 2, `pm-slot-escape` 3, both
+unchanged; `roundtrip-corpus --passes on` IDENTICAL 6590 -> 6590 of 14437,
+DIFFERENT 7847, bucket `diff:GetOwnPrivateBySym/GetByVal` 116 -> 116 (no
+output changes). The 3 `pm-slot-escape` rows (fn#1566 twice, fn#1572) are
+method-slot reads in two places. Some are in closures nested in a member
+whose receiver is `this` read back through an env slot (`r3 = _eK_6`).
+Others are in an async member's generator dispatch, where the slot load and
+its `Reflect.apply` sit in different blocks. Folding either needs a new
+argument (a slot that holds `this` is stable, or dominance through the
+dispatch loop), so both stay refused.
+
 **As implemented (`src/passes/private-fields/methods.ts`, run first inside
 `foldAll`).** The method slot store may go through one register
 (`r3 = _fnK; ...; M = r3;`, the register read nowhere else), the same one-hop

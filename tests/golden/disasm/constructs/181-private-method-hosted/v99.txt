@@ -1,0 +1,240 @@
+; hbc2js disassembly of 181-private-method-hosted/v99.hbc
+; version=99 layout=E opcodeTable=hbc99-mar2026 functions=6 strings=17 globalCodeIndex=0
+function #0 "global"  params=1 frame=19 env=0 flags=exc,dbg,overflowed  @0x000001bc size=196
+  .try T1..T2 -> L3 ; handler 0
+  0000  DeclareGlobalVar     s15 "make"
+  0005  GetGlobalObject      r1
+  0007  LoadConstUndefined   r4
+  0009  CreateClosure        r0, r4, f1 "make"
+  000e  PutByIdLoose         r1, r0, #c0, s15 "make"
+  0014  LoadConstUndefined   r0
+  0016  GetByIdShort         r2, r1, #c0, s15 "make"
+  001b  LoadConstUInt8       r6, 1
+  001e  Call2                r2, r2, r4, r6
+  0023  GetByIdShort         r5, r1, #c0, s15 "make"
+  0028  LoadConstInt         r3, -1
+  002e  Call2                r0, r5, r4, r3
+  0033  CreateThisForNew     r5, r2, 1
+  0037  Mov                  r11, r5
+  003a  Mov                  r10, r6
+  003d  Construct            r3, r2, 2
+  0041  SelectObject         r8, r5, r3
+  0045  TryGetById           r7, r1, #c2, s8 "print"
+  004b  GetByIdShort         r5, r8, #c3, s10 "add"
+  0050  LoadConstUInt8       r3, 2
+  0053  Call2                r5, r5, r8, r3
+  0058  LoadConstString      r3, s4 "add:"
+  005c  Call3                r0, r7, r4, r3, r5
+  0062  TryGetById           r7, r1, #c2, s8 "print"
+  0068  GetByIdShort         r5, r8, #c4, s9 "twice"
+  006d  LoadConstUInt8       r3, 3
+  0070  Call2                r5, r5, r8, r3
+  0075  LoadConstString      r3, s1 "twice:"
+  0079  Call3                r0, r7, r4, r3, r5
+T1:
+  007f  GetByIdShort         r2, r2, #c1, s16 "prototype"
+  0084  GetByIdShort         r5, r2, #c3, s10 "add"
+  0089  GetByIdShort         r2, r5, #c5, s14 "call"
+  008e  NewObject            r3
+  0090  JmpBuiltinIs         L1, 57, r2
+  0094  Call3                r2, r2, r5, r3, r6
+  009a  Jmp                  L2
+L1:
+  009c  Call2                r2, r5, r3, r6
+L2:
+  00a1  Mov                  r0, r2
+  00a4  Jmp                  L4
+T2:
+L3:
+  00a6  Catch                r2
+  00a8  TryGetById           r3, r1, #c2, s8 "print"
+  00ae  TryGetById           r1, r1, #c6, s13 "TypeError"
+  00b4  InstanceOf           r2, r2, r1
+  00b8  LoadConstString      r1, s5 "foreign:"
+  00bc  Call3                r0, r3, r4, r1, r2
+L4:
+  00c2  Ret                  r0
+
+function #1 "make"  params=2 frame=16 env=0 flags=dbg,overflowed  @0x00000280 size=103
+  0000  LoadConstZero        r0
+  0002  LoadParam            r2, 1
+  0005  JLess                L1, r2, r0
+  0009  CreateFunctionEnvironment r3, 3
+  000c  CreatePrivateName    r2, s11 "#n"
+  0012  StoreToEnvironment   r3, 0, r2
+  0016  CreatePrivateName    r2, s12 "Counter"
+  001c  StoreToEnvironment   r3, 2, r2
+  0020  CreateBaseClass      r2, r4, r3, 2
+  0026  Mov                  r5, r4
+  0029  CreateClosure        r4, r3, f3 "#bump"
+  002e  StoreToEnvironment   r3, 1, r4
+  0032  LoadConstString      r6, s10 "add"
+  0036  CreateClosure        r4, r3, f4 "add"
+  003b  DefineOwnByVal       r5, r4, r6, 0
+  0040  LoadConstString      r4, s9 "twice"
+  0044  CreateClosure        r3, r3, f5 "twice"
+  0049  DefineOwnByVal       r5, r3, r4, 0
+  004e  Jmp                  L2
+L1:
+  0050  GetGlobalObject      r3
+  0052  TryGetById           r4, r3, #c0, s8 "print"
+  0058  LoadConstString      r3, s6 "neg"
+  005c  LoadConstUndefined   r1
+  005e  Call2                r3, r4, r1, r3
+  0063  LoadConstNull        r2
+L2:
+  0065  Ret                  r2
+
+function #2 "Counter"  params=2 frame=13 env=0 flags=strict,dbg,overflowed,ctor  @0x000002e7 size=57
+  0000  GetParentEnvironment r2, 0
+  0003  GetNewTarget         r1
+  0005  GetByIdShort         r1, r1, #c0, s16 "prototype"
+  000a  NewObjectWithParent  r1, r1
+  000d  LoadFromEnvironment  r3, r2, 2
+  0011  PrivateIsIn          r0, r3, r1, r0
+  0016  JmpTrue              L1, r0
+  0019  LoadConstUndefined   r0
+  001b  AddOwnPrivateBySym   r1, r0, r3
+  001f  LoadFromEnvironment  r3, r2, 0
+  0023  AddOwnPrivateBySym   r1, r0, r3
+  0027  LoadParam            r2, 1
+  002a  PutOwnPrivateBySym   r1, r2, 1, r3
+  002f  Ret                  r1
+L1:
+  0031  LoadConstString      r4, s2 "Cannot initialize private field …"
+  0035  CallBuiltin          r1, b44 "throwTypeError", 2
+
+function #3 "#bump"  params=2 frame=15 env=0 flags=strict,dbg,overflowed,nc  @0x00000320 size=81
+  0000  LoadParam            r3, 0
+  0003  GetParentEnvironment r2, 0
+  0006  LoadParam            r0, 1
+  0009  LoadConstUInt8       r1, 1
+  000c  JLessN               L1, r1, r0
+  0010  LoadFromEnvironment  r4, r2, 0
+  0014  GetOwnPrivateBySym   r5, r3, 0, r4
+  0019  Add                  r5, r5, r0
+  001d  PutOwnPrivateBySym   r3, r5, 0, r4
+  0022  GetOwnPrivateBySym   r4, r3, 0, r4
+  0027  Ret                  r4
+L1:
+  0029  LoadFromEnvironment  r4, r2, 2
+  002d  PrivateIsIn          r4, r4, r3, r1
+  0032  JmpTrue              L2, r4
+  0035  LoadConstString      r6, s3 "Private element not found"
+  0039  CallBuiltin          r4, b44 "throwTypeError", 2
+L2:
+  003d  LoadFromEnvironment  r2, r2, 1
+  0041  SubN                 r0, r0, r1
+  0045  Call2                r4, r2, r3, r0
+  004a  Call2                r2, r2, r3, r1
+  004f  Ret                  r2
+
+function #4 "add"  params=2 frame=16 env=0 flags=strict,dbg,overflowed,nc  @0x00000371 size=140
+  0000  LoadParam            r4, 0
+  0003  GetParentEnvironment r3, 0
+  0006  LoadFromEnvironment  r2, r3, 2
+  000a  PrivateIsIn          r2, r2, r4, r0
+  000f  JmpTrue              L1, r2
+  0012  LoadConstString      r7, s3 "Private element not found"
+  0016  CallBuiltin          r2, b44 "throwTypeError", 2
+L1:
+  001a  LoadParam            r5, 1
+  001d  LoadConstUInt8       r1, 1
+  0020  JGreater             L2, r5, r1
+  0024  LoadFromEnvironment  r2, r3, 0
+  0028  GetOwnPrivateBySym   r6, r4, 1, r2
+  002d  Add                  r6, r6, r5
+  0031  PutOwnPrivateBySym   r4, r6, 1, r2
+  0036  GetOwnPrivateBySym   r2, r4, 1, r2
+  003b  Jmp                  L5
+L2:
+  003d  Sub                  r0, r5, r1
+  0041  JLessN               L3, r1, r0
+  0045  LoadFromEnvironment  r5, r3, 0
+  0049  GetOwnPrivateBySym   r6, r4, 1, r5
+  004e  Add                  r6, r6, r0
+  0052  PutOwnPrivateBySym   r4, r6, 1, r5
+  0057  GetOwnPrivateBySym   r5, r4, 1, r5
+  005c  Jmp                  L4
+L3:
+  005e  LoadFromEnvironment  r5, r3, 1
+  0062  SubN                 r0, r0, r1
+  0066  Call2                r6, r5, r4, r0
+  006b  Call2                r5, r5, r4, r1
+L4:
+  0070  LoadFromEnvironment  r3, r3, 0
+  0074  GetOwnPrivateBySym   r5, r4, 1, r3
+  0079  Add                  r5, r5, r1
+  007d  PutOwnPrivateBySym   r4, r5, 1, r3
+  0082  GetOwnPrivateBySym   r3, r4, 1, r3
+  0087  Mov                  r2, r3
+L5:
+  008a  Ret                  r2
+
+function #5 "twice"  params=2 frame=17 env=0 flags=strict,dbg,overflowed,nc  @0x000003fd size=234
+  0000  LoadParam            r4, 0
+  0003  GetParentEnvironment r5, 0
+  0006  LoadFromEnvironment  r2, r5, 2
+  000a  PrivateIsIn          r2, r2, r4, r0
+  000f  JmpTrue              L1, r2
+  0012  LoadConstString      r8, s3 "Private element not found"
+  0016  CallBuiltin          r2, b44 "throwTypeError", 2
+L1:
+  001a  LoadParam            r6, 1
+  001d  LoadConstUInt8       r1, 1
+  0020  JGreater             L2, r6, r1
+  0024  LoadFromEnvironment  r3, r5, 0
+  0028  GetOwnPrivateBySym   r2, r4, 1, r3
+  002d  Add                  r2, r2, r6
+  0031  PutOwnPrivateBySym   r4, r2, 1, r3
+  0036  GetOwnPrivateBySym   r2, r4, 1, r3
+  003b  Jmp                  L5
+L2:
+  003d  Sub                  r0, r6, r1
+  0041  JLessN               L3, r1, r0
+  0045  LoadFromEnvironment  r2, r5, 0
+  0049  GetOwnPrivateBySym   r7, r4, 1, r2
+  004e  Add                  r7, r7, r0
+  0052  PutOwnPrivateBySym   r4, r7, 1, r2
+  0057  GetOwnPrivateBySym   r2, r4, 1, r2
+  005c  Jmp                  L4
+L3:
+  005e  LoadFromEnvironment  r2, r5, 1
+  0062  SubN                 r0, r0, r1
+  0066  Call2                r7, r2, r4, r0
+  006b  Call2                r2, r2, r4, r1
+L4:
+  0070  LoadFromEnvironment  r2, r5, 0
+  0074  GetOwnPrivateBySym   r7, r4, 1, r2
+  0079  Add                  r7, r7, r1
+  007d  PutOwnPrivateBySym   r4, r7, 1, r2
+  0082  GetOwnPrivateBySym   r7, r4, 1, r2
+  0087  Mov                  r3, r2
+L5:
+  008a  JGreater             L6, r6, r1
+  008e  GetOwnPrivateBySym   r2, r4, 2, r3
+  0093  Add                  r2, r2, r6
+  0097  PutOwnPrivateBySym   r4, r2, 2, r3
+  009c  GetOwnPrivateBySym   r2, r4, 2, r3
+  00a1  Jmp                  L9
+L6:
+  00a3  Sub                  r0, r6, r1
+  00a7  JLessN               L7, r1, r0
+  00ab  GetOwnPrivateBySym   r6, r4, 2, r3
+  00b0  Add                  r6, r6, r0
+  00b4  PutOwnPrivateBySym   r4, r6, 2, r3
+  00b9  GetOwnPrivateBySym   r6, r4, 2, r3
+  00be  Jmp                  L8
+L7:
+  00c0  LoadFromEnvironment  r5, r5, 1
+  00c4  SubN                 r0, r0, r1
+  00c8  Call2                r6, r5, r4, r0
+  00cd  Call2                r5, r5, r4, r1
+L8:
+  00d2  GetOwnPrivateBySym   r5, r4, 2, r3
+  00d7  Add                  r5, r5, r1
+  00db  PutOwnPrivateBySym   r4, r5, 2, r3
+  00e0  GetOwnPrivateBySym   r3, r4, 2, r3
+  00e5  Mov                  r2, r3
+L9:
+  00e8  Ret                  r2
