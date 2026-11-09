@@ -41,7 +41,7 @@ export const PM_REFUSAL = {
 } as const;
 
 export type MethodsOutcome =
-  | { readonly tree: readonly Stmt[]; readonly methods: readonly string[] }
+  | { readonly tree: readonly Stmt[]; readonly methods: readonly string[]; readonly fnNames: readonly string[]; readonly slots: readonly string[] }
   | { readonly refused: string; readonly detail: string };
 
 /** `fn#2 "#bump"` -- the function-header comment the emitter writes. */
@@ -65,19 +65,40 @@ function methodName(f: FuncStmt): string | null {
   return null;
 }
 
-interface Method { readonly slot: string; readonly fn: FuncStmt; readonly display: string }
+interface Method { readonly slot: string; readonly fn: FuncStmt; readonly display: string; readonly reg: string | null }
 
-/** `null`: no private method in scope (nothing to do, not a refusal). */
-export function foldMethods(before: readonly Stmt[], scope?: FoldScope): MethodsOutcome | null {
+/** Top-level function declarations whose recorded name is `#...`. */
+export function methodFns(list: readonly Stmt[]): Map<string, FuncStmt> {
   const fns = new Map<string, FuncStmt>();
-  for (const s of before) if (s.k === "func") { const d = methodName(s); if (d !== null) fns.set(s.name, s); }
+  for (const s of list) if (s.k === "func" && methodName(s) !== null) fns.set(s.name, s);
+  return fns;
+}
+
+/** `null`: no private method in scope (nothing to do, not a refusal).
+ *  `outerFns`: the hosted shape (section 1.7.1) -- the class and slot stores
+ *  sit in a labelled block placed directly in the function body, the method
+ *  functions at that body's top level; the caller (`foldHosted`) deletes the
+ *  declarations and checks the whole frame. */
+export function foldMethods(before: readonly Stmt[], scope?: FoldScope, outerFns?: ReadonlyMap<string, FuncStmt>): MethodsOutcome | null {
+  const fns = outerFns ?? methodFns(before);
   if (fns.size === 0) return null;
   const methods: Method[] = [];
+  // `M = _fnK`, or through one register (`r3 = _fnK; ...; M = r3;`), the
+  // same one-hop rule `findCandidates` follows for a symbol.
+  const hop = new Map<string, string>();
   for (const s of before) {
     const st = simpleStore(s);
-    if (st === null || !ENV_SLOT.test(st.name) || st.value.k !== "ident" || !fns.has(st.value.name)) continue;
-    const fn = fns.get(st.value.name)!;
-    methods.push({ slot: st.name, fn, display: methodName(fn)! });
+    if (st !== null && st.value.k === "ident" && fns.has(st.value.name) && !ENV_SLOT.test(st.name)) { hop.set(st.name, st.value.name); continue; }
+    if (st !== null && ENV_SLOT.test(st.name) && st.value.k === "ident") {
+      const fnName = fns.has(st.value.name) ? st.value.name : hop.get(st.value.name);
+      if (fnName !== undefined) {
+        const fn = fns.get(fnName)!;
+        methods.push({ slot: st.name, fn, display: methodName(fn)!, reg: fns.has(st.value.name) ? null : st.value.name });
+        hop.delete(st.value.name);
+        continue;
+      }
+    }
+    for (const r of [...hop.keys()]) if (identUses([s], r).writes > 0) hop.delete(r);
   }
   if (methods.length === 0) return null;
   const refuse = (refused: string, detail: string): MethodsOutcome => ({ refused, detail });
@@ -85,13 +106,20 @@ export function foldMethods(before: readonly Stmt[], scope?: FoldScope): Methods
   if (cls === null) return refuse(PM_REFUSAL.noClass, "no single recovered class in scope");
   if (ctorBody(cls) === null) return refuse(PM_REFUSAL.noCtor, "class has no constructor member");
 
-  const uses = identUsesMany(before, [...methods.map((m) => m.fn.name), ...methods.map((m) => m.slot)]);
+  if (methods.length !== fns.size) {
+    const paired = new Set(methods.map((m) => m.fn.name));
+    const lone = [...fns.keys()].filter((n) => !paired.has(n));
+    return refuse(PM_REFUSAL.methodEscape, `${lone.join(", ")}: not stored once into a slot beside the class`);
+  }
+  const frameOf = outerFns !== undefined && scope?.fnBody !== undefined ? scope.fnBody : before;
+  const uses = identUsesMany(frameOf, [...methods.map((m) => m.fn.name), ...methods.map((m) => m.slot)]);
   const seen = new Set<string>();
   for (const m of methods) {
     const f = uses.get(m.fn.name)!;
     if (f.reads !== 1 || f.writes !== 0 || seen.has(m.display) || seen.has(m.slot)) return refuse(PM_REFUSAL.methodEscape, `${m.display}: ${m.fn.name} is mentioned outside its one slot store`);
     seen.add(m.display);
     seen.add(m.slot);
+    if (m.reg !== null && identUses(frameOf, m.reg).reads !== 1) return refuse(PM_REFUSAL.methodEscape, `${m.display}: register ${m.reg} holding ${m.fn.name} is read again`);
     if (uses.get(m.slot)!.writes !== 1) return refuse(PM_REFUSAL.slotRewritten, `${m.display}: slot ${m.slot} written more than once`);
     if (cls.name !== null) {
       const u = identUses(m.fn.body, cls.name);
@@ -118,7 +146,14 @@ export function foldMethods(before: readonly Stmt[], scope?: FoldScope): Methods
   if (flags.escape) return refuse(PM_REFUSAL.slotEscape, "a register holding a method is read outside a call");
   const newCls: ClassExpr = { ...cls, members };
   const fnNames = new Set(methods.map((m) => m.fn.name));
-  const stripped = before.filter((s) => !(s.k === "func" && fnNames.has(s.name)) && !(simpleStore(s) !== null && slots.has(simpleStore(s)!.name)));
+  const regs = new Set(methods.flatMap((m) => (m.reg === null ? [] : [m.reg])));
+  const stripped = before.flatMap((s): Stmt[] => {
+    if (s.k === "func" && fnNames.has(s.name)) return [];
+    const st = simpleStore(s);
+    if (st !== null && slots.has(st.name)) return [];
+    if (st !== null && regs.has(st.name) && st.value.k === "ident" && fnNames.has(st.value.name)) return s.k === "init" ? [{ k: "decl", kind: s.kind, names: [st.name] }] : [];
+    return [s];
+  });
   const tree2 = mapStmts(stripped, (st) => st, (e) => (e === cls ? newCls : e));
   const left = identUsesMany(tree2, [...slots.keys()]);
   for (const [n, u] of left) if (u.reads + u.writes + u.nested > 0) return refuse(PM_REFUSAL.slotEscape, `method slot ${n} is still mentioned`);
@@ -133,7 +168,7 @@ export function foldMethods(before: readonly Stmt[], scope?: FoldScope): Methods
   const tree4 = mapStmts(folded, (st) => st, (e) => (e === cls3 ? cls4 : e));
   // (4) the slots' declarations.
   const tree = tree4.map((st) => (st.k === "decl" ? { ...st, names: st.names.filter((n) => !slots.has(n)) } : st)).filter((st) => !(st.k === "decl" && st.names.length === 0));
-  return { tree, methods: methods.map((m) => m.display) };
+  return { tree, methods: methods.map((m) => m.display), fnNames: [...fnNames], slots: [...slots.keys(), brand.envName] };
 }
 
 /** `obj.#name` member nodes (reads, writes and calls). The brand fold must not
@@ -250,6 +285,7 @@ function scanList(list: readonly Stmt[], st: ScanState, ctx: ScanCtx): Stmt[] {
       out.push(rebuilt);
       continue;
     }
+    if (s.k === "func") { out.push({ ...s, body: scanList(s.body, emptyState(), { ...ctx, breaks: new Map() }) }); continue; }
     if (s.k === "break" && s.label !== null) ctx.breaks.get(s.label)?.push(clone(st));
     const store = simpleStore(s);
     if (store !== null && store.value.k === "ident" && ctx.slots.has(store.value.name)) {
@@ -305,21 +341,30 @@ function rewriteCalls(s: Stmt, st: ScanState, ctx: ScanCtx): Stmt {
     }
     return { k: "call", callee: { k: "member", obj: recv, prop: { k: "lit", text: display }, computed: false }, args: arr.elements };
   };
-  return mapShallow(s, f) as Stmt;
+  return mapShallow(s, f, ctx) as Stmt;
 }
 
-function mapShallow(n: unknown, f: (e: Expr) => Expr | null): unknown {
+/** Every nested function is its own frame (fresh registers): scan it from an
+ *  empty state. A `sameFrame` resume closure shares this frame's registers
+ *  and is left alone (any method mention in it then refuses). */
+function scanNested(fn: Extract<Expr, { k: "func" }>, ctx: ScanCtx): Expr {
+  if (fn.sameFrame === true) return fn;
+  return { ...fn, body: scanList(fn.body, emptyState(), { ...ctx, breaks: new Map() }) };
+}
+
+function mapShallow(n: unknown, f: (e: Expr) => Expr | null, ctx: ScanCtx): unknown {
   if (Array.isArray(n)) {
     let changed = false;
-    const out = n.map((x) => { const y = mapShallow(x, f); if (y !== x) changed = true; return y; });
+    const out = n.map((x) => { const y = mapShallow(x, f, ctx); if (y !== x) changed = true; return y; });
     return changed ? out : n;
   }
   if (n === null || typeof n !== "object") return n;
   const o = n as { readonly k?: string };
-  if (o.k === "func" || o.k === "class" || o.k === "arrow") return n;
+  if (o.k === "func") return scanNested(n as Extract<Expr, { k: "func" }>, ctx);
+  if (o.k === "class" || o.k === "arrow") return n;
   let changed = false;
   const out: Record<string, unknown> = {};
-  for (const [key, v] of Object.entries(o)) { const y = mapShallow(v, f); if (y !== v) changed = true; out[key] = y; }
+  for (const [key, v] of Object.entries(o)) { const y = mapShallow(v, f, ctx); if (y !== v) changed = true; out[key] = y; }
   const node = (changed ? out : o) as Expr;
   return (typeof node.k === "string" ? f(node) : null) ?? node;
 }

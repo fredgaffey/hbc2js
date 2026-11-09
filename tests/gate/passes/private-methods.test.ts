@@ -80,3 +80,20 @@ for (const version of ["v98", "v99"] as const) {
     assert.match(on, /Symbol\("Counter"\)/);
   });
 }
+
+// Static private method: the receiver hermesc passes is not the checked one,
+// so the step refuses (pm-undominated-call); output stays correct.
+const STATIC = "104-private-method-static";
+const staticDir = join(repoRoot(), "tests", "fixtures", "constructs", STATIC);
+test("private methods: 104-private-method-static is PASS under T2 at v98 and v99", async () => {
+  const report = await runTier({ tier: "gate", decompiler: hbc2jsDecompiler, versions: [98, 99], only: [STATIC] });
+  assert.equal(report.results.length, 2);
+  for (const r of report.results) assert.equal(r.verdict, VERDICT.PASS, `${r.fixture.name}: ${r.oracles.map((o) => `${o.oracle}=${o.verdict} ${o.detail ?? ""}`).join(" ")}`);
+});
+for (const version of ["v98", "v99"] as const) {
+  test(`private methods: ${STATIC} ${version} --passes=on prints expected.txt and keeps the method lowered`, () => {
+    const on = decompile(new Uint8Array(readFileSync(join(staticDir, `${version}.hbc`))), { resolveV98Ambiguity: true, passes: {} }).code;
+    assert.equal(run(on), readFileSync(join(staticDir, "expected.txt"), "utf8"));
+    assert.match(on, /\/\/ fn#\d+ "#tick"/);
+  });
+}

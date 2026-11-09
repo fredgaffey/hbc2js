@@ -32,7 +32,7 @@
 import type { Expr, Stmt } from "../ast.ts";
 import { identUses, identUsesMany, isHelperCall, mapStmts, walk } from "../ast.ts";
 import type { Match, PassContext } from "../types.ts";
-import { brandSymbolName, foldMethods } from "./methods.ts";
+import { brandSymbolName, foldMethods, methodFns } from "./methods.ts";
 
 export interface PrivateFieldsGroup {
   /** Display name (with the leading `#`) of every candidate this rung
@@ -744,20 +744,60 @@ export interface FoldScope {
 }
 
 export function foldAll(before: readonly Stmt[], scope?: FoldScope): { readonly after: readonly Stmt[]; readonly folded: readonly string[] } {
+  if (scope?.fnBody === undefined || scope.fnBody === before) {
+    const hosted = foldHosted(before);
+    if (hosted !== null) return hosted;
+  }
   // Spec 24 section 1.7.1: private methods first, so the field fold below
   // reaches a method body as an ordinary member (`./methods.ts`).
   const pm = foldMethods(before, scope === undefined ? undefined : { fnBody: scope.fnBody, list: before });
-  if (process.env.PMDBG && pm !== null) console.error("PM", "", "refused" in pm ? pm.refused + " " + pm.detail : "folded " + pm.methods.join(","));
-  let tree = pm !== null && "tree" in pm ? pm.tree : before;
+  const tree = pm !== null && "tree" in pm ? pm.tree : before;
   const folded: string[] = pm !== null && "tree" in pm ? [...pm.methods] : [];
-  for (const c of findCandidates(before)) {
-    const next = foldOne(tree, c, scope === undefined ? undefined : { fnBody: scope.fnBody, list: before });
+  return foldFields(tree, before, scope === undefined ? null : scope.fnBody, folded);
+}
+
+function foldFields(start: readonly Stmt[], list: readonly Stmt[], fnBody: readonly Stmt[] | undefined | null, folded: string[]): { readonly after: readonly Stmt[]; readonly folded: readonly string[] } {
+  let tree = start;
+  for (const c of findCandidates(list)) {
+    const next = foldOne(tree, c, fnBody === null ? undefined : { fnBody, list });
     if (next !== null) {
       tree = next;
       folded.push(c.displayName);
     }
   }
   return { after: tree, folded };
+}
+
+/** Section 1.7.1's hosted shape, matched on the whole function body: the
+ *  method functions are declared at its top level, the class and the slot
+ *  stores inside a labelled block placed directly in it. The methods step
+ *  runs on that block (the declarations go from the body), then the field
+ *  fold on the new block -- the innermost-first driver already visited the
+ *  block itself and found nothing to fold there. No method slot, brand slot
+ *  or folded field slot may be mentioned anywhere else in the frame. */
+export function foldHosted(fnBody: readonly Stmt[]): { readonly after: readonly Stmt[]; readonly folded: readonly string[]; readonly hostedList: readonly Stmt[]; readonly originalList: readonly Stmt[]; readonly frame: readonly Stmt[] } | null {
+  const fns = methodFns(fnBody);
+  if (fns.size === 0) return null;
+  const i = fnBody.findIndex((s) => s.k === "labeled" && s.body.some((t) => { const st = simpleStore(t); return st !== null && st.value.k === "ident" && fns.has(st.value.name); }));
+  if (i < 0) return null;
+  const lab = fnBody[i] as Extract<Stmt, { k: "labeled" }>;
+  const pm = foldMethods(lab.body, { fnBody, list: lab.body }, fns);
+  if (pm === null || "refused" in pm) return null;
+  const gone = new Set(pm.fnNames);
+  const slots = new Set(pm.slots);
+  const newLab: Stmt = { ...lab, body: pm.tree };
+  const frame = fnBody.flatMap((x, j): Stmt[] => {
+    if (j === i) return [newLab];
+    if (x.k === "func" && gone.has(x.name)) return [];
+    if (x.k === "decl" && x.names.some((n) => slots.has(n))) { const names = x.names.filter((n) => !slots.has(n)); return names.length === 0 ? [] : [{ ...x, names }]; }
+    return [x];
+  });
+  const fields = foldFields(pm.tree, pm.tree, frame, [...pm.methods]);
+  const after = frame.map((x) => (x === newLab ? { ...lab, body: fields.after } : x));
+  const fieldSlots = findCandidates(pm.tree).filter((c) => fields.folded.includes(c.displayName)).map((c) => c.envName);
+  const left = identUsesMany(after, [...slots, ...fieldSlots]);
+  for (const u of left.values()) if (u.reads + u.writes + u.nested > 0) return null;
+  return { after, folded: fields.folded, hostedList: pm.tree, originalList: lab.body, frame };
 }
 
 export function match(before: readonly Stmt[], ctx: PassContext): Match<readonly Stmt[], PrivateFieldsGroup> | null {
