@@ -139,9 +139,15 @@ test("corpus-path-recall: a small own file fully present, requiring the dependen
   const withEdge = buildInventory(compile(h.path, bundle([{ body: APP }, { body: nested }, { body: wrapperOf("sh", 2, 40), deps: [1] }]))).inventory;
   const report = matchBoth(withEdge, ([small]));
   assert.equal(scoreOf(report, "small-h")?.tier, "high", JSON.stringify(scoreOf(report, "small-h")));
-  assert.deepEqual(scoreOf(report, "small-h")?.viaDependency, { by: "nest-r", edge: "exact" });
-  // Without the edge (the module requires an app module) it stays medium.
+  // corpus-recall-bar: its factory and 3 of its 4 eligible functions
+  // exact-match, so the tiny-package coverage path makes it high before
+  // the edge rule runs (viaDependency is then not recorded).
+  assert.equal(scoreOf(report, "small-h")?.viaDependency, undefined);
+  // The same holds without the edge (the module requires an app module):
+  // the file itself is the evidence. The edge rule's own soundness checks
+  // are the wrapper and impostor tests above.
   const noEdge = buildInventory(compile(h.path, bundle([{ body: APP }, { body: nested }, { body: wrapperOf("sh", 2, 40), deps: [0] }]))).inventory;
   const r2 = matchBoth(noEdge, ([small]));
-  assert.notEqual(scoreOf(r2, "small-h")?.tier, "high", JSON.stringify(scoreOf(r2, "small-h")));
+  assert.equal(scoreOf(r2, "small-h")?.tier, "high", JSON.stringify(scoreOf(r2, "small-h")));
+  assert.equal(scoreOf(r2, "small-h")?.viaDependency, undefined);
 });
