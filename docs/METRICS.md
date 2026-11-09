@@ -180,7 +180,7 @@ Own build scored against the package lockfile truth. Offline and `--confirm` giv
 | bluesky own build (+ population overlay, db-v3-clean offline) | see DEPS.md | 43 / 79.1% / 17.2% | 47 / 78.7% / 18.7% (deps-population-widen) | not run | n/a |
 | rainbow own build (hbc96, + population overlay, db-v3-clean offline) | see DEPS.md | 106 / 77.4% / 15.8% | 108 / 77.8% / 16.2% (deps-population-widen) | not run | n/a |
 | metamask own build (hbc96, + population overlay, db-v3-clean offline) | see DEPS.md | 169 / 78.1% / 17.6% | 175 / 78.9% / 18.4% (deps-population-widen) | not run | n/a |
-| Expensify/App 12a92bd (J3, tiny-package coverage path, db-v3-clean offline) | 288 (91) | 128 / 69.5% / 30.9% (main 8c3cc77) | 133 / 70.7% / 32.6% (corpus-recall-bar, 0 FP added) | not run | n/a |
+| Expensify/App 12a92bd (J3, tiny-package coverage path, db-v3-clean offline) | 288 (91) | 128 / 69.5% / 30.9% (main 8c3cc77, 1812137) | 133 / 70.7% / 32.6% (corpus-recall-bar, 0 FP added) | not run | n/a |
 | Expensify/App 12a92bd (J3, tiny-package coverage path, db-v4-paths-partial offline) | 288 (91) | 93 / 96.8% / 31.2% | 99 / 97.0% / 33.3% (corpus-recall-bar) | not run | n/a |
 | Expensify/App 12a92bd (J3, tiny-package coverage path, + overlay) | 288 (91) | clean 209 / 83.7% / 60.8%; partial 176 / 99.4% / 60.8% | clean 219 / 84.5% / 64.2%; partial 186 / 99.5% / 64.2% (corpus-recall-bar; overlay taken from this truth) | not run | n/a |
 | react-navigation-example 0.85.3 (held out, tiny-package coverage path) | 76 (60) | clean 14 / 100% / 18.4%; partial 17 / 100% / 22.4%; + overlay 24 / 23 | clean 16 / 100% / 21.1%; partial 19 / 100% / 25.0%; + overlay 27 / 26, 100% (corpus-recall-bar) | not run | n/a |

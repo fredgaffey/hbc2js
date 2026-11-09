@@ -2586,7 +2586,8 @@ confirmed package (most true tiny packages have one, but so does
 `react-shallow-renderer` has one too).
 
 Measured on deb (`meas2.mjs` offline `scoreAgainstTruth`, sha pins
-matched; before = main 8c3cc77, after = this branch merged with it;
+matched; before = main 8c3cc77 and again 1812137 (identical numbers),
+after = this branch merged with each;
 confirmed / TP / FP, recall):
 
 | app | DB | before | after | TPs gained |
