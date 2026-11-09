@@ -189,6 +189,22 @@ the missing v98 VM a non-blocker, §1) and adding any host name the boot throws
 on — the same "run bare, add what it throws on, repeat" loop used to derive
 §4.1. Mark v98-specific additions in the T8b report and this pack's Gotchas.
 
+**Native-module presence (spec 33 L4).** Answering every name with a module
+makes optional modules look linked (expo-constants then `JSON.parse`d a stub
+function). `src/harness/native-manifest.ts` decides presence, first match
+wins: (1) a per-app `boot-native.json` next to the original (`present`:
+name -> constants or `true`; `absent`: names); (2) a curated RN-core Android
+list, present (with fixed constants: PlatformConstants, DeviceInfo,
+I18nManager, StatusBarManager, ...) or absent (iOS-only: ActionSheetManager,
+LinkingManager, ...); (3) bundle evidence of a required module:
+`getEnforcing('X')`, an Expo `requireNativeModule('X')` outside a `try`, a
+lookup called as a JSI installer (`get('X')?.installModules()`), or the last
+alternative of a lookup chain `get(A) || get(B)`; (4) a library's own spec
+module: a lookup that is the last expression of its Metro factory; (5)
+everything else is absent. `equiv --boot` and `exportBootProof` derive it
+from side A / the original and use it on both sides; `bootTrace` without
+`natives` keeps the open host.
+
 ## 5. The boot trace — reuse existing records, add none
 
 Every boot interaction maps onto an existing `src/harness/trace.ts` record; no

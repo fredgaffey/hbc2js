@@ -228,3 +228,23 @@ module, so *optional* native modules (`requireOptionalNativeModule
 constants are functions, and `JSON.parse` of one throws. The fix is a
 present/absent native-module list in the stub host (L4, spec 31 §4.2), not a
 per-module patch. Test 10 stays `todo`.
+
+**L4, part 1 (2026-11-10).** The stub host now has a native-module presence
+manifest (`src/harness/native-manifest.ts`, spec 31 §4.2): present modules
+answer with a recording stub whose manifest constants are readable as
+properties and from `getConstants()`; absent ones are `undefined` on
+`nativeModuleProxy`, `null` from `__turboModuleProxy`, and `undefined` on
+`expo.modules`, as on a device where they are not linked. It is derived once
+from the original and handed to both sides. With it the held-out original
+boots clean: B1 1568 factories, keys `LogBox`, `main`; B2 reaches
+`runApplication("main")` (the host now skips RN's own `LogBox` surface,
+which registers first) with 1 view and 1 commit. Three export bugs surfaced
+and are fixed, each with an `export-boot L4` test: a non-enumerable own
+define (v98+ class methods) was rendered non-writable, so MessageQueue's
+constructor bind threw (fixture `396-class-method-writable`); `--tier flat`
+modules called `__hbc_*` helpers that `helpers.js` did not install; and the
+boot timer called the app's `performance` polyfill (a TurboModule call the
+original never makes). B1 is still DIVERGENT, on a decompile gap: module 991
+fn#11865 loads slot 0 of an environment read out of another environment's
+slot, which renders as an `__hbc_unresolved_env` marker and throws under
+module 193 (whatwg-fetch); the export enters 85 factories to the original's 1568. Test 10 stays `todo`.
