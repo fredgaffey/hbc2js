@@ -559,8 +559,12 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
   // lumps every module together, so its "file size" is the package's.
   for (const s of high()) {
     if ((s.entry.file.modulePaths ?? 0) < 1) continue;
+    // A slimmed file has dropped most functions: its own file sizes come
+    // precomputed (slim-sigs.ts).
     const ownSize = new Map<number, number>();
-    for (const fn of s.entry.file.functions) if (fn.moduleId !== undefined) ownSize.set(fn.moduleId, (ownSize.get(fn.moduleId) ?? 0) + 1);
+    const pre = s.entry.file.slim?.fileSizes;
+    if (pre !== undefined) for (const [id, n] of Object.entries(pre)) ownSize.set(Number(id), n);
+    else for (const fn of s.entry.file.functions) if (fn.moduleId !== undefined) ownSize.set(fn.moduleId, (ownSize.get(fn.moduleId) ?? 0) + 1);
     const fileOf = new Map<string, number>(); // smallest own file holding the hash
     for (const fn of s.entry.file.functions) {
       const k = schemeKey(s.entry.file, fn.exactHash);

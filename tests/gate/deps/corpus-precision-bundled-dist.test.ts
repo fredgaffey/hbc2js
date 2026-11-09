@@ -21,6 +21,7 @@ import { fingerprintModule, SIG_HASH_SCHEME } from "../../../src/deps/fingerprin
 import { decodeFunction } from "../../../src/disasm/decode.ts";
 import { parseHbc } from "../../../src/parse/module.ts";
 import { attachModulePaths } from "../../../src/deps/module-paths.ts";
+import { slimSigFile, slimTargetFor } from "../../../src/deps/slim-sigs.ts";
 import type { LoadedSig } from "../../../src/deps/db.ts";
 import type { SigDbFile } from "../../../src/deps/sigdb-types.ts";
 
@@ -76,15 +77,23 @@ test("corpus-precision-bundled-dist: a giant dist file whose hits sit in small m
   // One own file of N functions (like babel.js); the app holds two small
   // libraries that the dist file inlined: 20 and 12 of its functions, each
   // its own dense module (so `scattered` anchors them).
-  const pkg = signature(h.path, "giant-dist", [moduleOf("gd", N, 51)], { paths: ["giant-dist/dist/bundle.js"] });
-  const all = helpers("gd", N, 51);
+  const all = helpers("gd", 32, 51);
   const libA = all.slice(0, 20);
-  const libB = all.slice(100, 112);
+  const libB = all.slice(20, 32);
   const lib = (fns: readonly string[]): string => fns.join("\n") + "\n" + exportAll(fns.map((s) => /^function (\w+)/.exec(s)![1]!));
-  const target = buildInventory(compile(h.path, bundle([APP, lib(libA), lib(libB), APP]))).inventory;
+  // The rest of the bundle: functions of other shapes the app lacks (so
+  // slimming drops them, as it drops most of babel.js).
+  const ops = ["+", "-", "*", "^", "|"];
+  const filler = Array.from({ length: N - 32 }, (_, i) => `function fz${i}(x) { ${`x = (x ${ops[i % 5]} ${i + 3}) % 65521; `.repeat(1 + Math.floor(i / 5))}return x; }`);
+  const pkg = signature(h.path, "giant-dist", [lib([...all, ...filler])], { paths: ["giant-dist/dist/bundle.js"] });
+  const target = buildInventory(compile(h.path, bundle([APP, lib(libA), lib(libB)]))).inventory;
   const report = matchInventory(target, loaded([pkg]));
   assert.equal(tierOf(report, "giant-dist")?.demotion?.rule, "bundled-dist", JSON.stringify(tierOf(report, "giant-dist")));
   assert.equal(tierOf(report, "giant-dist")?.tier, "medium");
+  // The CLI matches slimmed records (deps-slim-sigs), which drop the
+  // functions the app does not hold: the own file's size must survive.
+  const slim = matchInventory(target, loaded([slimSigFile(pkg, new Map(), slimTargetFor(target))]));
+  assert.equal(tierOf(slim, "giant-dist")?.demotion?.rule, "bundled-dist", "slim: " + JSON.stringify(tierOf(slim, "giant-dist")));
 });
 
 test("corpus-precision-bundled-dist: a large single-file package present as one module stays high (lodash.js)", (t) => {
