@@ -13,11 +13,10 @@
 // sees.
 import type { Expr, Stmt } from "../ast.ts";
 import type { IdentUses } from "../ast.ts";
-import { expressionOnlyCheck, isPure, isRegisterName, noteRegisterUsesSplice, registerUses } from "../ast.ts";
+import { expressionOnlyCheck, isPure, stmtLists, isRegisterName, noteRegisterUsesSplice, registerUses } from "../ast.ts";
 
 const NO_USES = { reads: 0, writes: 0, nested: 0 } as const;
 import type { CheckResult, PassContext } from "../types.ts";
-import { childLists } from "../restructure.ts";
 import type { ExprRebuildSite } from "./match.ts";
 import { classifySite, exprCounts } from "./match.ts";
 import { noteStmtIndexSplice } from "./stmt-index.ts";
@@ -96,17 +95,12 @@ function verifyExpectedShape(before: readonly Stmt[], after: readonly Stmt[], ru
  *  read-before-def slow path of `expressionOnlyCheck`. */
 function isLoopBodyIn(fnBody: readonly Stmt[] | undefined, list: readonly Stmt[]): boolean {
   if (fnBody === undefined) return false;
-  const LOOPS = new Set(["while", "do-while", "for", "for-in", "for-of"]);
-  const walk = (stmts: readonly Stmt[]): boolean => {
-    for (const s of stmts) {
-      for (const { list: child } of childLists(s)) {
-        if (child === list && LOOPS.has(s.k)) return true;
-        if (walk(child)) return true;
-      }
+  for (const l of stmtLists(fnBody)) {
+    for (const s of l) {
+      if ((s.k === "while" || s.k === "do-while" || s.k === "for" || s.k === "for-in" || s.k === "for-of") && s.body === list) return true;
     }
-    return false;
-  };
-  return walk(fnBody);
+  }
+  return false;
 }
 
 export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: PassContext): CheckResult {
