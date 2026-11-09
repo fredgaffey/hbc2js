@@ -86,7 +86,7 @@ test("ClaudeCliBackend: a cache hit never spawns the binary", async (t) => {
     kind: "suggest-name",
     skillId: "hbc-name",
     skillVersion: loadSkill("hbc-name", cfg.skillsDir).version,
-    skillText: loadSkill("hbc-name", cfg.skillsDir).body,
+    skillText: JSON.stringify(claudeCliArgs(cfg, loadSkill("hbc-name", cfg.skillsDir).body)),
     model: cfg.model,
     body: bodyFromContext(request.context),
     context: canonicaliseContext(request.context),
@@ -217,3 +217,16 @@ test("ClaudeCliBackend: editing the skill text without bumping its version is a 
 function loadSkillIdOf(dir: string, name: string): string | undefined {
   return /^id:\s*(\S+)/m.exec(readFileSync(join(dir, name), "utf8"))?.[1];
 }
+
+test("ClaudeCliBackend: changing only the hint text or a backend flag (same skill, same version) is a cache miss", async (t) => {
+  const cacheDir = tmpCacheDir();
+  t.after(() => rmSync(cacheDir, { recursive: true, force: true }));
+  const withHints = (h: string): WorkerJobRequest => ({ ...req(31, 32), context: { ...req(31, 32).context, hints: h } });
+  const text = async (cfg: ClaudeCliBackendConfig, r: WorkerJobRequest, out: string): Promise<string> =>
+    withEnv({ STUB_CLAUDE_STDOUT: JSON.stringify({ result: out, usage: { input_tokens: 1, output_tokens: 1 } }) }, async () => (await new ClaudeCliBackend(cfg).run(r)).text);
+  const cfg = config(cacheDir);
+  assert.equal(await text(cfg, withHints("def a1"), "A"), "A");
+  assert.equal(await text(cfg, withHints("def a1"), "X"), "A", "identical request still hits");
+  assert.equal(await text(cfg, withHints("params a1 (L5)"), "B"), "B", "hint change must miss");
+  assert.equal(await text({ ...cfg, model: "sonnet" }, withHints("def a1"), "C"), "C", "model change must miss");
+});
