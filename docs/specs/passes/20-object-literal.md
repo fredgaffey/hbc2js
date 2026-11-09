@@ -302,7 +302,10 @@ renaming rung. Two site kinds, both inside one straight-line list:
   (fixture `141-define-property-observable-literal`).
 * **B — callee base.** `rC = E` with `E` a global identifier or a
   non-computed member chain over one (it reads no register), then only
-  `isPureStmt` statements that never mention `rC`, then a call whose callee is
+  statements that cannot observe or be observed by `E`'s getters (no value,
+  or `rX = <literal or register>`; review-1110 objlit/fold: `isPureStmt` let a
+  global getter read or a `valueOf`-calling `+` run before `E`, fixture 330)
+  that never mention `rC`, then a call whose callee is
   `rC.m`, `rC` dead after it. The callee's base is the first thing the call
   evaluates, so `E` runs at the same point of the effect sequence; this is
   expr-rebuild's R1a, which could not fire while kind A's literal still stood
