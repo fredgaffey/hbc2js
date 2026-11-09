@@ -35,6 +35,8 @@ import { privateFields } from "../../src/passes/private-fields/index.ts";
 import { ctorBody, findCandidates, findClass, foldInBody, foldOne } from "../../src/passes/private-fields/match.ts";
 import { printProgram } from "../../src/emit/print.ts";
 import { foldAll } from "../../src/passes/inline-new/match.ts";
+import { foldMethods } from "../../src/passes/private-fields/methods.ts";
+import { foldHosted } from "../../src/passes/private-fields/match.ts";
 import { splitProject } from "../../src/split/index.ts";
 
 interface Refusal {
@@ -84,8 +86,21 @@ function installsOnForeignReceiver(body: readonly Stmt[], envName: string): bool
  *  scope, and why it did (or did not) fold -- re-deriving `foldOne`'s own
  *  decision tree one step at a time so each refusal gets its real cause
  *  instead of one opaque "refused". */
-function diagnose(before: readonly Stmt[], functionIndex: number, fnBody?: readonly Stmt[]): readonly Refusal[] {
+function diagnose(orig: readonly Stmt[], functionIndex: number, fnBody?: readonly Stmt[]): readonly Refusal[] {
   const out: Refusal[] = [];
+  // Spec 24 section 1.7.1: the private-methods step runs first inside
+  // `foldAll`; classify the fields on the tree it leaves (and record its own
+  // refusal, `pm-*`, as one row per frame).
+  const pm = foldMethods(orig, { fnBody, list: orig });
+  if (pm !== null && "refused" in pm) out.push({ reason: pm.refused, detail: pm.detail, functionIndex });
+  if (pm !== null && "tree" in pm) out.push({ reason: "pm-folded", detail: pm.methods.join(", "), functionIndex });
+  // The hosted shape folds on the whole-body visit; classify its block's
+  // fields on the block that visit leaves.
+  const hosted = pm === null && fnBody !== undefined && fnBody !== orig ? foldHosted(fnBody) : null;
+  const useHosted = hosted !== null && hosted.originalList === orig;
+  if (useHosted) out.push({ reason: "pm-folded", detail: `hosted: ${hosted.folded.join(", ")}`, functionIndex });
+  const before = useHosted ? hosted.hostedList : pm !== null && "tree" in pm ? pm.tree : orig;
+  if (useHosted) fnBody = hosted.frame;
   const candidates = findCandidates(before);
   if (candidates.length === 0) return out;
   let classCount = 0;
