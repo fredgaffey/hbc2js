@@ -61,7 +61,7 @@ export function isEnvCreate(name: string): boolean {
 // on react-navigation-example).
 type EnvValue =
   | { readonly t: "env"; readonly node: EnvNodeId }
-  | { readonly t: "closure"; readonly fn: number; readonly env: EnvNodeId | null }
+  | { readonly t: "closure"; readonly fn: number; readonly env: EnvNodeId | null; readonly fromSlot?: boolean }
   | { readonly t: "none" }
   | { readonly t: "unknown" };
 
@@ -173,6 +173,34 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
 
   // (env,slot) -> the environment it holds, or "conflict".
   const slotEnv = new Map<string, EnvNodeId | "conflict">();
+  // (env,slot) -> the closure it holds (function + captured environment), or
+  // "conflict". Only consulted by `GetClosureEnvironment`: hermesc (v>=98)
+  // inlines a call to a closure it knows is the only value of a captured
+  // variable, loads that closure back out of the slot and reads the callee's
+  // captures through its environment (export-boot L4, construct 400).
+  // `${function}:${env}` pairs a function reaches only through a slot-held
+  // closure's environment (and that environment's ancestors). The visibility
+  // check that made the load resolve already proved these lexically visible.
+  const viaSlotClosure = new Set<string>();
+  const slotClosure = new Map<string, { readonly fn: number; readonly env: EnvNodeId } | "conflict">();
+  /** Is the closure environment `cap` visible wherever the holder `of` is?
+   *  True when `cap` is `of` or a static ancestor of it, or when `of`'s chain
+   *  passes through an environment created by the same function as `cap` (the
+   *  inlined-helper case: hermesc gives an inlined callee's environment the
+   *  caller's function environment as parent, a sibling of the block scope the
+   *  argument closure captured). Either way the scope that declares `cap`'s
+   *  slots encloses every function that can reach `of`. */
+  const capturedVisibleFrom = (cap: EnvNodeId, of: EnvNodeId): boolean => {
+    const capOwner = drafts[cap]!.ownerFunction;
+    const seen = new Set<EnvNodeId>();
+    let cur: EnvNodeId | null | undefined = of;
+    while (cur !== null && cur !== undefined && !seen.has(cur)) {
+      if (cur === cap || drafts[cur]!.ownerFunction === capOwner) return true;
+      seen.add(cur);
+      cur = drafts[cur]!.parent;
+    }
+    return false;
+  };
 
   const walkUp = (start: EnvNodeId | null | undefined, levels: number): EnvValue => {
     let cur: EnvNodeId | null | undefined = start;
@@ -258,6 +286,13 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
       if (name === "GetClosureEnvironment") {
         const c = get(insn.operands[1]!.value);
         set(insn.operands[0]!.value, c.t === "closure" && c.env !== null ? { t: "env", node: c.env } : UNKNOWN);
+        if (c.t === "closure" && c.env !== null && c.fromSlot === true) {
+          const seen = new Set<EnvNodeId>();
+          for (let e: EnvNodeId | null | undefined = c.env; e !== null && e !== undefined && !seen.has(e); e = drafts[e]!.parent) {
+            seen.add(e);
+            viaSlotClosure.add(`${f}:${e}`);
+          }
+        }
         return;
       }
       if (name === "LoadConstUndefined") {
@@ -307,7 +342,14 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
         }
         if (env !== null) {
           const held = slotEnv.get(`${env}:${slot}`);
-          set(insn.operands[0]!.value, held !== undefined && held !== "conflict" ? { t: "env", node: held } : UNKNOWN);
+          const heldClosure = slotClosure.get(`${env}:${slot}`);
+          if (held !== undefined && held !== "conflict") set(insn.operands[0]!.value, { t: "env", node: held });
+          else if (heldClosure !== undefined && heldClosure !== "conflict" && capturedVisibleFrom(heldClosure.env, env)) {
+            // Every store of this slot is the same closure over the same static
+            // environment, and that environment is visible where the holder is,
+            // so `GetClosureEnvironment` on the loaded value names it exactly.
+            set(insn.operands[0]!.value, { t: "closure", fn: heldClosure.fn, env: heldClosure.env, fromSlot: true });
+          } else set(insn.operands[0]!.value, UNKNOWN);
         } else {
           set(insn.operands[0]!.value, UNKNOWN);
         }
@@ -342,6 +384,19 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
             }
           } else if (cur !== undefined && cur !== "conflict") {
             slotEnv.set(key, "conflict");
+            learned = true;
+          }
+          const curC = slotClosure.get(key);
+          if (val.t === "closure" && val.env !== null) {
+            if (curC === undefined) {
+              slotClosure.set(key, { fn: val.fn, env: val.env });
+              learned = true;
+            } else if (curC !== "conflict" && (curC.fn !== val.fn || curC.env !== val.env)) {
+              slotClosure.set(key, "conflict");
+              learned = true;
+            }
+          } else if (curC !== "conflict") {
+            slotClosure.set(key, "conflict");
             learned = true;
           }
           const d = drafts[env]!;
@@ -682,7 +737,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
     const slot = Number(slotText);
     let lexical = true;
     for (const f of [...rec.readers, ...rec.writers]) {
-      if (!visibleIn(f).has(env)) {
+      if (!visibleIn(f).has(env) && !viaSlotClosure.has(`${f}:${env}`)) {
         lexical = false;
         break;
       }

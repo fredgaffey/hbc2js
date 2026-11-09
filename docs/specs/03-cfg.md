@@ -642,6 +642,18 @@ environment created with an undefined parent has no parent.
   with a static `levels` → walk `parent` that many times (`unknown` if it runs
   off the top); `GetClosureEnvironment r, c` → the closure's env if `c` is a
   tracked `closure`, else `unknown`; `Mov` copies; every other write → `unknown`.
+* **A closure held in an environment slot** is tracked like an environment held
+  in one: if every store to `(env, slot)` is the same function closed over the
+  same environment node, a load of that slot yields that `closure`. hermesc
+  v>=98 needs it: with a single call site it inlines a helper that receives a
+  closure, then inlines the call to that closure inside the helper's inner
+  function, loading it back out of the slot and reading the callee's captures
+  through `GetClosureEnvironment` (export-boot L4, react-navigation module 991
+  fn#11865; construct `400-inlined-closure-env`). The load resolves only when
+  the captured environment is visible wherever the holder is — it is on the
+  holder's static chain, or that chain passes through an environment created by
+  the same function (the inlined helper's environment is a sibling of the block
+  scope the closure captured). Any other store to the slot makes it `conflict`.
 * `Create*Closure d, rE, fn` with `rE` = `none` records `closureEnvOf(fn) =
   null` — *known* to capture nothing, which is what makes it not an orphan. If
   another site creates the same `fn` with a real environment, that is a genuine
