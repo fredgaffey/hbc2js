@@ -910,8 +910,13 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
     if (attributed.size > 0 && !file.toolchainBaseline) {
       for (const fn of file.functions) {
         if (foreign.functions.has(fn.index)) continue;
-        const a = attributed.get(schemeKey(file, fn.exactHash));
-        if (a !== undefined && !a.has(file.package)) functions.add(fn.index);
+        const key = schemeKey(file, fn.exactHash);
+        const a = attributed.get(key);
+        // Each attributed claimant accounts for one target instance; a
+        // target holding the hash more often than that has another copy,
+        // which this claimant may own (lodash.debounce beside
+        // lodash.throttle, whose file inlines debounce's helpers).
+        if (a !== undefined && !a.has(file.package) && (targetCopies.get(key) ?? 0) <= a.size) functions.add(fn.index);
       }
     }
     const factories = new Set<number>();

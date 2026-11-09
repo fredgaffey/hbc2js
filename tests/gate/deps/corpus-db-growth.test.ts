@@ -145,3 +145,57 @@ test("corpus-db-growth: path attribution to a package with no signature claiming
   const r = matchInventory(target, loaded([x, forkWrapper]));
   assert.equal(tierOf(r, "x-real")?.tier, "high", JSON.stringify(tierOf(r, "x-real")));
 });
+
+// corpus-db-growth open item 2 (copies over-reach). Bluesky +pop2 lost
+// lodash.debounce (eligible 8 -> 2): lodash.throttle's own file inlines
+// debounce's helpers, a path-bearing file names that code
+// `lodash.throttle/...`, and the loaded throttle signature claims it, so
+// debounce's own functions became copies. Both are in the app: the target
+// holds each shared helper twice (traced on deb). One attributed package
+// accounts for one instance; the second instance is the other claimant's.
+test("corpus-db-growth: a hash the target holds more often than its attributed packages account for is not a copy", (t) => {
+  const h = requireHermesc(t, 96);
+  if (h === null) return;
+  const shared = helpers("dq", 6, 11);
+  const DEB = [...shared, ...helpers("du", 1, 501)].join("\n") + "\n" + exportAll([...fnNames("dq", 6), ...fnNames("du", 1)]);
+  const THR = [...shared, ...helpers("tu", 1, 801)].join("\n") + "\n" + exportAll([...fnNames("dq", 6), ...fnNames("tu", 1)]);
+  const deb = signature(h.path, "deb-real", [DEB]);
+  const thr = signature(h.path, "thr-real", [THR]);
+  const wrapper = signature(h.path, "wrapper", [moduleOf("wr", 6, 9001), THR], { paths: ["wrapper/index.js", "thr-real/index.js"] });
+  const target = buildInventory(compile(h.path, bundle([APP, DEB, THR]))).inventory;
+  const before = matchInventory(target, loaded([deb, thr]));
+  const grown = matchInventory(target, loaded([deb, thr, wrapper]));
+  for (const p of ["deb-real", "thr-real"]) {
+    assert.equal(tierOf(grown, p)?.exactHits, tierOf(before, p)?.exactHits, p + " grown: " + JSON.stringify(tierOf(grown, p)) + " before: " + JSON.stringify(tierOf(before, p)));
+    assert.equal(tierOf(grown, p)?.tier, tierOf(before, p)?.tier);
+  }
+  assert.equal(tierOf(grown, "deb-real")?.tier, "high");
+  // One instance in the target: the attribution still decides (the
+  // carrier case corpus-db-growth fixed is unchanged).
+  const single = buildInventory(compile(h.path, bundle([APP, THR]))).inventory;
+  const r = matchInventory(single, loaded([deb, thr, wrapper]));
+  assert.equal(tierOf(r, "deb-real")?.exactHits, 0, JSON.stringify(tierOf(r, "deb-real")));
+});
+
+// Same review: bluesky +pop2 lost react-native-svg to generic 4-24
+// instruction functions that expo/cli path-bearing files attribute to ms,
+// debug, color-convert, xcode. Code that small is not identifying, so a
+// path never makes it someone else's.
+test("corpus-db-growth: generic small functions are never attributed away by paths", (t) => {
+  const h = requireHermesc(t, 96);
+  if (h === null) return;
+  // Small generic helpers (8-20 instructions) the claimant shares with an
+  // unrelated package the wrapper bundled under its own path.
+  const small = Array.from({ length: 6 }, (_, i) => `function sm${i}(a) { return a === ${i} ? null : a + ${i}; }`);
+  const S = [...small, ...helpers("sv", 3, 611)].join("\n") + "\n" + exportAll([...fnNames("sm", 6), ...fnNames("sv", 3)]);
+  const svg = signature(h.path, "svg-real", [S]);
+  const msModule = [...small, ...helpers("ms", 4, 7301)].join("\n") + "\n" + exportAll([...fnNames("sm", 6), ...fnNames("ms", 4)]);
+  const ms = signature(h.path, "ms-like", [msModule]);
+  const wrapper = signature(h.path, "wrapper", [moduleOf("wr", 6, 9001), msModule], { paths: ["wrapper/index.js", "ms-like/index.js"] });
+  const target = buildInventory(compile(h.path, bundle([APP, S]))).inventory;
+  const before = matchInventory(target, loaded([svg, ms]));
+  const grown = matchInventory(target, loaded([svg, ms, wrapper]));
+  assert.ok(target.functions.some((f) => f.instrCount >= 8 && f.instrCount < 25), "fixture holds small eligible functions");
+  assert.equal(tierOf(grown, "svg-real")?.exactHits, tierOf(before, "svg-real")?.exactHits, "grown: " + JSON.stringify(tierOf(grown, "svg-real")) + " before: " + JSON.stringify(tierOf(before, "svg-real")));
+  assert.equal(tierOf(grown, "svg-real")?.tier, tierOf(before, "svg-real")?.tier);
+});
