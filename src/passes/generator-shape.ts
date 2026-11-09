@@ -20,7 +20,7 @@
 // exact shim shape below is the provenance this rung uses. The consequence is
 // recorded in the spec's landed note and in docs/BUGS.md.
 import type { Expr, Param, Stmt } from "./ast.ts";
-import { freeNames, identUses, isPureStmt, isRegisterName, mapStmts, parses, walk } from "./ast.ts";
+import { freeNames, identUses, isPure, isPureStmt, isRegisterName, mapStmts, parses, walk } from "./ast.ts";
 import { childLists, mapChildLists, restructureSegments } from "./restructure.ts";
 import type { CheckResult, Match, PassContext } from "./types.ts";
 
@@ -437,6 +437,8 @@ function group(stub: FuncStmt): Group | Refused {
  */
 export function recover(stub: FuncStmt, opts: RecoverOptions = ACYCLIC): Recovery {
   if (stub.generator === true || stub.async === true) return no("no-generator-site", "already recovered");
+  const shell = loweredShell(stub);
+  if (shell !== null) return shell;
   const g = group(stub);
   if ("ok" in g) return g;
   // R-Y6: `yield*` is lowered through a module-level mutable flag (§1.5).
@@ -479,6 +481,36 @@ export function recover(stub: FuncStmt, opts: RecoverOptions = ACYCLIC): Recover
   }
   const comments = stub.body.filter(isComment);
   return { ok: true, yields: t.yields, loops: structured.loops, fn: { k: "func", name: stub.name, params, generator: true, body: [...comments, ...g.prelude, ...threaded] } };
+}
+
+/** BUGS export-boot L1 (fixture 395): a v>=97 generator stub is
+ *  `<pure prologue>; return __hbc_makeGeneratorLowered(<body>);`. `gen-lowered`
+ *  (catalogue row 18) does not exist yet, so the lowered state machine stays,
+ *  but the stub itself must still BE a generator function: its prototype chain
+ *  (`GeneratorFunction`), `new` throwing, and the call returning a real
+ *  generator object are all observable (RN's `hasNativeConstructor(function*
+ *  () {}, "GeneratorFunction")`). The shell is `function* stub() { <prologue>;
+ *  return yield* __hbc_makeGeneratorLowered(<body>); }`: `yield*` forwards
+ *  next/throw/return to the lowered object and passes its result objects
+ *  through, and the native wrapper's own suspended-start and completed states
+ *  answer exactly as the lowered body would. The prologue now runs at the first
+ *  `next()` instead of at the call, so it must be unobservable: only pure
+ *  register/environment stores and closure declarations. A stub with an
+ *  observable prologue (a default parameter's call) returns null and stays a
+ *  plain function. */
+function loweredShell(stub: FuncStmt): Recovered | null {
+  const body = stub.body;
+  const last = body[body.length - 1];
+  if (last === undefined || last.k !== "return" || last.arg === null) return null;
+  const call = last.arg;
+  if (call.k !== "call" || call.callee.k !== "ident" || call.callee.name !== "__hbc_makeGeneratorLowered" || call.args.length !== 1 || call.args[0]!.k !== "ident") return null;
+  for (const s of body.slice(0, -1)) {
+    if (s.k === "func" || isPureStmt(s)) continue;
+    if (s.k === "init" && isPure(s.value)) continue;
+    return null;
+  }
+  const ret: Stmt = { k: "return", arg: { k: "yield", delegate: true, arg: call } };
+  return { ok: true, yields: 0, loops: 0, fn: { k: "func", name: stub.name, params: stub.params, generator: true, body: [...body.slice(0, -1), ret] } };
 }
 
 /** F25-5: `__this` -> `this`, `__args` -> `arguments`. Legal only because the
