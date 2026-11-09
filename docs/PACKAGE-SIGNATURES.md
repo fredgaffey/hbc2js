@@ -920,6 +920,44 @@ react-navigation TPs. (3) Persisting each module's one-level
 deeper than one level. (4) Deciding own/foreign at build time and storing
 a boolean: the rule could not change without a DB rebuild.
 
+**Foreign modules in the DB-wide indexes (sigdb-strip-embedded, 2026-11-09).**
+The own-file rule above covered scoring, not the two indexes built over the
+whole DB (`src/deps/hash-index.ts`): the candidate hash index and the hop-two
+string-set index still counted every function of every file as an owner, so a
+package's hash or string set was "not unique" whenever another signature
+carried a copy of its file, and a carrier was proposed by unique hashes that
+were really its copy of an absent package. On the v4-layered hbc96/98 farm
+(db-v4-paths files where the rebuild had written them, else db-v3-clean;
+6,527 of 13,733 hbc96 and 17,151 of 21,751 hbc98 files path-bearing), the
+path-bearing files are mostly copies: 86% of modules and 37% of functions
+(41% of functions with >= 8 instructions) at hbc98, 90% / 46% (49%) at hbc96;
+by module, hoisted copies 87%, `@babel/runtime` helpers 11%, nested
+`node_modules` copies 1.4% (hbc98). 14,326 of the 17,151 hbc98 files carry at
+least one foreign module. **Choice (B): keep the files, filter in the
+builders.** Both index builders skip `foreignSets(file).functions` (the same
+set scoring uses, `src/deps/module-paths.ts`); a pathless file gives the empty
+set and is indexed exactly as before, so an index over `db-v3-clean` is
+byte-for-byte unchanged and needs no rebuild. No stored field, hash scheme or
+`modulePaths` version changes. Index effect on the farm: hbc98 unique hashes
+530,413 -> 476,745 (10,854 became unique, 64,522 stopped being unique: hashes
+that only a copy held, which now claim nothing), string sets 165,239 ->
+156,121 (+6,401 / -15,519); hbc96 304,882 -> 296,976 and 153,328 -> 149,119.
+The hbc98 index file shrinks 15.3 -> 13.8 MB; build time and RSS unchanged.
+**Rejected (A): strip foreign modules from the files at finalize time** (a
+derived DB with a `strippedForeign` count and a version marker). It would save
+disk and load memory (37-46% of functions), but the scoring paths already read
+`foreignSets`, the gain for the indexes is identical, and stripping is
+irreversible: the own/foreign rule (a path under `P/` with no further
+`node_modules/`) could not change without rebuilding the DB, which the
+"Rejected (4)" ruling above already declined, and `promoteViaDependency` reads
+the foreign dependency modules an own file requires (`SigModule.depIds`).
+Slimmed records (`slim-sigs.ts`) already drop foreign functions from memory at
+match time. Measured on five truth apps in docs/DEPS.md "Foreign modules in
+the candidate indexes". Test: `tests/gate/deps/sigdb-strip-embedded.test.ts`
+(hash and string-set index ignore a hoisted and a nested copy; a pathless
+file's copies still count; a package blocked only by a copy is proposed, the
+carrier is not).
+
 **sqlite layer.** A sigdb v3 `.sqlite` stores module paths too (schema
 revision 2, additive inside `hbc2js-sigdb/3`): `modules.path`,
 `fingerprint_functions.module_id`, and `fingerprints.module_paths` /
