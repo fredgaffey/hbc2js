@@ -611,3 +611,19 @@ Coverage is unchanged (the abstentions are skill/prompt-bound, not model-bound);
 | tokens per named binding | 2,190 | 986 |
 
 Coverage rises 2.5x and tokens per name fall 55%, with high-confidence accuracy unchanged. All-confidence accuracy drops because the extra names are mostly `low`: low-confidence names are lower-accuracy by design (about 20% lenient), so a consumer or UI must show the confidence tier and not present `low` names as equal to `high` ones. `quality.test.ts` now grades the v6 recording (floors: coverage >= 0.8, lenient all-confidence >= 40% with n >= 30, high-confidence exact >= 0.6 with n >= 5).
+
+**Second app: Expensify 0.86.0 (2026-11-09, skill v6, `claude-cli`/`sonnet`, 60 labelled src functions).** The v6 recipe is app-independent. Register labels: `label-registers.ts` against the app's `index.android.bundle` and its source map with the v98 `hermesc -O -g` joined 98,775 functions, counts matching, 0 name mismatches, 40,391 resolved parameter labels (the Mac `.hbc` pinned in BUILD.md has the same 98,775 functions). Two tool changes were needed at this scale: the full `-dump-ra` is larger than V8's 512 MB string limit, so `runHermesc` filters the dump through `grep` in the pipe; and `record.ts --labelled` now prunes the scope to labelled functions before `collectTargets` (the per-function pass pipeline over ~50k src functions otherwise dominates; the result set is identical). The committed `expensify-app-0.86.0.labels.json` is a 300-function sample (seeded LCG pick) of the labelled src functions; the recording and `expensify-app-0.86.0.nameable.idmatch.json` sit beside it. Expect a setup phase of tens of minutes on a loaded machine (whole-module analysis of 98k functions) before the first model call; the 60 calls themselves took 1,392 s.
+
+| v6, sonnet, 60 fns | react-navigation | Expensify |
+| --- | --- | --- |
+| nameable bindings requested | 850 | 424 |
+| coverage | 86.8% (738) | 96.9% (411) |
+| confidence mix high / med / low | 171 / 260 / 309 | 69 / 159 / 183 |
+| lenient, all confidence | 35/75 (47%) | 32/93 (34%) |
+| exact, all confidence | 30/75 | 28/93 |
+| lenient, high confidence | 15/17 | 14/15 |
+| exact, high confidence | 12/17 | 14/15 |
+| tokens in / out | 645k / 83k | 571k / 46k |
+| tokens per named binding | 986 | 1,500 |
+
+Reading: coverage and high-confidence accuracy generalise (high tier 93% lenient on both apps, small n); all-confidence accuracy is lower on Expensify because `low` role names make up 45% of its output. Tokens per name are higher because the functions are smaller (7 bindings per call against 14), so the fixed ~9k-token skill prompt is amortised over fewer names. `tests/gate/llm-readability/expensify.test.ts` grades it (floors: coverage >= 0.9, lenient all >= 0.25 with n >= 60, high lenient >= 0.7 with n >= 10; skips only if the labels, recording or nameable map are absent).
