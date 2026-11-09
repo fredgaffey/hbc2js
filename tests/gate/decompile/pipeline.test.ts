@@ -97,7 +97,10 @@ test("every gate binary decompiles with strictEnv and reports no error diagnosti
       // `CreateThisForNew` ahead of the inlined `new` (lowered directly,
       // output correct), which inline-new leaves in place -- spec 24 section
       // 9.5 item (a), docs/BUGS.md GetOwnPrivateBySym row.
-      const inlined = b.fixture === "90-inlined-new" || b.fixture === "91-inlined-new-derived";
+      // 343 (review-1110): a base constructor's explicit `return o` and the
+      // derived constructor's super-return are `SelectObject`s outside any
+      // `new` triple, lowered directly (T2 matches the VM).
+      const inlined = b.fixture === "90-inlined-new" || b.fixture === "91-inlined-new-derived" || b.fixture === "343-private-return-override-stamp";
       const reported = unexpected.filter((d) => !(inlined && d.code === "W_UNPAIRED_NEW"));
       if (reported.length > 0) failures.push(`${b.fixture} v${b.version}${b.variant}: ${reported.map((d) => d.code).join(", ")}`);
     } catch (e) {

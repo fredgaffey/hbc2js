@@ -150,6 +150,14 @@ export function ctorBody(cls: ClassExpr): readonly Stmt[] | null {
   return m !== undefined && m.value !== null && m.value.k === "func" ? m.value.body : null;
 }
 
+/** The arguments of `src/emit/lower.ts`'s own-only private access helpers:
+ *  `[obj, sym]` for `__hbc_privGet`, `[obj, sym, value]` for `__hbc_privSet`. */
+function privateAccessCall(e: Expr): readonly Expr[] | null {
+  if (isHelperCall(e, "__hbc_privGet") && e.args.length === 2) return e.args;
+  if (isHelperCall(e, "__hbc_privSet") && e.args.length === 3) return e.args;
+  return null;
+}
+
 /** `Object.<name>(...)`, the emitter's own spelling (non-computed member on
  *  a bare `Object` ident). */
 function objectCall(e: Expr, name: string): readonly Expr[] | null {
@@ -302,6 +310,11 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
           consumed.add(n.prop);
           return;
         }
+        const access = privateAccessCall(n);
+        if (access !== null && isIdent(access[1]!) && aliases.has((access[1] as Ident).name)) {
+          consumed.add(access[1]!);
+          return;
+        }
         const hasOwnArgs = hasOwnCall(n);
         if (hasOwnArgs !== null && isIdent(hasOwnArgs[1]!) && aliases.has((hasOwnArgs[1] as Ident).name)) {
           // A brand test on `this` in the constructor ahead of the install
@@ -334,6 +347,13 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
     });
     const fx = (n: Expr): Expr => {
       if (n.k === "member" && n.computed && isIdent(n.prop) && aliases.has(n.prop.name)) return { ...n, prop: displayKey(), computed: false };
+      const access = privateAccessCall(n);
+      if (access !== null && isIdent(access[1]!) && aliases.has((access[1] as Ident).name)) {
+        // `__hbc_privGet(o, sym)` / `__hbc_privSet(o, sym, v)` (review-1110):
+        // `o.#x` throws exactly where the helper does.
+        const target: Expr = { k: "member", obj: access[0]!, prop: displayKey(), computed: false };
+        return access.length === 2 ? target : { k: "assign", target, value: access[2]! };
+      }
       const hasOwnArgs = hasOwnCall(n);
       if (hasOwnArgs !== null && isIdent(hasOwnArgs[1]!) && aliases.has((hasOwnArgs[1] as Ident).name)) return { k: "bin", op: "in", left: displayKey(), right: hasOwnArgs[0]! };
       return n;

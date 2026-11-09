@@ -440,6 +440,34 @@ function __hbc_b_throwTypeError(message) {
 }
 `,
   ),
+  // review-1110 iife/private: `GetOwnPrivateBySym` / `PutOwnPrivateBySym`.
+  // Hermes JSObject::getPrivateField / setPrivateField look the private name
+  // up on the object's OWN properties only and throw a TypeError when it is
+  // absent; the interpreter throws for a non-object base first. A bare
+  // `obj[sym]` read undefined (or a prototype's field) and a bare
+  // `obj[sym] = v` created the field on a foreign object.
+  h(
+    "__hbc_privGet",
+    `
+function __hbc_privGet(obj, sym) {
+  if (obj === null || (typeof obj !== "object" && typeof obj !== "function")) throw new TypeError("cannot read private property of a non-object");
+  var d = Reflect.getOwnPropertyDescriptor(obj, sym);
+  if (d === undefined) throw new TypeError("Private property does not exist: " + String(sym.description));
+  return d.value;
+}
+`,
+  ),
+  h(
+    "__hbc_privSet",
+    `
+function __hbc_privSet(obj, sym, value) {
+  if (obj === null || (typeof obj !== "object" && typeof obj !== "function")) throw new TypeError("cannot write private property of a non-object");
+  if (Reflect.getOwnPropertyDescriptor(obj, sym) === undefined) throw new TypeError("Private property does not exist: " + String(sym.description));
+  obj[sym] = value;
+  return value;
+}
+`,
+  ),
   h(
     "__hbc_b_throwReferenceError",
     `
