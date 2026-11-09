@@ -10,7 +10,7 @@ import { selectBundleInventory } from "./bundles.ts";
 import type { BundleSummary } from "./bundles.ts";
 import type { ApkEvidence } from "./apk.ts";
 import { deriveCandidatePackages } from "./candidates.ts";
-import { hashIndexHint } from "./hash-index.ts";
+import { hashIndexHint, uniqueHashOwnersInTarget } from "./hash-index.ts";
 import { classifyInventory, loadCommonalityIndex, DEFAULT_COMMONALITY_INDEX_PATH } from "./classify.ts";
 import type { ClassificationReport } from "./classify.ts";
 import { confirmCandidates, defaultConfirmJobs, detectRnVersionFromBaselineFilenames } from "./confirm.ts";
@@ -105,7 +105,7 @@ export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promis
   const layers = resolveDbLayers({ ...(opts.out !== undefined ? { outDir: opts.out } : {}), ...(opts.sigdb !== undefined ? { sigdb: opts.sigdb } : {}), noSharedDb: opts.noSharedDb === true });
   const otherHbcPackages = new Set<string>();
   const dbs = loadSignatures(layers, opts.exhaustive === true ? { slim: slimTargetFor(inventory, opts.minInstr) } : { candidates: deriveCandidatePackages(layers, inventory), hbcVersion: inventory.hbcVersion, otherHbcPackages, slim: slimTargetFor(inventory, opts.minInstr) });
-  const matchReport = matchInventory(inventory, dbs, opts.minInstr !== undefined ? { minInstr: opts.minInstr } : {});
+  const matchReport = matchInventory(inventory, dbs, { ...(opts.minInstr !== undefined ? { minInstr: opts.minInstr } : {}), uniqueHashOwners: uniqueHashOwnersInTarget(layers, inventory) });
 
   const apkHints = apkEvidence !== null ? apkHintsFromEvidence(apkEvidence) : undefined;
   const knownPackages = new Set([...dbs.map((d) => d.file.package), ...otherHbcPackages]);
@@ -225,7 +225,7 @@ export function runInformedDeps(inputPath: string, known: readonly KnownPackage[
   const layers = resolveDbLayers({ ...(opts.out !== undefined ? { outDir: opts.out } : {}), ...(opts.sigdb !== undefined ? { sigdb: opts.sigdb } : {}), noSharedDb: opts.noSharedDb === true });
   const candidateNames = new Set(known.map((k) => k.name));
   const dbs = loadSignatures(layers, { candidates: candidateNames, slim: slimTargetFor(inventory, opts.minInstr) });
-  const matchReport = matchInventory(inventory, dbs, opts.minInstr !== undefined ? { minInstr: opts.minInstr } : {});
+  const matchReport = matchInventory(inventory, dbs, { ...(opts.minInstr !== undefined ? { minInstr: opts.minInstr } : {}), uniqueHashOwners: uniqueHashOwnersInTarget(layers, inventory) });
   // Classification (D17h/D17i, library-vs-custom-code WITHOUT naming) is
   // independent of which candidate names were loaded -- run it the same way
   // `runDeps` does so a caller feeding this report into `exportProject`

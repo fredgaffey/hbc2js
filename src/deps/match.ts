@@ -222,6 +222,13 @@ const MIN_FUZZY_ONLY_FACTORY_INSTR = 24;
 // with a factory hit; the closest false one with a factory hit is 0.25.
 export const TINY_PACKAGE_MIN_EXACT_COVERAGE = 0.5;
 export const MIN_DISTINCT_EVIDENCE_HASHES = 3;
+// deps-rnav-recall (docs/DEPS.md "Tiny packages on DB-unique hashes"): a
+// tiny package with no factory hit is high when TINY_PACKAGE_MIN_EXACT_COVERAGE
+// of its functions exact-match and at least this many of the hits are
+// hashes the candidate hash index (maxOwners 1, whole DB) gives to it alone.
+// Measured on the five truth apps: 9 true tiny packages qualify, no false
+// one (the closest have one such hit: btoa, quickselect).
+export const TINY_PACKAGE_MIN_DB_UNIQUE_HITS = 2;
 // A target module holding more than this many times the package's whole
 // function count is a container (another package's pre-built dist file):
 // hits inside it are not the package's own module.
@@ -263,7 +270,7 @@ function buildIndex<K extends "exactHash" | "fuzzyHash" | "stringSetHash">(funct
   return s;
 }
 
-function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Set<string>, targetFuzzy: Set<string>, targetStringHash: Set<string>, minInstr: number, hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetCopies: ReadonlyMap<string, number>): { readonly score: PackageScore; readonly hitKeys: ReadonlySet<string>; readonly distinctEligible: number } | null {
+function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Set<string>, targetFuzzy: Set<string>, targetStringHash: Set<string>, minInstr: number, hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetCopies: ReadonlyMap<string, number>, uniqueHashOwners?: ReadonlyMap<string, string>): { readonly score: PackageScore; readonly hitKeys: ReadonlySet<string>; readonly distinctEligible: number } | null {
   const pkg: SigDbFile = entry.file;
   if (pkg.hbcVersion !== target.hbcVersion) return null;
   // corpus-embedded-copy (module paths v1, docs/PACKAGE-SIGNATURES.md §7):
@@ -316,11 +323,15 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
   let fuzzyOnlyHits = 0;
   let stringCorroborated = 0;
   const hitKeys = new Set<string>();
+  // deps-rnav-recall: distinct function hits the whole DB gives to this
+  // package alone (TINY_PACKAGE_MIN_DB_UNIQUE_HITS).
+  const dbUniqueHits = new Set<string>();
   for (const fn of eligible) {
     const exactKey = schemeKey(pkg, fn.exactHash);
     if (targetExact.has(exactKey)) {
       if (!isUnambiguous(exactKey)) continue; // shared with >=1 other distinct package — not this package's own evidence
       hitKeys.add(exactKey);
+      if (uniqueHashOwners?.get(exactKey) === pkg.package) dbUniqueHits.add(exactKey);
       exactHits++;
       exactHitInstrSum += fn.instrCount;
       continue;
@@ -381,16 +392,22 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
   // turn a plain medium into a few-distinct demotion, which the path-recall
   // edge rule then skips (call-bound, es-shim-unscopables).
   const tinyCoverageSignal = isTinyPackage && substantiveModuleHits >= 1 && exactCoverage >= TINY_PACKAGE_MIN_EXACT_COVERAGE && enoughDistinct;
+  // deps-rnav-recall: the same coverage without the factory (another babel
+  // preset or export list changes the factory hash) when at least
+  // TINY_PACKAGE_MIN_DB_UNIQUE_HITS of the hits are hashes no other package
+  // in the DB holds. Those are not a repeated boilerplate shape, so this
+  // path is exempt from few-distinct.
+  const tinyUniqueSignal = isTinyPackage && dbUniqueHits.size >= TINY_PACKAGE_MIN_DB_UNIQUE_HITS && exactCoverage >= TINY_PACKAGE_MIN_EXACT_COVERAGE;
 
   let tier: ConfidenceTier;
-  if (strongModuleSignal || strongFunctionSignal || tinyCoverageSignal) tier = "high";
+  if (strongModuleSignal || strongFunctionSignal || tinyCoverageSignal || tinyUniqueSignal) tier = "high";
   else if (fuzzyCoverage >= 0.5 || moduleExactHits >= 1) tier = "medium";
   else if (exactHits + fuzzyOnlyHits > 0) tier = "low";
   else tier = "none";
   let demotion: PackageScore["demotion"];
   // A package whose whole eligible code has fewer distinct hashes needs
   // them all (a one-function package fully matched stays high).
-  if (tier === "high" && !pkg.toolchainBaseline && !enoughDistinct) {
+  if (tier === "high" && !pkg.toolchainBaseline && !enoughDistinct && !tinyUniqueSignal) {
     tier = "medium";
     demotion = { rule: "few-distinct" };
   }
@@ -742,6 +759,10 @@ function promoteViaDependency(scored: readonly ScoredEntry[], inventory: ModuleI
 export interface MatchOptions {
   /** FLIRT-style minimum-instruction floor before a hash is trusted at all. */
   readonly minInstr?: number;
+  /** Exact hash -> the one DB package that holds it, for hashes the target
+   *  holds (`uniqueHashOwnersInTarget`, hash-index.ts). Absent: the
+   *  DB-unique tiny-package path is off. */
+  readonly uniqueHashOwners?: ReadonlyMap<string, string>;
 }
 
 export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedSig[], opts: MatchOptions = {}): MatchReport {
@@ -841,7 +862,7 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
   const scoreByOwner = new Map<string, PackageScore>();
   const scoredEntries: ScoredEntry[] = [];
   for (const entry of eligibleDbs) {
-    const scored = scorePackage(entry, inventory, targetExact, targetFuzzy, targetStringHash, minInstr, hashOwnerNames, targetCopies);
+    const scored = scorePackage(entry, inventory, targetExact, targetFuzzy, targetStringHash, minInstr, hashOwnerNames, targetCopies, opts.uniqueHashOwners);
     if (scored === null) continue;
     scoredEntries.push({ entry, ...scored });
   }

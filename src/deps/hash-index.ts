@@ -299,6 +299,50 @@ export function proposeFromHashIndex(layers: readonly DbLayer[], inventory: Modu
 }
 
 /** HBC versions present among `dir`'s signature filenames (for the builder CLI). */
+/** deps-rnav-recall: exact hash -> owning package for every single-owner
+ *  line of the candidate hash index whose hash the target holds (functions
+ *  of at least the index's minInstr), over every layer with an index for
+ *  the target's HBC version. A hash two layers give to different packages
+ *  is dropped. Feeds `MatchOptions.uniqueHashOwners`. */
+export function uniqueHashOwnersInTarget(layers: readonly DbLayer[], inventory: ModuleInventory): ReadonlyMap<string, string> {
+  const out = new Map<string, string>();
+  const conflicted = new Set<string>();
+  for (const layer of layers) {
+    const path = join(hashIndexDir(layer), hashIndexFileName(inventory.hbcVersion));
+    if (!existsSync(path)) continue;
+    const buf = readFileSync(path);
+    const nl = buf.indexOf(10);
+    if (nl < 0) continue;
+    const first = buf.toString("utf8", 0, nl);
+    if (!first.startsWith(HASH_INDEX_MAGIC)) continue;
+    const header = JSON.parse(first.slice(HASH_INDEX_MAGIC.length)) as HashIndexHeader;
+    if (header.hbcVersion !== inventory.hbcVersion) continue;
+    const target = new Set<string>();
+    for (const fn of inventory.functions) if (fn.instrCount >= header.minInstr) target.add(fn.exactHash);
+    let start = nl + 1;
+    while (start < buf.length) {
+      let end = buf.indexOf(10, start);
+      if (end < 0) end = buf.length;
+      const tab = buf.indexOf(9, start);
+      if (tab > start && tab < end) {
+        const comma = buf.indexOf(44, tab);
+        const hash = buf.toString("latin1", start, tab);
+        if ((comma < 0 || comma >= end) && target.has(hash)) {
+          const name = header.packages[Number(buf.toString("latin1", tab + 1, end))];
+          if (name !== undefined) {
+            const prev = out.get(hash);
+            if (prev !== undefined && prev !== name) conflicted.add(hash);
+            else out.set(hash, name);
+          }
+        }
+      }
+      start = end + 1;
+    }
+  }
+  for (const h of conflicted) out.delete(h);
+  return out;
+}
+
 export function sigHbcVersions(dir: string): readonly number[] {
   const vs = new Set<number>();
   for (const name of readdirSync(dir)) {
