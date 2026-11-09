@@ -1,0 +1,20 @@
+anon gen=true async=false ctor=GeneratorFunction
+empty gen=true async=false ctor=GeneratorFunction
+onlyReturn gen=true async=false ctor=GeneratorFunction
+sideEffect gen=true async=false ctor=GeneratorFunction
+asyncEmpty gen=false async=true ctor=AsyncFunction
+asyncReturn gen=false async=true ctor=AsyncFunction
+asyncThrow gen=false async=true ctor=AsyncFunction
+typeof next function
+empty next undefined true
+onlyReturn next 42 true true
+lazy 0
+after next 1
+iter self true
+proto obj object
+new true
+promise true
+sync end
+asyncEmpty undefined
+asyncReturn 5
+asyncThrow boom

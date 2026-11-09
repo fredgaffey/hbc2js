@@ -221,7 +221,18 @@ function stripPrologue(list: readonly Stmt[], opts: RecoverOptions, entry = fals
   // A trailing unlabelled `break` is the `case` arm's own terminator.
   let end = i + 1;
   while (end < list.length && list[end]!.k === "break" && (list[end]! as Stmt & { readonly k: "break" }).label === null) end++;
-  if (end !== list.length) return no("shim-shape", "the forced-return test is not the last statement of its segment");
+  if (end !== list.length) {
+    // BUGS export-boot L1 (fixture 395): when the forced-return arm ends in a
+    // `return` and has no `else`, the emitter prints the continuation AFTER
+    // the `if` rather than in an `else` -- the zero-yield generator's only
+    // segment is always this shape. `if (r) { ...; return } rest` is
+    // `if (r) { ...; return } else { rest }`, so the rest is the continuation.
+    const last = forcedArm.filter((s) => !isPcStore(s) && s.k !== "comment").at(-1);
+    if (contArm.length !== 0 || last === undefined || last.k !== "return") return no("shim-shape", "the forced-return test is not the last statement of its segment");
+    let stop = list.length;
+    while (stop > i + 1 && list[stop - 1]!.k === "break" && (list[stop - 1]! as Stmt & { readonly k: "break" }).label === null) stop--;
+    contArm = list.slice(i + 1, stop);
+  }
   // R-Y4: the forced-return arm must be exactly the empty completion, modulo
   // `__pc` stores. `24-generator-return-throw`'s g1 duplicates its `finally`
   // body in here (§1.3) and a native `.return(v)` would not run it.
