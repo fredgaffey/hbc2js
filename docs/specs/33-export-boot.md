@@ -191,3 +191,25 @@ B1 is EQUIVALENT in bytecode mode (v94; 107 factories each side). `equiv
 `--horizon-ms`, `--export-exec`, and prints `export-boot/1` with `--json`.
 `offlineBundle` now uses a silent Metro reporter (the banner went to stdout and
 broke the JSON) and no watchman (a recrawling watchman cost ~85 s per bundle).
+
+**L3 (2026-11-10).** B2 runs in the same prelude, behind `bootTrace({run:
+{horizonMs}})` (absent: B1 and spec 31 traces are unchanged). The host
+records the first registered key, then calls `RN$AppRegistry.runApplication`
+when the bundle defined it, else
+`__fbBatchedBridge.callFunctionReturnFlushedQueue("AppRegistry",
+"runApplication", …)`, and observes `AppRegistry.runApplication` itself (the
+`registerComponent` hook wraps it too). Timers, intervals, immediates,
+microtasks, rAF/idle (next 16 ms frame) and the native `Timing` module's
+`createTimer` (fired through `JSTimers.callTimers`) keep their callbacks and
+drain on the virtual clock up to the horizon, one macrotask per real VM turn
+so the engine's own Promise jobs settle in between. The global ErrorUtils
+handler records fatals (`err` phase `run`). UI managers record `ui.view <name>`
+for `createView`/`createNode` and `ui.commit` for a Paper
+`setChildren`/`manageChildren` on root tag 1 or a Fabric `completeRoot`;
+view configs are minimal and node handles opaque. An original that never
+reaches `runApplication`, hits a fatal, or commits nothing is INCONCLUSIVE.
+One stub gap, fixed on both sides: 0.72's PaperUIManager spreads
+`{...NativeUIManager}` at module-eval time, which copied only the methods
+read so far, so render found no `setChildren`; the UIManager stub now has its
+whole method table up front. rn-template B2 is EQUIVALENT (bytecode export:
+key `HelloHermes072`, 99 views, 1 commit, 246 factories each side).

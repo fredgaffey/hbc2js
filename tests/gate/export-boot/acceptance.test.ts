@@ -196,7 +196,7 @@ test("spec 33 test 8: `equiv --boot <original> <export-dir> --json` prints expor
   }
 });
 
-test("spec 33 test 9: rn-template B2 — runApplication with the same key renders the same view-name sequence", TODO, async () => {
+test("spec 33 test 9: rn-template B2 — runApplication with the same key renders the same view-name sequence", async () => {
   if (!IMPLEMENTED) return;
   const { exportBootProof } = await load();
   const { out, run } = exportTo(RN_HBC, GATE_EXPORT);

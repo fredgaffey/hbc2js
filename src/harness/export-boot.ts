@@ -27,6 +27,8 @@ export type ExportBootPhase = "register" | "run";
  *  oracle: it counts out-of-factory calls too, which differ by construction
  *  (the export bundle also runs the installed RN's polyfills). */
 export const DEFAULT_PROJECTED_NATIVE = 64;
+/** §3 B2: the default `--horizon-ms`, in virtual ms. */
+export const DEFAULT_HORIZON_MS = 1000;
 const HOST_NATIVE_CAP = 1_000_000;
 
 const NATIVE_FNS = new Set(["__turboModuleProxy", "nativeModuleProxy.get", "nativeCallSyncHook", "nativeLoggingHook", "__fbGenNativeModule"]);
@@ -137,7 +139,36 @@ export interface ExportBootResult {
   readonly divergence: ExportBootDivergence | null;
   readonly masked: number;
   readonly exportExec: "source" | "bytecode";
+  /** B2 only (empty / 0 in B1): created view names, never props, and the
+   *  commit count (Paper root setChildren/manageChildren, Fabric completeRoot). */
+  readonly views: { readonly a: readonly string[]; readonly b: readonly string[] };
+  readonly commits: { readonly a: number; readonly b: number };
   readonly reason: string | null;
+}
+
+/** §3 B2: what the run window produced on one side. */
+export interface RunObservation {
+  readonly runApplication: string | null;
+  readonly views: string[];
+  readonly commits: number;
+  /** First error that reached ErrorUtils or escaped a drained callback. */
+  readonly fatal: string | null;
+}
+
+export function observeRun(trace: Trace | readonly TraceRecord[] | readonly unknown[]): RunObservation {
+  const records = (Array.isArray(trace) ? trace : (trace as Trace).records) as readonly { k?: string; fn?: string; args?: readonly unknown[]; phase?: string; name?: string; message?: string }[];
+  let runApplication: string | null = null;
+  const views: string[] = [];
+  let commits = 0;
+  let fatal: string | null = null;
+  for (const r of records) {
+    if (r.k === "err" && r.phase === "run") { fatal ??= `${String(r.name)}: ${String(r.message)}`; continue; }
+    if (r.k !== "call") continue;
+    if (r.fn === "AppRegistry.runApplication") runApplication ??= plain(r.args?.[0]);
+    else if (r.fn === "ui.view") views.push(plain(r.args?.[0]));
+    else if (r.fn === "ui.commit") commits++;
+  }
+  return { runApplication, views, commits, fatal };
 }
 
 interface ExportManifestShape {
@@ -220,8 +251,9 @@ function keys(p: readonly string[]): string[] {
   return p.filter((e) => e.startsWith("registerComponent ")).map((e) => e.slice("registerComponent ".length));
 }
 
-/** Spec 33 §1: `exportBootProof(original, exportDir, opts)`. L1 implements
- *  phase B1 ("register"); "run" is accepted but compared as B1 until L3. */
+/** Spec 33 §1: `exportBootProof(original, exportDir, opts)`. Phase
+ *  "register" is B1; "run" is B2 (B1 over the longer window, plus the
+ *  runApplication key, view-name sequence and commits). */
 export async function exportBootProof(original: string, exportDir: string, opts: ExportBootOptions = {}): Promise<ExportBootResult> {
   const phase = opts.phase ?? "register";
   const seed = opts.seed ?? 0;
@@ -229,11 +261,13 @@ export async function exportBootProof(original: string, exportDir: string, opts:
   const traceOpts = { seed, firstNative: HOST_NATIVE_CAP, ...(vm !== undefined ? { vm } : {}), ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}) };
   const projOpts = (mask?: ReadonlySet<number>): ProjectOptions => ({ firstNative: opts.firstNative ?? DEFAULT_PROJECTED_NATIVE, ...(mask !== undefined ? { mask } : {}) });
   const mask = substitutedIds(exportDir);
-  const base = { schema: EXPORT_BOOT_SCHEMA, phase, runApplication: { a: null, b: null }, exportExec: "source" as const };
+  const base = { schema: EXPORT_BOOT_SCHEMA, phase, runApplication: { a: null, b: null }, exportExec: "source" as const, views: { a: [] as string[], b: [] as string[] }, commits: { a: 0, b: 0 } };
+  const run = phase === "run" ? { horizonMs: opts.horizonMs ?? DEFAULT_HORIZON_MS } : undefined;
 
   // The control first: if the original cannot boot here, nothing about the
   // export can be concluded, and the (slow) re-bundle is skipped.
-  const a = bootTrace(acquireBootSource(original).source, { ...traceOpts, wrapFactories: true });
+  const a = bootTrace(acquireBootSource(original).source, { ...traceOpts, wrapFactories: true, ...(run !== undefined ? { run } : {}) });
+  const ra = observeRun(a.trace);
   const pa = projectBootTrace(a.trace, projOpts(mask));
   const maskedCount = projectBootTrace(a.trace).filter((e) => e.startsWith("enter ")).length - enters(pa);
   const inconclusive = (reason: string, pb: readonly string[] = []): ExportBootResult => ({
@@ -248,6 +282,10 @@ export async function exportBootProof(original: string, exportDir: string, opts:
     return inconclusive(`the original's factory ${aThrow.slice(6)} threw under the stub host${why}: a stub-host gap (spec 31 §4.1), not evidence about the export`);
   }
   if (keys(pa).length === 0) return inconclusive("the original registered no app key under the stub host");
+  if (run !== undefined) {
+    const gap = ra.runApplication === null ? "never reached runApplication" : ra.fatal !== null ? `hit a fatal after runApplication (${ra.fatal})` : ra.commits === 0 ? "made no UI commit" : null;
+    if (gap !== null) return { ...inconclusive(`the original ${gap} under the stub host: a stub-host gap (spec 31 §4.1), not evidence about the export`), runApplication: { a: ra.runApplication, b: null }, views: { a: ra.views, b: [] }, commits: { a: ra.commits, b: 0 } };
+  }
 
   const { offlineBundle } = await import("../export/offline-check.ts");
   let bundlePath: string;
@@ -263,9 +301,11 @@ export async function exportBootProof(original: string, exportDir: string, opts:
   const compiler = opts.vm === undefined && opts.exportExec !== "source" ? findHermesc(manifestVersion(exportDir)) : null;
   const exportExec = compiler !== null ? "bytecode" as const : "source" as const;
   const bOpts = compiler !== null ? { ...traceOpts, vm: compiler.vm, hermesc: compiler.hermesc } : traceOpts;
-  const b = bootTrace(readFileSync(bundlePath, "utf8"), { ...bOpts, wrapFactories: false });
+  const b = bootTrace(readFileSync(bundlePath, "utf8"), { ...bOpts, wrapFactories: false, ...(run !== undefined ? { run } : {}) });
+  const rb = observeRun(b.trace);
   const pb = projectBootTrace(b.trace, projOpts());
-  const common = { ...base, exportExec, appKeys: { a: keys(pa), b: keys(pb) }, factories: { a: enters(pa), b: enters(pb) }, masked: maskedCount };
+  const runPart = run !== undefined ? { runApplication: { a: ra.runApplication, b: rb.runApplication }, views: { a: ra.views, b: rb.views }, commits: { a: ra.commits, b: rb.commits } } : {};
+  const common = { ...base, ...runPart, exportExec, appKeys: { a: keys(pa), b: keys(pb) }, factories: { a: enters(pa), b: enters(pb) }, masked: maskedCount };
   if (!b.ran && compiler !== null && (b.why ?? "").startsWith("hermesc")) {
     // The export's own code does not compile to bytecode: a real failure.
     return { ...common, verdict: "DIVERGENT", divergence: { index: 0, a: null, b: null, exportThrow: b.why }, reason: b.why };
@@ -285,6 +325,16 @@ export async function exportBootProof(original: string, exportDir: string, opts:
   if (!b.reachedEnd) {
     // The original booted under this host, so an export throw is real (§3).
     return { ...common, verdict: "DIVERGENT", divergence: { index: i, a: "end", b: `threw ${errText(b)}`, exportThrow }, reason: `the export threw where the original did not: ${errText(b)}` };
+  }
+  if (run !== undefined) {
+    // §3 B2. The original rendered and committed under this host (checked
+    // above), so every difference here is the export's.
+    if (rb.fatal !== null) return { ...common, verdict: "DIVERGENT", divergence: { index: i, a: "run", b: `fatal ${rb.fatal}`, exportThrow: rb.fatal }, reason: `the export hit a fatal after runApplication where the original did not: ${rb.fatal}` };
+    if (rb.runApplication !== ra.runApplication) return { ...common, verdict: "DIVERGENT", divergence: { index: i, a: `runApplication ${ra.runApplication}`, b: `runApplication ${rb.runApplication ?? "<never>"}` }, reason: `runApplication: original ${ra.runApplication}, export ${rb.runApplication ?? "never reached"}` };
+    let v = 0;
+    while (v < ra.views.length && v < rb.views.length && ra.views[v] === rb.views[v]) v++;
+    if (v < ra.views.length || v < rb.views.length) return { ...common, verdict: "DIVERGENT", divergence: { index: v, a: ra.views[v] !== undefined ? `view ${ra.views[v]}` : null, b: rb.views[v] !== undefined ? `view ${rb.views[v]}` : null }, reason: `first view-name mismatch at view ${v}: original ${ra.views[v] ?? "<end>"}, export ${rb.views[v] ?? "<end>"}` };
+    if (rb.commits === 0) return { ...common, verdict: "DIVERGENT", divergence: { index: v, a: "commit", b: null }, reason: "the export made no UI commit" };
   }
   return { ...common, verdict: "EQUIVALENT", divergence: null, reason: null };
 }
