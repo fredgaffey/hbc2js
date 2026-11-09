@@ -174,3 +174,8 @@ that function hand-patched, B1 is EQUIVALENT, so test 1 stays `todo` on that
 row and tests 2 to 6 are real. Source mode uses one VM for both sides, the
 one matching the bundle's HBC version: the default oldest VM (v84) cannot
 parse the BigInt literals decompiled code may contain.
+
+**L1 gap closed (2026-11-10).** The zero-yield generator is now recovered
+(docs/BUGS.md export-boot L1, Resolved; construct fixture
+`395-generator-no-yield`): module 87's `function* () {}` decompiles to
+`function*`, and test 1 is a real test with B1 EQUIVALENT on rn-template.
