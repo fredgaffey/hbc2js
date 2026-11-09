@@ -69,6 +69,17 @@ declaration and re-matched once per move, and it did not finish the
 react-navigation split in 14 minutes; the whole run normally takes about
 3.5 minutes.
 
+After object-literal-arg (spec 20 section 9) was merged in, the split hung
+again, for hours (closure-inline-hang). The cause was not this pass:
+object-literal-arg's `stableFunctionNames` walked the whole body once per
+top-level declaration, on every list it matched. A bundle's global function
+holds every module factory as a declaration, and each factory nests its
+module, so one match cost declarations times bundle size. It now makes one
+`identUsesMany` walk per body object, memoised. `entryCreated` is memoised
+per `FunctionCfg` too, since `match` and `check` both ask on every driver
+iteration. `tests/gate/passes/closure-inline-hang.test.ts` counts node
+visits and driver iterations, not wall time.
+
 **Printer side fix.** A function expression in callee position
 (`_fn3(a, b)` -> `(function _fn3() {...})(a, b)`) printed as
 `function _fn3() {...}(a, b);`. That parses as a declaration followed by a

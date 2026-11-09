@@ -25,7 +25,7 @@
 //    the effect sequence after the move — this is expr-rebuild's own R1a
 //    adjacent case (02-expr-rebuild.md §4), which could not fire earlier
 //    because kind A's literal still stood between the two statements.
-import { identUses, isPureStmt, isRegisterName, opcodeAt, originOf, registerUses } from "../ast.ts";
+import { identUses, identUsesMany, isPureStmt, isRegisterName, opcodeAt, originOf, registerUses } from "../ast.ts";
 import type { Expr, Stmt } from "../ast.ts";
 import type { Match, PassContext } from "../types.ts";
 
@@ -66,13 +66,19 @@ export function withCall(s: Stmt, call: Expr): Stmt {
 
 /** Names of the function declarations at the top of `fnBody` that are never
  *  assigned anywhere in it (reading one is effect-free and always yields the
- *  same closure). */
-function stableFunctionNames(fnBody: readonly Stmt[]): Set<string> {
-  const out = new Set<string>();
-  for (const s of fnBody) {
-    if (s.k !== "func") continue;
-    if (identUses(fnBody, s.name).writes === 0) out.add(s.name);
-  }
+ *  same closure). One `identUsesMany` walk for all of them, memoised per
+ *  `fnBody` object (the driver hands every list of one iteration the same
+ *  body): a walk per declaration, redone per matched list, was quadratic in
+ *  a bundle's global function, whose declarations nest the whole bundle
+ *  (closure-inline-hang). */
+const stableMemo = new WeakMap<readonly Stmt[], Set<string>>();
+export function stableFunctionNames(fnBody: readonly Stmt[]): Set<string> {
+  const hit = stableMemo.get(fnBody);
+  if (hit !== undefined) return hit;
+  const names = fnBody.flatMap((s) => (s.k === "func" ? [s.name] : []));
+  const uses = identUsesMany(fnBody, names);
+  const out = new Set(names.filter((n) => uses.get(n)!.writes === 0));
+  stableMemo.set(fnBody, out);
   return out;
 }
 

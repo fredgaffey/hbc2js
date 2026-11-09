@@ -109,9 +109,13 @@ const PROLOGUE = /^(?:Create\w*Environment|GetParentEnvironment|LoadParam\w*|Loa
  *  first non-prologue instruction: a source declaration (or an expression
  *  in the opening statement, where a move changes no order). The closure is
  *  already created at entry in the original, so hoisting is the faithful
- *  form. Unknown (no cfg): every closure counts as entry-created. */
+ *  form. Unknown (no cfg): every closure counts as entry-created. Memoised
+ *  per cfg: `match` and `check` ask on every driver iteration. */
+const entryMemo = new WeakMap<FunctionCfg, Set<number>>();
 export function entryCreated(cfg: FunctionCfg | undefined): Set<number> | null {
   if (cfg === undefined) return null;
+  const hit = entryMemo.get(cfg);
+  if (hit !== undefined) return hit;
   const insns = cfg.blocks.flatMap((b) => b.instructions).sort((a, b) => a.offset - b.offset);
   const out = new Set<number>();
   for (const insn of insns) {
@@ -119,6 +123,7 @@ export function entryCreated(cfg: FunctionCfg | undefined): Set<number> | null {
     const child = closureFunctionId(insn);
     if (child !== undefined) out.add(child);
   }
+  entryMemo.set(cfg, out);
   return out;
 }
 
