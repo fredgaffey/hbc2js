@@ -91,3 +91,35 @@ test("corpus-recall-hop-two: the string-set index keeps only sets with >= 2 stri
   assert.ok(!lines.includes(H(104)), "a set from a function owned by another package is dropped");
   assert.ok(!lines.includes(H(0)), "the empty set is dropped");
 });
+
+// deps-hop-two-cascade: the hop-two worker measured react-navigation-example
+// 10 -> 18 confirmed on db-v4-paths-partial and saw four more packages
+// confirm than the two it admitted. Traced: its "before" run used a stale
+// code copy predating corpus-path-recall (promoteViaDependency); with the
+// current matcher and the two admitted packages removed from the candidate
+// set the app confirms 17, and admitting them adds react-native-pager-view
+// only. Pinned here: admitting a hop-two package whose functions share no
+// hash with other candidates changes no other package's score.
+test("deps-hop-two-cascade: admitting a hop-two package leaves every other candidate's score unchanged", async () => {
+  const { loadSignatures } = await import("../../../src/deps/db.ts");
+  const { matchInventory } = await import("../../../src/deps/match.ts");
+  const { slimTargetFor } = await import("../../../src/deps/slim-sigs.ts");
+  const dir = mkdtempSync(join(tmpdir(), "hbc2js-hop-two-cascade-"));
+  const fns = (from: number, n: number, extra: Fn[] = []): Fn[] => [...Array.from({ length: n }, (_, i) => ({ h: from + i })), ...extra];
+  writeSig(dir, sig("app-root", fns(1, 6), ["hop-one-lib"]));
+  writeSig(dir, sig("hop-one-lib", fns(20, 6), ["two-own-evidence"]));
+  writeSig(dir, sig("two-own-evidence", fns(40, 6, [{ h: 60, ss: 100, sc: 3 }])));
+  writeCandidateHashIndex(dir, dir, 98);
+  const layers = [{ name: "shared" as const, dir }];
+  const target = [...fns(1, 6), ...fns(20, 6), ...fns(40, 6)].map((f) => f.h);
+  const inv = { hbcVersion: 98, totalFunctions: target.length + 1, moduledFunctionCount: target.length + 1, functions: [...target.map((h, i) => ({ index: i, instrCount: 20, exactHash: H(h), fuzzyHash: H(h + 1_000_000), stringSetHash: H(0) })), { index: target.length, instrCount: 20, exactHash: H(999), fuzzyHash: H(1999), stringSetHash: H(100) }], modules: [{ localModuleId: 0, factoryFunctionIndex: 0, depCount: 0, nestedFunctionIndices: [], functionIndices: [], instrCount: 20, exactHash: null, fuzzyHash: null, factoryStringSetHash: null, stringConstants: ["uses app-root here"] }] } as unknown as ModuleInventory;
+  const withTwo = deriveCandidatePackages(layers, inv);
+  assert.ok(withTwo.has("two-own-evidence"), `hop-two package admitted; got ${[...withTwo].sort().join(", ")}`);
+  const without = new Set([...withTwo].filter((p) => p !== "two-own-evidence"));
+  const run = (cands: Set<string>) => matchInventory(inv, loadSignatures(layers, { candidates: cands, hbcVersion: 98, otherHbcPackages: new Set(), slim: slimTargetFor(inv) }));
+  const a = run(without), b = run(withTwo);
+  assert.ok(b.packages.some((p) => p.package === "two-own-evidence"), "the admitted package is scored");
+  assert.ok(a.packages.some((p) => p.package === "app-root") && a.packages.some((p) => p.package === "hop-one-lib"), "the other candidates are scored in both runs");
+  const others = (r: ReturnType<typeof run>) => r.packages.filter((p) => p.package !== "two-own-evidence").sort((x, y) => x.package.localeCompare(y.package));
+  assert.deepEqual(others(b), others(a), "no other candidate's score moves when the hop-two package is admitted");
+});
