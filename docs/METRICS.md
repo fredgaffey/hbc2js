@@ -3,6 +3,82 @@
 Real-world `hbc2js deps` measurements. Controlled-fixture numbers live in
 `docs/DEPS.md` (Ground truth, D17d); this file is the corpus layer.
 
+## Measurement 2026-11-09 (remeasure 3, `a00cbac`, offline)
+
+- `hbc2js` at `a00cbac` (integrate-1109c merged with deps-twin-sourcemap), `deps --offline`, no `--confirm`, no truth overlay.
+- DB A: db-v3-clean (71,222 signature files). DB B: db-v3-clean with db-v4-paths files layered over it (snapshot of 34,649 override files in a 71,222-file view; the db-v4-paths rebuild was still running, 37,116 files at the end of the run). Both read-only.
+- 22 bundle-bearing apps; up to 4 jobs in parallel on a shared 32-core host, so wall times are inflated and noisy.
+- "confirmed rm2" is the previous section below.
+
+### Per-app counts (offline)
+
+| app | modules | confirmed rm2 | confirmed A | confirmed B | unique A / B | guessed A / B | wall A / B |
+|---|---|---|---|---|---|---|---|
+| app.phantom | 19,265 | 310 | 276 | 276 | 93 / 93 | 22 / 22 | 124 s / 169 s |
+| com.baronapp.cameo | 11,174 | 298 | 265 | 265 | 90 / 90 | 15 / 15 | 78 s / 89 s |
+| com.bloomberg.android.plus | 4,995 | 241 | 226 | 226 | 74 / 74 | 6 / 6 | 59 s / 76 s |
+| com.brex.mobile | 15,014 | out of memory | 336 | 195 | 60 / 54 | 20 / 20 | 986 s / 782 s |
+| com.discord | 17,037 | 222 | 212 | 188 | 72 / 63 | 12 / 13 | 100 s / 116 s |
+| com.microsoft.office.officehubrow | 0 | 0 | 0 | 0 | 0 / 0 | 0 / 0 | 3 s / 4 s |
+| com.microsoft.teams | 482 | 30 | 28 | 28 | 6 / 6 | 1 / 1 | 8 s / 10 s |
+| com.microsoft.xboxone.smartglass | 6,435 | 259 | 226 | 226 | 74 / 74 | 6 / 6 | 60 s / 74 s |
+| com.myklarnamobile | 23,651 | 51 | 46 | 50 | 15 / 17 | 6 / 7 | 189 s / 225 s |
+| com.oculus.twilight | 13,978 | 40 | 37 | 26 | 10 / 7 | 2 / 2 | 64 s / 82 s |
+| com.scee.psxandroid | 7,657 | 170 | 150 | 150 | 46 / 46 | 6 / 6 | 55 s / 70 s |
+| com.shopify.arrive | 9,461 | 221 | 192 | 192 | 63 / 63 | 11 / 11 | 75 s / 86 s |
+| com.shopify.mobile | 25,439 | 258 | 228 | 229 | 77 / 76 | 6 / 5 | 95 s / 112 s |
+| com.shopify.ping | 8,651 | 163 | 146 | 146 | 43 / 43 | 8 / 8 | 45 s / 44 s |
+| com.teslamotors.tesla | 19,951 | 403 | 372 | 372 | 130 / 130 | 14 / 14 | 450 s / 237 s |
+| com.uniswap.mobile | 11,380 | 365 | 336 | 230 | 94 / 77 | 10 / 13 | 292 s / 121 s |
+| com.wix.android | 19,286 | 433 | 411 | 411 | 143 / 143 | 17 / 17 | 159 s / 173 s |
+| host.exp.exponent | 2,370 | 79 | 69 | 69 | 23 / 23 | 9 / 9 | 30 s / 29 s |
+| io.metamask | 18,909 | 434 | 423 | 423 | 141 / 141 | 24 / 24 | 182 s / 179 s |
+| me.rainbow | 10,307 | 297 | 272 | 272 | 89 / 89 | 18 / 18 | 98 s / 94 s |
+| org.toshi | 31,131 | 369 | 340 | 340 | 114 / 114 | 15 / 15 | 261 s / 216 s |
+| xyz.blueskyweb.app | 6,392 | 119 | 105 | 100 | 33 / 33 | 11 / 10 | 88 s / 74 s |
+
+| aggregate | A | B |
+|---|---|---|
+| confirmed, sum over 22 apps | 4696 | 4414 |
+| guessed, sum over 22 apps | 239 | 242 |
+| brex peak RSS | 4.06 GB | 3.77 GB |
+| brex wall | 986 s | 782 s |
+
+The brex bundle (15,014 modules) completes on both DBs; the previous run exhausted an 8 GB heap.
+
+### Ground-truth apps (offline, no overlay)
+
+confirmed / TP / FP / precision / recall of all / recall of direct.
+
+| app | DB A | DB B |
+|---|---|---|
+| Expensify/App 12a92bd | 128 / 89 / 39 / 69.5% / 30.9% / 35.2% | 98 / 91 / 7 / 92.9% / 31.6% / 38.5% |
+| react-navigation-example 0.85.3 | 14 / 14 / 0 / 100% / 18.4% / 21.7% | 18 / 18 / 0 / 100% / 23.7% / 28.3% |
+| bluesky-social/social-app | 42 / 34 / 8 / 81.0% / 17.2% / 17.2% | 42 / 41 / 1 / 97.6% / 20.7% / 20.7% |
+| rainbow-me/rainbow | 104 / 82 / 22 / 78.8% / 15.8% / 20.4% | 104 / 82 / 22 / 78.8% / 15.8% / 20.4% |
+| MetaMask/metamask-mobile | 169 / 132 / 37 / 78.1% / 17.6% / 20.3% | 169 / 132 / 37 / 78.1% / 17.6% / 20.3% |
+
+Previous section (db-v3-clean): Expensify 154 / 59.1% / 31.6%, bluesky 51 / 68.6% / 17.7%, rainbow 116 / 72.4% / 16.2%, metamask 183 / 74.3% / 18.2%, react-navigation 14 / 100% / 18.4%.
+
+### viaDependency promotions (DB B, confirmed packages)
+
+| app | confirmed packages | with viaDependency | edge is react-native |
+|---|---|---|---|
+| com.brex.mobile | 54 | 8 | 8 |
+| com.discord | 63 | 10 | 7 |
+| com.shopify.mobile | 76 | 5 | 4 |
+| xyz.blueskyweb.app | 33 | 6 | 6 |
+| com.uniswap.mobile | 77 | 2 | 0 |
+| 17 other apps | | 0 | 0 |
+
+### Precision proxy (DB B; 10 packages per app, via-promoted first)
+
+| apps sampled | packages | string evidence in bundle or APK | generic word | no evidence found |
+|---|---|---|---|---|
+| 5 (brex, phantom, cameo, discord, uniswap) | 50 | 28 | 5 | 17 |
+| of which via-promoted | 20 | 14 | 1 | 5 |
+| previous section: 2 apps | 20 | 14 | 1 | 5 |
+
 ## Measurement 2026-11-09 (main c92c9e4, db-v3-clean, offline)
 
 - `hbc2js` measured at commit `c92c9e4`, `deps --offline` only (no `--confirm`).
