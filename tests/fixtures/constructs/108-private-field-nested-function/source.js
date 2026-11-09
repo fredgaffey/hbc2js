@@ -1,7 +1,7 @@
 // A private field read from a function DECLARED inside a class member (not
 // an arrow) that captures one of the member's own bindings, so hermesc keeps
 // it nested in the member (a non-capturing one is hoisted out of the class:
-// 101-private-field-hoisted-function). Its body loads the private name's
+// 109-private-field-hoisted-function). Its body loads the private name's
 // symbol from the defining frame's env slot. Before the fix, private-fields
 // folded the members but left that nested body alone, so the slot stayed
 // mentioned and R-PF1 (defining-body-escape) refused the name -- residue on

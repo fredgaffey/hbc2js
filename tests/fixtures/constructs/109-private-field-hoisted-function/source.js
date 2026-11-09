@@ -1,4 +1,4 @@
-// Negative twin of 100-private-field-nested-function: the function declared in
+// Negative twin of 108-private-field-nested-function: the function declared in
 // a member captures nothing of the member, so hermesc hoists it into the
 // frame that DEFINES the class -- outside the class body in the decompiled
 // output, where `o.#v` is not even valid syntax. Folding the class's own

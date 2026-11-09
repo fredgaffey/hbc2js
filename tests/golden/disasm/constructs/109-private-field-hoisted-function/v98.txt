@@ -1,5 +1,5 @@
-; hbc2js disassembly of 101-private-field-hoisted-function/v99.hbc
-; version=99 layout=E opcodeTable=hbc99-mar2026 functions=5 strings=12 globalCodeIndex=0
+; hbc2js disassembly of 109-private-field-hoisted-function/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=5 strings=12 globalCodeIndex=0
 function #0 "global"  params=1 frame=20 env=0 flags=dbg,overflowed  @0x0000015c size=191
   0000  CreateFunctionEnvironment r3, 1
   0003  CreatePrivateName    r8, s7 "#n"
@@ -59,9 +59,9 @@ function #1 "Bag"  params=2 frame=13 env=0 flags=strict,dbg,overflowed,ctor  @0x
   000d  LoadFromEnvironment  r3, r2, 0
   0011  PrivateIsIn          r0, r3, r1, r0
   0016  JmpTrue              L1, r0
-  0019  LoadConstUndefined   r0
-  001b  AddOwnPrivateBySym   r1, r0, r3
-  001f  LoadParam            r2, 1
+  0019  LoadParam            r2, 1
+  001c  LoadConstUndefined   r0
+  001e  AddOwnPrivateBySym   r1, r0, r3
   0022  PutOwnPrivateBySym   r1, r2, 1, r3
   0027  Ret                  r1
 L1:
