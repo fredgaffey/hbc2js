@@ -612,6 +612,38 @@ Coverage is unchanged (the abstentions are skill/prompt-bound, not model-bound);
 
 Coverage rises 2.5x and tokens per name fall 55%, with high-confidence accuracy unchanged. All-confidence accuracy drops because the extra names are mostly `low`: low-confidence names are lower-accuracy by design (about 20% lenient), so a consumer or UI must show the confidence tier and not present `low` names as equal to `high` ones. `quality.test.ts` now grades the v6 recording (floors: coverage >= 0.8, lenient all-confidence >= 40% with n >= 30, high-confidence exact >= 0.6 with n >= 5).
 
+**Skill v7: calibrate the middle and low tiers (2026-11-09).** Graded errors in the v6 recording (med/low names whose reference author name did not match, 3+ each): (1) parameter copies named from one property, comparison or callee instead of the parameter's broad role (`options` for `pathConfig`, `item` for `props`: `routeNames <- routePath`); (2) reused registers named for a later value (`index <- matchedRoute`, `initialRoutes <- routesLength`, `options <- scratch`); (3) constant temporaries named for their value, not their role (`undefinedValue`, `one`, `hyphen` where the author wrote `previous`, `match`, `segment`); (4) synonyms of the author's name that no rater can accept (`frame <- layout`, `acc <- groups`, `width <- value`; not fixable by prompting); (5) one-use `med` names that were guesses (`custom` names inferred from a single call). `binding-hints.ts` now also sends `assigns` (reuse), `propsRead`, `comparedWith`, `returned` and `argOf` (callee#argument position), and `skills/hbc-name.md` v7 adds calibration rules: a reused register is `low`, a constant is named for its role, a parameter copy takes the broad role, a call result is not named after its callee, and `med` needs two independent agreeing uses. Same 60-function recipe, sonnet (`<app>.recording.idmatch.v7.json`):
+
+| id-match, 60 fns, 850 bindings | v6 | v7 |
+| --- | --- | --- |
+| coverage | 86.8% (738) | 89.5% (761) |
+| confidence mix high / med / low | 171 / 260 / 309 | 48 / 265 / 448 |
+| graded lenient, high | 15/17 (exact 12) | 9/10 (exact 7) |
+| graded lenient, med | 15/34 (exact 14) | 14/30 (exact 12) |
+| graded lenient, low | 5/24 (exact 4) | 14/35 (exact 9) |
+| graded lenient, all | 35/75 (exact 30) | 37/75 (exact 28) |
+| tokens in / out | 645k / 83k | 683k / 96k |
+| tokens per named binding | 986 | 1,025 |
+
+The honest reading: coverage and low-tier accuracy rise (low 21% to 40% lenient), the high tier stays as accurate (about 90% lenient) but shrinks by 72% (171 to 48 names), because the model now keeps `high` for literal-backed names only; med accuracy is flat (about 45%); exact all-confidence is 2 lower. The graded sample is small (75 names), so the med/low differences are within noise; the robust effects are the high-tier shrinkage and the better-calibrated low tier. `quality.test.ts` now grades v7 (floors: coverage >= 0.85, high exact >= 0.6 with n >= 5, plus per-tier floors med >= 0.35 and low >= 0.25 lenient with n >= 15).
+
+**Skill v8 on a larger sample; v6 stays default (2026-11-09).** v7 cut the `high` tier from 171 to 48 names, so v8 keeps v7's richer hints (`assigns`, `propsRead`, `comparedWith`, `returned`, `argOf`) and v7's role-naming rules (reused register named for its first value, constant named for its role, parameter copy takes the broad role, call result not named after its callee) but drops v7's two confidence rules (reused register is `low`; `med` needs two agreeing uses) and states that confidence follows the `confidence` definition. The sample is extended to the first 120 labelled functions (`--only src --labelled ... --limit 120`, sonnet; v8 recorded in 33 min, committed as `<app>.recording.idmatch.v8.json`; v6 extended to the same 120 with the v6 skill and v6 hints as `<app>.recording.idmatch.v6.120.json`; `<app>.nameable.idmatch.v8.json` is the 120-function denominator, 1,383 bindings; on the shared first 60 it is 846 where the older file said 850, so the v6/v7 coverage figures differ in the 3rd digit from the tables above). All graded names, lenient (exact) against 1,074 parameter labels:
+
+| id-match, 120 fns, 1,383 bindings | v6 | v8 |
+| --- | --- | --- |
+| coverage | 89.9% (1,244) | 89.7% (1,241) |
+| confidence mix high / med / low | 247 / 444 / 571 | 218 / 474 / 550 |
+| high | 24/28 (21) | 29/34 (27) |
+| med | 25/57 (19) | 31/58 (24) |
+| low | 10/43 (7) | 8/39 (5) |
+| all | 59/128 (47) | 68/131 (56) |
+| tokens in / out | 1.24M / 144k | 1.35M / 155k |
+| tokens per named binding | 1,113 | 1,215 |
+
+Shared first 60 functions (the v7 comparison set, same denominator): v6 coverage 86.8%, mix 171/260/309, high 15/17, med 15/34, low 5/24, all 35/75; v7 89.6%, 48/265/448, high 9/10, med 14/30, low 14/35, all 37/75; v8 85.7%, 143/279/304, high 18/21, med 16/31, low 5/26, all 39/78.
+
+Decision rule (adopt v8 only if coverage >= v6, high volume >= ~80% of v6, high accuracy not lower, med and low accuracy higher): high volume 88% of v6 passes, high accuracy 85% vs 86% lenient (79% vs 75% exact) passes, med 53% vs 44% passes, but coverage is 3 names below v6 (1,241 vs 1,244; 85.7% vs 86.8% on the shared 60) and low is 21% vs 23%, so by the rule **v6 remains the default** (skill, hints and `quality.test.ts` are back at v6). Reading: v8 recovers v7's high tier (88% of v6's volume, against 19%) and gains on med and exact, which is the effect the role rules were meant to have, but low-tier accuracy does not improve and the gains are 5-9 names on samples of 28-58 per tier, inside noise. To flip the default, restore `skills/hbc-name.md` from commit dde468d and `src/readability/binding-hints.ts` + its test from 53af3a2, then re-key the synthetic recording. The v6/v8 comparison is pinned by a test in `quality.test.ts`.
+
 ## Render cost (2026-11-09)
 
 Profile on the held-out app (box at load ~15): `prepareModule` 0.3 s, the first whole-module raw emit (`rawFrames`, what the reuse gate used to build on the first `setName`) ~19 s, `NameService.render({fn})` 77-96 s each (it re-emitted all 15,551 functions through stage A + B and sliced one out; the hooks' whole-module views were rebuilt every call), whole-module `render()` ~66 s. Nothing was cached between calls except the analysis. Fix: scoped emit (`emitModule`'s `onlyFunction`) in `render({fn})`, hooks built once per `NameService`, per-function raw frames for the gate, and a touched-functions backstop in `runNamePass` (docs/RENAME.md "Rendering"). The sweep fidelity test now compares scoped renders of its touched functions instead of two whole-module renders. Measured after (same app, same load): `render({fn})` 1.1 s for the first call (hook build) then ~50-300 ms per call (was 77-96 s); `runNamePass` on one target 0.2 s (was two whole-module renders, ~130 s, plus ~19 s for the gate's first whole-module raw emit); scoped output is byte-identical to the whole-module slice on the held-out app (fns 2079 and 2080, plus 40 construct fixtures x 12 fns, with and without names). The ~21 min sweep test was not re-run in this pass.
