@@ -474,3 +474,20 @@ into the normal and the exceptional exit), where at most one runs.
 200 at v84, v94, v96, v98, v99 x `--passes none|on`; failed before with
 `distinct: false`). T2 under the real Hermes VMs
 (`tests/gate/decompile/equivalence.test.ts`) passes for fixture 200.
+
+**review-1110: the cycle test covers exceptional edges and generator
+resumes.** "Can execute twice" was decided on the normal CFG only, which
+missed two repeat routes. (1) A retry loop whose back edge runs only through
+a handler (`for (;;) { try { fs.push(function () {}); mayThrow(); break; }
+catch (e) {} }`): the attempt that loops leaves the `try` by an exception
+edge, so `inCycle`/`reaches` now walk `exceptionSuccs` too (fixture
+`340-closure-in-catch-retry-loop`, every version; failed with `attempts: 4
+false false`, `weakmap: 3 3 3`). (2) A pre-v97 generator body is emitted as
+a step function the factory calls once per `next()`; a site reachable from a
+suspend point's resume block runs once per resumption, so it counts as
+repeating (fixture `341-closure-per-generator-resume`; failed at v84/v94/v96
+with `loop distinct: false`). Negative control: fixture
+`344-closure-once-per-activation`. Still open (docs/BUGS.md): a function whose
+creation sites lie in two functions (hermesc inlined its creator into both)
+stays one declaration at their common host, so each creator call returns the
+same object.
