@@ -14,7 +14,7 @@ const score = (pkg: string, tier: PackageScore["tier"] = "high"): PackageScore =
   package: pkg, version: "1.0.0", hbcVersion: 96, layer: "shared", isBaseline: false, eligibleFunctions: 20, exactHits: 18, fuzzyOnlyHits: 0, stringCorroborated: 0,
   exactCoverage: 0.9, fuzzyCoverage: 0.9, moduleExactHits: 3, moduleTotal: 3, tier,
 });
-const inv = (...modules: readonly (readonly string[])[]) => ({ modules: modules.map((stringConstants) => ({ stringConstants })) });
+const inv = (...modules: readonly (readonly string[])[]) => ({ modules: modules.map((stringConstants) => ({ stringConstants, functionIndices: [0], depIds: [] as number[] })) });
 const MANIFEST = ["name", "version", "dependencies", "description"];
 const forkOf = (out: readonly PackageScore[], pkg: string): string | undefined => out.find((p) => p.package === pkg)?.fork?.package;
 const none: ReadonlySet<string> = new Set();
@@ -46,6 +46,12 @@ test("corpus-fork-relabel: a suffixed fork named beside the upstream in one smal
 test("corpus-fork-relabel: a suffixed package named by a dependent's manifest is the original of a -js fork (source-map-js -> source-map)", () => {
   const out = relabelForks([score("source-map-js")], inv([...MANIFEST, "css-tree", "mdn-data", "source-map", "^0.6.1"]), none);
   assert.equal(forkOf(out, "source-map-js"), "source-map");
+});
+
+test("corpus-fork-relabel: an affixed name in code, not in a package.json, is not a fork (react-native vs \"react-native-renderer\")", () => {
+  const renderer = { stringConstants: [...MANIFEST, "rendererPackageName", "react-native-renderer"], functionIndices: [0, 1, 2], depIds: [3] };
+  const out = relabelForks([score("react-native")], { modules: [renderer] }, none);
+  assert.equal(forkOf(out, "react-native"), undefined);
 });
 
 test("corpus-fork-relabel: a bare word is never the counterpart (readable-stream vs \"readable\")", () => {

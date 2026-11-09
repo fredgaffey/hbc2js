@@ -20,6 +20,10 @@
 //    name), and an affix Q must have no signature at all: one that has a
 //    signature which did not match is more likely a plugin of P
 //    (`react-native-reanimated-carousel`) than P's code under a new name.
+//    An affix Q must be named in a package.json-shaped module (one
+//    function, no requires, strings `name`, `version` and a dependency key): affixed names in code are
+//    often not packages (React's renderer calls itself
+//    `react-native-renderer`, which made `react-native` a false fork).
 // Guards: Q is not itself confirmed (then both codes are present, or the
 // twin rules decide), `@types/*` is never a fork, exactly one Q qualifies,
 // and every module that names P as a whole string also names Q and names at
@@ -67,7 +71,7 @@ function forkRule(p: string, q: string): ForkRule | null {
   return long.startsWith(short + "-") || long.endsWith("-" + short) ? "affix" : null;
 }
 
-export function relabelForks(packages: readonly PackageScore[], inventory: { readonly modules: readonly { readonly stringConstants: readonly string[] }[] }, signatureNames: ReadonlySet<string>): PackageScore[] {
+export function relabelForks(packages: readonly PackageScore[], inventory: { readonly modules: readonly { readonly stringConstants: readonly string[]; readonly functionIndices: readonly number[]; readonly depIds: readonly number[] | null }[] }, signatureNames: ReadonlySet<string>): PackageScore[] {
   const confirmed = new Set(packages.filter((p) => p.tier === "high" && !p.isBaseline).map((p) => p.package));
   if (confirmed.size === 0) return [...packages];
   // name -> modules naming it, and module -> names (only for names that
@@ -82,6 +86,13 @@ export function relabelForks(packages: readonly PackageScore[], inventory: { rea
       set.add(i);
     }
   });
+  const isManifest = (i: number): boolean => {
+    const m = inventory.modules[i]!;
+    // A bundled package.json is one data factory: no requires, no inner functions.
+    if (m.functionIndices.length !== 1 || (m.depIds !== null && m.depIds.length > 0)) return false;
+    const strs = new Set(m.stringConstants);
+    return strs.has("name") && strs.has("version") && (strs.has("dependencies") || strs.has("devDependencies") || strs.has("peerDependencies"));
+  };
   const namesIn = (i: number): string[] => inventory.modules[i]!.stringConstants.map(nameOf).filter((n): n is string => n !== null);
   return packages.map((p) => {
     if (p.tier !== "high" || p.isBaseline || p.fork !== undefined) return p;
@@ -94,6 +105,9 @@ export function relabelForks(packages: readonly PackageScore[], inventory: { rea
     if (qs.length !== 1) return p;
     const { q, rule } = qs[0]!;
     const qMods = modulesOf.get(q)!;
+    // An affix name in code is often not a package at all (React's renderer
+    // reports itself as "react-native-renderer"); a package.json listing it is.
+    if (rule === "affix" && ![...qMods].some(isManifest)) return p;
     for (const i of modulesOf.get(p.package) ?? []) {
       if (!qMods.has(i)) return p;
       const others = new Set(namesIn(i).filter((n) => n !== p.package && confirmed.has(n)));
