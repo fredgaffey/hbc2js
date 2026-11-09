@@ -250,7 +250,26 @@ export function foldAll(root: readonly Stmt[], onRefuse?: (r: Refusal) => void, 
         if (rc.value.args.length !== 3 || p === undefined || arr === undefined || arr.k !== "array" || nt === undefined || tokOf(env, p) !== pTok || tokOf(env, nt) !== clsTok) { onSkip?.(`H-D Reflect.construct operands differ (args ${rc.value.args.length}, arr ${arr?.k}, p ${tokOf(env, p!) === pTok}, nt ${nt === undefined ? "-" : tokOf(env, nt) === clsTok ? "ok" : nt.k})`); return null; }
         // The template, up to its own super(...): silent stores only.
         checkTemplate(body());
-        while (ti < body().length && (skippable(body()[ti]!) || silent(body()[ti]!))) { if (!skippable(body()[ti]!)) applyTemplate(body()[ti]!); ti++; }
+        // Section 9.2 (6): super-call leaves the constructor's own super-constructor
+        // lookup `r = Object.getPrototypeOf(<this class>)` ahead of the `super(...)`
+        // it rebuilt. It runs no user code (a class constructor is an ordinary
+        // function object) and is the template's copy of the caller's header
+        // store, so it pairs with that header: at most once, its register takes
+        // the header's token.
+        let protoSeen = false;
+        for (;;) {
+          const b = body()[ti];
+          if (b === undefined) break;
+          if (skippable(b) || silent(b)) { if (!skippable(b)) applyTemplate(b); ti++; continue; }
+          const ps = store(b);
+          if (!protoSeen && ps !== null && ps.value.k === "call" && isMemberCall(ps.value.callee, "Object", "getPrototypeOf") && ps.value.args.length === 1 && isIdent(ps.value.args[0]) && !isTemplateLocal("Object") && isTemplateLocal(ps.name) && tokT(ps.value.args[0]!) === clsTok) {
+            protoSeen = true;
+            toks.write(tenv, ps.name, pTok);
+            ti++;
+            continue;
+          }
+          break;
+        }
         const sup = body()[ti];
         if (sup === undefined || sup.k !== "expr" || sup.expr.k !== "call" || sup.expr.callee.k !== "lit" || sup.expr.callee.text !== "super") fail("R-IN1", "the derived constructor has no leading super(...) after silent stores");
         const sargs = (sup as Extract<Stmt, { k: "expr" }>).expr as Extract<Expr, { k: "call" }>;

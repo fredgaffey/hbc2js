@@ -1,6 +1,6 @@
 // docs/specs/00-project-skeleton.md §7.3 — hermes-dec oracles.
 // Reading hermes-dec's stdout is allowed; reading its source is forbidden (D4/R6).
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { delimiter, join } from "node:path";
 import { existsSync } from "node:fs";
 import type { TestContext } from "node:test";
@@ -37,4 +37,15 @@ export function requireOracle(t: TestContext, name: OracleName): string | null {
 export function runOracle(bin: string, args: readonly string[]): { status: number; stdout: string } {
   const result = spawnSync(bin, args, { shell: false, encoding: "utf8", maxBuffer: 1024 * 1024 * 256 });
   return { status: result.status ?? 1, stdout: result.stdout ?? "" };
+}
+
+/** Async twin of `runOracle`: lets sibling subtests (with a `concurrency` option) overlap
+ *  their oracle spawns instead of serialising on a blocking spawnSync. */
+export function runOracleAsync(bin: string, args: readonly string[]): Promise<{ status: number; stdout: string }> {
+  return new Promise((resolve) => {
+    execFile(bin, [...args], { shell: false, encoding: "utf8", maxBuffer: 1024 * 1024 * 256 }, (err, stdout) => {
+      const code = err === null ? 0 : typeof (err as { code?: unknown }).code === "number" ? (err as { code: number }).code : 1;
+      resolve({ status: code, stdout: stdout ?? "" });
+    });
+  });
 }
