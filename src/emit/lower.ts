@@ -165,6 +165,25 @@ export function planBlock(block: BasicBlock, functionInstructions: readonly Inst
   const selectObjects = new Map<number, number>();
   const methodCalls = new Map<number, { objReg: number; name: string }>();
   const unfusedReads = new Set<number>();
+  // A register every write of which, function-wide, is `GetGlobalObject`
+  // (Hermes hoists the global object into one register at entry).
+  const globalOnlyMemo = new Map<number, boolean>();
+  const globalOnly = (r: number): boolean => {
+    let v = globalOnlyMemo.get(r);
+    if (v === undefined) {
+      v = false;
+      for (const c of functionInstructions) {
+        if (!writtenRegisters(c).includes(r)) continue;
+        if (c.name !== "GetGlobalObject") {
+          v = false;
+          break;
+        }
+        v = true;
+      }
+      globalOnlyMemo.set(r, v);
+    }
+    return v;
+  };
   const ins = block.instructions;
 
   // The `new` triple is matched over the *whole function*, not one block: in
@@ -277,7 +296,7 @@ export function planBlock(block: BasicBlock, functionInstructions: readonly Inst
         FRAME_LOCAL.test(c.name) ||
         FRESH_OBJECT.test(c.name) ||
         (FRESH_OBJECT_INIT.test(c.name) && fresh.has(V(c, 0))) ||
-        (GETBYID.test(c.name) && globals.has(V(c, 1)));
+        (GETBYID.test(c.name) && (globals.has(V(c, 1)) || globalOnly(V(c, 1))));
       if (!ok) {
         observable = true;
         break;
