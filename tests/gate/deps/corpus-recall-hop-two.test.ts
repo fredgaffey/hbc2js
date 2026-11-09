@@ -116,7 +116,7 @@ test("deps-hop-two-cascade: admitting a hop-two package leaves every other candi
   const withTwo = deriveCandidatePackages(layers, inv);
   assert.ok(withTwo.has("two-own-evidence"), `hop-two package admitted; got ${[...withTwo].sort().join(", ")}`);
   const without = new Set([...withTwo].filter((p) => p !== "two-own-evidence"));
-  const run = (cands: Set<string>) => matchInventory(inv, loadSignatures(layers, { candidates: cands, hbcVersion: 98, otherHbcPackages: new Set(), slim: slimTargetFor(inv) }));
+  const run = (cands: ReadonlySet<string>) => matchInventory(inv, loadSignatures(layers, { candidates: cands, hbcVersion: 98, otherHbcPackages: new Set(), slim: slimTargetFor(inv) }));
   const a = run(without), b = run(withTwo);
   assert.ok(b.packages.some((p) => p.package === "two-own-evidence"), "the admitted package is scored");
   assert.ok(a.packages.some((p) => p.package === "app-root") && a.packages.some((p) => p.package === "hop-one-lib"), "the other candidates are scored in both runs");
