@@ -105,6 +105,7 @@ const { decodeFunction } = await import(join(REPO_ROOT, "src/disasm/decode.ts"))
 const { parseHbc } = await import(join(REPO_ROOT, "src/parse/module.ts"));
 const { fingerprintModule, SIG_HASH_SCHEME } = await import(join(REPO_ROOT, "src/deps/fingerprint.ts"));
 const { writeSignature } = await import(join(REPO_ROOT, "src/deps/db.ts"));
+const { BUILDER_METRO_CONFIG_NAME, builderConfigArgs, builderMetroConfigJs, bundleEnv, missingPeers, peerInstallArgv, unresolvedBareModule } = await import(join(REPO_ROOT, "src/deps/builder-support.ts"));
 const { attachModulePaths, MODULE_PATHS_VERSION, modulePathsFromSourceMap } = await import(join(REPO_ROOT, "src/deps/module-paths.ts"));
 
 const rawArgs = process.argv.slice(2);
@@ -140,11 +141,23 @@ function installPackage() {
   // BUILDONE1: strict first (installs peers), --legacy-peer-deps only as a
   // fallback - see install-plan.mjs.
   runInstall(spec, (cmd, argv) => execFileSync(cmd, argv, pipedOpts({ cwd: scaffoldDir, timeout: 180_000 })));
-}
-
-function uninstallPackage() {
+  // BUILDFAIL1(a): peers still absent after the (possibly legacy) install.
   try {
-    execFileSync("npm", ["uninstall", pkg, "--ignore-scripts", "--no-save", "--no-audit", "--no-fund"], {
+    const pj = JSON.parse(readFileSync(join(scaffoldDir, "node_modules", ...pkg.split("/"), "package.json"), "utf8"));
+    const peers = missingPeers(pj, (n) => existsSync(join(scaffoldDir, "node_modules", ...n.split("/"), "package.json")));
+    if (peers.length > 0) {
+      execFileSync("npm", peerInstallArgv(spec, peers), pipedOpts({ cwd: scaffoldDir, timeout: 180_000 }));
+      installedPeers.push(...peers.map((p) => p.name));
+    }
+  } catch {
+    // Best effort; the bundle then fails as before.
+  }
+}
+const installedPeers = [];
+
+function uninstallPackage(names = [pkg, ...installedPeers]) {
+  try {
+    execFileSync("npm", ["uninstall", ...names, "--ignore-scripts", "--no-save", "--no-audit", "--no-fund"], {
       cwd: scaffoldDir,
       stdio: ["ignore", "ignore", "ignore"],
       timeout: 60_000,
@@ -168,22 +181,37 @@ function bundleAndCompile(workDir) {
   // fallback (install-plan.mjs entryPlan).
   const pkgDir = join(scaffoldDir, "node_modules", pkg);
   const { attempts } = existsSync(join(pkgDir, "package.json")) ? entryPlan(pkg, pkgDir) : { attempts: [[pkg]] };
+  writeFileSync(join(scaffoldDir, BUILDER_METRO_CONFIG_NAME), builderMetroConfigJs());
   let lastErr;
   for (const specs of attempts) {
     writeFileSync(entryFile, entrySource(specs));
-    try {
+    // BUILDFAIL1(a2): an undeclared/optional dependency Metro cannot resolve is
+    // installed (with the target repeated: --no-save prunes it otherwise) and
+    // the bundle retried, at most 3 rounds.
+    for (let round = 0; ; round++) try {
       execFileSync(
         "npx",
-        ["react-native", "bundle", "--platform", "android", "--dev", "false", "--minify", "true", "--max-workers", "1", "--reset-cache", "--entry-file", entryFile, "--bundle-output", bundlePath, "--sourcemap-output", mapPath, "--assets-dest", assetsDir],
-        pipedOpts({ cwd: scaffoldDir, timeout: 120_000 }),
+        ["react-native", "bundle", ...builderConfigArgs(scaffoldDir), "--platform", "android", "--dev", "false", "--minify", "true", "--max-workers", "1", "--reset-cache", "--entry-file", entryFile, "--bundle-output", bundlePath, "--sourcemap-output", mapPath, "--assets-dest", assetsDir],
+        pipedOpts({ cwd: scaffoldDir, timeout: 120_000, env: bundleEnv() }),
       );
       lastErr = undefined;
       break;
     } catch (e) {
       lastErr = e;
-    } finally {
-      rmSync(entryFile, { force: true });
+      const miss = round < 3 ? unresolvedBareModule(`${e?.stderr ?? ""}${e?.message ?? ""}`) : null;
+      if (miss !== null && !existsSync(join(scaffoldDir, "node_modules", ...miss.split("/"), "package.json"))) {
+        try {
+          execFileSync("npm", peerInstallArgv(`${pkg}@${version}`, [...installedPeers.map((name) => ({ name, range: "*" })), { name: miss, range: "latest" }]), pipedOpts({ cwd: scaffoldDir, timeout: 180_000 }));
+          installedPeers.push(miss);
+          continue;
+        } catch {
+          // fall through to the recorded bundle error
+        }
+      }
+      break;
     }
+    rmSync(entryFile, { force: true });
+    if (lastErr === undefined) break;
   }
   if (lastErr !== undefined) throw lastErr;
   const hbcPath = join(workDir, "out.hbc");
@@ -281,7 +309,10 @@ async function main() {
     process.exitCode = 1;
   } finally {
     if (workDir !== null) rmSync(workDir, { recursive: true, force: true });
-    if (restoreScaffold !== null) restoreScaffold();
+    if (restoreScaffold !== null) {
+      restoreScaffold();
+      if (installedPeers.length > 0) uninstallPackage(installedPeers);
+    }
     else if (installed) uninstallPackage();
   }
 }
