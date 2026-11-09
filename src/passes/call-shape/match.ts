@@ -455,7 +455,9 @@ export function matchCondArg(list: readonly Stmt[], fnBody: readonly Stmt[]): Ca
       if (i < 0) continue;
       read = readOf(def.body[i]!, f, r);
       hoisted = def.body.slice(0, i);
-      if (mentionsLabel(hoisted, def.label)) continue;
+      // Hoisting the prefix out of the block must not move a block-scoped
+      // declaration, nor a jump that would skip the read.
+      if (mentionsLabel(hoisted, def.label) || hoisted.some((h) => h.k === "decl" || h.k === "init" || h.k === "func" || h.k === "classdecl")) continue;
       const tail = toExprs(def.body.slice(i + 1), def.label);
       if (tail === null) continue;
       seq.push(...tail);

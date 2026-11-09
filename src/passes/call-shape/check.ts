@@ -61,11 +61,12 @@ function recomputeSite(before: readonly Stmt[], fnBody: readonly Stmt[]): { read
 }
 
 export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: PassContext): CheckResult {
-  if (recomputeSite(before, ctx.fnBody ?? before).found === null) {
+  const first = recomputeSite(before, ctx.fnBody ?? before);
+  if (first.found === null) {
     // R3e (spec 04 section 9): recompute the site from `before` alone and
     // require `after` to be exactly that splice.
     const site = matchCondArg(before, ctx.fnBody ?? before);
-    if (site?.splice === undefined) return { ok: false, reason: "no recognised call-shape site in before" };
+    if (site?.splice === undefined) return { ok: false, reason: first.firstReason ?? "no recognised call-shape site in before" };
     const { from, to, stmts } = site.splice;
     const expected = [...before.slice(0, from), ...stmts, ...before.slice(to + 1)];
     if (expected.length !== after.length || !expected.every((s, i) => sameStmt(s, after[i]!))) return { ok: false, reason: "R3e: after is not the recomputed splice" };
