@@ -8,8 +8,8 @@
 import { identUsesMany, stmtLists, walk } from "../ast.ts";
 import type { Stmt } from "../ast.ts";
 import type { Match, PassContext } from "../types.ts";
-import type { FunctionCfg } from "../../cfg/types.ts";
-import { closureFunctionId } from "../../emit/lower.ts";
+import { closureFunctionId } from "../tree.ts";
+import type { FunctionCfg } from "../tree.ts";
 
 export interface ClosureInlineSite {
   /** Accepted declaration names, in body order. */
