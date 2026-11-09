@@ -367,19 +367,23 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
       exactCoverage >= MIN_EXACT_FUNCTION_COVERAGE_FOR_COVERAGE_PATH);
   const strongFunctionSignal =
     exactCoverage >= HIGH_EXACT_FUNCTION_COVERAGE ||
-    (isTinyPackage && exactHits >= MIN_TINY_PACKAGE_EXACT_FUNCTION_HITS && exactHitInstrSum >= MIN_TINY_PACKAGE_EXACT_FUNCTION_INSTR) ||
-    (isTinyPackage && substantiveModuleHits >= 1 && exactCoverage >= TINY_PACKAGE_MIN_EXACT_COVERAGE);
+    (isTinyPackage && exactHits >= MIN_TINY_PACKAGE_EXACT_FUNCTION_HITS && exactHitInstrSum >= MIN_TINY_PACKAGE_EXACT_FUNCTION_INSTR);
+  const distinctEligible = pkg.slim?.distinctEligible ?? new Set(eligible.map((f) => f.exactHash)).size;
+  const enoughDistinct = hitKeys.size >= Math.min(MIN_DISTINCT_EVIDENCE_HASHES, distinctEligible);
+  // corpus-recall-bar: only with enough distinct hashes; otherwise it would
+  // turn a plain medium into a few-distinct demotion, which the path-recall
+  // edge rule then skips (call-bound, es-shim-unscopables).
+  const tinyCoverageSignal = isTinyPackage && substantiveModuleHits >= 1 && exactCoverage >= TINY_PACKAGE_MIN_EXACT_COVERAGE && enoughDistinct;
 
   let tier: ConfidenceTier;
-  if (strongModuleSignal || strongFunctionSignal) tier = "high";
+  if (strongModuleSignal || strongFunctionSignal || tinyCoverageSignal) tier = "high";
   else if (fuzzyCoverage >= 0.5 || moduleExactHits >= 1) tier = "medium";
   else if (exactHits + fuzzyOnlyHits > 0) tier = "low";
   else tier = "none";
   let demotion: PackageScore["demotion"];
   // A package whose whole eligible code has fewer distinct hashes needs
   // them all (a one-function package fully matched stays high).
-  const distinctEligible = pkg.slim?.distinctEligible ?? new Set(eligible.map((f) => f.exactHash)).size;
-  if (tier === "high" && !pkg.toolchainBaseline && hitKeys.size < Math.min(MIN_DISTINCT_EVIDENCE_HASHES, distinctEligible)) {
+  if (tier === "high" && !pkg.toolchainBaseline && !enoughDistinct) {
     tier = "medium";
     demotion = { rule: "few-distinct" };
   }

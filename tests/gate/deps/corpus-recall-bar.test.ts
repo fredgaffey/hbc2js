@@ -88,3 +88,19 @@ test("corpus-recall-bar: half the functions without the module factory stays bel
   assert.ok(s !== undefined && s.moduleExactHits === 0 && s.exactCoverage >= TINY_PACKAGE_MIN_EXACT_COVERAGE, JSON.stringify(s));
   assert.notEqual(s.tier, "high", JSON.stringify(s));
 });
+
+test("corpus-recall-bar: the tiny coverage path never turns a medium package into a few-distinct demotion (call-bound, es-shim-unscopables)", (t) => {
+  const h = requireHermesc(t, 96);
+  if (h === null) return;
+  // Found merging with corpus-path-recall: call-bound, es-shim-unscopables
+  // and define-properties (2 of 3-4 functions, 2 distinct hashes) became
+  // high through the tiny path, then few-distinct demoted them, and the
+  // path-recall edge rule skips demoted packages, so 3 Expensify TPs were
+  // lost. Too few distinct hashes means the path does not apply: the
+  // package stays plain medium for the later rules.
+  const pkg = signature(h.path, "tiny-lib", [tinyModule(2, 2)]);
+  const s = scoreOf(h.path, pkg, tinyModule(2, 1));
+  assert.ok(s !== undefined && s.moduleExactHits === 1 && s.exactCoverage >= TINY_PACKAGE_MIN_EXACT_COVERAGE && s.exactHits < 3, JSON.stringify(s));
+  assert.equal(s.tier, "medium", JSON.stringify(s));
+  assert.equal(s.demotion, undefined, JSON.stringify(s));
+});
