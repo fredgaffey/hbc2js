@@ -719,7 +719,6 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
   // activation); creating it earlier (at entry) is unobservable because
   // closure creation runs no user code and the synthetic `_fn<n>` name is
   // read only at the creation sites themselves.
-  let perIterationClosures = 0;
   for (const [host, kids] of childrenOf) {
     let cfg: FunctionCfg;
     try {
@@ -749,15 +748,7 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
         here.some((a, i) => here.some((b, j) => i !== j && (a.block === b.block ? a.offset < b.offset : reaches(cfg, a.block, b.block))));
       if (!repeats) continue;
       inlineFunctions.add(child);
-      perIterationClosures++;
     }
-  }
-  if (perIterationClosures > 0) {
-    diagnostics.push({
-      severity: "info",
-      code: "I_CLOSURE_PER_EXECUTION",
-      message: `${perIterationClosures} closure(s) can be created more than once per activation (a loop, or several sites on one path); emitted as function expressions at their creation sites so each execution makes a new function object`,
-    });
   }
 
   /** True when a copy hosted in `host` must be emitted INLINE at its creation
