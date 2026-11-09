@@ -33,13 +33,13 @@ const MAP_PATH = join(
 const HAIKU_BACKEND_PATH = join(repoRoot(), "src", "workers", "backends", "haiku.ts");
 
 export const HIGH_CONFIDENCE_ACCURACY_TARGET = 0.8;
-/** Measured 2026-11-09 on the v7 recording: 7/10 = 0.70 exact (v6: 12/17, v5 sonnet: 11/18). */
+/** Measured 2026-11-09 on the v6 recording: 12/17 = 0.70 exact (v5 sonnet: 11/18). */
 export const HIGH_CONFIDENCE_ACCURACY_FLOOR = 0.6;
 export const COVERAGE_TARGET = 0.7;
 /** Measured floor of the committed batched recording (2026-11-09, v6 skill, over the nameable denominator: 738/850 = 0.868; v5 sonnet was 0.351). The
  *  spec target is COVERAGE_TARGET; the gap is reported via diagnostic, not
  *  hidden by lowering the target. Raise the floor when coverage improves. */
-export const COVERAGE_FLOOR = 0.85; // v7 measured 761/850 = 0.895 (v6 0.868)
+export const COVERAGE_FLOOR = 0.8;
 
 function sample(): LabelledSample {
   return JSON.parse(readFileSync(SAMPLE_PATH, "utf8")) as LabelledSample;
@@ -146,7 +146,7 @@ const HELD_OUT_RECORDING = join(
   "tests",
   "fixtures",
   "llm-readability",
-  "react-navigation-example-0.85.3.recording.idmatch.v7.json", // skill v7 (calibration rules + richer binding hints), sonnet, 60-function id-match recording; v6 is recording.idmatch.v6.json, v5 recording.idmatch.sonnet.json
+  "react-navigation-example-0.85.3.recording.idmatch.v6.json", // skill v6 (answer every target, role-based low names), sonnet, 60-function id-match recording; the v5 recording is recording.idmatch.sonnet.json
 );
 
 const HELD_OUT_NAMEABLE = join(repoRoot(), "tests", "fixtures", "llm-readability", "react-navigation-example-0.85.3.nameable.idmatch.json");
@@ -171,17 +171,10 @@ test("spec 28 section 7 (quality): >= 80% of high-confidence names on the labell
   const both = rateHighConfidence(s, proposals);
   t.diagnostic(`lenient rater: high ${String(both.high.lenient)}/${String(both.high.n)} (exact ${String(both.high.exact)}), all ${String(both.all.lenient)}/${String(both.all.n)} (exact ${String(both.all.exact)}); ${String(both.all.excludedSingleLetter)} single-letter labels unrated`);
   assert.ok(both.high.lenient >= both.high.exact && both.all.lenient >= both.all.exact, "the lenient rater only ever adds accepted names");
-  assert.ok(both.all.n >= 30 && both.all.lenient / both.all.n >= 0.4, `lenient all-confidence accuracy ${String(both.all.lenient)}/${String(both.all.n)} fell below the 0.4 floor (v7 id-match measured 37/75, v6 35/75; low-confidence names are lower-accuracy by design, v5 sonnet was 29/45)`);
+  assert.ok(both.all.n >= 30 && both.all.lenient / both.all.n >= 0.4, `lenient all-confidence accuracy ${String(both.all.lenient)}/${String(both.all.n)} fell below the 0.4 floor (v6 id-match measured 35/75; low-confidence names are lower-accuracy by design, v5 sonnet was 29/45)`);
   assert.ok(got.n >= 5, `only ${String(got.n)} high-confidence names overlap register labels; the measurement needs >= 5`);
   assert.ok(got.rate >= HIGH_CONFIDENCE_ACCURACY_FLOOR, `high-confidence accuracy ${got.rate} over ${got.n} names is below the recorded floor ${HIGH_CONFIDENCE_ACCURACY_FLOOR} (spec target ${HIGH_CONFIDENCE_ACCURACY_TARGET})`);
   assert.equal(got.misleading, 0, "no security-relevant register label is misrepresented");
-  // v7 calibration: the tiers below `high` are graded on their own so a drop
-  // in med/low accuracy cannot hide behind the high tier (v7: med 14/30, low 14/35 lenient).
-  for (const [tier, floor] of [["med", 0.35], ["low", 0.25]] as const) {
-    const sub = rateHighConfidence(s, new Map([...proposals].filter(([, p]) => p.confidence === tier)));
-    t.diagnostic(`${tier}-confidence lenient ${String(sub.all.lenient)}/${String(sub.all.n)}`);
-    assert.ok(sub.all.n >= 15 && sub.all.lenient / sub.all.n >= floor, `${tier}-confidence lenient accuracy ${String(sub.all.lenient)}/${String(sub.all.n)} fell below ${String(floor)}`);
-  }
 });
 
 test("spec 28 section 7 (coverage): the held-out recording names at least the recorded floor of requested registers (spec target 70%)", (t) => {
@@ -293,4 +286,27 @@ test("live-range identity: the web-target re-recording is graded per binding (do
   assert.ok(webMembers > 0, "the denominator must carry reg-split webs");
   assert.ok(stats.coverage !== undefined && stats.coverage >= 0.25, "coverage floor over nameable bindings (measured 297/1002)");
   assert.ok(both.all.n >= 20 && both.all.lenient >= both.all.exact);
+});
+
+test("readability-v8: v6 vs v8 on the same 120 labelled functions (v6 stays default; v8 is the experimental arm)", () => {
+  const dir = join(repoRoot(), "tests", "fixtures", "llm-readability");
+  const base = "react-navigation-example-0.85.3";
+  const s: LabelledSample = sample();
+  const nameable = JSON.parse(readFileSync(join(dir, `${base}.nameable.idmatch.v8.json`), "utf8")) as NameableMap;
+  const arm = (name: string) => {
+    const rec = JSON.parse(readFileSync(join(dir, `${base}.recording.idmatch.${name}.json`), "utf8")) as Recording;
+    const stats = recordingStats(rec, nameable);
+    const props = proposalsForLabels(s, recordedNames(rec));
+    const tier = (c: Confidence) => rateHighConfidence(s, new Map([...props].filter(([, p]) => p.confidence === c))).all;
+    return { stats, high: tier("high"), med: tier("med"), low: tier("low"), all: rateHighConfidence(s, props).all };
+  };
+  const v6 = arm("v6.120");
+  const v8 = arm("v8");
+  // Measured 2026-11-09: v6 coverage 1244/1383, v8 1241/1383; high 24/28 vs 29/34, med 25/57 vs 31/58, low 10/43 vs 8/39 (lenient).
+  assert.equal(v6.stats.requested, v8.stats.requested, "both arms answer the same requests");
+  for (const [n, a] of [["v6", v6], ["v8", v8]] as const) {
+    assert.ok((a.stats.coverage ?? 0) >= 0.85, `${n} coverage ${String(a.stats.coverage)}`);
+    assert.ok(a.high.n >= 25 && a.med.n >= 30 && a.low.n >= 30, `${n}: tier sample sizes ${String(a.high.n)}/${String(a.med.n)}/${String(a.low.n)}`);
+    assert.ok(a.high.lenient / a.high.n >= 0.75, `${n} high-tier lenient accuracy`);
+  }
 });

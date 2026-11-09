@@ -1,7 +1,7 @@
 ---
 id: hbc-name
 kind: suggest-name
-version: 8
+version: 6
 ---
 
 # hbc-name -- naming registers and functions in decompiled Hermes bytecode
@@ -25,11 +25,7 @@ You are given, and may use, only what is in the request:
   uses, flowsInto}`. `def` is the line that assigns the binding, `uses` up to
   three lines that read it, `flowsInto` the callees it is passed to; each line
   is prefixed `L<n>:` with its 1-based line in `source`. Start from these --
-  they are the evidence for that binding, already extracted. Also: `assigns`
-  (how many lines assign it; more than 1 means the register is REUSED for
-  unrelated values), `propsRead` (properties read off it), `comparedWith`
-  (literals it or its properties are compared with), `returned` (it is
-  returned) and `argOf` (`callee#argIndex` for each call it is passed to).
+  they are the evidence for that binding, already extracted.
 - `role` -- the module's segregation bucket and role signal, when classified.
 - `targets` -- OPTIONAL. When present, this request is about the WHOLE
   function, not one register: a list of every nameable `{fn,reg}` in it,
@@ -84,29 +80,7 @@ You never fetch anything else. If the evidence you need is absent, abstain.
    A constant temporary (`r2 = undefined`, `r3 = null`, `r0 = 0`) takes the
    role it plays at its uses (`undefinedValue`, `nullValue`, `startIndex`,
    `zero`) at `low`.
-9. Role-naming rules (v8), from grading earlier answers. These change WHICH
-   name you pick, not how confident you are:
-   - REUSED REGISTER (`assigns` > 1, no `web` on the target): the name must
-     fit the first assigned value; never name it for a later value.
-   - A constant temporary is named for the ROLE it plays, not its value:
-     not `undefinedValue`, `one`, `hyphen`, `nullValue` when `returned` or
-     `comparedWith` show a role (`match`, `found`, `previous`, `separator`,
-     `fallback`). Use the value-echo names only when nothing at all shows a
-     role.
-   - A copy of a parameter takes the broad role of the whole parameter
-     (`props`, `options`, `state`, `action`, `item`, `config`, `route`) that
-     `propsRead` and `argOf` imply, not a name built from one property read,
-     one comparison or one callee (`pathConfig`, `segmentDef`, `routePath`).
-     Use a narrow name only when a string literal or the function's own name
-     says so.
-   - A call result is named for what it IS, not for the callee that made it
-     (`r1 = getState(r0)` -> `state`, not `getStateResult`) unless the callee
-     name is the only evidence.
-   - Confidence stays as defined under `confidence` below: a literal or an
-     unambiguous call earns `high`, a clear use-based role `med`, a bare
-     role guess `low`. Do not downgrade a well-evidenced name only because
-     it has one use or its register is reused.
-10. Interior helper plumbing counts too: a binding that holds `globalThis`,
+9. Interior helper plumbing counts too: a binding that holds `globalThis`,
    `Array`, `Reflect`, a bound method or a closure over a named callee is
    named for that thing (`globalScope`, `ArrayCtor`, `reflectApply`).
 
