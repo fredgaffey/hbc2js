@@ -1,0 +1,4 @@
+neg
+add: 3
+twice: 9
+foreign: true

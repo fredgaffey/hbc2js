@@ -691,6 +691,12 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
         return;
       }
       case "if": {
+        // spec 04 section 10 (R3g): `fcall-diamond` proved the other arm is the
+        // same call, so only this one prints, and the test with it.
+        if (node.keepOnly !== undefined) {
+          lowerTree(node[node.keepOnly], out);
+          return;
+        }
         // spec 21 §3 item 3 / for-in's §2.1 shape: the Ramsey structurer
         // usually sinks a for-in loop into one arm of the "still enumerable"
         // guard, fusing "block bS; if bS {...}" into this one node. When that

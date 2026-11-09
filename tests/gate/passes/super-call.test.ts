@@ -24,10 +24,10 @@ import type { Expr, Stmt } from "../../../src/passes/ast.ts";
 import { classBindingSlots, foldSuperBody } from "../../../src/passes/super-call/match.ts";
 import type { ClassExpr } from "../../../src/passes/super-call/match.ts";
 
-const js = (fixture: string, version: "v98" | "v99", mode: "on" | "none" = "on"): string =>
+const js = (fixture: string, version: "v98" | "v99", mode: "on" | "none" | "no-private-fields" = "on"): string =>
   decompile(new Uint8Array(readFileSync(join(repoRoot(), "tests", "fixtures", "constructs", fixture, `${version}.hbc`))), {
     resolveV98Ambiguity: true,
-    passes: mode === "none" ? { none: true } : {},
+    passes: mode === "none" ? { none: true } : mode === "no-private-fields" ? { skip: ["private-fields"] } : {},
   }).code;
 
 /** The text of the `constructor(...) { ... }` that belongs to `class <name>`,
@@ -582,7 +582,10 @@ test("super-call: a live write to the stand-in that is not throw-guarded still r
 
 for (const version of ["v98", "v99"] as const) {
   test(`super-call: 81-derived-ctor-private-fields ${version} -- B's private-field constructor is rebuilt as super(...)`, () => {
-    const ctor = ctorOf(js("81-derived-ctor-private-fields", version), "B");
+    // private-fields skipped: since inline-new rebuilds fixture 81's inlined
+    // `new B(7)` (spec 24 section 9.2 (6)), it folds the brand check and the
+    // install below into `#x = 1`; this test pins super-call's own output.
+    const ctor = ctorOf(js("81-derived-ctor-private-fields", version, "no-private-fields"), "B");
     assert.match(ctor, /\bsuper\(/);
     assert.equal(ctor.split(/\bsuper\(/).length - 1, 1);
     assert.doesNotMatch(ctor, /Reflect\.construct/);
@@ -590,7 +593,7 @@ for (const version of ["v98", "v99"] as const) {
     // The stand-in is gone: both the brand check and the `#x` install now
     // address the literal `this`, which is the receiver `private-fields`
     // (row 20) needs before it can fold anything here.
-    assert.match(ctor, /hasOwnProperty\.call\(this,/);
+    assert.match(ctor, /Reflect\.getOwnPropertyDescriptor\(this,/);
     assert.match(ctor, /Object\.defineProperty\(this,/);
     assert.match(ctor, /\bthis\.y = /);
     // The brand-check store is demoted to its bare call, never `this = f()`.

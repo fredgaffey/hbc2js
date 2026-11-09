@@ -1,0 +1,91 @@
+; hbc2js disassembly of 160-receiverless-member-call/v96.hbc
+; version=96 layout=C opcodeTable=hbc96 functions=4 strings=15 globalCodeIndex=0
+function #0 "global"  params=1 frame=15 env=0 flags=strict,dbg  @0x00000160 size=236
+  0000  DeclareGlobalVar     s12 "ns1"
+  0005  DeclareGlobalVar     s13 "ns2"
+  000a  DeclareGlobalVar     s11 "describe"
+  000f  DeclareGlobalVar     s14 "viaSeq"
+  0014  DeclareGlobalVar     s10 "viaMethod"
+  0019  CreateEnvironment    r1
+  001b  CreateClosure        r2, r1, f1 "describe"
+  0020  GetGlobalObject      r0
+  0022  PutById              r0, r2, #c1, s11 "describe"
+  0028  CreateClosure        r2, r1, f2 "viaSeq"
+  002d  PutById              r0, r2, #c2, s14 "viaSeq"
+  0033  CreateClosure        r1, r1, f3 "viaMethod"
+  0038  PutById              r0, r1, #c3, s10 "viaMethod"
+  003e  NewObject            r1
+  0040  LoadConstString      r2, s5 "one"
+  0044  PutNewOwnByIdShort   r1, r2, s8 "tag"
+  0048  GetByIdShort         r2, r0, #c1, s11 "describe"
+  004d  PutNewOwnByIdShort   r1, r2, s7 "fn"
+  0051  PutById              r0, r1, #c4, s12 "ns1"
+  0057  NewObject            r1
+  0059  LoadConstString      r2, s4 "two"
+  005d  PutNewOwnByIdShort   r1, r2, s8 "tag"
+  0061  GetByIdShort         r2, r0, #c1, s11 "describe"
+  0066  PutNewOwnByIdShort   r1, r2, s7 "fn"
+  006a  PutById              r0, r1, #c5, s13 "ns2"
+  0070  TryGetById           r3, r0, #c2, s9 "print"
+  0076  GetByIdShort         r5, r0, #c3, s14 "viaSeq"
+  007b  GetByIdShort         r4, r0, #c4, s12 "ns1"
+  0080  LoadConstUndefined   r2
+  0082  LoadConstUInt8       r1, 1
+  0085  Call3                r1, r5, r2, r4, r1
+  008b  Call2                r1, r3, r2, r1
+  0090  TryGetById           r3, r0, #c2, s9 "print"
+  0096  GetByIdShort         r5, r0, #c3, s14 "viaSeq"
+  009b  GetByIdShort         r4, r0, #c5, s13 "ns2"
+  00a0  LoadConstUInt8       r1, 3
+  00a3  Call3                r1, r5, r2, r4, r1
+  00a9  Call2                r1, r3, r2, r1
+  00ae  TryGetById           r3, r0, #c2, s9 "print"
+  00b4  GetByIdShort         r5, r0, #c6, s10 "viaMethod"
+  00b9  GetByIdShort         r4, r0, #c4, s12 "ns1"
+  00be  LoadConstUInt8       r1, 5
+  00c1  Call3                r1, r5, r2, r4, r1
+  00c7  Call2                r1, r3, r2, r1
+  00cc  TryGetById           r1, r0, #c2, s9 "print"
+  00d2  GetByIdShort         r4, r0, #c6, s10 "viaMethod"
+  00d7  GetByIdShort         r3, r0, #c5, s13 "ns2"
+  00dc  LoadConstUInt8       r0, 7
+  00df  Call3                r0, r4, r2, r3, r0
+  00e5  Call2                r0, r1, r2, r0
+  00ea  Ret                  r0
+
+function #1 "describe"  params=2 frame=3 env=0 flags=strict,dbg  @0x0000024c size=43
+  0000  LoadParam            r0, 0
+  0003  LoadConstString      r1, s0 "no receiver"
+  0007  LoadConstUndefined   r2
+  0009  JStrictEqual         L1, r0, r2
+  000d  GetByIdShort         r2, r0, #c1, s8 "tag"
+  0012  LoadConstString      r0, s1 "receiver "
+  0016  Add                  r1, r0, r2
+L1:
+  001a  LoadConstString      r0, s2 " "
+  001e  Add                  r1, r1, r0
+  0022  LoadParam            r0, 1
+  0025  Add                  r0, r1, r0
+  0029  Ret                  r0
+
+function #2 "viaSeq"  params=3 frame=13 env=0 flags=strict,dbg  @0x00000277 size=49
+  0000  LoadParam            r0, 1
+  0003  LoadParam            r4, 2
+  0006  GetByIdShort         r1, r0, #c1, s7 "fn"
+  000b  LoadConstUndefined   r3
+  000d  Call2                r2, r1, r3, r4
+  0012  LoadConstString      r1, s6 "|"
+  0016  Add                  r1, r2, r1
+  001a  GetByIdShort         r2, r0, #c1, s7 "fn"
+  001f  LoadConstUInt8       r0, 1
+  0022  Add                  r0, r4, r0
+  0026  Call2                r0, r2, r3, r0
+  002b  Add                  r0, r1, r0
+  002f  Ret                  r0
+
+function #3 "viaMethod"  params=3 frame=11 env=0 flags=strict,dbg  @0x000002a8 size=18
+  0000  LoadParam            r2, 1
+  0003  GetByIdShort         r1, r2, #c1, s7 "fn"
+  0008  LoadParam            r0, 2
+  000b  Call2                r0, r1, r2, r0
+  0010  Ret                  r0

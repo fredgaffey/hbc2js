@@ -93,6 +93,25 @@ be any expression — `.apply` takes it as a value, so no array literal is neede
 `F` must satisfy the `impure-callee` rule above. Fewer than two arguments →
 refuse (`helper-arity`).
 
+**R3f — receiverless member call** (added 2026-11-09, round-trip review
+`passes-roundtrip-global`). `Reflect.apply(member(O, P, c), T, [a…])` where `T`
+passes R3a's undefined proof → `(0, O.P)(a…)` (a `seq` callee). This is
+Babel's interop call, `(0, _mod.default)(x)`, and it was the one shape R3a/R3b
+left as a real `Reflect.apply`: the old `member-callee-with-undefined-this`
+refusal was right that `O.P(a…)` would change `this`, but the sequence form
+does not — a parenthesised comma expression yields a plain value, so the call
+gets `this === undefined`, exactly as the bytecode did. Effect order is
+unchanged (`O.P` read, then the arguments, then the call); a non-callable
+`O.P` still throws `TypeError`, with hermesc's call-site message instead of
+`Reflect.apply`'s, the same caveat R3a already carries. `hermesc -O` compiles
+`(0, O.P)(a…)` to `GetById` + `LoadConst undefined` + `CallN`, the original
+instruction sequence; on react-navigation-example (v98) the leftover
+`Reflect.apply` was the largest sub-cause of the `diff:*/GetGlobalObject`
+buckets. Fixture `160-receiverless-member-call` (with the plain method call
+`ns.fn(x)` as its negative twin), test
+`tests/gate/passes/call-shape-receiverless.test.ts`. The checker additionally
+asserts the callee is exactly `(0, F)` over the source's own `F` node.
+
 ## 5. Writer
 
 Replace exactly that one `call` node in place; the enclosing statement and every
@@ -125,7 +144,8 @@ spread call arguments and optional calls are shapes *of a call*, not of
 `Reflect.apply`.
 
 **Refuse (per-site):** `dynamic-args`, `impure-callee`, `unproven-this`,
-`member-callee-with-undefined-this`, `explicit-new-target`,
+`member-callee-with-undefined-this` (retired 2026-11-09: R3f now rewrites the
+site; the reason name stays in the type for history), `explicit-new-target`,
 `duplicated-construct-callee`, `helper-arity`, `reflect-get-set` (never
 matched at all).
 
@@ -221,3 +241,71 @@ callback, now differing where hermesc places the hoisted `get` closure relative
 to the object literal) and `diff:PutOwnBySlotIdx/PutByIdLoose` 2 -> 172 (170
 from `diff:GetById(reg)`: an object literal with non-constant values now
 recompiles its property stores as PutByIdLoose -- the object-literal bucket).
+
+## 10. R3g -- the v98+ `Function.prototype.call` diamond (`fcall-diamond`)
+
+**Problem.** From bytecode v98 (and at v99), hermesc lowers `F.call(T, a...)`
+to a diamond: `C = GetById F, "call"; JmpBuiltinIs Lfast, <functionPrototypeCall>, C`,
+then a generic arm `CallN+1 Y, C, F, T, a...; Jmp J` and a fast arm
+`CallN X, F, T, a...` (each arm re-materialising its own constant arguments,
+often in different registers; `F.call()` has the fast arm load `undefined` as
+`this`; past three arguments the generic arm is a long-form `Call` through the
+outgoing-argument registers). It printed as
+`if (C === __hbc_b_functionPrototypeCall) {fast} generic`, which recompiles to
+something else (~184 functions in the roundtrip `diff:TryGetById(reg)`
+bucket).
+
+**Choice.** A stage-A annotation rung, `fcall-diamond`, owns the diamond; it
+sets `if.keepOnly` to the generic arm and the emitter prints that arm alone,
+with no test. `call-shape` R3b then turns the generic `Reflect.apply(F.call,
+F, [T, a...])` into `F.call(T, a...)`, which hermesc compiles back into the
+same diamond. One owner each: the diamond's proof is `fcall-diamond`'s, the
+call form stays `call-shape`'s.
+
+**Soundness.** The fast arm only runs when `C` is the VM's builtin
+`Function.prototype.call`; then the generic arm's `Call(C, F, [T, a...])` is
+by ES2024 20.2.3.3 exactly `Call(F, T, [a...])` -- the fast arm (a
+non-callable `F` throws a TypeError either way; only the message text can
+differ). When `C` is anything else (a shadowed own `.call`, an overridden
+`Function.prototype.call`) the generic arm ran before and still does. So
+printing only the generic arm is sound once `match` proves, from the
+bytecode and never from the printed tree:
+
+1. the branch is `JmpBuiltinIs[Not]` on builtin `functionPrototypeCall` of the
+   module's own builtin table; fast = the arm taken when the test holds;
+2. both arms are private (one predecessor, not handler entries), exit to one
+   common join `J`, and share the same exception handlers;
+3. symbolically evaluating each arm (unwritten register = its shared entry
+   value; only `LoadConst*`/`Mov` before the call, else refuse) gives a
+   generic callee equal to the tested register's entry value, a generic
+   `this` equal to the fast callee, and equal remaining arguments (a missing
+   `thisArg` = `undefined`);
+4. every register whose final value differs between the arms is dead at
+   `J`, and every register whose pre-call value differs is dead at each
+   handler (`registerLiveAfter`);
+5. the fast block occurs exactly once in the tree, alone (plus jumps) in one
+   arm of this `if`.
+
+The tree keeps both arms (stage A must stay CFG-isomorphic for the driver's
+round-trip), so `keepOnly` is a transparent annotation; `check` re-derives
+1-5 and asserts nothing but the annotation changed.
+
+**Rejected.** A stage-B rewrite of the printed `if (c === __hbc_b_...)` shape:
+it would have to re-prove arm equivalence from printed JS, where the
+register-renamed constant loads and the outgoing-register `Mov`s are already
+gone, and every printer change would move its matcher. Deleting the fast arm
+from the IR outright: the stage-A driver's P1 edge check rejects it.
+
+**Known gaps.** `fcall-diamond` labels: the `break L` inside the hidden fast
+arm still counts as a use, so `label-clean` keeps the wrapper (`L0: { ...;
+break L0; }`, compiles identically). A long-form generic `Call` collapses but
+`expr-rebuild` does not yet sink `C = F.call` past the outgoing `Mov`s, so it
+prints as `Reflect.apply(C, F', [...])`. The `functionPrototypeApply`
+(builtin 55) diamond has a `CallBuiltin` fast arm and is not matched.
+
+**Tests.** `tests/gate/passes/fcall-diamond.test.ts`: fixture
+`170-function-call-diamond` (two-argument, zero-argument, constant-argument,
+five-argument, shadowed `.call`, overridden `Function.prototype.call`) is T2
+PASS on the real VMs at 84/94/96/98/99 and has no shim left at 98/99;
+hand-built arms pin the accepted shapes and the refusals (wrong callee, wrong
+`this`, different argument/constant, arity, unmodelled instruction).

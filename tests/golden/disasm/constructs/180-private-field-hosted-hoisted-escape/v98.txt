@@ -1,0 +1,189 @@
+; hbc2js disassembly of 180-private-field-hosted-hoisted-escape/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=11 strings=22 globalCodeIndex=0
+function #0 "global"  params=1 frame=24 env=0 flags=dbg,overflowed  @0x00000200 size=325
+  0000  CreateFunctionEnvironment r4, 2
+  0003  CreatePrivateName    r3, s19 "#v"
+  0009  StoreToEnvironment   r4, 1, r3
+  000d  CreateBaseClass      r5, r6, r4, 1
+  0013  Mov                  r8, r6
+  0016  LoadConstString      r7, s17 "plus"
+  001a  CreateClosure        r6, r4, f2 "plus"
+  001f  DefineOwnByVal       r8, r6, r7, 0
+  0024  LoadConstString      r7, s12 "has"
+  0028  CreateClosure        r6, r4, f3 "has"
+  002d  DefineOwnByVal       r8, r6, r7, 0
+  0032  CreateClosure        r6, r4, f4 "pick"
+  0037  StoreToEnvironment   r4, 0, r6
+  003b  LoadConstString      r6, s18 "sum"
+  003f  ToPropertyKey        r7, r6
+  0042  CreateClosure        r6, r4, f5 ""
+  0047  DefineOwnByVal       r8, r6, r7, 0
+  004c  LoadConstString      r6, s15 "peek"
+  0050  CreateClosure        r4, r4, f6 "peek"
+  0055  DefineOwnByVal       r5, r4, r6, 0
+  005a  GetByIdShort         r4, r5, #c0, s14 "prototype"
+  005f  NewObjectWithParent  r6, r4
+  0062  PrivateIsIn          r1, r3, r6, r0
+  0067  JmpTrueLong          L2, r1
+  006d  LoadConstUndefined   r1
+  006f  AddOwnPrivateBySym   r6, r1, r3
+  0073  LoadConstUInt8       r0, 3
+  0076  PutOwnPrivateBySym   r6, r0, 1, r3
+  007b  GetByIdShort         r4, r5, #c0, s14 "prototype"
+  0080  NewObjectWithParent  r7, r4
+  0083  PrivateIsIn          r2, r3, r7, r2
+  0088  JmpTrueLong          L1, r2
+  008e  AddOwnPrivateBySym   r7, r1, r3
+  0092  LoadConstUInt8       r0, 4
+  0095  PutOwnPrivateBySym   r7, r0, 1, r3
+  009a  GetGlobalObject      r3
+  009c  TryGetById           r10, r3, #c1, s20 "print"
+  00a2  GetByIdShort         r4, r6, #c2, s17 "plus"
+  00a7  Call2                r9, r4, r6, r7
+  00ac  GetByIdShort         r4, r7, #c2, s17 "plus"
+  00b1  Call2                r8, r4, r7, r6
+  00b6  LoadConstString      r4, s10 "plus:"
+  00ba  Call4                r4, r10, r1, r4, r9, r8
+  00c1  TryGetById           r11, r3, #c1, s20 "print"
+  00c7  GetByIdShort         r4, r6, #c3, s12 "has"
+  00cc  Call2                r14, r4, r6, r7
+  00d1  GetByIdShort         r8, r6, #c3, s12 "has"
+  00d6  NewObject            r4
+  00d8  Call2                r13, r8, r6, r4
+  00dd  GetByIdShort         r4, r6, #c3, s12 "has"
+  00e2  LoadConstNull        r2
+  00e4  Call2                r12, r4, r6, r2
+  00e9  LoadConstString      r15, s6 "has:"
+  00ed  LoadConstUndefined   r16
+  00ef  Call                 r4, r11, 5
+  00f3  TryGetById           r8, r3, #c1, s20 "print"
+  00f9  GetByIdShort         r4, r5, #c4, s15 "peek"
+  00fe  Call2                r5, r4, r5, r6
+  0103  LoadConstString      r4, s8 "peek:"
+  0107  Call3                r4, r8, r1, r4, r5
+  010d  TryGetById           r5, r3, #c1, s20 "print"
+  0113  GetByIdShort         r4, r6, #c5, s18 "sum"
+  0118  NewArray             r3, 2
+  011c  DefineOwnInDenseArray r3, r6, 0
+  0120  DefineOwnInDenseArray r3, r7, 1
+  0124  Call2                r4, r4, r6, r3
+  0129  LoadConstString      r3, s11 "sum:"
+  012d  Call3                r3, r5, r1, r3, r4
+  0133  Ret                  r3
+L1:
+  0135  LoadConstString      r15, s2 "Cannot initialize private field …"
+  0139  CallBuiltin          r3, b44 "throwTypeError", 2
+L2:
+  013d  LoadConstString      r15, s2 "Cannot initialize private field …"
+  0141  CallBuiltin          r3, b44 "throwTypeError", 2
+
+function #1 "Box"  params=2 frame=13 env=0 flags=strict,dbg,overflowed,ctor  @0x00000345 size=49
+  0000  GetNewTarget         r1
+  0002  GetByIdShort         r1, r1, #c0, s14 "prototype"
+  0007  NewObjectWithParent  r1, r1
+  000a  GetParentEnvironment r2, 0
+  000d  LoadFromEnvironment  r3, r2, 1
+  0011  PrivateIsIn          r0, r3, r1, r0
+  0016  JmpTrue              L1, r0
+  0019  LoadParam            r2, 1
+  001c  LoadConstUndefined   r0
+  001e  AddOwnPrivateBySym   r1, r0, r3
+  0022  PutOwnPrivateBySym   r1, r2, 1, r3
+  0027  Ret                  r1
+L1:
+  0029  LoadConstString      r4, s2 "Cannot initialize private field …"
+  002d  CallBuiltin          r1, b44 "throwTypeError", 2
+
+function #2 "plus"  params=2 frame=13 env=0 flags=strict,dbg,overflowed,nc  @0x00000376 size=58
+  0000  CreateFunctionEnvironment r0, 1
+  0003  LoadParam            r1, 1
+  0006  StoreToEnvironment   r0, 0, r1
+  000a  GetParentEnvironment r1, 0
+  000d  LoadFromEnvironment  r2, r1, 1
+  0011  LoadParam            r1, 0
+  0014  GetOwnPrivateBySym   r1, r1, 0, r2
+  0019  NewArrayWithBuffer   r3, 1, 1, lit@0x0000
+  0021  GetByIdShort         r2, r3, #c0, s16 "map"
+  0026  CreateClosure        r0, r0, f7 "get"
+  002b  Call2                r0, r2, r3, r0
+  0030  GetByIndex           r0, r0, 0
+  0034  Add                  r0, r1, r0
+  0038  Ret                  r0
+
+function #3 "has"  params=2 frame=12 env=0 flags=strict,dbg,overflowed,nc  @0x000003b0 size=35
+  0000  CreateFunctionEnvironment r0, 1
+  0003  LoadParam            r1, 1
+  0006  StoreToEnvironment   r0, 0, r1
+  000a  NewArrayWithBuffer   r2, 1, 1, lit@0x0000
+  0012  GetByIdShort         r1, r2, #c0, s21 "some"
+  0017  CreateClosure        r0, r0, f8 "test"
+  001c  Call2                r0, r1, r2, r0
+  0021  Ret                  r0
+
+function #4 "pick"  params=2 frame=2 env=0 flags=strict,dbg,overflowed  @0x000003d3 size=17
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r1, r0, 1
+  0007  LoadParam            r0, 1
+  000a  GetOwnPrivateBySym   r0, r0, 0, r1
+  000f  Ret                  r0
+
+function #5 ""  params=2 frame=15 env=0 flags=strict,dbg,overflowed,nc  @0x000003e4 size=42
+  0000  LoadParam            r4, 1
+  0003  GetByIdShort         r3, r4, #c0, s16 "map"
+  0008  GetParentEnvironment r2, 0
+  000b  LoadFromEnvironment  r2, r2, 0
+  000f  Call2                r4, r3, r4, r2
+  0014  GetByIdShort         r3, r4, #c1, s13 "reduce"
+  0019  LoadConstZero        r0
+  001b  LoadConstUndefined   r1
+  001d  CreateClosure        r2, r1, f9 ""
+  0022  Call3                r2, r3, r4, r2, r0
+  0028  Ret                  r2
+
+function #6 "peek"  params=2 frame=12 env=0 flags=strict,dbg,overflowed,nc  @0x0000040e size=39
+  0000  CreateFunctionEnvironment r0, 1
+  0003  LoadParam            r1, 1
+  0006  StoreToEnvironment   r0, 0, r1
+  000a  NewArrayWithBuffer   r2, 1, 1, lit@0x0000
+  0012  GetByIdShort         r1, r2, #c0, s16 "map"
+  0017  CreateClosure        r0, r0, f10 "inner"
+  001c  Call2                r0, r1, r2, r0
+  0021  GetByIndex           r0, r0, 0
+  0025  Ret                  r0
+
+function #7 "get"  params=1 frame=2 env=0 flags=strict,dbg,overflowed  @0x00000435 size=21
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r1, r0, 0
+  0007  GetParentEnvironment r0, 1
+  000a  LoadFromEnvironment  r0, r0, 1
+  000e  GetOwnPrivateBySym   r0, r1, 0, r0
+  0013  Ret                  r0
+
+function #8 "test"  params=1 frame=3 env=0 flags=strict,dbg,overflowed  @0x0000044a size=31
+  0000  GetParentEnvironment r1, 0
+  0003  LoadFromEnvironment  r2, r1, 0
+  0007  LoadConstNull        r0
+  0009  JStrictEqual         L1, r2, r0
+  000d  GetParentEnvironment r1, 1
+  0010  LoadFromEnvironment  r1, r1, 1
+  0014  PrivateIsIn          r0, r1, r2, r0
+  0019  Ret                  r0
+L1:
+  001b  LoadConstFalse       r0
+  001d  Ret                  r0
+
+function #9 ""  params=3 frame=2 env=0 flags=strict,dbg,overflowed  @0x00000469 size=12
+  0000  LoadParam            r1, 2
+  0003  LoadParam            r0, 1
+  0006  Add                  r0, r0, r1
+  000a  Ret                  r0
+
+function #10 "inner"  params=1 frame=3 env=0 flags=strict,dbg,overflowed  @0x00000475 size=28
+  0000  GetParentEnvironment r1, 0
+  0003  LoadFromEnvironment  r2, r1, 0
+  0007  GetParentEnvironment r1, 1
+  000a  LoadFromEnvironment  r1, r1, 1
+  000e  GetOwnPrivateBySym   r1, r2, 0, r1
+  0013  LoadConstUInt8       r0, 2
+  0016  Mul                  r0, r1, r0
+  001a  Ret                  r0

@@ -91,9 +91,9 @@ export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: Pass
   const expectedArgCount = found.replacement.args.length;
 
   // Item 2: the rewritten node's argument count equals the source array's
-  // length (R3a/R3b/R3c only — R3d has no array literal to compare against,
+  // length (R3a/R3b/R3c/R3e only — R3d has no array literal to compare against,
   // per §4's own note that `.apply`'s `arr` "may be any expression").
-  if (found.rule === "R3a" || found.rule === "R3b" || found.rule === "R3c") {
+  if (found.rule === "R3a" || found.rule === "R3b" || found.rule === "R3c" || found.rule === "R3e" || found.rule === "R3f") {
     const target = found.target as Expr & { readonly k: "call" };
     const arrIndex = found.rule === "R3c" ? 1 : 2;
     const arr = target.args[arrIndex];
@@ -120,6 +120,16 @@ export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: Pass
     const beforeReads = effectSequence([{ k: "expr", expr: found.target }]).filter((e) => e.k === "member-read").length;
     const afterReads = effectSequence([{ k: "expr", expr: found.replacement }]).filter((e) => e.k === "member-read").length;
     if (afterReads < 1 || afterReads > beforeReads) return { ok: false, reason: "R3b's member read of O.P was not preserved" };
+  }
+
+  // R3f: the callee is exactly `(0, F)` with `F` the source's own callee
+  // node, so `this` stays undefined and `F` stays the first effect.
+  if (found.rule === "R3f" && found.replacement.k === "call") {
+    const c = found.replacement.callee;
+    const F = (found.target as Expr & { readonly k: "call" }).args[0];
+    if (c.k !== "seq" || c.exprs.length !== 2 || c.exprs[0]!.k !== "lit" || c.exprs[0]!.text !== "0" || c.exprs[1] !== F) {
+      return { ok: false, reason: "R3f's callee is not `(0, F)` over the source callee" };
+    }
   }
 
   // Deliberately no `expressionOnlyCheck`-style "no `rN` read before its own

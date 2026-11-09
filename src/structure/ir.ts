@@ -30,14 +30,18 @@ export type Stmt =
    */
   | { readonly k: "loop"; readonly label: LabelId; readonly body: Stmt; readonly form?: LoopForm; readonly hideLabel?: boolean }
   /**
-   * Two-way branch on the terminator of `cfgBlock`. `elseIf`
+   * Two-way branch on the terminator of `cfgBlock`. `keepOnly` (set only by
+   * `fcall-diamond`, docs/specs/passes/04-call-shape.md section 8) is a
+   * transparent annotation: the tree keeps both arms (so it stays
+   * CFG-isomorphic) but the emitter prints only the named arm, without the
+   * test — the other arm was proven to do the same thing. `elseIf`
    * (docs/specs/passes/09-if-chain.md §3/§5, set by src/passes/if-chain C3)
    * marks an `else` arm that is a chain link — `[if]` or `[block bX, if bX]`
    * — so the printer may render `else if` once stage B has folded the
    * condition-computing block into the condition. Transparent to verify.ts,
    * exactly like `form` and `hideLabel`; nothing sets it under `--passes=none`.
    */
-  | { readonly k: "if"; readonly cfgBlock: BlockId; readonly then: Stmt; readonly else: Stmt; readonly elseIf?: boolean }
+  | { readonly k: "if"; readonly cfgBlock: BlockId; readonly then: Stmt; readonly else: Stmt; readonly elseIf?: boolean; readonly keepOnly?: "then" | "else" }
   | { readonly k: "break"; readonly label: LabelId }
   | { readonly k: "continue"; readonly label: LabelId }
   | { readonly k: "return"; readonly cfgBlock: BlockId }

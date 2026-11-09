@@ -1,0 +1,64 @@
+; hbc2js disassembly of 201-private-brand-in-primitive/v99.hbc
+; version=99 layout=E opcodeTable=hbc99-mar2026 functions=3 strings=11 globalCodeIndex=0
+function #0 "global"  params=1 frame=19 env=0 flags=exc,dbg,overflowed  @0x00000158 size=145
+  .try T1..T2 -> L1 ; handler 0
+  0000  CreateFunctionEnvironment r1, 1
+  0003  LoadConstUndefined   r4
+  0005  LoadConstUndefined   r0
+  0007  CreatePrivateName    r2, s6 "#x"
+  000d  StoreToEnvironment   r1, 0, r2
+  0011  CreateBaseClass      r6, r2, r1, 1
+  0017  LoadConstString      r2, s8 "has"
+  001b  CreateClosure        r1, r1, f2 "has"
+  0020  DefineOwnByVal       r6, r1, r2, 0
+  0025  GetGlobalObject      r1
+  0027  TryGetById           r7, r1, #c0, s9 "print"
+  002d  GetByIdShort         r3, r6, #c1, s8 "has"
+  0032  LoadConstUndefined   r11
+  0034  Construct            r2, r6, 1
+  0038  Call2                r5, r3, r6, r2
+  003d  GetByIdShort         r3, r6, #c1, s8 "has"
+  0042  NewObject            r2
+  0044  Call2                r3, r3, r6, r2
+  0049  LoadConstString      r2, s3 "object:"
+  004d  Call4                r0, r7, r4, r2, r5, r3
+T1:
+  0054  TryGetById           r5, r1, #c0, s9 "print"
+  005a  GetByIdShort         r3, r6, #c1, s8 "has"
+  005f  LoadConstUInt8       r2, 3
+  0062  Call2                r3, r3, r6, r2
+  0067  LoadConstString      r2, s5 "primitive:"
+  006b  Call3                r0, r5, r4, r2, r3
+  0071  Jmp                  L2
+T2:
+L1:
+  0073  Catch                r2
+  0075  TryGetById           r3, r1, #c0, s9 "print"
+  007b  TryGetById           r1, r1, #c2, s7 "TypeError"
+  0081  InstanceOf           r2, r2, r1
+  0085  LoadConstString      r1, s4 "primitive threw:"
+  0089  Call3                r0, r3, r4, r1, r2
+L2:
+  008f  Ret                  r0
+
+function #1 "Box"  params=1 frame=13 env=0 flags=strict,dbg,overflowed,ctor  @0x000001e9 size=42
+  0000  GetNewTarget         r2
+  0002  GetByIdShort         r2, r2, #c0, s10 "prototype"
+  0007  NewObjectWithParent  r2, r2
+  000a  GetParentEnvironment r3, 0
+  000d  LoadFromEnvironment  r3, r3, 0
+  0011  PrivateIsIn          r1, r3, r2, r0
+  0016  JmpTrue              L1, r1
+  0019  LoadConstUInt8       r0, 1
+  001c  AddOwnPrivateBySym   r2, r0, r3
+  0020  Ret                  r2
+L1:
+  0022  LoadConstString      r4, s1 "Cannot initialize private field …"
+  0026  CallBuiltin          r2, b44 "throwTypeError", 2
+
+function #2 "has"  params=2 frame=3 env=0 flags=strict,dbg,overflowed,nc  @0x00000213 size=17
+  0000  GetParentEnvironment r1, 0
+  0003  LoadFromEnvironment  r2, r1, 0
+  0007  LoadParam            r1, 1
+  000a  PrivateIsIn          r0, r2, r1, r0
+  000f  Ret                  r0

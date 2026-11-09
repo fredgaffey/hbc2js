@@ -1043,7 +1043,17 @@ pauses below `MIN_FREE_GB` (default 8). Results go to `$OUT.log`
 (`RESULT {file, ok, modules, modMiss, functions, fnMiss}`); files that got
 no paths are listed in `$OUT.failed.txt` for hard-linking in pathless.
 The 71,222-file db-v3 is 36,274 jobs. Linux (needs `flock`). Tests:
-`tests/gate/deps/rebuild-paths-plan.test.ts`.
+`tests/gate/deps/rebuild-paths-plan.test.ts`, `rebuild-paths-slots.test.ts`.
+
+Slots: when slots equal the xargs parallelism a job can find every slot
+momentarily locked. A job therefore waits (sweeps all slots, sleeps
+`SLOT_POLL`=1 s, repeats) up to `SLOT_TIMEOUT` (default 7200 s) rather than
+skipping; the first full rebuild skipped ~13,027 of 71,222 files by giving up
+at once (8,049 `NOSLOT` lines). On timeout it logs `NOSLOT ... retried on
+re-run`; nothing is written to OUT, so a re-run's `--plan` retries those
+files (they are also in `$OUT.failed.txt`). `TOOL=` overrides the transplant
+script (the test uses a stub). Needs Linux `flock`; the slot tests skip
+where it is missing.
 
 Temp dirs: each job's Metro/hermesc scratch lives in one `sigpaths-<pid>-*`
 dir under `os.tmpdir()`, owned by `withWorkDir` / `runBundleJob`
