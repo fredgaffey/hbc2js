@@ -7,8 +7,8 @@ import type { CheckResult, PassContext } from "../types.ts";
 import { findSite } from "./match.ts";
 import { inlineAt } from "./rewrite.ts";
 
-export function check(before: readonly Stmt[], after: readonly Stmt[], _ctx: PassContext): CheckResult {
-  const site = findSite(before);
+export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: PassContext): CheckResult {
+  const site = findSite(before, ctx.cfg);
   if (site === null) return { ok: false, reason: "closure-inline has no site to re-derive" };
   if (JSON.stringify(inlineAt(before, site)) !== JSON.stringify(after)) return { ok: false, reason: "closure-inline's result is not exactly the declared move" };
   if (!parses(after)) return { ok: false, reason: "closure-inline result does not parse" };

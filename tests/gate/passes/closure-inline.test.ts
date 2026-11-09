@@ -15,6 +15,7 @@ import { requireOracles } from "../../support/tiers.ts";
 import { decompile } from "../../../src/decompile.ts";
 import type { Expr, Stmt } from "../../../src/emit/ast.ts";
 import { id, lit } from "../../../src/emit/ast.ts";
+import { printProgram } from "../../../src/emit/print.ts";
 import { classify } from "../../../src/passes/closure-inline/match.ts";
 import { parseHbc } from "../../../src/parse/module.ts";
 import { decodeFunction } from "../../../src/disasm/decode.ts";
@@ -118,4 +119,16 @@ test("closure-inline: refusals -- two reads, a loop, a declaration store, a shad
 
 test("closure-inline: an existing fixture file exists for every version", () => {
   for (const v of VERSIONS) assert.ok(existsSync(join(DIR, `v${v}.hbc`)));
+});
+
+// Review passes-roundtrip-closure-temp: `.obf` fixtures 02/03/04 went DIVERGENT
+// at v98/v99 -- a once-called `_fn3(a, b)` became a function expression in
+// callee position, printed as `function _fn3(...) {...}(a, b);`, which parses
+// as a DECLARATION plus a parenthesised expression: the call never ran.
+test("printer: a statement led by a function expression is parenthesised (the call still runs)", () => {
+  const callee: Expr = { k: "func", name: "_fn3", params: [], body: [{ k: "expr", expr: { k: "assign", target: { k: "member", obj: id("globalThis"), prop: lit("hit"), computed: false }, value: lit("1") } } as Stmt] };
+  const text = printProgram([exprStmt({ k: "call", callee, args: [] })]);
+  const g: { hit?: number } = {};
+  new Function("globalThis", text)(g);
+  assert.equal(g.hit, 1, text);
 });

@@ -8,6 +8,8 @@
 import { identUsesMany, stmtLists, walk } from "../ast.ts";
 import type { Stmt } from "../ast.ts";
 import type { Match, PassContext } from "../types.ts";
+import type { FunctionCfg } from "../../cfg/types.ts";
+import { closureFunctionId } from "../../emit/lower.ts";
 
 export interface ClosureInlineSite {
   /** Accepted declaration names, in body order. */
@@ -98,8 +100,42 @@ function mentioned(f: Func): Set<string> {
   return out;
 }
 
-/** Per top-level declaration: `ok` or the refusal reason. */
-export function analyze(body: readonly Stmt[]): Map<string, string> {
+/** Opcodes Hermes emits ahead of a function's first user statement: the
+ *  environment, parameters, constants, and every function DECLARATION's
+ *  closure (declarations are created at entry). */
+const PROLOGUE = /^(?:Create\w*Environment|GetParentEnvironment|LoadParam\w*|LoadConst\w*|Mov\w*|GetGlobalObject|DeclareGlobalVar|Create\w*Closure\w*|StoreN?P?ToEnvironment\w*|LoadThisNS|CoerceThisNS|GetNewTarget|ProfilePoint|AsyncBreakCheck)$/;
+
+/** Source function indices whose closure the bytecode creates BEFORE the
+ *  first non-prologue instruction: a source declaration (or an expression
+ *  in the opening statement, where a move changes no order). The closure is
+ *  already created at entry in the original, so hoisting is the faithful
+ *  form. Unknown (no cfg): every closure counts as entry-created. */
+export function entryCreated(cfg: FunctionCfg | undefined): Set<number> | null {
+  if (cfg === undefined) return null;
+  const insns = cfg.blocks.flatMap((b) => b.instructions).sort((a, b) => a.offset - b.offset);
+  const out = new Set<number>();
+  for (const insn of insns) {
+    if (!PROLOGUE.test(insn.name)) break;
+    const child = closureFunctionId(insn);
+    if (child !== undefined) out.add(child);
+  }
+  return out;
+}
+
+const FN_COMMENT = /^fn#(\d+)\b/;
+/** The bytecode function index from the emitter's `// fn#N "name"` line. */
+function fnIndexOf(f: Func): number | null {
+  for (const s of f.body) {
+    if (s.k !== "comment") continue;
+    const m = FN_COMMENT.exec(s.text);
+    if (m !== null) return Number(m[1]);
+  }
+  return null;
+}
+
+/** Per top-level declaration: `ok` or the refusal reason. `entry` null =
+ *  no bytecode evidence (hand-built tests): the prologue rule is skipped. */
+export function analyze(body: readonly Stmt[], entry: Set<number> | null = null): Map<string, string> {
   const funcs = body.filter((s): s is Func => s.k === "func");
   const verdicts = new Map<string, string>();
   if (funcs.length === 0) return verdicts;
@@ -124,6 +160,7 @@ export function analyze(body: readonly Stmt[]): Map<string, string> {
     else if (inLoop.get(n)!.reads > 0) reason = "in-loop";
     else if (stores.has(n)) reason = "declaration-store";
     else if (helpers.has(n)) reason = "helper-arg";
+    else if (entry !== null && (fnIndexOf(f) === null || entry.has(fnIndexOf(f)!))) reason = "entry-created";
     else for (const m of mine) if (shadow.has(m)) { reason = "shadowed"; break; }
     verdicts.set(n, reason);
   }
@@ -140,14 +177,14 @@ export function classify(body: readonly Stmt[], index: number): { readonly ok: t
   return r === "ok" ? { ok: true } : { ok: false, reason: r };
 }
 
-export function findSite(body: readonly Stmt[]): ClosureInlineSite | null {
-  const names = [...analyze(body)].filter(([, r]) => r === "ok").map(([n]) => n);
+export function findSite(body: readonly Stmt[], cfg?: FunctionCfg): ClosureInlineSite | null {
+  const names = [...analyze(body, cfg === undefined ? null : entryCreated(cfg))].filter(([, r]) => r === "ok").map(([n]) => n);
   return names.length === 0 ? null : { names };
 }
 
 export function match(list: readonly Stmt[], ctx: PassContext): Match<readonly Stmt[], ClosureInlineSite> | null {
   if (list !== ctx.fnBody) return null;
-  const site = findSite(list);
+  const site = findSite(list, ctx.cfg);
   if (site === null) return null;
   return { root: list, nodes: [list], data: site, at: { functionIndex: ctx.functionIndex, offset: 0 } };
 }

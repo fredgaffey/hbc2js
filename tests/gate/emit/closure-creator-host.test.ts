@@ -103,6 +103,8 @@ for (const version of VERSIONS) {
       assert.ok(line !== undefined, `v${version}: no line matching ${re}`);
       return line.length - line.trimStart().length;
     };
-    assert.equal(indent(/^\s+function _fn[1-9]\d*\(/), indent(/^\s+function left\(/), `v${version}: the shared callback must stay beside left/right:\n${code}`);
+    // `left`/`right` may be function expressions in makeTwo's returned array
+    // (closure-inline, spec 32): compare with makeTwo's own env-slot line.
+    assert.equal(indent(/^\s+function _fn[1-9]\d*\(/), /^\s+function left\(/.test(code) ? indent(/^\s+function left\(/) : indent(/^\s+let _e\d+_\d+;/), `v${version}: the shared callback must stay beside left/right:\n${code}`);
   });
 }
