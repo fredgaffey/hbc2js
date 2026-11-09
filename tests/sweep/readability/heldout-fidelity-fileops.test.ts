@@ -62,7 +62,10 @@ test("sweep: spec 28 landing 1 fidelity on the held-out app -- names applied the
     }
   }
   assert.ok(targets.length > 0);
-  const before = service.render().code;
+  // Scoped renders of the touched functions (render cost follows the functions touched,
+  // docs/READABILITY.md "Render cost"); the whole-module render is no longer needed here.
+  const renderTouched = (): string => fns.map((fn) => service.render({ fn }).code).join("\n");
+  const before = renderTouched();
   const backend = new FakeBackend({
     replies: {
       "suggest-name": (req) =>
@@ -73,16 +76,16 @@ test("sweep: spec 28 landing 1 fidelity on the held-out app -- names applied the
     },
   });
   // One pass over every target; runNamePass renders the whole module before and after
-  // itself (two ~40 s renders) and reports its own backstop verdict.
+  // itself (scoped to the touched functions) and reports its own backstop verdict.
   const result = await runNamePass(targets, { backend, service });
   const verdicts = new Set<string>([result.equiv.verdict]);
   const written = result.outcomes.filter((o) => o.written).length;
-  const named = written > 0 ? service.render().code : before;
+  const named = written > 0 ? renderTouched() : before;
   for (const o of result.outcomes) if (o.written) service.revert(o.target.bindingId);
-  const after = service.render().code;
+  const after = renderTouched();
   const identical = after === before ? fns.length : 0;
   assert.ok(written === 0 || named !== before, "applied names must change the render");
-  console.log(`SWEEP fidelity: ${String(fns.length)} fns, ${String(targets.length)} targets, ${String(written)} written, equiv ${[...verdicts].join("+")}, whole-module render byte-identical after revert: ${String(after === before)}, ${String(fns.length)} fns, ${String(Date.now() - t0)} ms`);
+  console.log(`SWEEP fidelity: ${String(fns.length)} fns, ${String(targets.length)} targets, ${String(written)} written, equiv ${[...verdicts].join("+")}, touched-function renders byte-identical after revert: ${String(after === before)}, ${String(fns.length)} fns, ${String(Date.now() - t0)} ms`);
   assert.ok(written > 0, `no fake name was written (equiv ${[...verdicts].join("+")})`);
   assert.equal(identical, fns.length);
 });

@@ -101,8 +101,9 @@ export function applyReplacement(s: Stmt, target: Expr, replacement: Expr): Stmt
 }
 
 export function rewrite(m: CallShapeMatch): readonly Stmt[] {
-  const { stmtIndex, target, replacement } = m.data;
+  const { stmtIndex, target, replacement, splice } = m.data;
   const list = m.root;
+  if (splice !== undefined) return [...list.slice(0, splice.from), ...splice.stmts, ...list.slice(splice.to + 1)];
   const newStmt = applyReplacement(list[stmtIndex]!, target, replacement);
   return [...list.slice(0, stmtIndex), newStmt, ...list.slice(stmtIndex + 1)];
 }

@@ -1,0 +1,7 @@
+true|t|n|[object Object]
+true|t|n|[object Object]
+true|1|4| true|2|3|
+true|1|7| true|2|[object Object]|
+2 2
+read obj.m,read d.get,call obj,read obj.m,call obj,read obj.m,call obj,read obj.m,call obj,read obj.m,call obj,read obj.m,call obj
+1 2 true a,b,default

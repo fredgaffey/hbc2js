@@ -417,3 +417,56 @@ test("order independence: a template literal's concat site is not a call-shape s
   assert.equal(v.ok, false);
   assert.equal(match(body, ctxFor(body)), null);
 });
+
+// ---------------------------------------------------------------------------
+// R3e (spec 04 section 9, review "passes-roundtrip-call3"): `F = R.P; <args
+// with control flow>; Reflect.apply(F, R, [A...])` -> `R.P((<args>, A1), ...)`.
+// ---------------------------------------------------------------------------
+
+/** `L0: { r4 = a1; r3 = r4.m; r0 = 2; if (!a2) break L0; <mid>; r0 = 1; break L0; } r1 = Reflect.apply(r3, r4, [r0]); return r1;` */
+function r3eList(mid: readonly Stmt[] = [], tail: readonly Stmt[] = [{ k: "return", arg: id("r1") }]): Stmt[] {
+  const label: Stmt = {
+    k: "labeled",
+    label: "L0",
+    body: [
+      exprStmt(assignExpr(id("r4"), id("a1"))),
+      exprStmt(assignExpr(id("r3"), member(id("r4"), "m"))),
+      exprStmt(assignExpr(id("r0"), lit("2"))),
+      { k: "if", test: { k: "unary", op: "!", arg: id("a2") }, then: [{ k: "break", label: "L0" }], else: [] },
+      ...mid,
+      exprStmt(assignExpr(id("r0"), lit("1"))),
+      { k: "break", label: "L0" },
+    ],
+  };
+  return [label, exprStmt(assignExpr(id("r1"), reflectApply(id("r3"), id("r4"), [id("r0")]))), ...tail];
+}
+
+test("call-shape R3e: a method read before a conditional argument folds into one member call, the arguments' effects kept in order", () => {
+  const list = r3eList();
+  const m = match(list, ctxFor(list));
+  assert.ok(m !== null && m.data.rule === "R3e");
+  const after = rewrite(m);
+  assert.equal(after.length, 3);
+  assert.equal(JSON.stringify(after[0]), JSON.stringify(exprStmt(assignExpr(id("r4"), id("a1")))));
+  const seq: Expr = { k: "seq", exprs: [assignExpr(id("r0"), lit("2")), { k: "logical", op: "&&", left: id("a2"), right: assignExpr(id("r0"), lit("1")) }, id("r0")] };
+  assert.equal(JSON.stringify(after[1]), JSON.stringify(exprStmt(assignExpr(id("r1"), call(member(id("r4"), "m"), [seq])))));
+  assert.deepEqual(check(list, after, ctxFor(list)), { ok: true });
+});
+
+test("call-shape R3e: a write to the receiver between the read and the call refuses (the call's this would change)", () => {
+  const list = r3eList([exprStmt(assignExpr(id("r4"), id("a3")))]);
+  assert.equal(match(list, ctxFor(list)), null);
+});
+
+test("call-shape R3e: a callee register still read after the call refuses (the read is removed by the fold)", () => {
+  const list = r3eList([], [{ k: "return", arg: id("r3") }]);
+  assert.equal(match(list, ctxFor(list)), null);
+});
+
+test("call-shape R3e: check rejects an after that is not the recomputed splice", () => {
+  const list = r3eList();
+  const m = match(list, ctxFor(list))!;
+  const after = rewrite(m);
+  const forged = [after[0]!, exprStmt(assignExpr(id("r1"), call(member(id("r4"), "m"), [id("r0")]))), after[2]!];
+  assert.equal(check(list, forged, ctxFor(list)).ok, false);
+});
