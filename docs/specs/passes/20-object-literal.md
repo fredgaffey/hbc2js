@@ -371,8 +371,11 @@ fold inside `src/emit` and, with passes off, change output nobody asked to
 change.
 
 **Measured** (fixture `260-literal-slot-fill-in-sequence`): both functions
-round-trip IDENTICAL at v98/v99. Bundle numbers: see the
-passes-roundtrip-objlit2 report in docs/e2e (react-navigation passes-on).
+round-trip IDENTICAL at v98/v99. React-navigation v98 passes-on, strong
+normalisation: 7695 -> 8177 IDENTICAL of 14437 (53.30% -> 56.64%), no
+function lost IDENTICAL; `diff:NewObjectWithBuffer/CreateClosure` 312 -> 7,
+`diff:PutOwnBySlotIdx/PutByIdLoose` 172 -> 2 (`.../PutByIdStrict` 257 -> 248
+is a different shape, untouched).
 
 **Found on the way, not fixed here.** `object-literal`'s `PutById` fold is
 unsound against an inherited setter installed *before* the object existed —
