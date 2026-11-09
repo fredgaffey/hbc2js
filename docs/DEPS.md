@@ -2684,7 +2684,6 @@ honest numbers. The stopping-reason table above was measured at main
 87ec7b8, before the path-recall and hash-index merges. Test:
 `tests/gate/deps/corpus-recall-bar.test.ts`.
 
-<<<<<<< HEAD
 ### Rainbow and metamask on the full path-bearing DB (corpus-precision-rainbow-mm, 2026-11-09)
 
 Measured offline on deb (`deps-rm/run.sh`, `meas2.mjs`: `scoreAgainstTruth`, no truth overlay), each DB a symlink farm with its own hash/string-set indexes (`build-candidate-hash-index.mjs --hbc 96,98`): `db-v3-clean`, and "full v4" = every `db-v3-clean` file replaced by its `db-v4-paths` rebuild where one exists (55,046 of 71,222 files).
@@ -2836,7 +2835,7 @@ Still open: rainbow's `react-query` (no `@tanstack` string) and rainbow's
 `whatwg-url`, where some guard holds (not traced). Metamask v3's `react-query`
 also stays an FP, also not traced.
 Test: `tests/gate/deps/corpus-fork-relabel.test.ts`.
-=======
+
 **Retry of the failed jobs** (deps-population-widen-3, 2026-11-09). The
 1,445 failed jobs were re-run on deb with main's builder fixes
 (`src/deps/builder-support.ts`: Node built-in shims, peer installs,
@@ -2894,4 +2893,3 @@ unchanged and it still loses no TP. This mixes in no truth overlay
 Reproduce (deb, `~/_hbc2js/pop2/`): jobs-retry.tsv = jobs-all.tsv minus the
 `ok` results of the first run; `drive.sh` (stops below 15 GB) via `xargs -P6`;
 `subtract.sh`, `after3.sh` (merge, index, `measure.sh <tag> <dir>`).
->>>>>>> origin/deps-population-widen-3
