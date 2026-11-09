@@ -34,7 +34,7 @@ export interface PackageScore {
    *  `embedded` (the hits are a subset of another confirmed, path-bearing
    *  package's own files), `twin` (the same hits as another confirmed
    *  package, which was kept). `by` names the other package. */
-  readonly demotion?: { readonly rule: "few-distinct" | "container" | "scattered" | "embedded" | "twin" | "bundled-dist"; readonly by?: string };
+  readonly demotion?: { readonly rule: "few-distinct" | "container" | "scattered" | "embedded" | "twin" | "inlined" | "bundled-dist"; readonly by?: string };
   /** Set when corpus-path-recall's module-graph rule (`promoteViaDependency`,
    *  docs/PACKAGE-SIGNATURES.md §7 "Recovery through the module graph")
    *  raised a path-bearing package to "high": an app module shaped like one
@@ -552,7 +552,8 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
   }
   const twins = high();
   const dependedOn = new Set<string>();
-  for (const s of twins) for (const d of s.entry.file.subtractedDependencies ?? []) dependedOn.add(d.slice(0, d.lastIndexOf("@") > 0 ? d.lastIndexOf("@") : d.length));
+  const depName = (d: string): string => d.slice(0, d.lastIndexOf("@") > 0 ? d.lastIndexOf("@") : d.length);
+  for (const s of twins) for (const d of s.entry.file.subtractedDependencies ?? []) dependedOn.add(depName(d));
   const pathBearing = (s: ScoredEntry): boolean => (s.entry.file.modulePaths ?? 0) >= 1;
   const rank = (s: ScoredEntry): readonly number[] => [pathBearing(s) ? 1 : 0, dependedOn.has(s.score.package) ? 1 : 0, s.hitKeys.size];
   const better = (a: ScoredEntry, b: ScoredEntry): boolean => {
@@ -578,6 +579,71 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
         demote(s, "twin", q.score.package);
         break;
       }
+    }
+  }
+  // inlined (corpus-mm-precision-inlined): a declared dependency P of a
+  // path-bearing package Q whose hits all sit in target modules holding one
+  // of Q's own files, next to Q code P's signature does not hold. One target
+  // module is one source file, so it is Q's file and P is inlined in it (a
+  // dist build), not installed: installed, P has modules of its own.
+  const inlinedHosts = high().filter((q) => pathBearing(q) && (q.entry.file.subtractedDependencies ?? []).length > 0);
+  if (inlinedHosts.length > 0) {
+    const ownKeysByModule = new Map<ScoredEntry, Map<number, Set<string>[]>>(); // target module -> per own file, Q's hit keys in it
+    for (const q of inlinedHosts) {
+      const f = q.entry.file;
+      const own = new Set(f.modules.filter((m) => typeof m.path === "string" && isOwnModulePath(f.package, m.path)).map((m) => m.localModuleId));
+      const perFile = new Map<number, Set<string>>();
+      for (const fn of f.functions) {
+        const k = schemeKey(f, fn.exactHash);
+        if (fn.moduleId === undefined || !own.has(fn.moduleId) || !q.hitKeys.has(k)) continue;
+        let set = perFile.get(fn.moduleId);
+        if (set === undefined) perFile.set(fn.moduleId, (set = new Set()));
+        set.add(k);
+      }
+      const byModule = new Map<number, Set<string>[]>();
+      for (const keys of perFile.values()) {
+        const inM = new Map<number, Set<string>>();
+        for (const k of keys) {
+          for (const i of occurrences.get(k) ?? []) {
+            const m = moduleOf.get(i);
+            if (m === undefined) continue;
+            let set = inM.get(m);
+            if (set === undefined) inM.set(m, (set = new Set()));
+            set.add(k);
+          }
+        }
+        for (const [m, set] of inM) {
+          const list = byModule.get(m);
+          if (list === undefined) byModule.set(m, [set]);
+          else list.push(set);
+        }
+      }
+      ownKeysByModule.set(q, byModule);
+    }
+    for (const s of high()) {
+      const hosts = inlinedHosts.filter((q) => q.score.package !== s.score.package && q.score.tier === "high" && (q.entry.file.subtractedDependencies ?? []).some((d) => depName(d) === s.score.package));
+      if (hosts.length === 0) continue;
+      const sigKeys = new Set(s.entry.file.functions.map((fn) => schemeKey(s.entry.file, fn.exactHash)));
+      let all = 0;
+      let inside = 0;
+      let by: string | undefined;
+      for (const k of s.hitKeys) {
+        for (const i of occurrences.get(k) ?? []) {
+          all++;
+          const m = moduleOf.get(i);
+          if (m === undefined) continue;
+          const q = hosts.find((h) => (ownKeysByModule.get(h)!.get(m) ?? []).some((set) => {
+            let foreign = 0;
+            for (const x of set) if (!sigKeys.has(x)) foreign++;
+            return foreign >= MIN_DISTINCT_EVIDENCE_HASHES;
+          }));
+          if (q !== undefined) {
+            inside++;
+            by ??= q.score.package;
+          }
+        }
+      }
+      if (all > 0 && by !== undefined && inside >= EXPLAINED_EVIDENCE_SHARE * all) demote(s, "inlined", by);
     }
   }
   // bundled-dist (corpus-precision-bundled-dist): last, so it changes no
