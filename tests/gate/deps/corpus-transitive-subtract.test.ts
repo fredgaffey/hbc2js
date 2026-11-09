@@ -51,6 +51,7 @@ function signature(hermesc: string, pkg: string, bodies: readonly string[], clos
 }
 
 const APP = `var c = 1; for (var w = 0; w < 19; w++) { c = (c * 31 + w) % 1000003; } module.exports = function appOnly(v) { return c ^ v; };`;
+const APP2 = `module.exports = function appTwo(v) { var s = 0; for (var i = 0; i < v; i++) s += i * 7; return s; };`;
 const OWN = file(helpers("sp", 12, 71)); // the shim package's own index.js
 const MID = file(helpers("cb", 20, 2001)); // call-bind's own code
 const LEAF = file(helpers("fb", 20, 5001)); // function-bind's own code
@@ -67,7 +68,10 @@ const scoreOf = (r: ReturnType<typeof matchInventory>, p: string) => r.packages.
 test("deps-transitive-subtract: a package whose hits are all its dependency closure's code is not confirmed", (t) => {
   const h = requireHermesc(t, 96);
   if (h === null) return;
-  const target = buildInventory(compile(h.path, bundle([APP, MID, LEAF]))).inventory;
+  // (Two app modules: a target with the signature's module count would
+  // share its bundle-global function, which the scaffold baseline removes
+  // from real signatures.)
+  const target = buildInventory(compile(h.path, bundle([APP, APP2, MID, LEAF]))).inventory;
   const r = matchInventory(target, sigs(h.path, ["call-bind", "function-bind"]));
   assert.notEqual(scoreOf(r, "shim-p")?.tier, "high", JSON.stringify(scoreOf(r, "shim-p")));
   assert.equal(scoreOf(r, "call-bind")?.tier, "high", JSON.stringify(scoreOf(r, "call-bind")));

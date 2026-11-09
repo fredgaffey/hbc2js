@@ -948,13 +948,23 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
     const functions = new Set<number>();
     const holders = closureHolders(file);
     if ((attributed.size > 0 || holders.length > 0) && !file.toolchainBaseline) {
+      // All or nothing: the closure's code is set aside only when NO hit is
+      // left outside it. A true package whose own code is a few functions
+      // (define-properties, typed-array-buffer) otherwise sank below its
+      // tier on the subtraction alone.
+      const inClosure: number[] = [];
+      let ownHit = false;
       for (const fn of file.functions) {
         if (foreign.functions.has(fn.index)) continue;
         const key = schemeKey(file, fn.exactHash);
         const a = attributed.get(key);
         if (a !== undefined && !a.has(file.package)) functions.add(fn.index);
-        else if (holders.some((h) => h.has(key))) functions.add(fn.index);
+        else if (holders.length > 0 && targetExact.has(key) && fn.instrCount >= minInstr) {
+          if (holders.some((h) => h.has(key))) inClosure.push(fn.index);
+          else ownHit = true;
+        }
       }
+      if (!ownHit) for (const i of inClosure) functions.add(i);
     }
     const factories = new Set<number>();
     if (functions.size > 0) for (const m of file.modules) if (functions.has(m.factoryFunctionIndex)) factories.add(m.factoryFunctionIndex);
