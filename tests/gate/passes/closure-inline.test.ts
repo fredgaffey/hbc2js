@@ -16,7 +16,8 @@ import { decompile } from "../../../src/decompile.ts";
 import type { Expr, Stmt } from "../../../src/emit/ast.ts";
 import { id, lit } from "../../../src/emit/ast.ts";
 import { printProgram } from "../../../src/emit/print.ts";
-import { classify } from "../../../src/passes/closure-inline/match.ts";
+import { classify, match } from "../../../src/passes/closure-inline/match.ts";
+import type { PassContext } from "../../../src/passes/types.ts";
 import { parseHbc } from "../../../src/parse/module.ts";
 import { decodeFunction } from "../../../src/disasm/decode.ts";
 import { normaliseFunction } from "../../../src/harness/roundtrip.ts";
@@ -131,4 +132,14 @@ test("printer: a statement led by a function expression is parenthesised (the ca
   const g: { hit?: number } = {};
   new Function("globalThis", text)(g);
   assert.equal(g.hit, 1, text);
+});
+
+// Review passes-roundtrip-closure-temp: the react-navigation split did not
+// finish -- every `__d(_fnN, id, deps)` module factory in the GLOBAL function
+// is a once-read call argument, and moving them took them away from the split.
+test("closure-inline: never rewrites the global function", () => {
+  const body: Stmt[] = [fn("_fn5"), callOf(id("_fn5"))];
+  const ctx = (global: boolean): PassContext => ({ fnBody: body, functionIndex: 0, module: { isGlobalFunction: () => global } } as unknown as PassContext);
+  assert.equal(match(body, ctx(true)), null);
+  assert.notEqual(match(body, ctx(false)), null);
 });

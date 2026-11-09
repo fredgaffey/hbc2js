@@ -184,6 +184,10 @@ export function findSite(body: readonly Stmt[], cfg?: FunctionCfg): ClosureInlin
 
 export function match(list: readonly Stmt[], ctx: PassContext): Match<readonly Stmt[], ClosureInlineSite> | null {
   if (list !== ctx.fnBody) return null;
+  // Never the global function: a bundle's `__d(_fnN, id, deps)` module
+  // factories are read once each, as call arguments, and `--split` (and the
+  // module reader) find them as hoisted declarations.
+  if (ctx.module?.isGlobalFunction(ctx.functionIndex) === true) return null;
   const site = findSite(list, ctx.cfg);
   if (site === null) return null;
   return { root: list, nodes: [list], data: site, at: { functionIndex: ctx.functionIndex, offset: 0 } };
