@@ -32,8 +32,6 @@ const bundle = (bodies: readonly string[]): string => [HEAD, ...bodies.map((b, i
 const helpers = (tag: string, n: number, seed: number): string[] =>
   Array.from({ length: n }, (_, i) => `function ${tag}${i}(x, y) { var t = ${seed + i}; for (var k = 0; k < x; k++) { t = (t * ${31 + i} + k * y - (k % ${3 + i})) % ${1000003 + seed}; if (t > ${500 + i}) t = t - y; } return t + "${tag}${i}".length; }`);
 const exportAll = (names: readonly string[]): string => `module.exports = { ${names.map((n) => `${n}: ${n}`).join(", ")} };`;
-const fnNames = (tag: string, n: number): string[] => Array.from({ length: n }, (_, i) => `${tag}${i}`);
-const moduleOf = (tag: string, n: number, seed: number): string => helpers(tag, n, seed).join("\n") + "\n" + exportAll(fnNames(tag, n));
 
 function compile(hermesc: string, js: string): Uint8Array {
   const dir = mkdtempSync(join(tmpdir(), "hbc2js-inlined-"));
