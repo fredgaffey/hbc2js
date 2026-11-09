@@ -287,3 +287,26 @@ test("live-range identity: the web-target re-recording is graded per binding (do
   assert.ok(stats.coverage !== undefined && stats.coverage >= 0.25, "coverage floor over nameable bindings (measured 297/1002)");
   assert.ok(both.all.n >= 20 && both.all.lenient >= both.all.exact);
 });
+
+test("readability-v8: v6 vs v8 on the same 120 labelled functions (v6 stays default; v8 is the experimental arm)", () => {
+  const dir = join(repoRoot(), "tests", "fixtures", "llm-readability");
+  const base = "react-navigation-example-0.85.3";
+  const s: LabelledSample = sample();
+  const nameable = JSON.parse(readFileSync(join(dir, `${base}.nameable.idmatch.v8.json`), "utf8")) as NameableMap;
+  const arm = (name: string) => {
+    const rec = JSON.parse(readFileSync(join(dir, `${base}.recording.idmatch.${name}.json`), "utf8")) as Recording;
+    const stats = recordingStats(rec, nameable);
+    const props = proposalsForLabels(s, recordedNames(rec));
+    const tier = (c: Confidence) => rateHighConfidence(s, new Map([...props].filter(([, p]) => p.confidence === c))).all;
+    return { stats, high: tier("high"), med: tier("med"), low: tier("low"), all: rateHighConfidence(s, props).all };
+  };
+  const v6 = arm("v6.120");
+  const v8 = arm("v8");
+  // Measured 2026-11-09: v6 coverage 1244/1383, v8 1241/1383; high 24/28 vs 29/34, med 25/57 vs 31/58, low 10/43 vs 8/39 (lenient).
+  assert.equal(v6.stats.requested, v8.stats.requested, "both arms answer the same requests");
+  for (const [n, a] of [["v6", v6], ["v8", v8]] as const) {
+    assert.ok((a.stats.coverage ?? 0) >= 0.85, `${n} coverage ${String(a.stats.coverage)}`);
+    assert.ok(a.high.n >= 25 && a.med.n >= 30 && a.low.n >= 30, `${n}: tier sample sizes ${String(a.high.n)}/${String(a.med.n)}/${String(a.low.n)}`);
+    assert.ok(a.high.lenient / a.high.n >= 0.75, `${n} high-tier lenient accuracy`);
+  }
+});

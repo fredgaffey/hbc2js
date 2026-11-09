@@ -1820,7 +1820,7 @@ function namesTouching(list: readonly Stmt[]): ReadonlySet<string> {
  *  defUse(after)) …` — returns the first offending register name, or
  *  `null`. `head`/`tailBefore`/`tailAfter` are the reference-equal split
  *  points `expressionOnlyCheck` already found for the effect-sequence half. */
-function incrementalReadBeforeDef(before: readonly Stmt[], after: readonly Stmt[], head: number, tailBefore: number, tailAfter: number): string | null {
+function incrementalReadBeforeDef(before: readonly Stmt[], after: readonly Stmt[], head: number, tailBefore: number, tailAfter: number, carry: boolean): string | null {
   const { du: duBefore, posOf, violating: violatingBefore } = keyedDefUseCache.get(before) ?? coldKeyedDefUse(before);
 
   // `aKey` is deliberately `posOf(before[head])` — the *old* mid region's
@@ -1849,8 +1849,8 @@ function incrementalReadBeforeDef(before: readonly Stmt[], after: readonly Stmt[
   // is ever violated, and the honest fallback for the rare pure-append edge
   // case above.
   if ((head < before.length && aKey === undefined) || (tailAfter < after.length && bKey === undefined)) {
-    const cold = coldKeyedDefUse(after);
-    return firstOf(cold.violating);
+    coldKeyedDefUse(after);
+    return readBeforeDefBruteForceReference(before, after, carry);
   }
 
   let prev = aKey;
@@ -1867,8 +1867,8 @@ function incrementalReadBeforeDef(before: readonly Stmt[], after: readonly Stmt[
     // Thousands of splices landing in the exact same gap: drop the cached
     // lineage and pay one full recompute, same as a cold call for a fresh
     // list — always sound, just not `O(changed region)` this one time.
-    const cold = coldKeyedDefUse(after);
-    return firstOf(cold.violating);
+    coldKeyedDefUse(after);
+    return readBeforeDefBruteForceReference(before, after, carry);
   }
 
   const touched = new Set<string>(midDu.keys());
@@ -1903,19 +1903,77 @@ function incrementalReadBeforeDef(before: readonly Stmt[], after: readonly Stmt[
     if (entry !== undefined && isViolating(entry)) violating.add(name);
   }
   keyedDefUseCache.set(after, { du: merged, posOf, violating }); // same lineage: `posOf` is carried forward, not copied
-  return firstOf(violating);
-}
-
-function firstOf(names: ReadonlySet<string>): string | null {
-  for (const name of names) return name;
+  // Only a violation the rewrite introduced refuses (docs/specs/passes/
+  // 04-call-shape.md section 10, >3-argument `f.call`): a name already read
+  // before its first def in `before` (a register live into this list, then
+  // reassigned in it) is carried when its first def is the same statement,
+  // outside the changed region. Then every read before that def is either in
+  // the unchanged prefix, or (first def in the suffix) reads the live-in
+  // value both before and after, with no def of the name in between.
+  if (!carry) {
+    for (const name of violating) return name;
+    return null;
+  }
+  const outside = (k: number): boolean => (aKey !== undefined && k < aKey) || (bKey !== undefined && k >= bKey);
+  for (const name of violating) {
+    if (!touched.has(name)) {
+      if (violatingBefore.has(name)) continue;
+      return name;
+    }
+    const bef = duBefore.get(name);
+    const aft = merged.get(name);
+    if (violatingBefore.has(name) && bef !== undefined && aft !== undefined) {
+      const fb = Math.min(...bef.defs);
+      if (fb === Math.min(...aft.defs) && outside(fb)) continue;
+    }
+    return name;
+  }
   return null;
 }
 
-function readBeforeDefBruteForceReference(after: readonly Stmt[]): string | null {
-  for (const [name, { defs, reads }] of defUse(after)) {
+/** From scratch: the first name `after` reads before its first def that is
+ *  not carried over from `before` (the same rule `incrementalReadBeforeDef`
+ *  returns by: violating in `before` too, its first def the same statement
+ *  object, in the unchanged prefix or suffix). */
+function readBeforeDefBruteForceReference(before: readonly Stmt[], after: readonly Stmt[], carry = true): string | null {
+  let head = 0;
+  const minLen = Math.min(before.length, after.length);
+  while (head < minLen && before[head] === after[head]) head++;
+  let tb = before.length;
+  let ta = after.length;
+  while (tb > head && ta > head && before[tb - 1] === after[ta - 1]) {
+    tb--;
+    ta--;
+  }
+  // `defUse` positions count every statement walked (nested ones too), so the
+  // prefix/suffix boundaries are taken as walk positions of the boundary
+  // statements, not top-level indices.
+  const walk = (list: readonly Stmt[]): { du: Map<string, DefUse>; pos: Map<Stmt, number>; end: number } => {
+    let n = 0;
+    const pos = new Map<Stmt, number>();
+    const du = defUseWalk(list, (st) => {
+      pos.set(st, n);
+      return n++;
+    });
+    return { du, pos, end: n };
+  };
+  const B = walk(before);
+  const A = walk(after);
+  const at = (w: typeof B, list: readonly Stmt[], i: number): number => (i < list.length ? (w.pos.get(list[i]!) ?? w.end) : w.end);
+  const headB = at(B, before, head);
+  const tailB = at(B, before, tb);
+  const tailA = at(A, after, ta);
+  for (const [name, { defs, reads }] of A.du) {
     if (defs.length === 0) continue;
     const firstDef = Math.min(...defs);
-    if (reads.some((r) => r < firstDef)) return name;
+    if (!reads.some((r) => r < firstDef)) continue;
+    const b = B.du.get(name);
+    if (carry && b !== undefined && b.defs.length > 0) {
+      const fb = Math.min(...b.defs);
+      const carried = b.reads.some((r) => r < fb) && ((fb < headB && firstDef === fb) || (fb >= tailB && firstDef - tailA === fb - tailB));
+      if (carried) continue;
+    }
+    return name;
   }
   return null;
 }
@@ -1933,7 +1991,17 @@ export function _setExpressionOnlyCheckDiffProbeForTests(probe: typeof _expressi
 /** §4.3's expression-only `check`: the effect sequence is unchanged, and no
  *  `rN` in `after` is read before its own first def in `after` (a rewrite
  *  must not read a register earlier than the point it is actually computed). */
-export function expressionOnlyCheck(before: readonly Stmt[], after: readonly Stmt[]): CheckResult {
+export interface ExpressionOnlyOptions {
+  /** Carry a read-before-def the rewrite did not introduce (default). `false`
+   *  is the strict form, which refuses every fold in a list with any such
+   *  register: expr-rebuild asks for it in a derived-constructor frame,
+   *  whose unfolded lowering super-call, inline-new and private-fields
+   *  match (docs/specs/passes/02-expr-rebuild.md, "Carried live-in reads"). */
+  readonly carryLiveIn?: boolean;
+}
+
+export function expressionOnlyCheck(before: readonly Stmt[], after: readonly Stmt[], opts: ExpressionOnlyOptions = {}): CheckResult {
+  const carry = opts.carryLiveIn ?? true;
   // `effectSequence` is concatenative (`visitStmts` is a plain left-to-right
   // walk with no state carried between statements), so
   // `effectSequence(before) === effects(before[0,h)) ++ effects(before[h,tb))
@@ -1961,8 +2029,8 @@ export function expressionOnlyCheck(before: readonly Stmt[], after: readonly Stm
   const eb = JSON.stringify(effectSequence(before.slice(head, tailBefore)));
   const ea = JSON.stringify(effectSequence(after.slice(head, tailAfter)));
   if (eb !== ea) return { ok: false, reason: "the rewrite changed the observable effect sequence" };
-  const violation = incrementalReadBeforeDef(before, after, head, tailBefore, tailAfter);
-  if (_expressionOnlyCheckDiffProbe !== null) _expressionOnlyCheckDiffProbe(before, after, readBeforeDefBruteForceReference(after), violation);
+  const violation = incrementalReadBeforeDef(before, after, head, tailBefore, tailAfter, carry);
+  if (_expressionOnlyCheckDiffProbe !== null) _expressionOnlyCheckDiffProbe(before, after, readBeforeDefBruteForceReference(before, after, carry), violation);
   if (violation !== null) return { ok: false, reason: `${violation} is read before its first def in the rewrite` };
   return { ok: true };
 }

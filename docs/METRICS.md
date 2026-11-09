@@ -191,6 +191,7 @@ Own build scored against the package lockfile truth. Offline and `--confirm` giv
 | Expensify/App 12a92bd (J3, hash-index candidates, db-v3-clean offline) | 288 (91) | 128 / 69.5% / 30.9% (main 87ec7b8) | 130 / 70.0% / 31.6% (direct 35.2%; corpus-recall-candidates, +`js-base64` `react-native-uuid`, 0 FP added) | not run | n/a |
 | Expensify/App 12a92bd (J3, hash-index candidates, db-v4-paths-partial offline) | 288 (91) | 90 / 96.7% / 30.2% | 92 / 96.7% / 30.9% (direct 37.4%; corpus-recall-candidates) | not run | n/a |
 | react-navigation-example 0.85.3 (held out, hash-index candidates) | 76 (60) | partial 10 / 100% / 13.2%; clean 14 / 100% / 18.4% | unchanged, 0 FP (corpus-recall-candidates) | not run | n/a |
+| five truth apps (DB-unique tiny path, full v4 farm, offline) | see DEPS.md | react-navigation 21 / 100% / 27.6%; bluesky 46 / 97.8% / 22.7%; rainbow 115 / 93.9% / 20.8%; metamask 176 / 88.6% / 20.8%; Expensify 107 / 93.5% / 34.7% | react-navigation 22 / 100% / 28.9%; bluesky 47 / 97.9% / 23.2%; rainbow 116 / 94.0% / 21.0%; metamask 179 / 88.8% / 21.2%; Expensify unchanged; 0 FP added, 0 TP lost (deps-rnav-recall) | not run | n/a |
 | bluesky own build (hash-index candidates, offline) | see DEPS.md | partial 29 / 100% / 14.6%; clean 42 / 81.0% / 17.2% | unchanged (corpus-recall-candidates) | not run | n/a |
 | rainbow own build (hash-index candidates, offline, either DB) | see DEPS.md | 104 / 78.8% / 15.8% (direct 20.4%) | 127 / 81.9% / 20.1% (direct 26.5%; corpus-recall-candidates, +22 TP, +1 FP `digest-fetch`) | not run | n/a |
 | metamask own build (hash-index candidates, offline, either DB) | see DEPS.md | 169 / 78.1% / 17.6% (direct 20.3%) | 178 / 79.2% / 18.8% (direct 20.3%; corpus-recall-candidates, +10 TP, `bs58` lost, FP `react-base16-styling` in, `eventid` out) | not run | n/a |
@@ -280,3 +281,14 @@ Wall: offline 11-86 s; confirm 279-1386 s (3 workers, loaded host).
 - The one false positive: `semver-truncate@3.0.0`, a 1-module package with 26
   eligible functions, exact 69%, 0 of 1 modules exactly matched, no string
   corroboration (rainbow, v4-paths, tier high).
+
+## deps-combined-1110 (2026-11-10, offline, deb, deps-transub-farm)
+
+| tree | react-navigation | Expensify J3 | bluesky | rainbow | MetaMask |
+|---|---|---|---|---|---|
+| main | 21 / 21 / 0 | 107 / 102 / 5 | 46 / 45 / 1 | 115 / 108 / 7 | 176 / 162 / 14 |
+| integrate-1110a | 22 / 22 / 0 | 107 / 102 / 5 | 47 / 46 / 1 | 116 / 109 / 7 | 179 / 165 / 14 |
+| review-deps-rules | 22 / 22 / 0 | 106 / 101 / 5 | 47 / 46 / 1 | 116 / 109 / 7 | 179 / 165 / 14 |
+| deps-combined-1110 | 22 / 22 / 0 | 104 / 101 / 3 | 44 / 43 / 1 | 115 / 109 / 6 | 176 / 164 / 12 |
+
+Confirmed / TP / FP; lost TPs traced in docs/DEPS.md "Combined rule hardening".
