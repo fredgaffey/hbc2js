@@ -784,7 +784,7 @@ export interface MatchOptions {
  *  claims also keeps it while fewer than the threshold SUPPORTED owners
  *  remain: candidates loaded with no evidence of their own in the target
  *  are not competing owners, so loading more of them changes nothing. */
-function independentOwnerRule(dbs: readonly LoadedSig[], hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetExact: ReadonlySet<string>, minInstr: number): (hash: string, pkg: string) => boolean {
+function independentOwnerRule(dbs: readonly LoadedSig[], hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetExact: ReadonlySet<string>, minInstr: number, targetCopies: ReadonlyMap<string, number>): (hash: string, pkg: string) => boolean {
   const variant = process.env.HBC2JS_AMBIG_VARIANT ?? "v2";
   if (variant === "off") return (hash) => (hashOwnerNames.get(hash)?.size ?? 1) < AMBIGUOUS_OWNER_THRESHOLD;
   const direct = new Map<string, Set<string>>();
@@ -800,7 +800,11 @@ function independentOwnerRule(dbs: readonly LoadedSig[], hashOwnerNames: Readonl
     if (!evidenced.has(file.package)) for (const fn of file.functions) {
       if (fn.instrCount < minInstr) continue;
       const k = schemeKey(file, fn.exactHash);
-      if (targetExact.has(k) && hashOwnerNames.get(k)?.size === 1) {
+      // Supported: a target hash of at least minInstr instructions, not
+      // generic in the target (TARGET_GENERIC_COPIES), that no loaded
+      // package of another name holds (hashOwnerNames spans every loaded
+      // file, index-less layers included).
+      if (targetExact.has(k) && (targetCopies.get(k) ?? 0) < TARGET_GENERIC_COPIES && hashOwnerNames.get(k)?.size === 1) {
         evidenced.add(file.package);
         break;
       }
@@ -1025,7 +1029,7 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
     }
   }
 
-  const ownsHash = independentOwnerRule(eligibleDbs, hashOwnerNames, targetExact, minInstr);
+  const ownsHash = independentOwnerRule(eligibleDbs, hashOwnerNames, targetExact, minInstr, targetCopies);
 
   // Pass 2: score every package now that `hashOwnerNames` is complete —
   // ambiguity-aware, so a package's own tier never rests on evidence another

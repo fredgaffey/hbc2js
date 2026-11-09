@@ -109,3 +109,18 @@ test("corpus-ambiguity-cutoff: code shared by many independent claimants none of
   const r = matchInventory(target, loaded([x, ...carriers(h.path, "sib-", AMBIGUOUS_OWNER_THRESHOLD + 2, [])]));
   for (const p of ["x-real", "sib-0"]) assert.equal(scoreOf(r, p)?.exactHits, 0, p + ": " + JSON.stringify(scoreOf(r, p)));
 });
+
+// review-1110 deps rules (fix 2): "supported" needs a unique target hit
+// that is real evidence, i.e. at least minInstr instructions and not
+// generic in the target (TARGET_GENERIC_COPIES). A package whose only
+// unique hit is a helper the app repeats three times is not supported, so
+// it keeps no share of code 20+ independent claimants hold.
+test("corpus-ambiguity-cutoff: a unique hit the target holds generically does not make a package supported (review-1110)", (t) => {
+  const h = requireHermesc(t, 96);
+  if (h === null) return;
+  const G = moduleOf("gq", 1, 5001);
+  const target = buildInventory(compile(h.path, bundle([APP, G, G, G, X()]))).inventory;
+  const g = signature(h.path, "g-generic", [G, X()]);
+  const grown = matchInventory(target, loaded([g, ...carriers(h.path, "other-", AMBIGUOUS_OWNER_THRESHOLD + 5)]));
+  assert.ok((scoreOf(grown, "g-generic")?.exactHits ?? 0) < 6, "X stays ambiguous for g: " + JSON.stringify(scoreOf(grown, "g-generic")));
+});
