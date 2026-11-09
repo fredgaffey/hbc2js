@@ -1,29 +1,49 @@
-// closure-inline matcher (docs/specs/passes/32-closure-inline.md section 3).
-// One site: the whole function body. Finds the first top-level hoisted
-// `function _fnN` declaration whose value is read exactly once, outside every
-// loop, and returns its index; `rewrite` moves the declaration to that read.
-import { identUses, isRegisterName, stmtLists, walk } from "../ast.ts";
+// closure-inline matcher (docs/specs/passes/32-closure-inline.md section 2).
+// One site, the whole function body, and a one-shot fixed point: `analyze`
+// decides every top-level hoisted declaration in a constant number of walks
+// (a per-declaration walk of a module factory with thousands of closures is
+// quadratic -- the `fn-naming`/M5 lesson, `identUsesMany`'s doc), and
+// `rewrite` moves all the accepted ones at once. The moves are independent: a
+// read inside another moved function is a nested use and is refused.
+import { identUsesMany, isRegisterName, stmtLists, walk } from "../ast.ts";
 import type { Stmt } from "../ast.ts";
 import type { Match, PassContext } from "../types.ts";
 
 export interface ClosureInlineSite {
-  /** Index of the `func` statement in `ctx.fnBody`. */
-  readonly index: number;
-  readonly name: string;
+  /** Accepted declaration names, in body order. */
+  readonly names: readonly string[];
 }
 
 const LOOPS = new Set(["while", "do-while", "for", "for-in", "for-of"]);
+type Func = Stmt & { readonly k: "func" };
 
-/** Every identifier mentioned anywhere in `s`, nested functions included. */
-function mentioned(s: Stmt): Set<string> {
-  const out = new Set<string>();
-  walk([s], { expr: (e) => { if (e.k === "ident") out.add(e.name); } });
+/** The direct child statement lists of `s` (nested functions excluded). */
+function childLists(s: Stmt): readonly (readonly Stmt[])[] {
+  switch (s.k) {
+    case "if": return [s.then, s.else];
+    case "while": case "do-while": case "for": case "for-in": case "for-of": case "labeled": return [s.body];
+    case "try": return [s.block, s.handler, ...(s.finalizer !== undefined ? [s.finalizer] : [])];
+    case "switch": return s.cases.map((c) => c.body);
+    default: return [];
+  }
+}
+
+/** Every outermost loop statement in `body` (a loop inside one is covered). */
+function outermostLoops(body: readonly Stmt[]): Stmt[] {
+  const out: Stmt[] = [];
+  const visit = (list: readonly Stmt[]): void => {
+    for (const s of list) {
+      if (LOOPS.has(s.k)) out.push(s);
+      else for (const l of childLists(s)) visit(l);
+    }
+  };
+  visit(body);
   return out;
 }
 
-/** Names that some NESTED block of `body` (not `body` itself, not a nested
- *  function) declares, plus every `catch` parameter and loop binding -- a
- *  binding that could shadow, at the read site, a name the closure uses. */
+/** Names some NESTED block of `body` declares, plus every `catch` parameter
+ *  and loop binding: a binding that could shadow, at a read site, a name the
+ *  moved closure uses. */
 function nestedBindings(body: readonly Stmt[]): Set<string> {
   const out = new Set<string>();
   for (const list of stmtLists(body)) {
@@ -39,62 +59,77 @@ function nestedBindings(body: readonly Stmt[]): Set<string> {
   return out;
 }
 
-export type Verdict = { readonly ok: true } | { readonly ok: false; readonly reason: string };
+/** Names whose read is exactly the stored value of `x = name` / `let x =
+ *  name` with `x` NOT a register (a member, an env slot, a named binding).
+ *  That is how a source function DECLARATION surfaces (`r1.m = m`,
+ *  `_e14_3 = _fn5`): Hermes created its closure at entry, where the store
+ *  already sits, so a move would change no bytecode and would only cost the
+ *  declaration form. A read copied into a register, or nested in a larger
+ *  expression (an argument, a descriptor literal), is a function
+ *  EXPRESSION's position. */
+function declarationStores(body: readonly Stmt[]): Set<string> {
+  const out = new Set<string>();
+  for (const list of stmtLists(body)) {
+    for (const s of list) {
+      if (s.k === "expr" && s.expr.k === "assign" && s.expr.value.k === "ident") {
+        if (!(s.expr.target.k === "ident" && isRegisterName(s.expr.target.name))) out.add(s.expr.value.name);
+      } else if (s.k === "init" && s.value.k === "ident" && !isRegisterName(s.name)) out.add(s.value.name);
+    }
+  }
+  return out;
+}
 
-export function classify(body: readonly Stmt[], index: number): Verdict {
+/** Every identifier mentioned anywhere in `f` (nested functions included). */
+function mentioned(f: Func): Set<string> {
+  const out = new Set<string>();
+  walk([f], { expr: (e) => { if (e.k === "ident") out.add(e.name); } });
+  for (const p of f.params) out.add(p.name);
+  return out;
+}
+
+/** Per top-level declaration: `ok` or the refusal reason. */
+export function analyze(body: readonly Stmt[]): Map<string, string> {
+  const funcs = body.filter((s): s is Func => s.k === "func");
+  const verdicts = new Map<string, string>();
+  if (funcs.length === 0) return verdicts;
+  const names = funcs.map((f) => f.name);
+  const uses = identUsesMany(body, names);
+  const inLoop = identUsesMany(outermostLoops(body), names);
+  const stores = declarationStores(body);
+  const shadow = nestedBindings(body);
+  const seen = new Set<string>();
+  for (const f of funcs) {
+    const n = f.name;
+    if (seen.has(n)) { verdicts.set(n, "duplicate-name"); continue; }
+    seen.add(n);
+    const mine = mentioned(f);
+    const u = uses.get(n)!;
+    let reason = "ok";
+    if (mine.has(n)) reason = "self-reference";
+    else if (u.writes > 0) reason = "written";
+    else if (u.nested > 0) reason = "nested-use";
+    else if (u.reads !== 1) reason = u.reads === 0 ? "unused" : "multi-use";
+    else if (inLoop.get(n)!.reads > 0) reason = "in-loop";
+    else if (stores.has(n)) reason = "declaration-store";
+    else for (const m of mine) if (shadow.has(m)) { reason = "shadowed"; break; }
+    verdicts.set(n, reason);
+  }
+  // a name declared twice is ambiguous for both declarations
+  for (const f of funcs) if (verdicts.get(f.name) === "duplicate-name") verdicts.set(f.name, "duplicate-name");
+  return verdicts;
+}
+
+/** Verdict for the declaration at `body[index]` (tests, diagnostics). */
+export function classify(body: readonly Stmt[], index: number): { readonly ok: true } | { readonly ok: false; readonly reason: string } {
   const f = body[index];
   if (f === undefined || f.k !== "func") return { ok: false, reason: "not-a-declaration" };
-  const self = identUses([f], f.name);
-  if (self.reads > 0 || self.nested > 0 || mentionsInside(f)) return { ok: false, reason: "self-reference" };
-  const rest = body.filter((_, i) => i !== index);
-  const u = identUses(rest, f.name);
-  if (u.writes > 0) return { ok: false, reason: "written" };
-  if (u.nested > 0) return { ok: false, reason: "nested-use" };
-  if (u.reads !== 1) return { ok: false, reason: u.reads === 0 ? "unused" : "multi-use" };
-  for (const list of stmtLists(rest)) {
-    for (const s of list) {
-      if (LOOPS.has(s.k) && identUses([s], f.name).reads > 0) return { ok: false, reason: "in-loop" };
-    }
-  }
-  if (isDeclarationStore(rest, f.name)) return { ok: false, reason: "declaration-store" };
-  const shadow = nestedBindings(rest);
-  for (const n of mentioned(f)) if (n !== f.name && shadow.has(n)) return { ok: false, reason: "shadowed" };
-  return { ok: true };
-}
-
-/** Is the one read exactly the stored value of `x = name` / `let x = name`
- *  with `x` NOT a register (a member, an env slot, a named binding)? That is
- *  how a source function DECLARATION surfaces (`r1.m = m`, `_e14_3 = _fn5`):
- *  Hermes created its closure at entry, where the store already sits, so
- *  inlining would change no bytecode and would only cost the declaration
- *  form. A read copied into a register, or nested in a larger expression (an
- *  argument, a descriptor literal), is a function EXPRESSION's position. */
-function isDeclarationStore(stmts: readonly Stmt[], name: string): boolean {
-  let hit = false;
-  for (const list of stmtLists(stmts)) {
-    for (const s of list) {
-      if (s.k === "expr" && s.expr.k === "assign" && s.expr.value.k === "ident" && s.expr.value.name === name) {
-        if (!(s.expr.target.k === "ident" && isRegisterName(s.expr.target.name))) hit = true;
-      } else if (s.k === "init" && s.value.k === "ident" && s.value.name === name && !isRegisterName(s.name)) hit = true;
-    }
-  }
-  return hit;
-}
-
-/** Does `f`'s own body or parameter list mention its name? */
-function mentionsInside(f: Stmt & { readonly k: "func" }): boolean {
-  let hit = false;
-  walk(f.body, { expr: (e) => { if (e.k === "ident" && e.name === f.name) hit = true; } });
-  for (const p of f.params) if (p.name === f.name) hit = true;
-  return hit;
+  const r = analyze(body).get(f.name)!;
+  return r === "ok" ? { ok: true } : { ok: false, reason: r };
 }
 
 export function findSite(body: readonly Stmt[]): ClosureInlineSite | null {
-  for (let i = 0; i < body.length; i++) {
-    const s = body[i]!;
-    if (s.k === "func" && classify(body, i).ok) return { index: i, name: s.name };
-  }
-  return null;
+  const names = [...analyze(body)].filter(([, r]) => r === "ok").map(([n]) => n);
+  return names.length === 0 ? null : { names };
 }
 
 export function match(list: readonly Stmt[], ctx: PassContext): Match<readonly Stmt[], ClosureInlineSite> | null {
