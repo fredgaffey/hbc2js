@@ -644,6 +644,22 @@ Shared first 60 functions (the v7 comparison set, same denominator): v6 coverage
 
 Decision rule (adopt v8 only if coverage >= v6, high volume >= ~80% of v6, high accuracy not lower, med and low accuracy higher): high volume 88% of v6 passes, high accuracy 85% vs 86% lenient (79% vs 75% exact) passes, med 53% vs 44% passes, but coverage is 3 names below v6 (1,241 vs 1,244; 85.7% vs 86.8% on the shared 60) and low is 21% vs 23%, so by the rule **v6 remains the default** (skill, hints and `quality.test.ts` are back at v6). Reading: v8 recovers v7's high tier (88% of v6's volume, against 19%) and gains on med and exact, which is the effect the role rules were meant to have, but low-tier accuracy does not improve and the gains are 5-9 names on samples of 28-58 per tier, inside noise. To flip the default, restore `skills/hbc-name.md` from commit dde468d and `src/readability/binding-hints.ts` + its test from 53af3a2, then re-key the synthetic recording. The v6/v8 comparison is pinned by a test in `quality.test.ts`.
 
+
+**Second app: Expensify 0.86.0 (2026-11-09, skill v6, `claude-cli`/`sonnet`, 60 labelled src functions).** The v6 recipe is app-independent. Register labels: `label-registers.ts` against the app's `index.android.bundle` and its source map with the v98 `hermesc -O -g` joined 98,775 functions, counts matching, 0 name mismatches, 40,391 resolved parameter labels (the Mac `.hbc` pinned in BUILD.md has the same 98,775 functions). Two tool changes were needed at this scale: the full `-dump-ra` is larger than V8's 512 MB string limit, so `runHermesc` filters the dump through `grep` in the pipe; and `record.ts --labelled` now prunes the scope to labelled functions before `collectTargets` (the per-function pass pipeline over ~50k src functions otherwise dominates; the result set is identical). The committed `expensify-app-0.86.0.labels.json` is a 300-function sample (seeded LCG pick) of the labelled src functions; the recording and `expensify-app-0.86.0.nameable.idmatch.json` sit beside it. Expect a setup phase of tens of minutes on a loaded machine (whole-module analysis of 98k functions) before the first model call; the 60 calls themselves took 1,392 s.
+
+| v6, sonnet, 60 fns | react-navigation | Expensify |
+| --- | --- | --- |
+| nameable bindings requested | 850 | 424 |
+| coverage | 86.8% (738) | 96.9% (411) |
+| confidence mix high / med / low | 171 / 260 / 309 | 69 / 159 / 183 |
+| lenient, all confidence | 35/75 (47%) | 32/93 (34%) |
+| exact, all confidence | 30/75 | 28/93 |
+| lenient, high confidence | 15/17 | 14/15 |
+| exact, high confidence | 12/17 | 14/15 |
+| tokens in / out | 645k / 83k | 571k / 46k |
+| tokens per named binding | 986 | 1,500 |
+
+Reading: coverage and high-confidence accuracy generalise (high tier 93% lenient on both apps, small n); all-confidence accuracy is lower on Expensify because `low` role names make up 45% of its output. Tokens per name are higher because the functions are smaller (7 bindings per call against 14), so the fixed ~9k-token skill prompt is amortised over fewer names. `tests/gate/llm-readability/expensify.test.ts` grades it (floors: coverage >= 0.9, lenient all >= 0.25 with n >= 60, high lenient >= 0.7 with n >= 10; skips only if the labels, recording or nameable map are absent).
 ## Render cost (2026-11-09)
 
 Profile on the held-out app (box at load ~15): `prepareModule` 0.3 s, the first whole-module raw emit (`rawFrames`, what the reuse gate used to build on the first `setName`) ~19 s, `NameService.render({fn})` 77-96 s each (it re-emitted all 15,551 functions through stage A + B and sliced one out; the hooks' whole-module views were rebuilt every call), whole-module `render()` ~66 s. Nothing was cached between calls except the analysis. Fix: scoped emit (`emitModule`'s `onlyFunction`) in `render({fn})`, hooks built once per `NameService`, per-function raw frames for the gate, and a touched-functions backstop in `runNamePass` (docs/RENAME.md "Rendering"). The sweep fidelity test now compares scoped renders of its touched functions instead of two whole-module renders. Measured after (same app, same load): `render({fn})` 1.1 s for the first call (hook build) then ~50-300 ms per call (was 77-96 s); `runNamePass` on one target 0.2 s (was two whole-module renders, ~130 s, plus ~19 s for the gate's first whole-module raw emit); scoped output is byte-identical to the whole-module slice on the held-out app (fns 2079 and 2080, plus 40 construct fixtures x 12 fns, with and without names). The ~21 min sweep test was not re-run in this pass.
