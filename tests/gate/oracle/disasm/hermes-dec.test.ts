@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { parseHbc } from "../../../../src/index.ts";
 import { decodeFunction } from "../../../../src/disasm/decode.ts";
 import { listFixtures } from "../../../support/fixtures.ts";
-import { requireOracle, runOracle } from "../../../support/oracles.ts";
+import { requireOracle, runOracleAsync } from "../../../support/oracles.ts";
 import { isKnownAmbiguousV98 } from "../../../support/known-issues.ts";
 import { normaliseHermesDec, ourFuncLine, ourHandlerLines, ourInstructionLine } from "./normalize.ts";
 
@@ -91,18 +91,20 @@ function applyV98Allowlist(oursLines: readonly string[], theirsLines: readonly s
   return { ours, theirs };
 }
 
-test("7.B: hbc-disassembler diff, per (fixture, version)", async (t) => {
+test("7.B: hbc-disassembler diff, per (fixture, version)", { concurrency: 8 }, async (t) => {
   const bin = requireOracle(t, "hbc-disassembler");
   if (bin === null) return;
 
   const fixtures = listFixtures();
   const dir = mkdtempSync(join(tmpdir(), "hbc2js-hermesdec-oracle-"));
+  let seq = 0;
+  const pending: Promise<unknown>[] = [];
   try {
     for (const f of fixtures) {
       for (const b of f.binaries) {
-        await t.test(`${f.group}/${f.name} v${b.version}${b.variant === "public" ? "-public" : ""}`, () => {
-          const outPath = join(dir, "out.disasm");
-          const { status, stdout } = runOracle(bin, [b.path, outPath]);
+        pending.push(t.test(`${f.group}/${f.name} v${b.version}${b.variant === "public" ? "-public" : ""}`, async () => {
+          const outPath = join(dir, `out-${++seq}.disasm`);
+          const { status, stdout } = await runOracleAsync(bin, [b.path, outPath]);
           // hbc-disassembler writes to the given path and a short banner to stdout;
           // read the file it wrote (docs/TOOLCHAIN.md).
           const content = readFileSync(outPath, "utf8");
@@ -133,9 +135,10 @@ test("7.B: hbc-disassembler diff, per (fixture, version)", async (t) => {
           }
           assert.equal(mismatches.length, 0, `\n${mismatches.join("\n")}`);
           assert.equal(oursForCompare.length, theirsForCompare.length, `${f.group}/${f.name} v${b.version}: line count ours=${ours.length} theirs=${theirs.length}`);
-        });
+        }));
       }
     }
+      await Promise.all(pending);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -456,3 +456,31 @@ fails only if the tool itself crashes, never on a metric value.
 it asserts the script still runs against today's `decompile()`/
 `splitProject()`/`runDeps()` APIs and produces a well-shaped report, not
 any particular metric value.
+
+## Test suite performance
+
+Cost is dominated by repeated heavy work (re-exporting the same bundle, serial
+child-process spawns), not by assertions. What is shared or overlapped:
+
+- **Export CLI cache** (`tests/gate/export/support.ts` `exportTo`): a successful
+  `hbc2js export` is stored under `<tmpdir>/hbc2js-test-export-cache-v1/<key>`,
+  key = sha1(bundle bytes, CLI args, size+mtime of every file in `src/` and
+  `third_party/`, `package-lock.json`). Every call gets its own fresh *copy* of
+  the cached tree (tests may still mutate/build in it); the output path in
+  stdout/stderr is stored as a token and re-substituted. Non-zero exits are
+  never cached. First cold run in a parallel gate may still export the same
+  bundle in several files at once (races are safe: write to a temp dir, then
+  atomic rename). Clear: `rm -rf "$TMPDIR/hbc2js-test-export-cache-v1"`
+  (`os.tmpdir()` on Linux). Invalidation is automatic on any `src/` edit.
+- **Decompile/split cache** (`tests/support/decompiled.ts`): pre-existing; same
+  invalidation scheme, `hbc2js-test-decompile-cache-v1`.
+- **hermes-dec oracle diff** (`tests/gate/oracle/disasm/hermes-dec.test.ts`):
+  438 subtests run with `concurrency: 8` over an async oracle spawn
+  (`runOracleAsync`); each uses its own output file.
+- **emit T1**: the per-binary `node --check` runs in a pool of 6 async children.
+
+Invariants: no test is skipped, weakened or moved; test counts are unchanged;
+caches are keyed by inputs so a stale hit needs both an input change and an
+identical key. Never cache a result that depends on the output path or cwd
+without tokenising it. Timings on a shared box are only comparable at similar
+`uptime` load averages.

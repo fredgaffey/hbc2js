@@ -1,0 +1,96 @@
+; hbc2js disassembly of 111-inlined-new-derived-before-super/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=5 strings=12 globalCodeIndex=0
+function #0 "global"  params=1 frame=21 env=0 flags=dbg,overflowed  @0x0000015c size=162
+  0000  CreateFunctionEnvironment r3, 2
+  0003  DeclareGlobalVar     s7 "tag"
+  0008  GetGlobalObject      r4
+  000a  LoadConstUndefined   r1
+  000c  CreateClosure        r5, r1, f1 "tag"
+  0011  PutByIdLoose         r4, r5, #c0, s7 "tag"
+  0017  CreateBaseClass      r7, r5, r1, 2
+  001d  CreatePrivateName    r5, s8 "#w"
+  0023  StoreToEnvironment   r3, 0, r5
+  0027  CreateDerivedClass   r8, r6, r3, r7, 3
+  002e  Mov                  r9, r6
+  0031  LoadConstString      r7, s9 "w"
+  0035  CreateClosure        r6, r3, f4 "w"
+  003a  DefineOwnGetterSetterByVal r9, r7, r6, r1, 0
+  0040  StoreToEnvironment   r3, 1, r8
+  0044  GetByIdShort         r3, r4, #c0, s7 "tag"
+  0049  LoadConstUInt8       r0, 3
+  004c  Call2                r12, r3, r1, r0
+  0051  LoadParentNoTraps    r3, r8
+  0054  CreateThisForSuper   r6, r3, r8, 1
+  0059  Mov                  r13, r6
+  005c  CallWithNewTarget    r3, r3, r8, 2
+  0061  SelectObject         r3, r6, r3
+  0065  LoadConstEmpty       r6
+  0067  ThrowIfThisInitialized r6
+  0069  PrivateIsIn          r2, r5, r3, r0
+  006e  JmpTrue              L1, r2
+  0071  AddOwnPrivateBySym   r3, r1, r5
+  0075  LoadConstUInt8       r0, 6
+  0078  PutOwnPrivateBySym   r3, r0, 1, r5
+  007d  TryGetById           r6, r4, #c2, s6 "print"
+  0083  GetByIdShort         r5, r3, #c3, s11 "v"
+  0088  GetByIdShort         r4, r3, #c4, s9 "w"
+  008d  LoadConstString      r3, s4 "child:"
+  0091  Call4                r3, r6, r1, r3, r5, r4
+  0098  Ret                  r3
+L1:
+  009a  LoadConstString      r12, s1 "Cannot initialize private field …"
+  009e  CallBuiltin          r3, b44 "throwTypeError", 2
+
+function #1 "tag"  params=2 frame=14 env=0 flags=dbg,overflowed  @0x000001fe size=33
+  0000  LoadParam            r2, 1
+  0003  GetGlobalObject      r1
+  0005  TryGetById           r3, r1, #c0, s6 "print"
+  000b  LoadConstString      r1, s7 "tag"
+  000f  LoadConstUndefined   r0
+  0011  Call3                r1, r3, r0, r1, r2
+  0017  LoadConstString      r1, s3 "T"
+  001b  Add                  r1, r1, r2
+  001f  Ret                  r1
+
+function #2 "Base"  params=2 frame=2 env=0 flags=strict,dbg,overflowed,ctor  @0x0000021f size=21
+  0000  GetNewTarget         r0
+  0002  GetByIdShort         r0, r0, #c0, s10 "prototype"
+  0007  NewObjectWithParent  r0, r0
+  000a  LoadParam            r1, 1
+  000d  PutByIdStrict        r0, r1, #c0, s11 "v"
+  0013  Ret                  r0
+
+function #3 "Child"  params=2 frame=18 env=0 flags=strict,dbg,overflowed,ctor  @0x00000234 size=88
+  0000  GetParentEnvironment r4, 0
+  0003  LoadParam            r5, 1
+  0006  GetGlobalObject      r3
+  0008  GetByIdShort         r3, r3, #c0, s7 "tag"
+  000d  LoadConstUndefined   r1
+  000f  Call2                r9, r3, r1, r5
+  0014  GetNewTarget         r7
+  0016  LoadFromEnvironment  r3, r4, 1
+  001a  LoadParentNoTraps    r3, r3
+  001d  CreateThisForSuper   r6, r3, r7, 1
+  0022  Mov                  r10, r6
+  0025  CallWithNewTarget    r3, r3, r7, 2
+  002a  SelectObject         r3, r6, r3
+  002e  LoadConstEmpty       r6
+  0030  ThrowIfThisInitialized r6
+  0032  LoadFromEnvironment  r4, r4, 0
+  0036  PrivateIsIn          r2, r4, r3, r0
+  003b  JmpTrue              L1, r2
+  003e  AddOwnPrivateBySym   r3, r1, r4
+  0042  LoadConstUInt8       r0, 2
+  0045  Mul                  r0, r5, r0
+  0049  PutOwnPrivateBySym   r3, r0, 1, r4
+  004e  Ret                  r3
+L1:
+  0050  LoadConstString      r9, s1 "Cannot initialize private field …"
+  0054  CallBuiltin          r3, b44 "throwTypeError", 2
+
+function #4 "w"  params=1 frame=2 env=0 flags=strict,dbg,overflowed,nc  @0x0000028c size=17
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r1, r0, 0
+  0007  LoadParam            r0, 0
+  000a  GetOwnPrivateBySym   r0, r0, 0, r1
+  000f  Ret                  r0
