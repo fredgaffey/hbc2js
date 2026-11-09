@@ -283,18 +283,22 @@ guard), `clobbered-between`, `read-twice`, `guard-in-other-list` (guard and
 read must share a statement list; a read that migrated into a nested `if` body
 is refused, not chased).
 
-**Lowered generator bodies are not visited (missed fold, not a refusal).**
+**Lowered generator bodies (visited since 2026-11-10).**
 At v84/94/96 a generator (and an `async function`, lowered through one) is
-emitted as `return function (...) { switch (__state) ... }` inside its own
-function index: the resumable body is a function *expression* in a `return`,
-and `stmtLists` (`src/passes/ast.ts`) never descends into a `func` (it is
-"a separate frame"), so no stage-B pass sees those guards and fixture 310
-keeps six of them there; 98/99 emit native generator bodies and fold all of
-them. Not cheap to lift soundly: the closure re-enters per resume and its
-registers live in the enclosing frame across yields, so the whole-function
-proof and conditions 5-6 would have to treat the closure plus its outer
-frame as one function, and the `catch` arm reads a register stored in an
-earlier resume (a correct refusal). Only condition 7 would carry over as is.
+emitted as `return function (...) { switch (__state) ... }`, a `sameFrame`
+closure sharing the enclosing frame's registers. `global-access` opts in to
+those lists (`Pass.sameFrame`, 00-LADDER section 3.2 "Resumable bodies"):
+the store walks of section 4 see writes inside the closure, condition 5
+treats the closure body as the outermost loop (it is re-entered per
+resume), and condition 6 adds one refusal there -- a guard with **no**
+`globalThis` store earlier in the same resume is refused (`pre-guard-clobber`),
+because its register was stored by an earlier resume (or is still
+`undefined`). Condition 7 carries over unchanged (a resume enters every
+list at its start). Hermes loads `globalThis` once in the first resume and
+reuses that register in every later one, so those later guards (fixture
+310's 3 survivors, the `catch`-arm one among them; fixture 370's
+`JSON`/`Number`) stay guarded by design; 98/99 emit native generator bodies
+and fold all of them.
 The output is independent of the `moduleName` given to `decompile`, which
 reaches only the header comment (pinned by
 `tests/gate/passes/fix-modulename-dependence.test.ts`).
