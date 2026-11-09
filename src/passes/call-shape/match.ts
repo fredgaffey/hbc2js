@@ -14,7 +14,7 @@
 // shape it always resolves to either a rule + replacement or one of the
 // named §7 refuse reasons.
 import type { Expr, Stmt } from "../ast.ts";
-import { identUses, isHelperCall, isRegisterName } from "../ast.ts";
+import { identUses, isHelperCall, isPure, isRegisterName } from "../ast.ts";
 import { applyReplacement } from "./rewrite.ts";
 import type { Match, PassContext } from "../types.ts";
 
@@ -488,6 +488,28 @@ function symbolKeyRead(e: Expr | undefined, reg: string): boolean {
   return v !== undefined && v.k === "member" && v.computed && v.prop.k === "ident" && v.prop.name === reg;
 }
 
+/** `F.apply(T, arguments)` (section 10, the `apply` diamond's generic arm):
+ *  hermesc reifies the arguments object after reading `F.apply`, so R3e's
+ *  sequence ends in `rA = arguments` (or the loose `__hbc_arguments(arguments)`
+ *  copy) with the last argument `rA`. Sink that value into the argument:
+ *  creating the object is unobservable, and everything it moves past (the
+ *  other arguments) is pure, so not even a parameter write can change what it
+ *  captures. rA must be read only there and die at the call. */
+function sinkReifiedArguments(seq: readonly Expr[], args: readonly Expr[], stmt: Stmt, assigned: readonly string[], fnBody: readonly Stmt[]): { seq: Expr[]; args: Expr[] } | null {
+  const last = seq[seq.length - 1];
+  const tail = args[args.length - 1];
+  if (last === undefined || tail === undefined || last.k !== "assign" || last.target.k !== "ident" || tail.k !== "ident" || tail.name !== last.target.name) return null;
+  const a = tail.name;
+  const v = last.value;
+  const isReify = v.k === "argumentsObject" || (v.k === "call" && v.callee.k === "ident" && v.callee.name === "__hbc_arguments" && v.args.length === 1 && v.args[0]!.k === "argumentsObject");
+  if (!isRegisterName(a) || !isReify) return null;
+  if (!args.slice(0, -1).every(isPure)) return null;
+  if (identUses([stmt], a).reads !== 1) return null;
+  const u = identUses(fnBody, a);
+  if (!(u.reads === 1 && u.writes === 1) && !assigned.includes(a)) return null;
+  return { seq: seq.slice(0, -1), args: [...args.slice(0, -1), v] };
+}
+
 export function matchCondArg(list: readonly Stmt[], fnBody: readonly Stmt[]): CallShapeSite | null {
   for (let j = 1; j < list.length; j++) {
     const assigned: string[] = [];
@@ -552,7 +574,13 @@ export function matchCondArg(list: readonly Stmt[], fnBody: readonly Stmt[]): Ca
       const fu = identUses(mid, f);
       if (identUses(mid, r).writes !== 0 || fu.reads !== 0 || fu.writes !== 0) continue;
     }
-    const callArgs = seq.length === 0 ? args : [{ k: "seq", exprs: [...seq, args[0]!] } as Expr, ...args.slice(1)];
+    const sunk = sinkReifiedArguments(seq, args, list[j]!, assigned, fnBody);
+    if (sunk !== null) {
+      seq.length = 0;
+      seq.push(...sunk.seq);
+    }
+    const finalArgs = sunk?.args ?? args;
+    const callArgs = seq.length === 0 ? finalArgs : [{ k: "seq", exprs: [...seq, finalArgs[0]!] } as Expr, ...finalArgs.slice(1)];
     const replacement: Expr = { k: "call", callee: read, args: callArgs };
     const newStmt = applyReplacement(list[j]!, call, replacement);
     return { rule: "R3e", stmtIndex: j, target: call, replacement, splice: { from: k, to: j, stmts: [...hoisted, ...decls, newStmt] } };
