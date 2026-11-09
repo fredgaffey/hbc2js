@@ -177,6 +177,39 @@ export function isOwnModulePath(pkg: string, path: string | null | undefined): b
   return !path.slice(pkg.length + 1).includes("node_modules/");
 }
 
+/** The npm package a node_modules-relative path belongs to: the name after
+ *  its last `node_modules/` (`a/node_modules/@s/b/x.js` -> `@s/b`). */
+export function packageOfPath(path: string): string {
+  const i = path.lastIndexOf("node_modules/");
+  const rest = i >= 0 ? path.slice(i + "node_modules/".length) : path;
+  const seg = rest.split("/");
+  return seg[0]!.startsWith("@") && seg.length > 1 ? `${seg[0]}/${seg[1]}` : seg[0]!;
+}
+
+/** sigdb-strip-embedded: function index -> the package that a foreign
+ *  module's path names, for a path-bearing file's foreign functions (empty
+ *  for a pathless file). DB-wide indexes count the copy as that package's
+ *  occurrence, never the carrier's. */
+export function foreignFunctionPackages(file: SigDbFile): ReadonlyMap<number, string> {
+  const out = new Map<number, string>();
+  const fs = foreignSets(file);
+  if (fs.functions.size === 0) return out;
+  const byId = new Map<number, string>();
+  const byFactory = new Map<number, string>();
+  for (const m of file.modules) {
+    if (isOwnModulePath(file.package, m.path) || m.path === null || m.path === undefined) continue;
+    const pkg = packageOfPath(m.path);
+    byFactory.set(m.factoryFunctionIndex, pkg);
+    if (m.localModuleId !== null) byId.set(m.localModuleId, pkg);
+  }
+  for (const f of file.functions) {
+    if (!fs.functions.has(f.index)) continue;
+    const pkg = byFactory.get(f.index) ?? (f.moduleId !== undefined ? byId.get(f.moduleId) : undefined);
+    if (pkg !== undefined) out.set(f.index, pkg);
+  }
+  return out;
+}
+
 export interface ForeignSets {
   /** Function indices whose module is another package's file. */
   readonly functions: ReadonlySet<number>;

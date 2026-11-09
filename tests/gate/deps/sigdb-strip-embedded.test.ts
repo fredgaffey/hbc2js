@@ -87,3 +87,25 @@ test("sigdb-strip-embedded: a package whose hashes were only blocked by another 
   assert.ok(cands.has("owner-lib"), `owner-lib's 3 hashes are unique now; got ${[...cands].join(", ")}`);
   assert.ok(!cands.has("carrier"), "the copy inside carrier is not carrier's evidence");
 });
+
+// Found measuring on the v4-layered farm (react-native-root-toast and
+// enzyme-shallow-equal became metamask/rainbow FPs): in a mixed DB a PATHLESS
+// file's copy of another package (deprecated-react-native-prop-types,
+// object-is) used to be blocked by a path-bearing file's copy of the same
+// code; dropping that copy made the pathless carrier the sole owner. A foreign
+// module is attributed to the package its path names instead of dropped.
+test("sigdb-strip-embedded: mixed DB, a foreign module still blocks a pathless file's copy of the same package", () => {
+  const dir = mkdtempSync(join(tmpdir(), "hbc2js-strip-embedded-mixed-"));
+  writeSig(dir, sig("pathless-carrier", [{ h: 1 }, { h: 2, ss: 101 }, { h: 3 }], null));
+  writeSig(dir, sig("path-carrier", [{ h: 10, mod: 0 }, { h: 1, mod: 1 }, { h: 2, ss: 101, mod: 1 }, { h: 4, mod: 2 }],
+    [{ id: 0, factory: 0, path: "path-carrier/index.js" }, { id: 1, factory: 1, path: "path-carrier/node_modules/@sc/copied/lib/x.js" }, { id: 2, factory: 3, path: "pathless-carrier/index.js" }]));
+  const idx = indexed(buildCandidateHashIndex(dir, 98));
+  assert.ok(!idx.has(H(1)), "hash 1 is pathless-carrier's copy and @sc/copied's code: two owners");
+  assert.equal(idx.get(H(3)), "pathless-carrier");
+  assert.equal(idx.get(H(4)), "pathless-carrier", "a copy attributed to a package that has a file counts for it");
+  assert.equal(idx.get(H(10)), "path-carrier");
+  const header = JSON.parse(buildCandidateHashIndex(dir, 98).split("\n")[0]!.replace(/^[^{]*/, "")) as { packages: string[] };
+  assert.ok(!header.packages.includes("@sc/copied"), "a package with no signature file is never named in the index");
+  const ss = indexed(buildCandidateStringSetIndex(dir, 98));
+  assert.ok(!ss.has(H(101)), "string set 101: two owners");
+});
