@@ -1,0 +1,60 @@
+; hbc2js disassembly of 314-review-guard-outer-local-name/v94.hbc
+; version=94 layout=C opcodeTable=hbc94 functions=4 strings=9 globalCodeIndex=0
+function #0 "global"  params=1 frame=16 env=0 flags=dbg  @0x00000120 size=168
+  0000  DeclareGlobalVar     s5 "snap"
+  0005  DeclareGlobalVar     s8 "reader"
+  000a  CreateEnvironment    r1
+  000c  CreateClosure        r2, r1, f1 "reader"
+  0011  GetGlobalObject      r0
+  0013  PutById              r0, r2, #c1, s8 "reader"
+  0019  TryGetById           r3, r0, #c1, s4 "globalThis"
+  001f  CreateClosure        r2, r1, f2 ""
+  0024  PutById              r3, r2, #c2, s7 "Dyn314"
+  002a  TryGetById           r5, r0, #c2, s6 "print"
+  0030  GetByIdShort         r3, r0, #c3, s8 "reader"
+  0035  LoadConstUndefined   r4
+  0037  LoadConstZero        r2
+  0039  Call2                r3, r3, r4, r2
+  003e  Call2                r3, r5, r4, r3
+  0043  TryGetById           r3, r0, #c1, s4 "globalThis"
+  0049  GetByIdShort         r3, r3, #c4, s7 "Dyn314"
+  004e  PutById              r0, r3, #c3, s5 "snap"
+  0054  TryGetById           r5, r0, #c2, s6 "print"
+  005a  GetByIdShort         r3, r0, #c5, s5 "snap"
+  005f  Call1                r3, r3, r4
+  0063  Call2                r3, r5, r4, r3
+  0068  TryGetById           r3, r0, #c1, s4 "globalThis"
+  006e  CreateClosure        r1, r1, f3 ""
+  0073  PutById              r3, r1, #c2, s7 "Dyn314"
+  0079  TryGetById           r3, r0, #c2, s6 "print"
+  007f  GetByIdShort         r1, r0, #c3, s8 "reader"
+  0084  Call2                r2, r1, r4, r2
+  0089  GetByIdShort         r1, r0, #c5, s5 "snap"
+  008e  Call1                r1, r1, r4
+  0092  GetByIdShort         r5, r0, #c3, s8 "reader"
+  0097  LoadConstUInt8       r0, 2
+  009a  Call2                r0, r5, r4, r0
+  009f  Call4                r0, r3, r4, r2, r1, r0
+  00a6  Ret                  r0
+
+function #1 "reader"  params=2 frame=10 env=0 flags=dbg  @0x000001c8 size=30
+  0000  LoadParam            r1, 1
+  0003  LoadConstZero        r0
+  0005  JmpFalse             L1, r1
+  0008  Mov                  r0, r1
+L1:
+  000b  JmpTrue              L2, r0
+  000e  GetGlobalObject      r1
+  0010  TryGetById           r2, r1, #c1, s7 "Dyn314"
+  0016  LoadConstUndefined   r1
+  0018  Call1                r0, r2, r1
+L2:
+  001c  Ret                  r0
+
+function #2 ""  params=1 frame=1 env=0 flags=none  @0x000001e6 size=6
+  0000  LoadConstString      r0, s2 "a"
+  0004  Ret                  r0
+
+function #3 ""  params=1 frame=1 env=0 flags=none  @0x000001ec size=6
+  0000  LoadConstString      r0, s3 "b"
+  0004  Ret                  r0

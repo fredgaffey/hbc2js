@@ -1,0 +1,94 @@
+; hbc2js disassembly of 313-review-guard-reassigned-global-fn/v84.hbc
+; version=84 layout=B opcodeTable=hbc84 functions=6 strings=10 globalCodeIndex=0
+function #0 "global"  params=1 frame=17 env=0 flags=dbg  @0x00000164 size=188
+  0000  DeclareGlobalVar     s7 "helper313"
+  0005  DeclareGlobalVar     s9 "reader"
+  000a  DeclareGlobalVar     s6 "loopReader"
+  000f  CreateEnvironment    r1
+  0011  CreateClosure        r2, r1, f1 "helper313"
+  0016  GetGlobalObject      r0
+  0018  PutById              r0, r2, #c1, s7 "helper313"
+  001e  CreateClosure        r2, r1, f2 "reader"
+  0023  PutById              r0, r2, #c2, s9 "reader"
+  0029  CreateClosure        r2, r1, f3 "loopReader"
+  002e  PutById              r0, r2, #c3, s6 "loopReader"
+  0034  TryGetById           r6, r0, #c1, s8 "print"
+  003a  GetByIdShort         r2, r0, #c2, s9 "reader"
+  003f  LoadConstUndefined   r3
+  0041  LoadConstZero        r4
+  0043  Call2                r5, r2, r3, r4
+  0048  GetByIdShort         r2, r0, #c3, s6 "loopReader"
+  004d  LoadConstUInt8       r7, 2
+  0050  Call2                r2, r2, r3, r7
+  0055  Call3                r2, r6, r3, r5, r2
+  005b  CreateClosure        r2, r1, f4 "helper313"
+  0060  PutById              r0, r2, #c1, s7 "helper313"
+  0066  TryGetById           r6, r0, #c1, s8 "print"
+  006c  GetByIdShort         r2, r0, #c2, s9 "reader"
+  0071  Call2                r5, r2, r3, r4
+  0076  GetByIdShort         r2, r0, #c3, s6 "loopReader"
+  007b  Call2                r2, r2, r3, r7
+  0080  Call3                r2, r6, r3, r5, r2
+  0086  TryGetById           r2, r0, #c4, s5 "globalThis"
+  008c  CreateClosure        r1, r1, f5 ""
+  0091  PutById              r2, r1, #c1, s7 "helper313"
+  0097  TryGetById           r2, r0, #c1, s8 "print"
+  009d  GetByIdShort         r1, r0, #c2, s9 "reader"
+  00a2  Call2                r1, r1, r3, r4
+  00a7  GetByIdShort         r4, r0, #c2, s9 "reader"
+  00ac  LoadConstUInt8       r0, 1
+  00af  Call2                r0, r4, r3, r0
+  00b4  Call3                r0, r2, r3, r1, r0
+  00ba  Ret                  r0
+
+function #1 "helper313"  params=1 frame=1 env=0 flags=none  @0x00000220 size=6
+  0000  LoadConstString      r0, s1 "orig"
+  0004  Ret                  r0
+
+function #2 "reader"  params=2 frame=10 env=0 flags=dbg  @0x00000226 size=29
+  0000  LoadParam            r1, 1
+  0003  LoadConstZero        r0
+  0005  JmpFalse             L1, r1
+  0008  Mov                  r0, r1
+L1:
+  000b  JmpTrue              L2, r0
+  000e  GetGlobalObject      r1
+  0010  GetByIdShort         r2, r1, #c1, s7 "helper313"
+  0015  LoadConstUndefined   r1
+  0017  Call1                r0, r2, r1
+L2:
+  001b  Ret                  r0
+
+function #3 "loopReader"  params=2 frame=18 env=0 flags=dbg  @0x00000243 size=68
+  0000  LoadParam            r8, 1
+  0003  LoadConstString      r7, s0 ""
+  0007  LoadConstZero        r6
+  0009  GetGlobalObject      r5
+  000b  LoadConstUndefined   r4
+  000d  LoadConstUInt8       r3, 1
+  0010  Mov                  r2, r7
+  0013  Mov                  r0, r2
+  0016  LoadConstZero        r1
+  0018  JNotLess             L3, r1, r8
+L1:
+  001c  Mov                  r9, r7
+  001f  JNotGreaterN         L2, r1, r6
+  0023  Mov                  r9, r1
+L2:
+  0026  GetByIdShort         r10, r5, #c1, s7 "helper313"
+  002b  Call1                r10, r10, r4
+  002f  Add                  r9, r2, r9
+  0033  Add                  r2, r9, r10
+  0037  AddN                 r1, r1, r3
+  003b  Mov                  r0, r2
+  003e  JLess                L1, r1, r8
+L3:
+  0042  Ret                  r0
+
+function #4 "helper313"  params=1 frame=1 env=0 flags=none  @0x00000287 size=6
+  0000  LoadConstString      r0, s3 "replaced"
+  0004  Ret                  r0
+
+function #5 ""  params=1 frame=1 env=0 flags=none  @0x0000028d size=6
+  0000  LoadConstString      r0, s4 "viaGlobalThis"
+  0004  Ret                  r0
