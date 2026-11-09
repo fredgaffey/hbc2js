@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import { loadSkill } from "../../src/readability/skills.ts";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { repoRoot } from "../support/paths.ts";
@@ -86,6 +86,7 @@ test("ClaudeCliBackend: a cache hit never spawns the binary", async (t) => {
     kind: "suggest-name",
     skillId: "hbc-name",
     skillVersion: loadSkill("hbc-name", cfg.skillsDir).version,
+    skillText: loadSkill("hbc-name", cfg.skillsDir).body,
     model: cfg.model,
     body: bodyFromContext(request.context),
     context: canonicaliseContext(request.context),
@@ -194,3 +195,25 @@ test("ClaudeCliBackend: same cacheKey shape as HaikuBackend -- a recording keyed
   const haikuKey = cacheKey({ kind: "suggest-name", skillId: "hbc-name", skillVersion: 1, model: "same-model-id", body: "b", context });
   assert.equal(claudeKey, haikuKey, "cacheKey is the same pure function for both backends -- a recording replays across them when model matches");
 });
+
+// Review: the live cache keyed on skill VERSION only, so a same-version skill edit replayed old answers.
+test("ClaudeCliBackend: editing the skill text without bumping its version is a cache miss (v9b-replayed-v9a)", async (t) => {
+  const cacheDir = tmpCacheDir();
+  const skillsDir = mkdtempSync(join(tmpdir(), "hbc-skills-"));
+  t.after(() => { rmSync(cacheDir, { recursive: true, force: true }); rmSync(skillsDir, { recursive: true, force: true }); });
+  cpSync(config(cacheDir).skillsDir, skillsDir, { recursive: true });
+  const cfg = { ...config(cacheDir), skillsDir };
+  const request = req(21, 22);
+  await withEnv({ STUB_CLAUDE_STDOUT: JSON.stringify({ result: "answer-A", usage: { input_tokens: 1, output_tokens: 1 } }) }, async () => {
+    assert.equal((await new ClaudeCliBackend(cfg).run(request)).text, "answer-A");
+  });
+  const f = join(skillsDir, readdirSync(skillsDir).find((n) => loadSkillIdOf(skillsDir, n) === "hbc-name") ?? "");
+  writeFileSync(f, readFileSync(f, "utf8") + "\nEdited rule, same version.\n");
+  await withEnv({ STUB_CLAUDE_STDOUT: JSON.stringify({ result: "answer-B", usage: { input_tokens: 1, output_tokens: 1 } }) }, async () => {
+    assert.equal((await new ClaudeCliBackend(cfg).run(request)).text, "answer-B", "stale answer replayed after a same-version skill edit");
+  });
+});
+
+function loadSkillIdOf(dir: string, name: string): string | undefined {
+  return /^id:\s*(\S+)/m.exec(readFileSync(join(dir, name), "utf8"))?.[1];
+}

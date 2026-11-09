@@ -110,7 +110,7 @@ export class ClaudeCliBackend implements WorkerBackend {
     const skill = loadSkill(skillId, this.config.skillsDir);
     const body = bodyFromContext(req.context);
     const context = canonicaliseContext(req.context);
-    const key = cacheKey({ kind: req.kind, skillId, skillVersion: skill.version, model: this.config.model, body, context });
+    const key = cacheKey({ kind: req.kind, skillId, skillVersion: skill.version, skillText: skill.body, model: this.config.model, body, context });
 
     const cached = readCacheEntry(this.config.cacheDir, key);
     if (cached !== undefined) {
