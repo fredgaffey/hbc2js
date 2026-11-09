@@ -283,6 +283,22 @@ guard), `clobbered-between`, `read-twice`, `guard-in-other-list` (guard and
 read must share a statement list; a read that migrated into a nested `if` body
 is refused, not chased).
 
+**Lowered generator bodies are not visited (missed fold, not a refusal).**
+At v84/94/96 a generator (and an `async function`, lowered through one) is
+emitted as `return function (...) { switch (__state) ... }` inside its own
+function index: the resumable body is a function *expression* in a `return`,
+and `stmtLists` (`src/passes/ast.ts`) never descends into a `func` (it is
+"a separate frame"), so no stage-B pass sees those guards and fixture 310
+keeps six of them there; 98/99 emit native generator bodies and fold all of
+them. Not cheap to lift soundly: the closure re-enters per resume and its
+registers live in the enclosing frame across yields, so the whole-function
+proof and conditions 5-6 would have to treat the closure plus its outer
+frame as one function, and the `catch` arm reads a register stored in an
+earlier resume (a correct refusal). Only condition 7 would carry over as is.
+The output is independent of the `moduleName` given to `decompile`, which
+reaches only the header comment (pinned by
+`tests/gate/passes/fix-modulename-dependence.test.ts`).
+
 **Semantic note (must appear in the commit message and `docs/BUGS.md` if a
 fixture trips it).** A bare `print` reference throws
 `ReferenceError: print is not defined` where the guard threw

@@ -45,8 +45,10 @@ test("review-1110 guard/this: probe fixtures 310-314 are T2 PASS at every versio
   assert.equal(report.results.length, FIXTURES.length * VERSIONS.length);
 });
 
-// 84/94/96 keep guards in the generator/async lowered bodies (missed folds,
-// not a soundness question), so only 98/99 are pinned guard-free.
+// 84/94/96 keep guards in the generator/async lowered bodies (missed folds:
+// the resumable body is a function expression no stage-B pass descends into,
+// docs/specs/passes/03-global-access.md section 7; name-independent, see
+// fix-modulename-dependence.test.ts), so only 98/99 are pinned guard-free.
 test("review-1110 guard/this: fixture 310 has no global guard left at 98/99, so condition 7 is what was exercised", () => {
   for (const v of [98, 99]) {
     const bytes = new Uint8Array(readFileSync(join(repoRoot(), "tests", "fixtures", "constructs", FIXTURES[0]!, `v${v}.hbc`)));
