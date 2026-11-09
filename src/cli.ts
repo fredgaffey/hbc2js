@@ -1370,6 +1370,7 @@ async function runDepsCmd(argv: readonly string[]): Promise<number> {
       // `--json`'s stdout.
       ...(args.confirm ? { onProgress: (message: string) => process.stderr.write(`hbc2js deps --confirm: ${message}\n`) } : {}),
     });
+    if (process.env.HBC2JS_VERBOSE === "1") for (const h of result.hints) process.stderr.write(`hbc2js deps: hint: ${h}\n`);
     if (args.out !== undefined) {
       const deps = packageJsonDependencies(result.report);
       if (Object.keys(deps).length > 0) {
