@@ -273,7 +273,7 @@ Hermes itself differs from Node the row says so and the VM is the reference.
 
 | # | Name | Pattern | Status |
 |---|---|---|---|
-| 60 | member-call-chain-reads | `a.b.c(d.e)`, `a.b["c"](d.e, a.b.ok)` through tracing Proxies | **DIVERGE** all versions, passes on+off — method-call fusion (BUGS.md 2026-11-10 adversarial-1110 open row) |
+| 60 | member-call-chain-reads | `a.b.c(d.e)`, `a.b["c"](d.e, a.b.ok)` through tracing Proxies | PASS after fix-method-read-fusion (was DIVERGE: method-call fusion; verified v94-v99, passes on+off) |
 | 61 | compound-assign-computed | `o[k()] += v()`, `*=`, `-=`, `<<=` on a Proxy | PASS |
 | 62 | optional-chain-sideeffects | `?.` short-circuiting whole chains incl. argument evaluation | PASS |
 | 63 | new-observable-args | `new ns.C(a(), b())`, `new (pick())(…)`, spread `new`, `new` of a non-constructor | PASS after fix (was E_PASS_CRASH in spread-rest with passes on, every version; `constructs/350-spread-new-construct`) |
@@ -284,12 +284,12 @@ Hermes itself differs from Node the row says so and the VM is the reference.
 | 68 | delete-sideeffects | `delete` with computed keys, `deleteProperty` trap, frozen objects | PASS |
 | 69 | in-instanceof-hasinstance | operand order, `Symbol.hasInstance`, Proxy `has` trap, TypeErrors | PASS |
 | 70 | tagged-template-order | tag read vs substitutions, per-site strings identity | PASS-vs-VM: Hermes evaluates the substitutions before reading the tag (`s1 s2 get tag`; Node `get tag s1 s2`); the candidate matches the VM |
-| 71 | throw-mid-args | exception thrown mid-argument-list / mid-literal / mid-assignment | **DIVERGE** all versions, passes on+off — getter callee read skipped when an argument throws (method-call fusion row) |
+| 71 | throw-mid-args | exception thrown mid-argument-list / mid-literal / mid-assignment | PASS after fix-method-read-fusion (was DIVERGE: method-call fusion; verified v94-v99, passes on+off) |
 | 72 | labeled-break-in-finally | labeled `break`/`continue` in `finally` overriding `return`/`throw` | PASS |
 | 73 | global-getter-reads | accessor globals: reads, `=`, `+=`, `++`, `typeof` | PASS |
 | 74 | prototype-getter-chain | methods and setters found through prototype accessors | PASS |
 | 75 | assign-target-before-rhs | target object/key evaluated before the RHS; chained assignment | PASS |
-| 76 | call-args-mutate-receiver | arguments that reassign the callee/receiver | **DIVERGE** v98/v99, passes on+off — getter `m` read after `obj.n = 10` (method-call fusion row); PASS v94/v96 |
+| 76 | call-args-mutate-receiver | arguments that reassign the callee/receiver | PASS after fix-method-read-fusion (was DIVERGE: method-call fusion; verified v94-v99, passes on+off) |
 | 77 | compound-assign-var-mutated-in-rhs | `x += (x = 10, 5)` on locals, captured, globals, members | PASS |
 | 78 | update-expr-getter | `++`/`--` on Proxy members, ToNumeric via valueOf, BigInt | PASS |
 | 79 | object-literal-order | computed key vs value order, spread getters, computed `["__proto__"]` | PASS after fix (computed `"__proto__"` set the prototype, every version; `constructs/351-computed-proto-key`). Line 2 is PASS-vs-VM: Hermes evaluates a computed key's value before the key's `toString` |
@@ -298,4 +298,4 @@ Hermes itself differs from Node the row says so and the VM is the reference.
 | 82 | closures-in-loop-identity | closure identity per iteration, per-closure prototypes and state | PASS |
 | 83 | logical-assign-accessors | `\|\|=` `&&=` `??=`: get always, set only when taken | PASS |
 | 84 | binary-toprimitive-order | left-before-right conversion for every binary/relational operator | PASS |
-| 85 | getter-args-and-receivers | getters on receivers and in arguments; nested method calls | **DIVERGE** all versions, passes on+off — outer `run` read after the inner call (method-call fusion row) |
+| 85 | getter-args-and-receivers | getters on receivers and in arguments; nested method calls | PASS after fix-method-read-fusion (was DIVERGE: method-call fusion; verified v94-v99, passes on+off) |
