@@ -1,0 +1,3 @@
+name: named named true function
+rec: fact 120 true
+outer: probe:0,probe:1
