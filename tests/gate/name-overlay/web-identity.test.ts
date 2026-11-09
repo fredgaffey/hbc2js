@@ -76,7 +76,7 @@ test("web identity: nameable bindings list each bound web of a split register, n
 
 test("web identity: a web-keyed name renames only that live range", () => {
   const code = renderSetup(new Map([["r1_3", { name: "total" }]]));
-  assert.match(code, /let total = apply\.width \+ apply\.height;/);
+  assert.match(code, /let total = r1_2\.width \+ r1_2\.height;/);
   assert.match(code, /return total;/);
   assert.match(code, /let r1 = a1\("styles"\);/, "web 1 keeps its own (unnamed) binding");
   assert.doesNotMatch(code, /r1_3/);
