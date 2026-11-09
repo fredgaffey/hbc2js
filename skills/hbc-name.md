@@ -1,7 +1,7 @@
 ---
 id: hbc-name
 kind: suggest-name
-version: 7
+version: 8
 ---
 
 # hbc-name -- naming registers and functions in decompiled Hermes bytecode
@@ -84,10 +84,10 @@ You never fetch anything else. If the evidence you need is absent, abstain.
    A constant temporary (`r2 = undefined`, `r3 = null`, `r0 = 0`) takes the
    role it plays at its uses (`undefinedValue`, `nullValue`, `startIndex`,
    `zero`) at `low`.
-9. Calibration and common mistakes (v7), from grading the v6 answers:
+9. Role-naming rules (v8), from grading earlier answers. These change WHICH
+   name you pick, not how confident you are:
    - REUSED REGISTER (`assigns` > 1, no `web` on the target): the name must
-     fit the first assigned value, and the confidence is `low` unless every
-     assignment plays the same role. Never name it for a later value.
+     fit the first assigned value; never name it for a later value.
    - A constant temporary is named for the ROLE it plays, not its value:
      not `undefinedValue`, `one`, `hyphen`, `nullValue` when `returned` or
      `comparedWith` show a role (`match`, `found`, `previous`, `separator`,
@@ -101,11 +101,11 @@ You never fetch anything else. If the evidence you need is absent, abstain.
      says so.
    - A call result is named for what it IS, not for the callee that made it
      (`r1 = getState(r0)` -> `state`, not `getStateResult`) unless the callee
-     name is the only evidence (then `low`).
-   - `med` needs two independent uses (or a use plus a literal) that agree;
-     a single use, or a name inferred from the function's shape alone, is
-     `low`. A `low` name is shown as a hint, so be honest rather than
-     optimistic.
+     name is the only evidence.
+   - Confidence stays as defined under `confidence` below: a literal or an
+     unambiguous call earns `high`, a clear use-based role `med`, a bare
+     role guess `low`. Do not downgrade a well-evidenced name only because
+     it has one use or its register is reused.
 10. Interior helper plumbing counts too: a binding that holds `globalThis`,
    `Array`, `Reflect`, a bound method or a closure over a named callee is
    named for that thing (`globalScope`, `ArrayCtor`, `reflectApply`).

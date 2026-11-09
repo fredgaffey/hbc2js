@@ -94,3 +94,14 @@ test("readability-lowconf: hbc-name v7 carries the calibration rules and documen
     assert.ok(skill.body.includes(needle), `skill body lacks ${needle}`);
   }
 });
+
+test("readability-v8: hbc-name v8 keeps the v7 role rules and hint fields but not v7's confidence squeeze", () => {
+  const skill = loadSkill("hbc-name");
+  assert.ok(skill.version >= 8, `hbc-name is v${String(skill.version)}`);
+  for (const needle of ["`assigns`", "`propsRead`", "`comparedWith`", "`argOf`", "not `undefinedValue`", "broad role of the whole parameter", "not for the callee that made it"]) {
+    assert.ok(skill.body.includes(needle), `skill body lacks ${needle}`);
+  }
+  for (const gone of ["is `low` unless every", "two independent uses"]) {
+    assert.ok(!skill.body.includes(gone), `v7 confidence rule still present: ${gone}`);
+  }
+});
