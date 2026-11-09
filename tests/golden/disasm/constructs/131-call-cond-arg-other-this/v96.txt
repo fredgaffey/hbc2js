@@ -1,0 +1,108 @@
+; hbc2js disassembly of 131-call-cond-arg-other-this/v96.hbc
+; version=96 layout=C opcodeTable=hbc96 functions=5 strings=12 globalCodeIndex=0
+function #0 "global"  params=1 frame=18 env=0 flags=dbg  @0x00000154 size=238
+  0000  DeclareGlobalVar     s7 "other"
+  0005  DeclareGlobalVar     s6 "o"
+  000a  DeclareGlobalVar     s8 "otherThis"
+  000f  DeclareGlobalVar     s11 "twice"
+  0014  DeclareGlobalVar     s9 "swapped"
+  0019  CreateEnvironment    r2
+  001b  CreateClosure        r1, r2, f1 "otherThis"
+  0020  GetGlobalObject      r0
+  0022  PutById              r0, r1, #c1, s8 "otherThis"
+  0028  CreateClosure        r1, r2, f2 "twice"
+  002d  PutById              r0, r1, #c2, s11 "twice"
+  0033  CreateClosure        r1, r2, f3 "swapped"
+  0038  PutById              r0, r1, #c3, s9 "swapped"
+  003e  NewObject            r1
+  0040  LoadConstString      r3, s7 "other"
+  0044  PutNewOwnByIdShort   r1, r3, s4 "name"
+  0048  PutById              r0, r1, #c4, s7 "other"
+  004e  NewObject            r1
+  0050  LoadConstString      r3, s6 "o"
+  0054  PutNewOwnByIdShort   r1, r3, s4 "name"
+  0058  CreateClosure        r2, r2, f4 "m"
+  005d  PutNewOwnByIdShort   r1, r2, s5 "m"
+  0061  PutById              r0, r1, #c5, s6 "o"
+  0067  TryGetById           r4, r0, #c1, s10 "print"
+  006d  GetByIdShort         r2, r0, #c2, s8 "otherThis"
+  0072  GetByIdShort         r1, r0, #c3, s6 "o"
+  0077  LoadConstUndefined   r3
+  0079  LoadConstTrue        r7
+  007b  Call3                r2, r2, r3, r1, r7
+  0081  GetByIdShort         r5, r0, #c2, s8 "otherThis"
+  0086  GetByIdShort         r1, r0, #c3, s6 "o"
+  008b  LoadConstFalse       r6
+  008d  Call3                r1, r5, r3, r1, r6
+  0093  Call3                r1, r4, r3, r2, r1
+  0099  TryGetById           r2, r0, #c1, s10 "print"
+  009f  GetByIdShort         r4, r0, #c4, s11 "twice"
+  00a4  GetByIdShort         r1, r0, #c3, s6 "o"
+  00a9  Call3                r1, r4, r3, r1, r7
+  00af  Call2                r1, r2, r3, r1
+  00b4  TryGetById           r2, r0, #c1, s10 "print"
+  00ba  GetByIdShort         r5, r0, #c5, s9 "swapped"
+  00bf  GetByIdShort         r4, r0, #c3, s6 "o"
+  00c4  GetByIdShort         r1, r0, #c6, s7 "other"
+  00c9  Call4                r1, r5, r3, r4, r1, r7
+  00d0  GetByIdShort         r5, r0, #c5, s9 "swapped"
+  00d5  GetByIdShort         r4, r0, #c3, s6 "o"
+  00da  GetByIdShort         r0, r0, #c3, s6 "o"
+  00df  Call4                r0, r5, r3, r4, r0, r6
+  00e6  Call3                r0, r2, r3, r1, r0
+  00ec  Ret                  r0
+
+function #1 "otherThis"  params=3 frame=13 env=0 flags=dbg  @0x00000242 size=40
+  0000  LoadParam            r0, 1
+  0003  GetByIdShort         r3, r0, #c1, s5 "m"
+  0008  LoadConstUInt8       r2, 2
+  000b  LoadParam            r0, 2
+  000e  JmpFalse             L1, r0
+  0011  LoadConstUInt8       r2, 1
+L1:
+  0014  GetByIdShort         r1, r3, #c2, s3 "call"
+  0019  GetGlobalObject      r0
+  001b  GetByIdShort         r0, r0, #c3, s7 "other"
+  0020  Call3                r0, r1, r3, r0, r2
+  0026  Ret                  r0
+
+function #2 "twice"  params=3 frame=14 env=0 flags=dbg  @0x0000026a size=63
+  0000  LoadParam            r1, 1
+  0003  GetByIdShort         r4, r1, #c1, s5 "m"
+  0008  LoadConstUInt8       r3, 2
+  000b  LoadParam            r0, 2
+  000e  JmpFalse             L1, r0
+  0011  LoadConstUInt8       r3, 1
+L1:
+  0014  GetByIdShort         r0, r4, #c2, s3 "call"
+  0019  Call3                r1, r0, r4, r1, r3
+  001f  LoadConstString      r0, s0 ","
+  0023  Add                  r1, r1, r0
+  0027  GetByIdShort         r2, r4, #c2, s3 "call"
+  002c  GetGlobalObject      r0
+  002e  GetByIdShort         r0, r0, #c3, s7 "other"
+  0033  Call3                r0, r2, r4, r0, r3
+  0039  Add                  r0, r1, r0
+  003d  Ret                  r0
+
+function #3 "swapped"  params=4 frame=13 env=0 flags=dbg  @0x000002a9 size=36
+  0000  LoadParam            r0, 1
+  0003  GetByIdShort         r3, r0, #c1, s5 "m"
+  0008  GetByIdShort         r2, r3, #c2, s3 "call"
+  000d  LoadConstUInt8       r1, 2
+  0010  LoadParam            r0, 3
+  0013  JmpFalse             L1, r0
+  0016  LoadConstUInt8       r1, 1
+L1:
+  0019  LoadParam            r0, 2
+  001c  Call3                r0, r2, r3, r0, r1
+  0022  Ret                  r0
+
+function #4 "m"  params=2 frame=2 env=0 flags=dbg  @0x000002cd size=24
+  0000  LoadThisNS           r0
+  0002  GetByIdShort         r1, r0, #c1, s4 "name"
+  0007  LoadConstString      r0, s1 ":"
+  000b  Add                  r1, r1, r0
+  000f  LoadParam            r0, 1
+  0012  Add                  r0, r1, r0
+  0016  Ret                  r0
