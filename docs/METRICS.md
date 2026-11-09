@@ -165,15 +165,27 @@ Own build scored against the package lockfile truth. Offline and `--confirm` giv
 | bluesky own build (precision rules, offline) | see DEPS.md | partial 37 / 78.4% / 14.6%; clean 46 / 73.9% / 17.2% | partial 32 / 90.6% / 14.6%; clean 43 / 79.1% / 17.2% (corpus-precision-forks) | not run | n/a |
 | rainbow own build (precision rules, offline, either DB) | see DEPS.md | 107 / 76.6% / 15.8% | 106 / 77.4% / 15.8% (corpus-precision-forks) | not run | n/a |
 | metamask own build (precision rules, offline, either DB) | see DEPS.md | 169 / 78.1% / 17.6% | unchanged (corpus-precision-forks) | not run | n/a |
+| Expensify/App 12a92bd (J3, scattered rule, db-v4-paths-partial offline) | 288 (91) | 94 / 92.6% / 30.2% | 90 / 96.7% / 30.2% (direct 37.4%; corpus-precision-residual, 0 TP lost) | not run | n/a |
+| Expensify/App 12a92bd (J3, scattered rule, db-v3-clean offline) | 288 (91) | 131 / 67.9% / 30.9% | 128 / 69.5% / 30.9% (corpus-precision-residual, 0 TP lost) | not run | n/a |
+| react-navigation-example 0.85.3 (held out, scattered rule) | 76 (60) | partial 10 / 100% / 13.2%; clean 14 / 100% / 18.4% | unchanged (corpus-precision-residual) | not run | n/a |
+| bluesky own build (scattered rule, offline) | see DEPS.md | partial 32 / 90.6%; clean 43 / 79.1% | partial 29 / 100% / 14.6%; clean 42 / 81.0% / 17.2% (corpus-precision-residual) | not run | n/a |
+| rainbow own build (scattered rule, offline, either DB) | see DEPS.md | 106 / 77.4% / 15.8% | 104 / 78.8% / 15.8% (corpus-precision-residual) | not run | n/a |
+| metamask own build (scattered rule, offline, either DB) | see DEPS.md | 169 / 78.1% / 17.6% | unchanged (corpus-precision-residual) | not run | n/a |
 | Expensify/App 12a92bd (J3, + exact-version overlay `db-overlay-recall` 264 files, db-v3-clean offline) | 288 (91) | 131 / 67.9% / 30.9% (precision rules) | 207 / 80.7% / 58.0% (direct 80.2%; deps-recall-nosig; overlay population taken from this truth file, see DEPS.md) | not run | n/a |
 | Expensify/App 12a92bd (J3, + exact-version overlay, db-v4-paths-partial offline) | 288 (91) | 94 / 92.6% / 30.2% (precision rules) | 170 / 96.5% / 56.9% (direct 82.4%; deps-recall-nosig) | not run | n/a |
 | react-navigation-example 0.85.3 (held out, + exact-version overlay) | 76 (60) | partial 10 / 100% / 13.2%; clean 14 / 100% / 18.4% | partial 15 / 100% / 19.7%; clean 18 / 100% / 23.7% (deps-recall-nosig) | not run | n/a |
+| five truth apps (one-sided twin, corpus-twin-sourcemap; partial/clean, with/without overlay) | see DEPS.md | Expensify + overlay: partial 166 / 98.8%, clean 204 / 81.9% | Expensify + overlay: partial 165 / 99.4% (FP `lodash-es` only), clean 201 / 83.1%; the other 18 runs unchanged; 0 TP lost; react-navigation 0 FP | not run | n/a |
 | Expensify/App 12a92bd (J3, + truth-blind population overlay `db-overlay-pop` 739 files, db-v3-clean offline) | 288 (91) | 131 / 67.9% / 30.9% | 158 / 71.5% / 39.2% (direct 42.9%; deps-population-widen) | not run | n/a |
 | react-navigation-example 0.85.3 (held out, + population overlay, db-v3-clean offline) | 76 (60) | 14 / 100% / 18.4% | 17 / 94.1% / 21.1% (direct 23.3%; FP `@babel/standalone`) | not run | n/a |
 | bluesky own build (+ population overlay, db-v3-clean offline) | see DEPS.md | 43 / 79.1% / 17.2% | 47 / 78.7% / 18.7% (deps-population-widen) | not run | n/a |
 | rainbow own build (hbc96, + population overlay, db-v3-clean offline) | see DEPS.md | 106 / 77.4% / 15.8% | 108 / 77.8% / 16.2% (deps-population-widen) | not run | n/a |
 | metamask own build (hbc96, + population overlay, db-v3-clean offline) | see DEPS.md | 169 / 78.1% / 17.6% | 175 / 78.9% / 18.4% (deps-population-widen) | not run | n/a |
-
+| Expensify/App 12a92bd (J3, hash-index candidates, db-v3-clean offline) | 288 (91) | 128 / 69.5% / 30.9% (main 87ec7b8) | 130 / 70.0% / 31.6% (direct 35.2%; corpus-recall-candidates, +`js-base64` `react-native-uuid`, 0 FP added) | not run | n/a |
+| Expensify/App 12a92bd (J3, hash-index candidates, db-v4-paths-partial offline) | 288 (91) | 90 / 96.7% / 30.2% | 92 / 96.7% / 30.9% (direct 37.4%; corpus-recall-candidates) | not run | n/a |
+| react-navigation-example 0.85.3 (held out, hash-index candidates) | 76 (60) | partial 10 / 100% / 13.2%; clean 14 / 100% / 18.4% | unchanged, 0 FP (corpus-recall-candidates) | not run | n/a |
+| bluesky own build (hash-index candidates, offline) | see DEPS.md | partial 29 / 100% / 14.6%; clean 42 / 81.0% / 17.2% | unchanged (corpus-recall-candidates) | not run | n/a |
+| rainbow own build (hash-index candidates, offline, either DB) | see DEPS.md | 104 / 78.8% / 15.8% (direct 20.4%) | 127 / 81.9% / 20.1% (direct 26.5%; corpus-recall-candidates, +22 TP, +1 FP `digest-fetch`) | not run | n/a |
+| metamask own build (hash-index candidates, offline, either DB) | see DEPS.md | 169 / 78.1% / 17.6% (direct 20.3%) | 178 / 79.2% / 18.8% (direct 20.3%; corpus-recall-candidates, +10 TP, `bs58` lost, FP `react-base16-styling` in, `eventid` out) | not run | n/a |
 Store-bundle scoring was not repeated in this measurement.
 
 ## `--confirm` on three apps without ground truth
@@ -193,3 +205,24 @@ The precision proxy (10 confirmed packages sampled per app, checked against bund
 - The 2 `totalModules: 0` apps are webpack or multi-bundle shapes (`corpus-B4`, open).
 - Store-bundle ground-truth numbers and the precision proxy on the other 12 apps were not re-measured.
 - Guessed-tier entries for generic English words (for example `focus`, `any`, `reject`) are still present offline; the minimum-evidence rule acts on the confirm tier.
+
+## db-v4-paths ship readiness (2026-11-09, partial rebuild, offline)
+
+Partial rebuild: 29,885 of 71,222 files had paths when measured; the v4 column is that DB layered over db-v3-clean for the rest (so it is a lower bound). Code: main plus the ship tooling (new demotion rules included). Same bundles and truth files as above.
+
+Validator on the 28,557 files then done: 0 errors, all `hashScheme` 2, hbc98 14,220 / hbc99 14,337, module path coverage 89.9% (5,019,382 of 5,584,113), function `moduleId` coverage 60.9% (36.96M of 60.68M; deeper-than-factory or baseline functions have none), 261 files with under half their modules pathed.
+
+| app | db | confirmed | TP | FP | precision | recall |
+|---|---|---|---|---|---|---|
+| Expensify | v3-clean | 131 | 89 | 42 | 0.679 | 0.309 |
+| Expensify | v4 partial | 102 | 88 | 14 | 0.863 | 0.306 |
+| react-navigation | v3-clean | 14 | 14 | 0 | 1.000 | 0.184 |
+| react-navigation | v4 partial | 11 | 11 | 0 | 1.000 | 0.145 |
+| bluesky | v3-clean | 43 | 34 | 9 | 0.791 | 0.172 |
+| bluesky | v4 partial | 39 | 32 | 7 | 0.821 | 0.162 |
+| rainbow | v3-clean | 106 | 82 | 24 | 0.774 | 0.158 |
+| rainbow | v4 partial | 106 | 82 | 24 | 0.774 | 0.158 |
+| metamask | v3-clean | 169 | 132 | 37 | 0.781 | 0.176 |
+| metamask | v4 partial | 169 | 132 | 37 | 0.781 | 0.176 |
+
+Rainbow and metamask are unchanged because none of their false-positive owners was rebuilt yet; re-measure after DONE (`ship-meas/meas.sh`-style run with the final DB).

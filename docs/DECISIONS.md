@@ -452,3 +452,14 @@ origins `traceFile` would read are resolved on the main thread and handed over
 as `tracedOrigins`. A context with a live `oracle`/`functionOracle`/`evaluator`
 stays in-process, as before. The in-process path is compute-then-commit, so
 `rewriteFunction`/`fileOp` behave identically for the UI, MCP and CLI callers.
+
+## D35 — Export's offline bundle check targets the installed babel preset; the tree keeps the original toolchain names
+
+An export of an app older than the pinned toolchain (RN 0.72 names
+`metro-react-native-babel-preset`) still has to bundle offline in the gate. The
+check redirects Metro's `babelTransformerPath` to a wrapper over the installed
+`@react-native/metro-babel-transformer`; the exported tree is not modified and
+no `--toolchain` flag exists. Rejected: a second pinned toolchain per RN minor.
+See spec 29 §4.6.
+
+- **Default readability naming model is Sonnet (2026-11-09).** `DEFAULT_MODEL_ALIAS` in `src/readability/types.ts` is the one source of truth (claude-cli alias, agent driver; HTTP backend uses the matching id). Measured on the held-out app: sonnet 75% vs haiku 53% lenient accuracy and fewer tokens per named binding. Override: `--model`/`HBC2JS_LLM_MODEL=haiku`. See docs/READABILITY.md.

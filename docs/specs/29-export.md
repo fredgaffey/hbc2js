@@ -374,6 +374,26 @@ for an id absent from the index entirely) -- not the P2.1 `modules.json`/
 `functions.jsonl` artifact stack (spec 10), which carries no package field
 at all; EXPORT.json is the right join here.
 
+### 4.6 Offline bundling check: the installed toolchain, the tree unchanged
+
+An exported tree names the toolchain of the app it came from (§4.3): an RN 0.72
+app gets `metro-react-native-babel-preset` 0.77 / metro 0.76 in
+`babel.config.js` and `package.json`. This repo pins one toolchain (RN 0.85.3),
+so the offline check (`src/export/offline-check.ts`, used by the gate) cannot
+resolve those names and Metro dies at "Cannot find module
+metro-react-native-babel-preset". Choice: the tree stays faithful to the
+original app (a user who installs it themselves gets the original toolchain),
+and only the check is redirected: Metro's `transformer.babelTransformerPath`
+points at `offline-babel-transformer.cjs`, which runs the installed
+`@react-native/metro-babel-transformer` with an empty `projectRoot`, so the
+tree's own `babel.config.js` is ignored and the installed
+`@react-native/babel-preset` is used. No file in the tree is written or
+changed, and there is no CLI flag. Rejected: pinning a second toolchain per RN
+minor (heavy, more dependencies, more upkeep). Proof: the RN 0.72 template
+exports and bundles offline (`tests/gate/export/build.test.ts`, sweep tier).
+Limit: this proves the tree's sources transform and resolve, not that the
+original toolchain would; that is a property of the original app's own pins.
+
 ## 5. Library substitution — real imports where the evidence supports one
 
 ### 5.1 The granularity problem, stated honestly

@@ -46,7 +46,13 @@ export const SKILLS_DIR = "skills";
 // Backend configuration (spec 28 section 9.1)
 // ---------------------------------------------------------------------------
 
+/** Haiku model id, kept for `--model`/env overrides and old recordings. */
 export const DEFAULT_HAIKU_MODEL = "claude-haiku-4-5-20251001";
+/** SINGLE SOURCE OF TRUTH for the default readability naming model (docs/READABILITY.md
+ *  2026-11-09: sonnet 75% vs haiku 53% lenient, cheaper per named register). The
+ *  alias is for `claude -p`; the id is the HTTP backend's equivalent. */
+export const DEFAULT_MODEL_ALIAS = "sonnet";
+export const DEFAULT_SONNET_MODEL = "claude-sonnet-5-5";
 /** Env var holding the model id override. */
 export const MODEL_ENV = "HBC2JS_LLM_MODEL";
 /** Env var holding the per-run token budget. */
@@ -58,7 +64,7 @@ export const CACHE_DIR_ENV = "HBC2JS_LLM_CACHE_DIR";
 export const API_KEY_ENV = "ANTHROPIC_API_KEY";
 
 export interface HaikuBackendConfig {
-  /** Model id; `DEFAULT_HAIKU_MODEL` unless config/env overrides it. */
+  /** Model id; `DEFAULT_SONNET_MODEL` unless config/env overrides it. */
   readonly model: string;
   /** Hard stop for one run, in TOKENS (the project's tokens-not-dollars
    *  convention). A run that would exceed it stops cleanly. */
@@ -139,7 +145,7 @@ export function resolveHaikuConfig(
   overrides: ConfigOverrides = {},
   projectDir = ".",
 ): HaikuBackendConfig {
-  const shared = resolveSharedConfig(env, overrides, projectDir, DEFAULT_HAIKU_MODEL);
+  const shared = resolveSharedConfig(env, overrides, projectDir, DEFAULT_SONNET_MODEL);
   return { ...shared, apiKeyEnv: API_KEY_ENV };
 }
 
@@ -151,7 +157,7 @@ function numberFromEnv(raw: string | undefined, name: string): number | undefine
 }
 
 /** `claude -p` accepts a model alias, not a full Anthropic model id. */
-export const DEFAULT_CLAUDE_CLI_MODEL = "haiku";
+export const DEFAULT_CLAUDE_CLI_MODEL = DEFAULT_MODEL_ALIAS;
 /** Env var overriding the `claude` binary invoked; a bare command name is
  *  resolved against `PATH` the way `child_process.spawn` already does. */
 export const CLAUDE_BIN_ENV = "HBC2JS_CLAUDE_BIN";

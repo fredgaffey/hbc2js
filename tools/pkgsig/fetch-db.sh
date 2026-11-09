@@ -34,6 +34,15 @@
 # the same user-cache layer `hbc2js deps` already reads by default
 # (docs/DEPS.md "Signature DB layering").
 #
+# Release by tag: with no source set, HBC2JS_SIGDB_TAG=<release tag> (e.g.
+# sigdb-v4-20261109, the module-paths DB, docs/PACKAGE-SIGNATURES.md "Shipping
+# db-v4-paths") fetches
+# https://github.com/${HBC2JS_SIGDB_REPO:-fredgaffey/hbc2js}/releases/download/<tag>/<tag>.tar.zst
+# (a private repo needs HBC2JS_SIGDB_SOURCE with a reachable URL instead).
+# HBC2JS_SIGDB_SHA256=<hex> checks the archive against the release's
+# SHA256SUMS line. No default tag: until the owner publishes v4, behaviour is
+# unchanged.
+#
 # Neither env var has a default: no archive is published anywhere public yet
 # (D17c: "distributed separately... fetch-on-demand" is the plan; only a
 # remote-hosted build exists as of this task). Whoever hosts a public release
@@ -56,8 +65,11 @@
 set -euo pipefail
 
 SOURCE="${HBC2JS_SIGDB_SOURCE:-${HBC2JS_SIGDB_URL:-}}"
+if [ -z "$SOURCE" ] && [ -n "${HBC2JS_SIGDB_TAG:-}" ]; then
+  SOURCE="https://github.com/${HBC2JS_SIGDB_REPO:-fredgaffey/hbc2js}/releases/download/$HBC2JS_SIGDB_TAG/$HBC2JS_SIGDB_TAG.tar.zst"
+fi
 if [ -z "$SOURCE" ]; then
-  echo "ERROR: set HBC2JS_SIGDB_SOURCE (see docs/PACKAGE-SIGNATURES.md §6)." >&2
+  echo "ERROR: set HBC2JS_SIGDB_SOURCE or HBC2JS_SIGDB_TAG (see docs/PACKAGE-SIGNATURES.md §6)." >&2
   echo "  e.g. HBC2JS_SIGDB_SOURCE=https://.../sigdb-20260830-partial.tar.zst $0 [dest-dir]" >&2
   echo "  or:  HBC2JS_SIGDB_SOURCE=$HBC2JS_REMOTE_HOST:~/hbc2js-bulk/dist/sigdb-20260830-partial.tar.zst $0 [dest-dir]" >&2
   exit 1
@@ -87,6 +99,11 @@ case "$SOURCE" in
     cp "$SOURCE" "$ARCHIVE"
     ;;
 esac
+
+if [ -n "${HBC2JS_SIGDB_SHA256:-}" ]; then
+  GOT="$( { sha256sum "$ARCHIVE" 2>/dev/null || shasum -a 256 "$ARCHIVE"; } | cut -d' ' -f1)"
+  [ "$GOT" = "$HBC2JS_SIGDB_SHA256" ] || { echo "ERROR: sha256 mismatch (got $GOT)" >&2; exit 1; }
+fi
 
 case "$SOURCE" in
   *.tar.zst) tar --zstd -xf "$ARCHIVE" -C "$DEST" ;;

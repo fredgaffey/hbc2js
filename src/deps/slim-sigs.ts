@@ -8,7 +8,7 @@
 // counts. Never write a slim record back to a sigdb.
 
 import type { ModuleInventory } from "./inventory.ts";
-import { foreignSets } from "./module-paths.ts";
+import { foreignSets, viaDependencyCounts } from "./module-paths.ts";
 import { LEGACY_PREFIX, schemeKey } from "./match.ts";
 import type { SigDbFile } from "./sigdb-types.ts";
 
@@ -59,6 +59,7 @@ export function slimSigFile(f: SigDbFile, intern: Map<string, string>, target?: 
     const o: Record<string, unknown> = { factoryFunctionIndex: m.factoryFunctionIndex, localModuleId: m.localModuleId, factoryExactHash: sn(m.factoryExactHash), factoryFuzzyHash: sn(m.factoryFuzzyHash), factoryIsBaseline: m.factoryIsBaseline };
     if (m.factoryIsDependency !== undefined) o.factoryIsDependency = m.factoryIsDependency;
     if (m.path !== undefined) o.path = m.path === null ? null : s(m.path);
+    if (m.depIds !== undefined) o.depIds = m.depIds;
     return o;
   };
   const head = (): Record<string, unknown> => {
@@ -109,9 +110,24 @@ export function slimSigFile(f: SigDbFile, intern: Map<string, string>, target?: 
     keptModules.push(m);
     if (fnByIndex.has(m.factoryFunctionIndex)) keptFn.add(m.factoryFunctionIndex);
   }
+  // corpus-path-recall: own files that require another package's module
+  // (and those modules) stay, with their counts, for promoteViaDependency.
+  const graph = viaDependencyCounts(f, target.minInstr);
+  const keptSet = new Set(keptModules);
+  for (const m of graph.wrappers) {
+    if (!keptSet.has(m)) {
+      keptSet.add(m);
+      keptModules.push(m);
+    }
+    for (const d of graph.depsOf(m)) {
+      if (keptSet.has(d)) continue;
+      keptSet.add(d);
+      keptModules.push(d);
+    }
+  }
   const o = head();
   o.functions = f.functions.filter((fn) => keptFn.has(fn.index)).map(fnRec);
   o.modules = keptModules.map(modRec);
-  o.slim = { minInstr: target.minInstr, eligible, moduleTotal, distinctEligible: distinct.size };
+  o.slim = { minInstr: target.minInstr, eligible, moduleTotal, distinctEligible: distinct.size, ...(f.modulePaths !== undefined && f.modulePaths >= 1 ? { ownPathDistinct: graph.ownPathDistinct, ownFuzzy: graph.ownFuzzy } : {}) };
   return o as unknown as SigDbFile;
 }

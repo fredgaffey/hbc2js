@@ -206,3 +206,38 @@ export function foreignSets(file: SigDbFile): ForeignSets {
   cache.set(file, out);
   return out;
 }
+
+/** corpus-path-recall (docs/PACKAGE-SIGNATURES.md §7 "Recovery through the
+ *  module graph"): a path-bearing file's own modules that require another
+ *  package's module ("wrappers"), the distinct eligible exact hashes of its
+ *  own path-bearing modules' functions, and each wrapper's distinct
+ *  eligible fuzzy hashes. Computed from the full file; `slimSigFile`
+ *  stores the counts so a slimmed file is judged the same. */
+export function viaDependencyCounts(file: SigDbFile, minInstr: number): {
+  readonly wrappers: readonly SigModule[];
+  readonly depsOf: (m: SigModule) => readonly SigModule[];
+  readonly ownPathDistinct: number;
+  readonly ownFuzzy: Readonly<Record<number, number>>;
+} {
+  const byId = new Map(file.modules.map((m) => [m.localModuleId, m]));
+  const isOwnPath = (m: SigModule): boolean => typeof m.path === "string" && isOwnModulePath(file.package, m.path);
+  const depsOf = (m: SigModule): SigModule[] =>
+    (m.depIds ?? []).map((d) => byId.get(d)).filter((d): d is SigModule => d !== undefined && typeof d.path === "string" && !isOwnModulePath(file.package, d.path));
+  if (file.modulePaths === undefined || file.modulePaths < 1) return { wrappers: [], depsOf, ownPathDistinct: 0, ownFuzzy: {} };
+  const ownIds = new Set(file.modules.filter(isOwnPath).map((m) => m.localModuleId));
+  const wrappers = file.modules.filter((m) => isOwnPath(m) && m.localModuleId !== null && depsOf(m).length > 0);
+  const wrapperIds = new Set(wrappers.map((m) => m.localModuleId));
+  const exact = new Set<string>();
+  const fuzzy = new Map<number, Set<string>>();
+  for (const f of file.functions) {
+    if (f.instrCount < minInstr || f.moduleId === undefined || !ownIds.has(f.moduleId)) continue;
+    exact.add(f.exactHash);
+    if (!wrapperIds.has(f.moduleId)) continue;
+    let set = fuzzy.get(f.moduleId);
+    if (set === undefined) fuzzy.set(f.moduleId, (set = new Set()));
+    set.add(f.fuzzyHash);
+  }
+  const ownFuzzy: Record<number, number> = {};
+  for (const m of wrappers) ownFuzzy[m.localModuleId!] = fuzzy.get(m.localModuleId!)?.size ?? 0;
+  return { wrappers, depsOf, ownPathDistinct: exact.size, ownFuzzy };
+}
