@@ -555,7 +555,7 @@ async function installCandidate(candidate: ResolvedCandidate, scratchProjectDir:
   try {
     const pj = JSON.parse(readFileSync(join(scratchProjectDir, "node_modules", ...candidate.package.split("/"), "package.json"), "utf8"));
     const peers = missingPeers(pj, (n) => existsSync(join(scratchProjectDir, "node_modules", ...n.split("/"), "package.json")));
-    if (peers.length > 0) await execFileAsync("npm", peerInstallArgv(peers), { cwd: scratchProjectDir, env });
+    if (peers.length > 0) await execFileAsync("npm", peerInstallArgv(spec, peers), { cwd: scratchProjectDir, env });
   } catch {
     // Best effort: an uninstallable peer just leaves the bundle to fail as before.
   }

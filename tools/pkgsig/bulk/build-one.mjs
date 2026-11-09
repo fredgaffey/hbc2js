@@ -146,7 +146,7 @@ function installPackage() {
     const pj = JSON.parse(readFileSync(join(scaffoldDir, "node_modules", ...pkg.split("/"), "package.json"), "utf8"));
     const peers = missingPeers(pj, (n) => existsSync(join(scaffoldDir, "node_modules", ...n.split("/"), "package.json")));
     if (peers.length > 0) {
-      execFileSync("npm", peerInstallArgv(peers), pipedOpts({ cwd: scaffoldDir, timeout: 180_000 }));
+      execFileSync("npm", peerInstallArgv(spec, peers), pipedOpts({ cwd: scaffoldDir, timeout: 180_000 }));
       installedPeers.push(...peers.map((p) => p.name));
     }
   } catch {

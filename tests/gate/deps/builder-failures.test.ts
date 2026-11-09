@@ -26,7 +26,7 @@ function loadConfig(prev?: (c: unknown, n: string, p: string) => unknown) {
 test("BUILDFAIL1(b): unresolvable Node built-ins map to an empty shim; real resolutions are untouched", () => {
   const resolve = loadConfig();
   const failing = { resolveRequest: (_c: unknown, n: string) => { throw new Error("Unable to resolve " + n); } };
-  for (const n of ["os", "node:util", "module", "fs", "path", "crypto", "stream", "events", "fs/promises"]) {
+  for (const n of ["os", "node:util", "module", "fs", "path", "crypto", "stream", "events", "fs/promises", "node:sqlite", "node:whatever"]) {
     assert.deepEqual(resolve(failing, n, "android"), { type: "sourceFile", filePath: "/scratch/hbc2js-node-shim.js" }, n);
   }
   assert.throws(() => resolve(failing, "expo-modules-core", "android"), /Unable to resolve/);
@@ -46,7 +46,8 @@ test("BUILDFAIL1(a): non-optional absent peers are planned; optional, installed,
     (n) => n === "expo-font",
   );
   assert.deepEqual(peers.map((p) => `${p.name}@${p.range}`), ["expo-modules-core@*", "react-native-worklets@>=0.5.0"]);
-  const argv = peerInstallArgv(peers);
+  const argv = peerInstallArgv("expo-asset@57.0.7", peers);
+  assert.equal(argv[1], "expo-asset@57.0.7", "target repeated: --no-save installs prune the earlier target");
   assert.ok(argv.includes("react-native-worklets@>=0.5.0") && argv.includes("--ignore-scripts") && argv.includes("--no-save"));
   assert.deepEqual(missingPeers({}, () => false), []);
 });

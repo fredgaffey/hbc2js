@@ -15,6 +15,7 @@ export const NODE_BUILTINS: readonly string[] = [
   "domain", "events", "fs", "fs/promises", "http", "http2", "https", "inspector", "module", "net", "os", "path", "path/posix", "path/win32",
   "perf_hooks", "process", "punycode", "querystring", "readline", "repl", "stream", "stream/promises", "string_decoder", "sys", "timers",
   "timers/promises", "tls", "tty", "url", "util", "util/types", "v8", "vm", "worker_threads", "zlib",
+  "dns/promises", "readline/promises", "stream/web", "stream/consumers", "inspector/promises", "trace_events", "wasi", "sqlite", "test", "sea", "cluster", "tty",
 ];
 
 export const BUILDER_METRO_CONFIG_NAME = "metro.hbc2js-builder.config.js";
@@ -38,7 +39,7 @@ module.exports = mergeConfig(base, {
       try {
         return prev ? prev(context, moduleName, platform) : context.resolveRequest(context, moduleName, platform);
       } catch (err) {
-        if (BUILTINS.has(moduleName.replace(/^node:/, ''))) return { type: 'sourceFile', filePath: SHIM };
+        if (moduleName.startsWith('node:') || BUILTINS.has(moduleName)) return { type: 'sourceFile', filePath: SHIM };
         throw err;
       }
     },
@@ -72,7 +73,9 @@ export function missingPeers(pkgJson: { peerDependencies?: Record<string, string
   return out;
 }
 
-/** npm argv installing the missing peers (npm resolves the range). */
-export function peerInstallArgv(peers: readonly PeerSpec[]): string[] {
-  return ["install", ...peers.map((p) => `${p.name}@${p.range}`), "--ignore-scripts", "--no-save", "--no-audit", "--no-fund", "--legacy-peer-deps"];
+/** npm argv installing the missing peers (npm resolves the range). `spec` (the
+ *  package itself) MUST be repeated: a `--no-save` install prunes earlier
+ *  `--no-save` packages as extraneous, so peers alone would delete the target. */
+export function peerInstallArgv(spec: string, peers: readonly PeerSpec[]): string[] {
+  return ["install", spec, ...peers.map((p) => `${p.name}@${p.range}`), "--ignore-scripts", "--no-save", "--no-audit", "--no-fund", "--legacy-peer-deps"];
 }
