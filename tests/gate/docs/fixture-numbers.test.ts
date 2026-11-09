@@ -12,7 +12,8 @@ test("construct fixture numeric prefixes are unique", () => {
   for (const name of readdirSync(dir)) {
     const m = /^(\d+)-/.exec(name);
     if (!m) continue;
-    seen.set(m[1], [...(seen.get(m[1]) ?? []), name]);
+    const k = m[1] as string;
+    seen.set(k, [...(seen.get(k) ?? []), name]);
   }
   const dups = [...seen].filter(([, v]) => v.length > 1).map(([k, v]) => `${k}: ${v.join(", ")}`);
   assert.deepEqual(dups, []);
