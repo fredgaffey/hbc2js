@@ -10,7 +10,7 @@ import { repoRoot } from "../../support/paths.ts";
 import { analyseModule } from "../../../src/cfg/index.ts";
 import { parseForDecompile } from "../../../src/decompile.ts";
 import { NameService, OverlayStore, regId } from "../../../src/name-overlay/index.ts";
-import { rawFrames } from "../../../src/name-overlay/frames.ts";
+import { rawFrames, rawFramesFor } from "../../../src/name-overlay/frames.ts";
 
 const DIR = join(repoRoot(), "tests", "fixtures", "constructs");
 const F96 = join(DIR, "96-reg-reuse-straight", "v99.hbc");
@@ -61,4 +61,23 @@ test("render-cost: scoped render is byte-identical to the whole-module slice (co
     }
   }
   assert.ok(compared > 100, `compared ${compared}`);
+});
+
+test("render-cost: rawFramesFor(fn) captures the same raw frame as the whole-module rawFrames", () => {
+  const dirs = readdirSync(DIR).filter((d) => /^\d\d-/.test(d)).slice(0, 25);
+  let compared = 0;
+  for (const d of dirs) {
+    const p = join(DIR, d, "v99.hbc");
+    if (!existsSync(p)) continue;
+    const analysis = analysisOf(p);
+    const whole = rawFrames(analysis, { strictEnv: false });
+    for (const [f, frame] of whole) {
+      if (f >= 12) continue;
+      const one = rawFramesFor(analysis, f, { strictEnv: false }).get(f);
+      assert.ok(one !== undefined, `${d} fn ${f}`);
+      assert.equal(JSON.stringify(one.node), JSON.stringify(frame.node), `${d} fn ${f}`);
+      compared++;
+    }
+  }
+  assert.ok(compared > 50, `compared ${compared}`);
 });
