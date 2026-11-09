@@ -395,3 +395,21 @@ own `.apply`, overridden `Function.prototype.apply`) is T2 PASS at
 84/94/96/98/99 with no shim at 98/99; hand-built arms pin the apply proof
 and its refusals (other builtin, other `this`, other function, non-arguments
 array, untested callee, reify outside the apply form).
+
+**Review 1110** (`tests/gate/passes/review-1110-diamonds.test.ts`). Fixture
+`320-review-diamonds-probes` is a negative control, T2 PASS at
+84/94/96/98/99 with all 26 v99 diamonds collapsed: bound, Proxy and
+non-callable callees; `Function.prototype.call/apply` deleted, overridden
+and restored mid-function and mid-loop; a getter on the callee read and on
+`.call`; the receiver register reassigned inside the argument list; nested
+diamonds; throws between the read and the call (long-form call in `try`);
+parameters reassigned before a loose/strict/default-param `apply`;
+`arguments` written (`[0]`, `length`), escaping through an arrow or an
+alias, or used twice (hermesc emits no diamond then: the
+`CreateArgumentsInst` has another user). One bug, outside the diamond
+proof: the `__hbc_arguments` copy was a strict arguments object, so a loose
+function's forwarded/escaping `arguments` lost `callee` (reading it threw
+instead of giving the function); the copy is now made by a loose,
+parameterless function (still unmapped) and takes the source object's own
+`callee` descriptor (fixture `321-review-diamonds-arguments-callee`,
+DIVERGENT at every version before).
