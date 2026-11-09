@@ -93,6 +93,25 @@ be any expression — `.apply` takes it as a value, so no array literal is neede
 `F` must satisfy the `impure-callee` rule above. Fewer than two arguments →
 refuse (`helper-arity`).
 
+**R3f — receiverless member call** (added 2026-11-09, round-trip review
+`passes-roundtrip-global`). `Reflect.apply(member(O, P, c), T, [a…])` where `T`
+passes R3a's undefined proof → `(0, O.P)(a…)` (a `seq` callee). This is
+Babel's interop call, `(0, _mod.default)(x)`, and it was the one shape R3a/R3b
+left as a real `Reflect.apply`: the old `member-callee-with-undefined-this`
+refusal was right that `O.P(a…)` would change `this`, but the sequence form
+does not — a parenthesised comma expression yields a plain value, so the call
+gets `this === undefined`, exactly as the bytecode did. Effect order is
+unchanged (`O.P` read, then the arguments, then the call); a non-callable
+`O.P` still throws `TypeError`, with hermesc's call-site message instead of
+`Reflect.apply`'s, the same caveat R3a already carries. `hermesc -O` compiles
+`(0, O.P)(a…)` to `GetById` + `LoadConst undefined` + `CallN`, the original
+instruction sequence; on react-navigation-example (v98) the leftover
+`Reflect.apply` was the largest sub-cause of the `diff:*/GetGlobalObject`
+buckets. Fixture `160-receiverless-member-call` (with the plain method call
+`ns.fn(x)` as its negative twin), test
+`tests/gate/passes/call-shape-receiverless.test.ts`. The checker additionally
+asserts the callee is exactly `(0, F)` over the source's own `F` node.
+
 ## 5. Writer
 
 Replace exactly that one `call` node in place; the enclosing statement and every
@@ -125,7 +144,8 @@ spread call arguments and optional calls are shapes *of a call*, not of
 `Reflect.apply`.
 
 **Refuse (per-site):** `dynamic-args`, `impure-callee`, `unproven-this`,
-`member-callee-with-undefined-this`, `explicit-new-target`,
+`member-callee-with-undefined-this` (retired 2026-11-09: R3f now rewrites the
+site; the reason name stays in the type for history), `explicit-new-target`,
 `duplicated-construct-callee`, `helper-arity`, `reflect-get-set` (never
 matched at all).
 

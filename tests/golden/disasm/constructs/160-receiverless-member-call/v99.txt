@@ -1,0 +1,86 @@
+; hbc2js disassembly of 160-receiverless-member-call/v99.hbc
+; version=99 layout=E opcodeTable=hbc99-mar2026 functions=4 strings=15 globalCodeIndex=0
+function #0 "global"  params=1 frame=16 env=0 flags=strict,dbg,overflowed  @0x00000168 size=226
+  0000  DeclareGlobalVar     s11 "describe"
+  0005  DeclareGlobalVar     s14 "viaSeq"
+  000a  DeclareGlobalVar     s10 "viaMethod"
+  000f  DeclareGlobalVar     s12 "ns1"
+  0014  DeclareGlobalVar     s13 "ns2"
+  0019  GetGlobalObject      r2
+  001b  LoadConstUndefined   r1
+  001d  CreateClosure        r3, r1, f1 "describe"
+  0022  PutByIdStrict        r2, r3, #c0, s11 "describe"
+  0028  CreateClosure        r3, r1, f2 "viaSeq"
+  002d  PutByIdStrict        r2, r3, #c1, s14 "viaSeq"
+  0033  CreateClosure        r3, r1, f3 "viaMethod"
+  0038  PutByIdStrict        r2, r3, #c2, s10 "viaMethod"
+  003e  NewObjectWithBuffer  r3, sh0(numProps=2), lit@0x0000
+  0044  GetByIdShort         r4, r2, #c0, s11 "describe"
+  0049  PutOwnBySlotIdx      r3, r4, 1
+  004d  PutByIdStrict        r2, r3, #c3, s12 "ns1"
+  0053  NewObjectWithBuffer  r3, sh0(numProps=2), lit@0x0004
+  0059  GetByIdShort         r4, r2, #c0, s11 "describe"
+  005e  PutOwnBySlotIdx      r3, r4, 1
+  0062  PutByIdStrict        r2, r3, #c4, s13 "ns2"
+  0068  TryGetById           r4, r2, #c1, s9 "print"
+  006e  GetByIdShort         r5, r2, #c2, s14 "viaSeq"
+  0073  GetByIdShort         r3, r2, #c3, s12 "ns1"
+  0078  LoadConstUInt8       r0, 1
+  007b  Call3                r3, r5, r1, r3, r0
+  0081  Call2                r3, r4, r1, r3
+  0086  TryGetById           r4, r2, #c1, s9 "print"
+  008c  GetByIdShort         r5, r2, #c2, s14 "viaSeq"
+  0091  GetByIdShort         r3, r2, #c4, s13 "ns2"
+  0096  LoadConstUInt8       r0, 3
+  0099  Call3                r3, r5, r1, r3, r0
+  009f  Call2                r3, r4, r1, r3
+  00a4  TryGetById           r4, r2, #c1, s9 "print"
+  00aa  GetByIdShort         r5, r2, #c5, s10 "viaMethod"
+  00af  GetByIdShort         r3, r2, #c3, s12 "ns1"
+  00b4  LoadConstUInt8       r0, 5
+  00b7  Call3                r3, r5, r1, r3, r0
+  00bd  Call2                r3, r4, r1, r3
+  00c2  TryGetById           r3, r2, #c1, s9 "print"
+  00c8  GetByIdShort         r4, r2, #c5, s10 "viaMethod"
+  00cd  GetByIdShort         r2, r2, #c4, s13 "ns2"
+  00d2  LoadConstUInt8       r0, 7
+  00d5  Call3                r2, r4, r1, r2, r0
+  00db  Call2                r2, r3, r1, r2
+  00e0  Ret                  r2
+
+function #1 "describe"  params=2 frame=4 env=0 flags=strict,dbg,overflowed  @0x0000024a size=43
+  0000  LoadParam            r1, 0
+  0003  LoadConstString      r3, s0 "no receiver"
+  0007  LoadConstUndefined   r0
+  0009  JStrictEqual         L1, r1, r0
+  000d  GetByIdShort         r2, r1, #c0, s8 "tag"
+  0012  LoadConstString      r1, s1 "receiver "
+  0016  Add                  r3, r1, r2
+L1:
+  001a  LoadParam            r2, 1
+  001d  LoadConstString      r1, s2 " "
+  0021  AddS                 r1, r3, r1
+  0025  Add                  r1, r1, r2
+  0029  Ret                  r1
+
+function #2 "viaSeq"  params=3 frame=15 env=0 flags=strict,dbg,overflowed  @0x00000275 size=49
+  0000  LoadParam            r4, 1
+  0003  LoadParam            r2, 2
+  0006  GetByIdShort         r3, r4, #c0, s7 "fn"
+  000b  LoadConstUndefined   r1
+  000d  Call2                r5, r3, r1, r2
+  0012  LoadConstString      r3, s6 "|"
+  0016  Add                  r3, r5, r3
+  001a  GetByIdShort         r4, r4, #c0, s7 "fn"
+  001f  LoadConstUInt8       r0, 1
+  0022  Add                  r2, r2, r0
+  0026  Call2                r2, r4, r1, r2
+  002b  Add                  r2, r3, r2
+  002f  Ret                  r2
+
+function #3 "viaMethod"  params=3 frame=12 env=0 flags=strict,dbg,overflowed  @0x000002a6 size=18
+  0000  LoadParam            r2, 1
+  0003  GetByIdShort         r1, r2, #c0, s7 "fn"
+  0008  LoadParam            r0, 2
+  000b  Call2                r0, r1, r2, r0
+  0010  Ret                  r0
