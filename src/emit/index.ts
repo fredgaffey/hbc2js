@@ -157,6 +157,26 @@ function inCycle(cfg: import("../cfg/types.ts").FunctionCfg, block: number): boo
   return false;
 }
 
+/** True when `to` is reachable from `from` along at least one normal edge. */
+function reaches(cfg: import("../cfg/types.ts").FunctionCfg, from: number, to: number): boolean {
+  const seen = new Set<number>();
+  const stack = [...cfg.blocks[from]!.succs.map((e) => e.to)];
+  while (stack.length > 0) {
+    const b = stack.pop()!;
+    if (b === to) return true;
+    if (seen.has(b)) continue;
+    seen.add(b);
+    for (const e of cfg.blocks[b]!.succs) stack.push(e.to);
+  }
+  return false;
+}
+
+const CREATE_CLOSURE_OPS: ReadonlySet<string> = new Set([
+  "CreateClosure", "CreateClosureLongIndex",
+  "CreateGeneratorClosure", "CreateGeneratorClosureLongIndex",
+  "CreateAsyncClosure", "CreateAsyncClosureLongIndex",
+]);
+
 export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): EmitResult {
   const mod = analysis.module;
   const provenanceComments = opts.provenanceComments ?? true;
@@ -687,6 +707,59 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
     for (const child of node.closures) inlineFunctions.add(child);
   }
 
+  // Spec 27 §12 (review-1109-1): a `CreateClosure` that can execute more than
+  // once per activation of its host makes a fresh function object every time,
+  // but a hoisted declaration is ONE object per activation, so every
+  // iteration of `for (...) fs.push(function () {...})` got the same function
+  // (VM `fs[0] !== fs[1]` is true; ours was false). Such a closure is emitted
+  // as a function expression at its creation site instead — the same
+  // `inlineFunctions` route the loop-local environments above use. The
+  // hoisted declaration stays only when every site is in the host, none lies
+  // on a cycle, and no site reaches another (at most one execution per
+  // activation); creating it earlier (at entry) is unobservable because
+  // closure creation runs no user code and the synthetic `_fn<n>` name is
+  // read only at the creation sites themselves.
+  let perIterationClosures = 0;
+  for (const [host, kids] of childrenOf) {
+    let cfg: FunctionCfg;
+    try {
+      cfg = analysis.cfg(host);
+    } catch {
+      continue;
+    }
+    const localSites = new Map<number, { block: number; offset: number; plain: boolean }[]>();
+    for (const b of cfg.blocks) {
+      for (const insn of b.instructions) {
+        const child = closureFunctionId(insn);
+        if (child === undefined) continue;
+        const entry = { block: b.id, offset: insn.offset, plain: CREATE_CLOSURE_OPS.has(insn.name) };
+        const list = localSites.get(child);
+        if (list === undefined) localSites.set(child, [entry]);
+        else list.push(entry);
+      }
+    }
+    for (const child of kids) {
+      if (inlineFunctions.has(child) || envGraph.closureCopies.has(child)) continue;
+      const here = localSites.get(child);
+      if (here === undefined || here.length === 0 || !here.every((s) => s.plain)) continue;
+      const all = envGraph.closureCreationSites.get(child);
+      if (all !== undefined && [...all.keys()].some((k) => Number(k.slice(0, k.indexOf(":"))) !== host)) continue;
+      const repeats =
+        here.some((s) => inCycle(cfg, s.block)) ||
+        here.some((a, i) => here.some((b, j) => i !== j && (a.block === b.block ? a.offset < b.offset : reaches(cfg, a.block, b.block))));
+      if (!repeats) continue;
+      inlineFunctions.add(child);
+      perIterationClosures++;
+    }
+  }
+  if (perIterationClosures > 0) {
+    diagnostics.push({
+      severity: "info",
+      code: "I_CLOSURE_PER_EXECUTION",
+      message: `${perIterationClosures} closure(s) can be created more than once per activation (a loop, or several sites on one path); emitted as function expressions at their creation sites so each execution makes a new function object`,
+    });
+  }
+
   /** True when a copy hosted in `host` must be emitted INLINE at its creation
    *  site rather than hoisted: it captured an environment `host` declares
    *  inside a loop body's block (report §5 "Landing item 3"). */
@@ -788,7 +861,7 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
       const inlined = new Map<number, Stmt>();
       for (const child of kids) {
         const body = emitOne(child, childCtx);
-        if (inlineFunctions.has(child)) inlined.set(child, body);
+        if (inlineFunctions.has(child) && body.k === "func") inlined.set(child, body);
         else hoisted.push(body);
       }
       // They travel with their whole lexical subtree, under the composed
