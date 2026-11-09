@@ -2683,3 +2683,48 @@ population (see "The no-signature bucket"); the rows without it are the
 honest numbers. The stopping-reason table above was measured at main
 87ec7b8, before the path-recall and hash-index merges. Test:
 `tests/gate/deps/corpus-recall-bar.test.ts`.
+
+### Rainbow and metamask on the full path-bearing DB (corpus-precision-rainbow-mm, 2026-11-09)
+
+Measured offline on deb (`deps-rm/run.sh`, `meas2.mjs`: `scoreAgainstTruth`, no truth overlay), each DB a symlink farm with its own hash/string-set indexes (`build-candidate-hash-index.mjs --hbc 96,98`): `db-v3-clean`, and "full v4" = every `db-v3-clean` file replaced by its `db-v4-paths` rebuild where one exists (55,046 of 71,222 files).
+
+| app | db-v3-clean: confirmed / TP / FP, precision, recall | full v4 before | full v4 after |
+|---|---|---|---|
+| Expensify J3 | 135 / 96 / 39, 71.1%, 33.3% | 107 / 100 / 7, 93.5%, 34.7% | unchanged |
+| react-navigation-example | 16 / 16 / 0, 100%, 21.1% | 21 / 21 / 0, 100%, 27.6% | unchanged |
+| bluesky own build | 45 / 37 / 8, 82.2%, 18.7% | 46 / 45 / 1, 97.8%, 22.7% | unchanged |
+| rainbow own build | 129 / 106 / 23, 82.2%, 20.5% | 117 / 108 / 9, 92.3%, 20.8% | 115 / 108 / 7, 93.9%, 20.8% |
+| metamask own build | 186 / 148 / 38, 79.6%, 19.8% | 176 / 156 / 20, 88.6%, 20.8% | unchanged |
+
+The full DB alone removes 14 rainbow and 18 metamask FPs. The rest, traced
+by where each FP's hit hashes sit in the app (source map owner) and which
+rule should have caught it:
+
+| mechanism | rainbow | metamask | status |
+|---|---|---|---|
+| pathless signature holding its dependencies' code; the matched version is pathless because its v4 rebuild failed (listed in `db-v4-paths.failed.txt`) | `d3-geo` (hits in `d3-array`), `jszip` (`pako`), `typeorm`, `wagmi` (`viem`, `@tanstack/*`, `@noble/curves`) | `fast-json-patch`, `is-array-buffer`, `is-regex` (es-shim chain), `jszip`, `mammoth` (`@xmldom/xmldom`), `p-map`, `reactotron-react-native`, `rpc-websockets` (`@babel/runtime`), `typeorm`, `wagmi` | open: needs those builds fixed, not a rule |
+| fork or rename whose counterpart has no matching signature | `react-query` (`@tanstack/react-query`), `whatwg-url` (`whatwg-url-without-unicode`) | `react-query`, `source-map-js` (`source-map`), `superstruct` (`@metamask/superstruct`), `whatwg-url` | open (the known fork row above) |
+| small package inlined in another package's pre-built dist module | `async-lock` (`@rudderstack/rudder-sdk-react-native`), `preact` (`@sentry-internal/feedback`) | `resq` (inlines `fuse.js`) | fixed for the first two (below) |
+| module-graph promotion through the `react-native` hub, fuzzy edge | none | `@react-native-community/cookies`, `react-native-webview` | open: the hub caveat of "Path recall" |
+| code moved between packages across versions | none | `fast-xml-builder` (in the app's `fast-xml-parser`) | open |
+| large file inlined in a renderer of about its size | none | `react-reconciler` (in `react-native`'s renderer) | open |
+| app-vendored copy (the code really is there, under app paths) | `d3-interpolate-path` | none | not a matcher error |
+| generic shapes spread over many packages | none | `@shopify/react-native-skia` | open |
+
+A rule demoting a pathless package whose path-bearing sibling versions hit
+none of their own files was simulated and rejected: it would remove 7 FPs
+but also 8 TPs (`react` 19.0.3 against 19.0.8's own files, `luxon`, `jsbi`,
+`events`, `typedarray`, ...), whose sibling builds come from another entry
+point or drifted.
+
+**The fix.** `container` (target modules more than `CONTAINER_SIZE_RATIO`
+times the whole package) sized the package by the largest of
+`totalFunctions`, `rawFunctionCount` and its eligible count. On a
+path-bearing signature `rawFunctionCount` also counts the builder bundle's
+toolchain and runtime modules (98 for `async-lock`'s 21 functions, 123 for
+`preact`'s 46), so the bound was out of reach. Path-bearing signatures now
+leave the raw count out; pathless ones keep it (their toolchain functions
+are not told apart). `db-v3-clean` is pathless, so its numbers are
+unchanged by construction. TPs lost: 0 on all five apps.
+
+Test: `tests/gate/deps/corpus-precision-rainbow-mm.test.ts`.
