@@ -17,7 +17,7 @@ import type { Expr, Stmt } from "../ast.ts";
 import { isHelperCall, isRegisterName } from "../ast.ts";
 import type { Match, PassContext } from "../types.ts";
 
-export type CallShapeRule = "R3a" | "R3b" | "R3c" | "R3d";
+export type CallShapeRule = "R3a" | "R3b" | "R3c" | "R3d" | "R3e";
 
 export type RefuseReason = "dynamic-args" | "impure-callee" | "unproven-this" | "member-callee-with-undefined-this" | "explicit-new-target" | "duplicated-construct-callee" | "helper-arity" | "not-a-call-shape-site";
 
@@ -161,7 +161,11 @@ function classifyReflectApply(node: Expr & { readonly k: "call" }, fnBody: reado
     const O = F.obj;
     const sameIdent = O.k === "ident" && T.k === "ident" && T.name === O.name;
     if (sameIdent) return { ok: true, rule: "R3b", replacement: { k: "call", callee: F, args } };
-    if (isProvenUndefinedThis(T, fnBody)) return { ok: false, reason: "member-callee-with-undefined-this" };
+    // R3e (spec 04 section 4): a member callee called with a proven-undefined
+    // receiver is Babel's interop call `(0, O.p)(a...)`. The sequence makes
+    // the callee a plain value, so `this` stays undefined; `O.p` is still the
+    // first effect, exactly as in `Reflect.apply`'s argument order.
+    if (isProvenUndefinedThis(T, fnBody)) return { ok: true, rule: "R3e", replacement: { k: "call", callee: { k: "seq", exprs: [{ k: "lit", text: "0" }, F] }, args } };
     return { ok: false, reason: "unproven-this" };
   }
 

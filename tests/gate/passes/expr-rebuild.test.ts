@@ -396,10 +396,10 @@ test("v94 shape: 02-while-loop — a six-times-reused register folds its string 
 
 test("v94 shape: 01-if-else-chain — a member-read callee folds into its call site", () => {
   const code = decompile(loadFixture("01-if-else-chain", 94, ""), { moduleName: "x" }).code;
-  // `member-callee-with-undefined-this` correctly still refuses this one —
   // `r1.check.apply(undefined, [r8])` cannot become `r1.check(r8)` (that
-  // would change `this` from `undefined` to `r1.check`'s object, `r1`).
-  assert.match(code, /Reflect\.apply\(r1\.check, r3, \[r8\]\)/);
+  // would change `this` from `undefined` to `r1.check`'s object, `r1`);
+  // call-shape's R3e prints the receiverless call `(0, r1.check)(r8)`.
+  assert.match(code, /\(0, r1\.check\)\(r8\)/);
   // The pre-rung baseline: also skip `call-shape` (not just `expr-rebuild`)
   // to isolate expr-rebuild's own contribution here. Since the scoped-
   // `identUses` fix (the work log), call-shape alone — before
