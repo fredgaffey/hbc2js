@@ -490,6 +490,16 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
     case "PutOwnByVal":
     case "DefineOwnByVal": {
       const enumerable = V(insn, 3) !== 0;
+      // `o[k] = v` is a [[Set]]; PutOwnByVal is a define. They differ for a
+      // computed `["__proto__"]: v` key, where the assignment would run the
+      // Object.prototype.__proto__ setter instead of creating an own property
+      // (adversarial-1110, constructs/351). Statically-known key only; a
+      // dynamic key that evaluates to "__proto__" is still lowered as a Set
+      // (docs/BUGS.md).
+      if (enumerable && isLiteralStringReg(f, plan, index, V(insn, 2), "__proto__")) {
+        out.push(defineProperty(RG(insn, 0), RG(insn, 2), [{ key: "value", value: RG(insn, 1) }, { key: "writable", value: lit("true") }], true));
+        return;
+      }
       if (enumerable) {
         out.push(assign(member(RG(insn, 0), RG(insn, 2), true), RG(insn, 1)));
         return;
@@ -604,6 +614,12 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
       if (shape === undefined) return fail(`shape index ${V(insn, 2)} out of range`);
       const keys = objectKeys(f.mod, shape.keyBufferOffset, shape.numProps, f.fn.index, insn.offset);
       const literalObj = objectFromBuffers(f.mod, keys, V(insn, 3), f.fn.index, insn.offset);
+      // Object.assign is a [[Set]] per key: an own "__proto__" key would run
+      // the inherited setter. Then print the literal with the parent as a
+      // plain `__proto__:` entry instead (adversarial-1110, constructs/351).
+      if (keys.includes("__proto__") && literalObj.k === "object") {
+        return set(V(insn, 0), { k: "object", props: [{ key: "__proto__", computed: false, value: RG(insn, 1) }, ...literalObj.props] });
+      }
       return set(V(insn, 0), call(prop(id("Object"), "assign"), [call(prop(id("Object"), "create"), [RG(insn, 1)]), literalObj]));
     }
     case "CreateRegExp":
@@ -1009,6 +1025,27 @@ function isLiteralUndefinedReg(f: FunctionEmitter, plan: BlockPlan, index: numbe
   for (const ins of f.fn.instructions) {
     if (!writtenRegisters(ins).includes(r)) continue;
     if (ins.name !== "LoadConstUndefined") return false;
+    writes++;
+  }
+  return writes > 0;
+}
+
+/**
+ * True when register `r`, read by the instruction at `index`, statically holds
+ * the string literal `want`: the nearest preceding in-block write is a
+ * `LoadConstString*` of it, or (no in-block write) every write in the function
+ * is. Anything else answers false.
+ */
+function isLiteralStringReg(f: FunctionEmitter, plan: BlockPlan, index: number, r: number, want: string): boolean {
+  const isWant = (ins: Instruction): boolean => (ins.name === "LoadConstString" || ins.name === "LoadConstStringLongIndex") && f.mod.strings.get(V(ins, 1)) === want;
+  for (let i = index - 1; i >= 0; i--) {
+    const prev = plan.instructions[i]!;
+    if (writtenRegisters(prev).includes(r)) return isWant(prev);
+  }
+  let writes = 0;
+  for (const ins of f.fn.instructions) {
+    if (!writtenRegisters(ins).includes(r)) continue;
+    if (!isWant(ins)) return false;
     writes++;
   }
   return writes > 0;
