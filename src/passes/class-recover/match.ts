@@ -100,6 +100,7 @@ function readDescriptor(e: Expr): Descriptor | null {
   let kind: Descriptor["kind"] | null = null;
   let fn: Expr | null = null;
   let enumerable = true;
+  let writable = false;
   let seen = 0;
   for (const p of e.props) {
     if ("k" in p) return null; // a spread in the descriptor: not the emitter's shape
@@ -121,8 +122,18 @@ function readDescriptor(e: Expr): Descriptor | null {
       seen++;
       continue;
     }
-    return null; // `writable`/anything else: an instance install, not a class-body member (R-C6)
+    // A data member is defined writable, like the VM's own define
+    // (export-boot L4, fixture 396). A private install is also
+    // `configurable: false`, which the branch above refuses (R-C6).
+    if (p.key === "writable") {
+      if (!(p.value.k === "lit" && p.value.text === "true")) return null;
+      writable = true;
+      seen++;
+      continue;
+    }
+    return null; // anything else: an instance install, not a class-body member (R-C6)
   }
+  if (writable && kind !== "method") return null;
   return kind === null || fn === null || seen !== e.props.length ? null : { kind, fn, enumerable };
 }
 

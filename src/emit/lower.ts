@@ -477,7 +477,8 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
       return;
     case "PutNewOwnNEById":
     case "PutNewOwnNEByIdLong":
-      out.push(defineProperty(RG(insn, 0), lit(quote(f.mod.strings.get(V(insn, 2)))), [{ key: "value", value: RG(insn, 1) }], false));
+      // Writable, like the VM's non-enumerable new own property (fixture 396).
+      out.push(defineProperty(RG(insn, 0), lit(quote(f.mod.strings.get(V(insn, 2)))), [{ key: "value", value: RG(insn, 1) }, { key: "writable", value: lit("true") }], false));
       return;
     case "PutOwnByIndex":
     case "PutOwnByIndexL":
@@ -494,7 +495,10 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
         out.push(assign(member(RG(insn, 0), RG(insn, 2), true), RG(insn, 1)));
         return;
       }
-      out.push(defineProperty(RG(insn, 0), RG(insn, 2), [{ key: "value", value: RG(insn, 1) }], false));
+      // The VM defines with getDefaultNewPropertyFlags() minus enumerable:
+      // writable and configurable stay true (a class method can be
+      // re-assigned; export-boot L4, fixture 396).
+      out.push(defineProperty(RG(insn, 0), RG(insn, 2), [{ key: "value", value: RG(insn, 1) }, { key: "writable", value: lit("true") }], false));
       return;
     }
     case "PutOwnGetterSetterByVal":
