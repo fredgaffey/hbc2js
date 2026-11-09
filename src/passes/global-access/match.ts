@@ -156,6 +156,49 @@ export function isProvenGlobal(fnBody: readonly Stmt[], e: Expr): boolean {
   return globalWriteIndices.length === 1 && globalWriteIndices[0] === 0;
 }
 
+/**
+ * §4 condition 7 (2026-11-09, roundtrip `diff:JmpTrue(label)` bucket): the
+ * **local** proof, an alternative to `isProvenGlobal` for one site. Hermes
+ * often loads `globalThis` into a register that already held an unrelated
+ * value earlier in the function, so the whole-function rule ("the register's
+ * first write is its only `globalThis` write") refuses although the store sits
+ * right before the guard. Sound without any whole-function reasoning when:
+ *
+ *  - some `list[k]`, `k < guardIndex`, is exactly `rN = globalThis` (the
+ *    `GetGlobalObject` lowering), and no statement in `list[k+1..guardIndex-1]`
+ *    writes `rN` at any depth (`identUses(...).writes`, which also sees
+ *    assignments buried inside expressions). A structured statement list can
+ *    only be entered at its start, and a `break`/`continue` landing inside it
+ *    lands after the statement that contains it, so every arrival at the guard
+ *    (including every loop re-entry) has just run `list[k]`: condition 5 and
+ *    condition 6 are subsumed;
+ *  - nothing in `list[guardIndex+1..useIndex-1]` writes `rN` (condition 3,
+ *    re-asserted here so `check` re-derives it from `before`);
+ *  - the read's own statement `list[useIndex]` cannot write `rN` before the
+ *    read: it writes `rN` nowhere, or it is exactly `rN = value` with no write
+ *    to `rN` inside `value` (the store happens after the read).
+ *
+ * Condition 3 (no write to `G` between guard and read) is checked by
+ * `classifySite`/`check` for every proof alike.
+ */
+export function isLocallyProvenGlobal(list: readonly Stmt[], guardIndex: number, useIndex: number, e: Expr): boolean {
+  if (e.k !== "ident" || !isRegisterName(e.name)) return false;
+  const reg = e.name;
+  let k = guardIndex - 1;
+  for (; k >= 0; k--) {
+    const s = list[k]!;
+    if (s.k === "expr" && s.expr.k === "assign" && s.expr.target.k === "ident" && s.expr.target.name === reg && s.expr.value.k === "ident" && s.expr.value.name === "globalThis") break;
+    if (identUses([s], reg).writes > 0) return false;
+  }
+  if (k < 0) return false;
+  const use = list[useIndex];
+  if (use === undefined || useIndex <= guardIndex) return false;
+  // condition 3 re-asserted inside the proof, so `check` re-derives it too
+  if (identUses(list.slice(guardIndex + 1, useIndex), reg).writes > 0) return false;
+  if (identUses([use], reg).writes === 0) return true;
+  return use.k === "expr" && use.expr.k === "assign" && use.expr.target.k === "ident" && use.expr.target.name === reg && identUses([{ k: "expr", expr: use.expr.value }], reg).writes === 0;
+}
+
 // ---------------------------------------------------------------------------
 // §4 condition 5: repeat-visit (loop re-entry) soundness.
 // ---------------------------------------------------------------------------
@@ -605,9 +648,20 @@ function isGuardShapeFor(s: Stmt, name: string): boolean {
  *  reason. */
 export function classifySite(list: readonly Stmt[], fnBody: readonly Stmt[], i: number, name: string, global: Expr): ClassifyResult {
   if (!isSafeIdentifier(name)) return { ok: false, reason: "unsafe-identifier" };
-  if (!isProvenGlobal(fnBody, global)) return { ok: false, reason: "unproven-global" };
-  if (hasLoopReentryClobber(fnBody, list, global)) return { ok: false, reason: "loop-reentry-clobber" };
-  if (hasPreGuardClobber(fnBody, list, i, global)) return { ok: false, reason: "pre-guard-clobber" };
+  // §4 condition 7: the local proof is decided per read site, below; the
+  // whole-function proof (and its conditions 5/6) is the fallback.
+  const wholeFunction = (): RefuseReason | null => {
+    if (!isProvenGlobal(fnBody, global)) return "unproven-global";
+    if (hasLoopReentryClobber(fnBody, list, global)) return "loop-reentry-clobber";
+    if (hasPreGuardClobber(fnBody, list, i, global)) return "pre-guard-clobber";
+    return null;
+  };
+  const useLocal = (j: number): boolean => isLocallyProvenGlobal(list, i, j, global);
+  const firstUse = firstReadIndex(list, i, global, name);
+  if (firstUse === null || !useLocal(firstUse)) {
+    const why = wholeFunction();
+    if (why !== null) return { ok: false, reason: why };
+  }
   if (isShadowed(name, fnBody)) return { ok: false, reason: "shadowed" };
 
   for (let k = i + 1; k < list.length; k++) {
@@ -619,6 +673,13 @@ export function classifySite(list: readonly Stmt[], fnBody: readonly Stmt[], i: 
     if (isGuardShapeFor(s, name) || statementClobbers(s, global, name)) return { ok: false, reason: "clobbered-between" };
   }
   return { ok: false, reason: "no-read-after-guard" };
+}
+
+/** The index of the first statement after `list[i]` holding a top-level
+ *  read of `global.name` (the candidate `useIndex`), or `null`. */
+export function firstReadIndex(list: readonly Stmt[], i: number, global: Expr, name: string): number | null {
+  for (let k = i + 1; k < list.length; k++) if (countMatchingReads(topLevelExprFields(list[k]!), global, name) > 0) return k;
+  return null;
 }
 
 export function match(list: readonly Stmt[], ctx: PassContext): GlobalAccessMatch | null {

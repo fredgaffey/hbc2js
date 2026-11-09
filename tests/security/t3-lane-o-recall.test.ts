@@ -10,6 +10,9 @@ import { runDeps } from "../../src/deps/index.ts";
 import { loadOsvSlice, matchOsv } from "../../src/security/osv-adapter.ts";
 import { repoRoot } from "../support/paths.ts";
 
+// Hermetic: the user-cache sigdb layer (~/.cache/hbc2js/sigdb) must not leak a developer machine's own signatures into this test.
+process.env.XDG_CACHE_HOME = (await import("node:fs")).mkdtempSync((await import("node:path")).join((await import("node:os")).tmpdir(), "hbc2js-xdg-"));
+
 const FIXTURE_DIR = join(repoRoot(), "tests", "fixtures", "security", "vuln-app");
 
 test("T3: Lane O adapter on the seeded fixture = 100% recall, 0 claim-tier off-lockfile findings", async () => {

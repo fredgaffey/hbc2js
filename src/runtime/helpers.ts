@@ -181,7 +181,10 @@ function __hbc_makeGeneratorLowered(body) {
 var __hbc_arguments = (function () {
   "use strict";
   var make = function () { return arguments; };
-  return function (a) { return make.apply(undefined, a); };
+  // Captured once, before any user code: a program that overrides
+  // Function.prototype.apply must not reach this copy (fixture 220).
+  var apply = Reflect.apply;
+  return function (a) { return apply(make, undefined, a); };
 })();
 `,
   ),

@@ -1,0 +1,4 @@
+7 7 0 6
+5
+ReferenceError
+local01 2

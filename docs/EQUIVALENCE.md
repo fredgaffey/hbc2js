@@ -346,6 +346,16 @@ opcode tables without a version bump, and a different builtin table changes
 `GetBuiltinClosure` operands), and the decompiled file must be compiled with a
 matching filename because the name is embedded even without `-g`.
 
+**Function pairing in the corpus harness.** `tools/e2e/roundtrip-corpus.ts` pairs
+each original function with a recompiled one per module by walking the two
+closure trees together. Siblings first pair by name (`_fnNNN` or a unique
+restored name); the leftovers are aligned by an order-preserving
+Needleman-Wunsch alignment (`alignLeftovers`) scored on parameter count, name,
+child count and subtree size, not by position. A closure the recompile
+inlined or split off therefore becomes one `tree:unmatched-closure` gap
+instead of shifting every later sibling onto its neighbour and flipping
+byte-identical functions to DIFFERENT.
+
 ### 4.4 The complementarity, demonstrated
 
 ```
