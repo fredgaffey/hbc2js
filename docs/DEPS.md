@@ -2893,3 +2893,57 @@ unchanged and it still loses no TP. This mixes in no truth overlay
 Reproduce (deb, `~/_hbc2js/pop2/`): jobs-retry.tsv = jobs-all.tsv minus the
 `ok` results of the first run; `drive.sh` (stops below 15 GB) via `xargs -P6`;
 `subtract.sh`, `after3.sh` (merge, index, `measure.sh <tag> <dir>`).
+
+### Tiny packages on DB-unique hashes (deps-rnav-recall, 2026-11-09)
+
+On react-navigation-example (full v4 farm, offline, no overlay) 21 of 76
+truth packages are reported, all true. Each of the other 55 was put in one
+bucket by where it stops (a classification script that also forces every
+truth package into the candidate set and scores every DB version at HBC 98):
+
+| cause | count | packages / note |
+|---|---|---|
+| (a) not in the DB | 29 | the five `@react-navigation/*` workspace packages (bottom-tabs, devtools, drawer, elements, native-stack), `react-native-tab-view`, `react-native-drawer-layout`, `expo-asset`, `expo-constants`, `expo-font`, `expo-linking`, `expo-splash-screen`, four `@expo-google-fonts/*`, three `@react-native-vector-icons/*` font packages (asset modules only), `@expo/react-native-action-sheet`, `@babel/runtime`, `@react-native/assets-registry`, `@ungap/structured-clone`, `semver`, `filter-obj`, `split-on-first`, `warn-once`, `use-latest-callback`, `react-native-showtime` |
+| (a) in the DB, no HBC 98 build | 3 | `expo`, `nullthrows`, `@react-native-vector-icons/common` |
+| (a) HBC 98 builds, no exact hit at any version | 1 | `nanoid` |
+| (b) no eligible function | 0 | |
+| (c) tiny-package bar | 12 | 4 with half their functions exact but no factory hit (`invariant`, `@react-native/normalize-colors`, `react-freeze`, `stacktrace-parser`); 4 not candidates (`decode-uri-component`, `escape-string-regexp`, `fast-deep-equal`, `expo-blur`); 4 with no exact hit (`hoist-non-react-statics`, `react-is`, `standard-navigation`, `use-sync-external-store`) |
+| (c) function hits, no module hit | 8 | all an older version than the app ships: `@react-navigation/core` 6.4.17, `@react-native/virtualized-lists` 0.72.8, `@tanstack/query-core`, `@tanstack/react-query`, `expo-modules-core`, `expo-status-bar`, `promise`, `@react-native-async-storage/async-storage` |
+| (c) one module hit | 1 | `@react-navigation/routers` |
+| (c) demotion rule | 0 | |
+| (d) not really in the bundle | 0 | the font packages above contribute asset registrations only |
+| (e) not a candidate, high when forced | 1 | `query-string` |
+
+So most of the loss is the DB (33 in (a), and the 8 function-only ones are
+version gaps too). The sound part of (c) is the first group of the tiny row.
+Their own functions match exactly; the factory does not, because the app's
+Babel preset or export list differs from the DB build. The existing tiny
+path needs that factory. These hits are different from the false tiny
+packages' hits: each is a hash that the candidate hash index (`maxOwners`
+1, the whole DB at that HBC version) gives to this one package. The false
+ones (`immediate`, `wrappy`, `meros`, rainbow's family of 23 packages built
+from one dist file) have no such hash or only one (`btoa`, `quickselect`).
+So a tiny package is now high when at least half its eligible functions
+exact-match and at least `TINY_PACKAGE_MIN_DB_UNIQUE_HITS` (2) of the hits
+are DB-unique (`uniqueHashOwnersInTarget` in `hash-index.ts`, passed to the
+matcher as `MatchOptions.uniqueHashOwners`). This path is exempt from
+`few-distinct`, which exists for one repeated boilerplate shape. Hashes are
+looked up only for scheme-2 files and only in layers that carry an index
+for the target's HBC version. With no index the path is off.
+
+Measured on deb (`meas2.mjs` offline `scoreAgainstTruth`, full v4 farm,
+sha pins matched; before = main 81cde59; confirmed / TP / FP, precision,
+recall):
+
+| app | before | after | TPs gained |
+|---|---|---|---|
+| Expensify J3 | 107 / 100 / 7, 93.5%, 34.7% | unchanged | none |
+| react-navigation-example | 21 / 21 / 0, 100%, 27.6% | 22 / 22 / 0, 100%, 28.9% | `@react-native/normalize-colors` |
+| bluesky own build | 46 / 45 / 1, 97.8%, 22.7% | 47 / 46 / 1, 97.9%, 23.2% | `@react-native/normalize-colors` |
+| rainbow own build | 115 / 108 / 7, 93.9%, 20.8% | 116 / 109 / 7, 94.0%, 21.0% | `base-64` |
+| metamask own build | 176 / 156 / 20, 88.6%, 20.8% | 179 / 159 / 20, 88.8%, 21.2% | `base-64`, `klona`, `valid-url` |
+
+No false positive was added and no true positive was lost. On
+react-navigation, `invariant`, `react-freeze` and `stacktrace-parser`
+qualify in the classification run but are still not reported by the
+pipeline. That is an open item. Test: `tests/gate/deps/deps-rnav-recall.test.ts`.
