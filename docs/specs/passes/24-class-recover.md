@@ -373,6 +373,29 @@ own register `r3` read as newly free. A name now passes when the function body
 declares it at top level and no mention of it is left inside a nested function
 or class.
 
+**Loops in a member (2026-11-09).** A member that reads `#x` inside a loop
+copies the symbol from its slot into a register in the loop body (`r12 =
+_eD_S; r12 = list[r12];`). `foldInBody` scanned a loop as one leaf, so the
+slot read survived and R-PF1 refused the name (4 of the react-navigation
+`defining-body-escape` residue). Worse, an alias copied *before* a loop and
+read inside it had its copy dropped while the read stayed `this[r]`. A
+`while`/`do-while`/`for` without an init is now folded with the aliases held
+at its entry, because two rules make that set exact on every iteration
+without a fixed point: (i) an entry alias the loop writes anywhere refuses the
+name; (ii) every alias copy inside the loop must be *confined*, killed by a
+plain store to the same register later in the same list with only plain
+statements between (no `if`, loop, label or jump), so no copy's value reaches
+the back edge, a `continue`, a `break` or the code after the loop. An install
+inside a loop refuses (it runs zero or many times, a field declaration once),
+register values (`list = this`) the loop rewrites are dropped, and a frame
+with a `try` is not reasoned about. Rejected: a fixed-point alias analysis
+over the loop's back edges; the confined shape is all hermesc emits here and
+the conservative rule needs no join. Fixture 112-private-field-loop-copy
+(`for-in` lowered to `while (true)`, and a `do-while`);
+`tests/gate/passes/private-fields-loop.test.ts` adds hand-built refusals
+(back-edge carried, carried out of the loop, `continue` before the kill,
+entry alias overwritten).
+
 ### 1.8 Corpus reach
 
 `tests/fixtures/bundles/rn-template-0.72/index.android.hbc` is v94 (layout C), so it has
@@ -874,6 +897,16 @@ after the `new` from a literal / unwritten name. The constructor that
 so the region and `X = new C(args)` perform the same effects on the same
 receiver. Accepted deviation: an env-slot class binding read before its one
 store throws a TypeError in both forms, with a different message.
+(6) The derived prefix (2026-11-09). super-call leaves the constructor's own
+super-constructor lookup `r = Object.getPrototypeOf(<binding>)` ahead of the
+`super(...)` it rebuilt, a call and so not a silent store; R-IN1 refused every
+such constructor (all 6 R-IN1 sites on react-navigation, fixture 81 too). The
+template prefix now admits it once, when its operand's token is the class
+token and `Object` is not a constructor local. It runs no user code (a class
+constructor is an ordinary function object, `[[GetPrototypeOf]]` is the
+ordinary one) and it is the template's copy of the caller's H-D header store,
+so its register takes the header's token. Real code before `super` (fixture
+111-inlined-new-derived-before-super) still refuses R-IN1.
 
 ### 9.3 Refusal codes (via `ctx.refuse`, counted per site)
 
@@ -906,7 +939,7 @@ another frame stays (it is sound, and the warning is the lowering's); (b) FIXED 
 fixture 90 `private-fields` refused R-PF1 after the rebuild because the
 symbol's register is reused later in the defining frame; R-PF1 is now def-use
 for the register (section 1.7);
-(c) on 93 `private-fields` refuses `ambiguous-multiple-classes`; (f) 2026-11-09: on react-navigation the `defining-body-escape` residue is mostly private reads in functions, not inlined constructions (docs/BUGS.md row; 6 of 68 are R-IN1); (d) a class
+(c) on 93 `private-fields` refuses `ambiguous-multiple-classes`; (f) 2026-11-09: on react-navigation the `defining-body-escape` residue is mostly private reads in functions, not inlined constructions (docs/BUGS.md row; 6 of 68 were R-IN1, FIXED by section 9.2 (6), fixture 110-inlined-new-derived-residue); (d) a class
 whose only prototype member is installed through `C.prototype` directly
 (fixture 91's `Base`, 92's `Point` with one method) is refused `no-members`
 by class-recover; (e) fixture 89's env-IIFE class is not reached (the class
