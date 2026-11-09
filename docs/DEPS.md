@@ -2871,7 +2871,21 @@ real reconciler module also holds renderer-shaped functions from RN's
 signature, so a variant without the edge removed a true `react-reconciler`
 there. Test: `tests/gate/deps/corpus-mm-precision-inlined.test.ts`.
 
-MEASUREMENT_TABLE
+Measured offline on deb (`meas2.mjs` `scoreAgainstTruth`, full v4 farm
+`deps-rm/f-v4`), confirmed / TP / FP, precision, recall. A: main before and
+this rule alone on main. B: `deps-db-growth` (no fork relabel) and the
+merge of relabel + db-growth + this rule.
+
+| app | A: main | A: + inlined | B: db-growth | B: merged |
+|---|---|---|---|---|
+| metamask | 176 / 162 / 14, 92.0%, 21.6% | 175 / 162 / 13, 92.6%, 21.6% | 175 / 155 / 20, 88.6%, 20.7% | 174 / 161 / 13, 92.5%, 21.5% |
+| rainbow | 115 / 108 / 7, 93.9%, 20.9% | unchanged | 114 / 108 / 6, 94.7%, 20.9% | unchanged |
+| Expensify J3 | 107 / 102 / 5, 95.3%, 35.4% | unchanged | 105 / 100 / 5, 95.2%, 34.7% | 105 / 102 / 3, 97.1%, 35.4% (relabel) |
+| bluesky | 46 / 45 / 1, 97.8%, 22.7% | unchanged | 44 / 43 / 1, 97.7%, 21.7% | unchanged |
+| react-navigation | 21 / 21 / 0, 100%, 27.6% | unchanged | unchanged | unchanged |
+
+The rule removes `fast-xml-builder` on metamask and nothing else. It costs
+no TP on any app. In B, every other change comes from the fork relabel.
 
 **Retry of the failed jobs** (deps-population-widen-3, 2026-11-09). The
 1,445 failed jobs were re-run on deb with main's builder fixes
