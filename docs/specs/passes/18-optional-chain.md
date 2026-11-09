@@ -399,7 +399,7 @@ label, a chain whose `rRes` is read mid-run, a `Reflect.apply` whose `this`
 is not the callee's base; ≥1 site the `check` refuses (e.g. a mutated
 guard-depth sequence).
 
-**Corpus metric** (`tools/passes-metrics.ts`): count of `== <null-reg>` /
+**Corpus metric** (`tools/passes-metrics.mjs`): count of `== <null-reg>` /
 `!= <null-reg>` guard statements (the §2 shapes) remaining in printed
 output. Baseline: 13 chain guards + 5 nullish guards in `48` at v94.
 **Floor: ≥ 90 %** removed across `tests/fixtures/constructs/**` at all five

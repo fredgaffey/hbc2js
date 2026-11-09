@@ -350,7 +350,7 @@ iterator rest loop (must not match), a broken index chain, two
 `copyRestArgs` calls in one body, an `__hbc_b_apply` with a defined `this`;
 ≥1 site the `check` refuses.
 
-**Corpus metric** (`tools/passes-metrics.ts`): count of
+**Corpus metric** (`tools/passes-metrics.mjs`): count of
 `__hbc_b_arraySpread` + `__hbc_b_apply` + `__hbc_b_copyRestArgs` + 2-arg
 `__hbc_b_copyDataProperties` occurrences in printed output. Baseline: 13
 in `40`, 9 in `41`, 3 in `42` per version. **Floor: ≥ 90 % removed** across
