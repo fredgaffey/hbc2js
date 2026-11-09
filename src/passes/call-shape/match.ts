@@ -159,7 +159,9 @@ function everyRegisterWrite(fnBody: readonly Stmt[], reg: string): Expr[] | null
       return;
     }
     const n = node as { readonly k?: unknown } & Record<string, unknown>;
-    if (n.k === "func") return;
+    // A `sameFrame` resume closure is this frame's own body (its registers
+    // are these registers): its writes count (00-LADDER "Resumable bodies").
+    if (n.k === "func" && n.sameFrame !== true) return;
     if (n.k === "ident") return; // a read (writes are caught at their parent)
     if (n.k === "assign" && (n.target as Expr).k === "ident") {
       if ((n.target as Expr & { k: "ident" }).name === reg) values.push(n.value as Expr);

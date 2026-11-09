@@ -29,6 +29,7 @@ export const callShape: Pass<readonly Stmt[], CallShapeSite> = {
   stage: "B",
   targets: ["19-var-hoisting", "01-if-else-chain", "32-class-basic", "21-iife-closures"],
   catalogue: ["R3"],
+  sameFrame: true, // audited for the resume closure: 00-LADDER "Resumable bodies"
   after: ["expr-rebuild", "global-access"],
   match,
   rewrite,
