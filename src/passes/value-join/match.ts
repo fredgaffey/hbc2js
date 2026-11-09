@@ -118,6 +118,15 @@ function declares(s: Stmt): boolean {
 export function parseSite(list: readonly Stmt[], index: number): ValueJoinSite | null {
   const lab = list[index];
   if (lab === undefined || lab.k !== "labeled") return null;
+  // Only a join that feeds straight into another jump: the block after `L`
+  // is a `break`/`continue`, so the original's join block held nothing but
+  // that jump — the jump-to-jump block only an expression join leaves behind
+  // (spec §1). Anywhere else the statement form already recompiles the same
+  // (an if-statement's join is not empty) and the expression form would not:
+  // a value join used as an `if` test, a chained `(a && b) || c`, a hoisted
+  // constant arm.
+  const next = list[index + 1];
+  if (next === undefined || (next.k !== "break" && next.k !== "continue")) return null;
   const body = lab.body;
   const L = lab.label;
   if (!isBreak(body[body.length - 1], L)) return null;
