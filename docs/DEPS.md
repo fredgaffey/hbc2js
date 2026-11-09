@@ -2546,13 +2546,46 @@ The hbc96 apps get no hbc98 signatures, yet gain 2 and 6 TPs. That was not
 traced: the new packages' names probably change the candidate and
 subtraction context.
 
+**Completed run** (resumed 2026-11-09 after disk was freed; 6 slots, the
+jobs without results; `dep-subtract` against db-v3-clean). All 2,347
+planned jobs ran: 902 built, 1,445 failed (1,408 `react-native bundle`
+failures, the peer-import class; 7 npm/npx timeouts, 2 hermesc, the rest
+`npm install` failures, mostly platform-specific optional binaries).
+Overlay `db-overlay-pop`: 901 files, 90 MB (one built file had no
+subtract output). Measured with current main (bundled-dist rule,
+sigdb-strip-embedded), offline, sha pins matched; "+ index" adds the
+candidate hash index (`build-candidate-hash-index.mjs`, built on a
+symlink copy of each layered directory, so uniqueness is across base +
+overlay):
+
+| bundle | DB | confirmed / TP / FP | recall all (direct) | + index: confirmed / TP / FP | recall all (direct) |
+|---|---|---|---|---|---|
+| Expensify | db-v3-clean | 128 / 89 / 39 | 30.9% (35.2%) | 130 / 91 / 39 | 31.6% (35.2%) |
+| Expensify | + pop | 153 / 116 / 37 | 40.3% (42.9%) | 155 / 118 / 37 | 41.0% (42.9%) |
+| react-navigation | db-v3-clean | 14 / 14 / 0 | 18.4% (21.7%) | 14 / 14 / 0 | 18.4% (21.7%) |
+| react-navigation | + pop | 17 / 17 / 0 | 22.4% (25.0%) | 17 / 17 / 0 | 22.4% (25.0%) |
+| bluesky | db-v3-clean | 42 / 34 / 8 | 17.2% (17.2%) | 42 / 34 / 8 | 17.2% (17.2%) |
+| bluesky | + pop | 49 / 41 / 8 | 20.7% (20.7%) | 49 / 41 / 8 | 20.7% (20.7%) |
+| rainbow | db-v3-clean | 104 / 82 / 22 | 15.8% (20.4%) | 127 / 104 / 23 | 20.1% (26.5%) |
+| rainbow | + pop | 107 / 84 / 23 | 16.2% (20.4%) | 130 / 106 / 24 | 20.5% (26.5%) |
+| MetaMask | db-v3-clean | 169 / 132 / 37 | 17.6% (20.3%) | 178 / 141 / 37 | 18.8% (20.3%) |
+| MetaMask | + pop | 176 / 138 / 38 | 18.4% (20.3%) | 184 / 146 / 38 | 19.5% (20.3%) |
+
+TPs gained by the population: Expensify +27, react-navigation +3,
+bluesky +7, rainbow +2, MetaMask +6 (+5 with the index); no TP lost. New
+FPs against the base: `eventemitter3` on Expensify (`builtins`,
+`source-map-js`, `cssstyle` left) and `unicode-trie` on rainbow and
+MetaMask; `@babel/standalone`, `@gorhom/bottom-sheet` and `refa` no longer
+appear. The population and the hash index gains are additive: the index
+adds +2 on Expensify but is what moves rainbow and MetaMask.
+
 **Coverage of truth** (truth read only here, for scoring): planned
 population / built overlay, by name (exact version): Expensify 85 (41) / 73
 (41) of 288; react-navigation 20 / 15 of 76; bluesky 54 / 34 of 198 (both
 truth files have no usable versions); rainbow 162 (95) / 97 (57) of 518;
 MetaMask 190 (108) / 119 (65) of 749. The truth-chosen recall overlay
 reached 58.0% on Expensify, and this run reached 39.2%. Most of the gap is
-the 1,355 jobs not run and the 265 that failed.
+the builds that failed (see Completed run).
 
 Reproduce (deb, `~/_hbc2js/pop/`): `population-corpus.mjs --apk-dir
 ../hbc2js-local-corpus/apks --exclude au.gov.nsw --exclude io.metamask
