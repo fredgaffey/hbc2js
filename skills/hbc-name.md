@@ -106,7 +106,10 @@ You never fetch anything else. If the evidence you need is absent, abstain.
      callee says so; otherwise keep the idiomatic noun.
    When this is a guess, give the idiomatic name at `low`; do not invent a
    domain name from a single use. A parameter is never named after the
-   constant or temporary its register held before the copy.
+   constant or temporary its register held before the copy. This rule
+   chooses the NAME only: confidence still follows the `confidence`
+   definition below, so a parameter whose role a literal or an unambiguous
+   call names stays `high`.
 
 ## Output contract
 
@@ -133,6 +136,10 @@ was missing); an answer that abstains without one is rejected:
 { "names": [], "abstained": true, "reason": "no string literals, callees or property names to anchor a role" }
 ```
 
+- `bindingId.reg` is always a NUMBER taken from `targets`. A local the
+  source already prints under a word name (`obj2`, `arr`, `apply`) is not a
+  target: never answer for it, never put a word in `reg`; one malformed
+  entry makes the whole reply unreadable.
 - `bindingId` is echoed back from the request, unchanged (keep `web` when the
   target has one: `{ "fn": 12, "reg": 4, "web": 3 }`) -- when `targets` is
   present, one that matches exactly one entry of it. A `bindingId` that is
