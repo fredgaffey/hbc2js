@@ -2439,3 +2439,92 @@ Forcing exactly those 150 as candidates (diagnostic, truth-informed, not a mode)
 **Measured** (main 87ec7b8 before, this branch after, offline; `db-v3-clean` and `db-v4-paths-partial` each with their own index; commands: `tools/deps/build-candidate-hash-index.mjs <db> --hbc 96,98`, then `scoreAgainstTruth` per app): Expensify 128 -> 130 confirmed on `db-v3-clean` and 90 -> 92 on the partial DB (+`js-base64`, `react-native-uuid`, no FP added); react-navigation-example unchanged at 0 FP; bluesky unchanged; rainbow 104 -> 127 (+22 TP, +1 FP `digest-fetch`, recall 15.8% -> 20.1%, direct 20.4% -> 26.5%); metamask 169 -> 178 (+10 TP, `bs58` lost, `react-base16-styling` in and `eventid` out as FP, recall 17.6% -> 18.8%). Both DBs give the same deltas. Of the forced ceiling (+71 TP), 34 are recovered; the rest are hop-two packages (ruled out without own evidence), packages with under 3 unique hashes, and packages under the coverage floor (`asn1.js` 0.22, `bignumber.js` 0.23, `react-redux` 0.09, `styled-components` 0.13, `react-devtools-core` 0.17, `@notifee/react-native` 0.27). Tests: `tests/gate/deps/corpus-recall-candidates.test.ts`. Remaining gaps are rows in `docs/BUGS.md`.
 
 Corpus scale: `com.brex.mobile` (hbc98, `hbc2js deps --offline`, default heap) completes before and after with the same peak RSS (3.38 GB vs 3.37 GB) and 324 -> 328 confirmed (no truth file). Wall time went 10 min 13 s -> 21 min 39 s, but the two runs shared deb with other workers at load average 45 and 70 respectively, so that ratio is not a measurement of this change; the index scan itself reads one 15 MB file. Re-time on an idle host.
+
+### Hop-two candidate expansion (corpus-recall-hop-two)
+
+**Problem.** 35 truth packages (Expensify 7, react-navigation-example 5, bluesky 2, rainbow 11, metamask 10 on `db-v3-clean`) were never proposed because they are only a recorded dependency of a candidate that is itself not string-evidenced (dependency-, hash- or scope-proposed). The 2026-09-29 owner ruling: second-hop expansion only with the package's own string evidence, never on the dependency edge alone.
+
+**Choice: "own string evidence" = an own distinctive string set.** Signature files carry no string literals, only each function's string-set hash (the hash of the set of string constants it uses) and the count. Name, `name@version` and require-path evidence are already covered by the direct substring rule, so none of the 35 had any. A hop-two package Q (a recorded dependency of a non-direct candidate, not already a candidate) is admitted when at least one target function's string-set hash equals one of Q's own functions' string sets, where that set (a) has at least 2 strings, (b) comes from a function Q's file owns (`owner` null or Q), and (c) appears in no other package's signature at that HBC version, toolchain baselines included. `tools/deps/build-candidate-hash-index.mjs` now writes `candidate-stringset-index__hbc<N>.tsv` (set hash -> its single owner) beside the hash index (`src/deps/hash-index.ts`; 4.5-4.9 MB per version on `db-v3-clean`, 2 min 41 s build, 0.21 GB RSS). `deriveCandidatePackages` reads it only for the hop-two set. A DB without that file proposes nothing at hop two. Admitted packages' dependencies are not expanded (no hop three). Tests: `tests/gate/deps/corpus-recall-hop-two.test.ts`, including the negatives: absent, shared, one-string and borrowed (another package's `owner`) sets.
+
+**Rejected: string sets merely not shared with the parent.** Diagnosed on all five apps first (string sets present in the target and absent from the parent's functions): dozens of FP hop-two packages pass (`safer-buffer`, `is-weakref`, `is-async-function`, `lodash-es`, `whatwg-mimetype`), because their string sets are common to many packages. Global uniqueness drops them all. It also drops the TPs `is-regex`, `is-date-object`, `lodash.debounce`, `has-property-descriptors`: every one of their hashes and string sets is also in another package's signature. They are FPs when forced on metamask/rainbow, so the guard keeps them out by design (BUGS row narrowed).
+
+**Measured** (deps-recall-candidates code before, this branch after, offline, hash index on, same index farms; `scoreAgainstTruth` per app). `db-v3-clean`: Expensify, react-navigation-example, bluesky and rainbow unchanged. Metamask 178 -> 181 confirmed (+`bare-events`, `rfdc` TP, +1 FP `jszip`, recall 18.8% -> 19.1%). `db-v4-paths-partial`: Expensify 92 -> 95 (+`abort-controller`, `define-properties`, `htmlparser2`, 0 FP); react-navigation-example 10 -> 18 at 0 FP (recall 13.2% -> 23.7%); bluesky 29 -> 39 at 0 FP (14.6% -> 19.7%); rainbow unchanged; metamask as on the clean DB. The "before" figures on `db-v4-paths-partial` (10 / 29 / 92) are wrong as a baseline: that run used a stale code copy whose `match.ts` is the corpus-precision-residual vintage (commit 43957ae), before corpus-path-recall's `promoteViaDependency`, the scattered-anchor fixes and slimmed module edges. Hop-two does not cascade.
+
+**No cascade (deps-hop-two-cascade).** We first read the react-navigation-example gain as admitting `react-native-pager-view` and `standard-navigation` also making `@react-navigation/native`, `react-native-screens`, `react-native-safe-area-context`, `react-native-gesture-handler` and others confirm. It traced to the stale baseline above. With the current matcher on the same farm and those two packages removed from the candidate set, the app confirms 17. Each of those packages reaches high through `promoteViaDependency`'s fuzzy form with `by: react-native` (`abort-controller` through `event-target-shim`), not through the admitted packages. Admitting them adds `react-native-pager-view` only (also `viaDependency` by `react-native`). `standard-navigation` does not reach high. So hop-two's real gain on react-navigation-example is +1 TP (17 -> 18), and the rest of 10 -> 18 is path recall. On Expensify the same A/B (current code, admitted packages removed vs kept) gives 92 -> 95: exactly the three admitted packages (`abort-controller` via `event-target-shim`, `define-properties` via `has-property-descriptors`, `htmlparser2` via `domhandler`), nothing else moves. Bluesky confirms 39 under the current code. Its 29 "before" is the stale baseline too, and the hop-two share of the gap was not split out. That is principled. A candidate added to the set changes another package's score only through shared evidence: hash ambiguity (`hashOwnerNames`), demotion by a better-explaining package, or a fuzzy-form edge where the new package is the confirmed dependency D. A package that shares no hash with the other candidates moves nothing. `tests/gate/deps/corpus-recall-hop-two.test.ts` (`deps-hop-two-cascade`) pins that invariance. Corpus scale: `com.brex.mobile` (`--offline`, default heap) completes, with the same confirmed set as before, 16 min 24 s wall and 3.56 GB peak RSS (3.37 GB before, on a deb at load 50-70).
+
+### Population widening (deps-population-widen, 2026-11-09)
+
+The never-queued bucket above is a population choice, so this widens the
+population without reading any measured app. `tools/pkgsig/bulk/population-closure.mjs`
+takes the dependency closure (registry `dependencies` + `peerDependencies`,
+2 hops) of every package with an hbc98 file in db-v3-clean or db-v4-paths
+(2,162 names), plus (c) scoped package-name strings from the string tables
+of 24 real-world corpus APKs (`population-corpus.mjs`; MetaMask, rainbow,
+bluesky and the au.gov.nsw app excluded and never opened; Expensify and
+react-navigation are not in the corpus). The truth-chosen
+`db-overlay-recall` is not a source. Not used: an npm "dependents of
+react/react-native/expo" list (the registry search API has no dependents
+query); the bulk build's keyword search already covers RN libraries.
+**Policy:** one version per new name, the one most parent ranges resolve to
+(else `latest`), because matching is by name across versions (building the
+exact version of 68 other-version-only packages recovered 9). A name is new
+when it has no hbc98 file. Skipped: `@types/*`, react, react-native, and
+the build toolchain (typescript, eslint*, jest*, babel presets/plugins/core,
+bundlers). Ranked by distinct dependent *families* (scope, else name, so one
+SDK's 80 packages are one vote) + 2 per corpus app.
+
+**Build** (deb, 6 slots, `build-one.mjs` path-bearing hbc98, then
+`dep-subtract.mjs` against db-v3-clean, into `db-overlay-pop`): 2,347
+planned jobs; the run stopped at job 992 after 67 min because free disk
+fell to 16 GB (outside this run's ~2.5 GB). 727 built (43 reused from
+identical recall-overlay builds, by name@version), 265 failed (mostly peer
+imports unresolved, the known class in docs/BUGS.md; 6 npm timeouts, 2
+hermesc). 739 overlay files, 82 MB.
+
+**Measured** (deb, offline `scoreAgainstTruth`, sha pins matched, matcher
+code at deps-recall-nosig, before the hash-index candidate merge; base =
+db-v3-clean alone; +pop = db-v3-clean + db-overlay-pop, not db-overlay-recall):
+
+| bundle | DB | confirmed / TP / FP | recall all (direct) | signature present | ceiling |
+|---|---|---|---|---|---|
+| Expensify (hbc98) | db-v3-clean | 131 / 89 / 42 | 30.9% (35.2%) | 143 | 125 |
+| Expensify | + db-overlay-pop | 158 / 113 / 45 | 39.2% (42.9%) | 216 | 172 |
+| react-navigation (hbc98) | db-v3-clean | 14 / 14 / 0 | 18.4% (21.7%) | 44 | 33 |
+| react-navigation | + db-overlay-pop | 17 / 16 / 1 | 21.1% (23.3%) | 59 | 43 |
+| bluesky (hbc98) | db-v3-clean | 43 / 34 / 9 | 17.2% (17.2%) | 75 | 70 |
+| bluesky | + db-overlay-pop | 47 / 37 / 10 | 18.7% (18.7%) | 109 | 100 |
+| rainbow (hbc96) | db-v3-clean | 106 / 82 / 24 | 15.8% (20.4%) | 192 | 121 |
+| rainbow | + db-overlay-pop | 108 / 84 / 24 | 16.2% (20.4%) | 192 | 126 |
+| MetaMask (hbc96) | db-v3-clean | 169 / 132 / 37 | 17.6% (20.3%) | 246 | 206 |
+| MetaMask | + db-overlay-pop | 175 / 138 / 37 | 18.4% (20.3%) | 246 | 213 |
+
+No true positive lost. New false positives: `@babel/standalone` on
+Expensify, react-navigation and bluesky (a browser build of Babel that
+embeds copies of its helpers: an embedded-copy case the precision rules do
+not demote), plus `eventemitter3`, `@gorhom/bottom-sheet`, `refa` on
+Expensify (`builtins` left). The toolchain skip list was fixed before the
+build and was not widened after seeing these. Expensify gains 24 TPs
+(`@sentry/{browser,core,react}`, `@formatjs/intl-listformat`, `expo`,
+`expo-asset`, `@react-navigation/*`, `semver`, `source-map`, ...).
+The hbc96 apps get no hbc98 signatures, yet gain 2 and 6 TPs. That was not
+traced: the new packages' names probably change the candidate and
+subtraction context.
+
+**Coverage of truth** (truth read only here, for scoring): planned
+population / built overlay, by name (exact version): Expensify 85 (41) / 73
+(41) of 288; react-navigation 20 / 15 of 76; bluesky 54 / 34 of 198 (both
+truth files have no usable versions); rainbow 162 (95) / 97 (57) of 518;
+MetaMask 190 (108) / 119 (65) of 749. The truth-chosen recall overlay
+reached 58.0% on Expensify, and this run reached 39.2%. Most of the gap is
+the 1,355 jobs not run and the 265 that failed.
+
+Reproduce (deb, `~/_hbc2js/pop/`): `population-corpus.mjs --apk-dir
+../hbc2js-local-corpus/apks --exclude au.gov.nsw --exclude io.metamask
+--exclude me.rainbow --exclude xyz.blueskyweb --out corpus-names.json`;
+`population-closure.mjs --seed-db ../db-v3-clean --seed-db ../db-v4-paths
+--hbc 98 --hops 2 --cap 3000 --corpus-names corpus-names.json --cache
+registry-cache.json --out jobs-all.tsv --plan-out plan.json`; `xargs -a
+jobs-all.tsv -d '\n' -P6 -n1 ./drive.sh` (stops itself below 16 GB);
+`after.sh` (subtract, merge, `measure5.sh pop <dir>`). Next: finish the
+remaining 1,355 jobs once disk allows, and look into why `@babel/standalone`
+is not demoted.

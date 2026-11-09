@@ -175,13 +175,19 @@ Own build scored against the package lockfile truth. Offline and `--confirm` giv
 | Expensify/App 12a92bd (J3, + exact-version overlay, db-v4-paths-partial offline) | 288 (91) | 94 / 92.6% / 30.2% (precision rules) | 170 / 96.5% / 56.9% (direct 82.4%; deps-recall-nosig) | not run | n/a |
 | react-navigation-example 0.85.3 (held out, + exact-version overlay) | 76 (60) | partial 10 / 100% / 13.2%; clean 14 / 100% / 18.4% | partial 15 / 100% / 19.7%; clean 18 / 100% / 23.7% (deps-recall-nosig) | not run | n/a |
 | five truth apps (one-sided twin, corpus-twin-sourcemap; partial/clean, with/without overlay) | see DEPS.md | Expensify + overlay: partial 166 / 98.8%, clean 204 / 81.9% | Expensify + overlay: partial 165 / 99.4% (FP `lodash-es` only), clean 201 / 83.1%; the other 18 runs unchanged; 0 TP lost; react-navigation 0 FP | not run | n/a |
-
+| Expensify/App 12a92bd (J3, + truth-blind population overlay `db-overlay-pop` 739 files, db-v3-clean offline) | 288 (91) | 131 / 67.9% / 30.9% | 158 / 71.5% / 39.2% (direct 42.9%; deps-population-widen) | not run | n/a |
+| react-navigation-example 0.85.3 (held out, + population overlay, db-v3-clean offline) | 76 (60) | 14 / 100% / 18.4% | 17 / 94.1% / 21.1% (direct 23.3%; FP `@babel/standalone`) | not run | n/a |
+| bluesky own build (+ population overlay, db-v3-clean offline) | see DEPS.md | 43 / 79.1% / 17.2% | 47 / 78.7% / 18.7% (deps-population-widen) | not run | n/a |
+| rainbow own build (hbc96, + population overlay, db-v3-clean offline) | see DEPS.md | 106 / 77.4% / 15.8% | 108 / 77.8% / 16.2% (deps-population-widen) | not run | n/a |
+| metamask own build (hbc96, + population overlay, db-v3-clean offline) | see DEPS.md | 169 / 78.1% / 17.6% | 175 / 78.9% / 18.4% (deps-population-widen) | not run | n/a |
 | Expensify/App 12a92bd (J3, hash-index candidates, db-v3-clean offline) | 288 (91) | 128 / 69.5% / 30.9% (main 87ec7b8) | 130 / 70.0% / 31.6% (direct 35.2%; corpus-recall-candidates, +`js-base64` `react-native-uuid`, 0 FP added) | not run | n/a |
 | Expensify/App 12a92bd (J3, hash-index candidates, db-v4-paths-partial offline) | 288 (91) | 90 / 96.7% / 30.2% | 92 / 96.7% / 30.9% (direct 37.4%; corpus-recall-candidates) | not run | n/a |
 | react-navigation-example 0.85.3 (held out, hash-index candidates) | 76 (60) | partial 10 / 100% / 13.2%; clean 14 / 100% / 18.4% | unchanged, 0 FP (corpus-recall-candidates) | not run | n/a |
 | bluesky own build (hash-index candidates, offline) | see DEPS.md | partial 29 / 100% / 14.6%; clean 42 / 81.0% / 17.2% | unchanged (corpus-recall-candidates) | not run | n/a |
 | rainbow own build (hash-index candidates, offline, either DB) | see DEPS.md | 104 / 78.8% / 15.8% (direct 20.4%) | 127 / 81.9% / 20.1% (direct 26.5%; corpus-recall-candidates, +22 TP, +1 FP `digest-fetch`) | not run | n/a |
 | metamask own build (hash-index candidates, offline, either DB) | see DEPS.md | 169 / 78.1% / 17.6% (direct 20.3%) | 178 / 79.2% / 18.8% (direct 20.3%; corpus-recall-candidates, +10 TP, `bs58` lost, FP `react-base16-styling` in, `eventid` out) | not run | n/a |
+| five truth apps (hop-two expansion with own string sets, db-v3-clean + hash index, offline) | see DEPS.md | Expensify 130 / 70.0%; nav 14 / 100%; bluesky 42 / 81.0%; rainbow 127 / 81.9%; metamask 178 / 79.2% / 18.8% | unchanged except metamask 181 / 79.0% / 19.1% (+`bare-events` `rfdc`, +1 FP `jszip`; corpus-recall-hop-two) | not run | n/a |
+| five truth apps (hop-two expansion with own string sets, db-v4-paths-partial + hash index, offline) | see DEPS.md | Expensify 92 / 96.7% / 30.9%; nav 10 / 100% / 13.2%; bluesky 29 / 100% / 14.6%; rainbow 127 / 81.9%; metamask 178 / 79.2% | Expensify 95 / 96.8% / 31.9%; nav 18 / 100% / 23.7% (0 FP); bluesky 39 / 100% / 19.7%; rainbow unchanged; metamask 181 / 79.0% / 19.1% (+23 TP, +1 FP `jszip`; corpus-recall-hop-two) | not run | n/a |
 Store-bundle scoring was not repeated in this measurement.
 
 ## `--confirm` on three apps without ground truth
