@@ -77,7 +77,7 @@ function listJsonFiles(dir: string, candidates?: ReadonlySet<string>): string[] 
   const files: string[] = [];
   if (!existsSync(dir)) return files;
   for (const name of readdirSync(dir)) {
-    if (name === "index.json") continue;
+    if (name === "index.json" || name === "dependency-closure.json") continue;
     if (!name.endsWith(".json")) continue;
     // Evidence-directed filtering (`candidates.ts`): when a
     // candidate set is given, skip any non-baseline file whose own
@@ -313,6 +313,21 @@ export interface LoadSignaturesOptions {
  * confirmation shadows a stale shared/user-cache copy rather than being
  * matched twice.
  */
+/** deps-transitive-subtract: a JSON layer's optional
+ *  `dependency-closure.json` (`{ "<name>@<version>": [dep names] }`,
+ *  `tools/pkgsig/bulk/dep-closure.mjs`), so a closure can be added to an
+ *  existing DB without rewriting its signature files. */
+function readClosureSidecar(dir: string): Record<string, unknown> | null {
+  const path = join(dir, "dependency-closure.json");
+  if (!existsSync(path)) return null;
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+    return parsed !== null && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function loadSignatures(layers: readonly DbLayer[], opts: LoadSignaturesOptions = {}): LoadedSig[] {
   const seen = new Set<string>();
   const out: LoadedSig[] = [];
@@ -338,12 +353,17 @@ export function loadSignatures(layers: readonly DbLayer[], opts: LoadSignaturesO
       continue;
     }
     const candidates = layer.name === "project" && layer.filterable !== true ? undefined : opts.candidates;
+    const closures = readClosureSidecar(layer.dir);
     for (const path of listJsonFiles(layer.dir, candidates)) {
       let file: SigDbFile;
       try {
         file = JSON.parse(readFileSync(path, "utf8")) as SigDbFile;
       } catch {
         continue;
+      }
+      if (file.dependencyClosure === undefined && closures !== null) {
+        const closure = closures[`${file.package}@${file.version}`];
+        if (Array.isArray(closure)) file = { ...file, dependencyClosure: closure };
       }
       const key = keyOf(file);
       if (seen.has(key)) continue;

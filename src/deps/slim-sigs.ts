@@ -69,6 +69,7 @@ export function slimSigFile(f: SigDbFile, intern: Map<string, string>, target?: 
     // the container rule the package's whole function count, the
     // embedded rule whether the file has module paths.
     if (f.subtractedDependencies !== undefined) o.subtractedDependencies = f.subtractedDependencies.map(s);
+    if (f.dependencyClosure !== undefined) o.dependencyClosure = f.dependencyClosure.map(s);
     o.totalFunctions = f.totalFunctions;
     o.rawFunctionCount = f.rawFunctionCount;
     if (f.modulePaths !== undefined) o.modulePaths = f.modulePaths;

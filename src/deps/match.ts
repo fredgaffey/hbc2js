@@ -902,17 +902,58 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
       else attributed.set(key, c);
     }
   }
+  // deps-transitive-subtract (docs/DEPS.md "Transitive dependency
+  // subtraction"): which target hashes each loaded package holds as own
+  // code, and each package's declared dependency closure (union over its
+  // loaded versions). A hash that a member of P's closure holds is that
+  // member's code, so it is a copy in P, unless the member's own closure
+  // names P (a cycle: the edge cannot tell the two apart).
+  const closureOf = new Map<string, Set<string>>();
+  for (const entry of eligibleDbs) {
+    const c = entry.file.dependencyClosure;
+    if (c === undefined || c.length === 0 || entry.file.toolchainBaseline) continue;
+    let set = closureOf.get(entry.file.package);
+    if (set === undefined) closureOf.set(entry.file.package, (set = new Set()));
+    for (const d of c) if (d !== entry.file.package) set.add(d);
+  }
+  const ownTargetKeys = new Map<string, Set<string>>();
+  if (closureOf.size > 0) {
+    const wanted = new Set<string>();
+    for (const c of closureOf.values()) for (const d of c) wanted.add(d);
+    for (const entry of eligibleDbs) {
+      if (entry.file.toolchainBaseline || !wanted.has(entry.file.package)) continue;
+      const foreign = foreignSets(entry.file);
+      let set = ownTargetKeys.get(entry.file.package);
+      if (set === undefined) ownTargetKeys.set(entry.file.package, (set = new Set()));
+      for (const fn of entry.file.functions) {
+        const key = schemeKey(entry.file, fn.exactHash);
+        if (!foreign.functions.has(fn.index) && targetExact.has(key)) set.add(key);
+      }
+    }
+  }
+  const closureHolders = (file: SigDbFile): Set<string>[] => {
+    const out: Set<string>[] = [];
+    if (file.toolchainBaseline) return out;
+    for (const d of closureOf.get(file.package) ?? []) {
+      const keys = ownTargetKeys.get(d);
+      if (keys !== undefined && keys.size > 0 && closureOf.get(d)?.has(file.package) !== true) out.push(keys);
+    }
+    return out;
+  };
   const views = new Map<SigDbFile, OwnView>();
   const viewOf = (file: SigDbFile): OwnView => {
     let v = views.get(file);
     if (v !== undefined) return v;
     const foreign = foreignSets(file);
     const functions = new Set<number>();
-    if (attributed.size > 0 && !file.toolchainBaseline) {
+    const holders = closureHolders(file);
+    if ((attributed.size > 0 || holders.length > 0) && !file.toolchainBaseline) {
       for (const fn of file.functions) {
         if (foreign.functions.has(fn.index)) continue;
-        const a = attributed.get(schemeKey(file, fn.exactHash));
+        const key = schemeKey(file, fn.exactHash);
+        const a = attributed.get(key);
         if (a !== undefined && !a.has(file.package)) functions.add(fn.index);
+        else if (holders.some((h) => h.has(key))) functions.add(fn.index);
       }
     }
     const factories = new Set<number>();
