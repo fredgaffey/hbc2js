@@ -2705,11 +2705,46 @@ rule should have caught it:
 | pathless signature holding its dependencies' code; the matched version is pathless because its v4 rebuild failed (listed in `db-v4-paths.failed.txt`) | `d3-geo` (hits in `d3-array`), `jszip` (`pako`), `typeorm`, `wagmi` (`viem`, `@tanstack/*`, `@noble/curves`) | `fast-json-patch`, `is-array-buffer`, `is-regex` (es-shim chain), `jszip`, `mammoth` (`@xmldom/xmldom`), `p-map`, `reactotron-react-native`, `rpc-websockets` (`@babel/runtime`), `typeorm`, `wagmi` | open: needs those builds fixed, not a rule |
 | fork or rename whose counterpart has no matching signature | `react-query` (`@tanstack/react-query`), `whatwg-url` (`whatwg-url-without-unicode`) | `react-query`, `source-map-js` (`source-map`), `superstruct` (`@metamask/superstruct`), `whatwg-url` | open (the known fork row above) |
 | small package inlined in another package's pre-built dist module | `async-lock` (`@rudderstack/rudder-sdk-react-native`), `preact` (`@sentry-internal/feedback`) | `resq` (inlines `fuse.js`) | fixed for the first two (below) |
-| module-graph promotion through the `react-native` hub, fuzzy edge | none | `@react-native-community/cookies`, `react-native-webview` | open: the hub caveat of "Path recall" |
+| module-graph promotion through the `react-native` hub, fuzzy edge | none | `@react-native-community/cookies`, `react-native-webview` | a fork, not the hub: the app ships `@react-native-cookies/cookies` and `@metamask/react-native-webview`, which hold the upstream code (deps-hub-edge, below) |
 | code moved between packages across versions | none | `fast-xml-builder` (in the app's `fast-xml-parser`) | open |
 | large file inlined in a renderer of about its size | none | `react-reconciler` (in `react-native`'s renderer) | open |
 | app-vendored copy (the code really is there, under app paths) | `d3-interpolate-path` | none | not a matcher error |
 | generic shapes spread over many packages | none | `@shopify/react-native-skia` | open |
+
+**The two hub-edge FPs are forks (deps-hub-edge, 2026-11-09).** Every
+`viaDependency` promotion on the five truth apps was dumped (full v4: 51
+promotions; `db-v3-clean` has none, since the rule needs path-bearing files):
+package, `by`, edge form, the matching own-file/app-module pairs with their
+fuzzy overlap, own-file size, the app module's requires and requirers, and
+which confirmed package explains each one. Metamask's two FPs are not wrong
+evidence. The source map puts the matched modules under
+`node_modules/@react-native-cookies/cookies/index.js` and
+`node_modules/@metamask/react-native-webview/src/{WebView.android,WebViewShared}.tsx`.
+Those are renames of the upstream packages, and the truth names the fork. The
+cookies module still holds the string
+`@react-native-community/cookies: Import libraries to android ...`, and the
+webview `WebViewShared` module has the same strings as rainbow's true
+`react-native-webview` 13.6.3. So nothing in the code separates them from
+the TPs, and none of the measured features has a margin. Fuzzy coverage of
+the own file is 0.60-0.67 for the FPs and 0.50-1.0 for the TPs
+(`react-native-permissions` 0.60, `@react-navigation/native` on metamask
+0.50). The FPs have 4, 7 and 12 distinct fuzzy hashes; the TPs go down to 3
+(`react-native-is-edge-to-edge`, `-worklets`). Own files are 89-339
+instructions; the TPs go down to 39. Neither FP's app module requires code
+of a confirmed package that the own file does not declare. Requirers are
+unexplained app modules for both FPs and TPs. Native-module strings are in
+both. Any cut on these loses TPs and keeps a fork reported under the
+upstream name it really carries, so no rule ships. They join the fork row
+above. The one promotion the dump shows riding on the wrong module *is*
+through the hub, but it is a TP: metamask's `react-native-permissions` index
+matches `react-native-reanimated`'s index (a generic re-export shape), and 12
+of the 13 explained requires of that module are reanimated, skia or
+worklets code, none of which permissions declares. A guard "reject a fuzzy
+pair whose app module has 3+ explained requires, most of them to confirmed
+packages the own file does not declare" rejects only that pair on all five
+apps. As measured that is one TP lost and no FP removed. It was not
+shipped: it is correct, but only worth adding together with a case where it
+removes an FP.
 
 A rule demoting a pathless package whose path-bearing sibling versions hit
 none of their own files was simulated and rejected: it would remove 7 FPs
