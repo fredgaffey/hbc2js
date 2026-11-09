@@ -1,0 +1,194 @@
+; hbc2js disassembly of 190-undefined-receiver-rewritten/v84.hbc
+; version=84 layout=B opcodeTable=hbc84 functions=6 strings=33 globalCodeIndex=0
+function #0 "global"  params=1 frame=20 env=0 flags=strict,dbg  @0x00000264 size=465
+  0000  DeclareGlobalVar     s25 "obj"
+  0005  DeclareGlobalVar     s29 "arr"
+  000a  DeclareGlobalVar     s24 "who"
+  000f  DeclareGlobalVar     s26 "joinAfterLabel"
+  0014  DeclareGlobalVar     s20 "loopThenTail"
+  0019  DeclareGlobalVar     s21 "bySwitch"
+  001e  DeclareGlobalVar     s32 "mixed"
+  0023  CreateEnvironment    r1
+  0025  CreateClosure        r2, r1, f1 "who"
+  002a  GetGlobalObject      r0
+  002c  PutById              r0, r2, #c1, s24 "who"
+  0032  CreateClosure        r2, r1, f2 "joinAfterLabel"
+  0037  PutById              r0, r2, #c2, s26 "joinAfterLabel"
+  003d  CreateClosure        r2, r1, f3 "loopThenTail"
+  0042  PutById              r0, r2, #c3, s20 "loopThenTail"
+  0048  CreateClosure        r2, r1, f4 "bySwitch"
+  004d  PutById              r0, r2, #c4, s21 "bySwitch"
+  0053  CreateClosure        r1, r1, f5 "mixed"
+  0058  PutById              r0, r1, #c5, s32 "mixed"
+  005e  NewObject            r1
+  0060  LoadConstString      r2, s10 "o"
+  0064  PutNewOwnByIdShort   r1, r2, s18 "tag"
+  0068  GetByIdShort         r2, r0, #c1, s24 "who"
+  006d  PutNewOwnByIdShort   r1, r2, s23 "m"
+  0071  PutById              r0, r1, #c6, s25 "obj"
+  0077  TryGetById           r4, r0, #c2, s17 "print"
+  007d  GetByIdShort         r6, r0, #c3, s26 "joinAfterLabel"
+  0082  GetByIdShort         r5, r0, #c1, s24 "who"
+  0087  LoadConstUndefined   r3
+  0089  NewObjectWithBuffer  r2, 2, 2, lit@0x0000, lit@0x0000
+  0093  LoadConstString      r1, s13 "x"
+  0097  Call4                r2, r6, r3, r5, r2, r1
+  009e  GetByIdShort         r7, r0, #c3, s26 "joinAfterLabel"
+  00a3  GetByIdShort         r6, r0, #c1, s24 "who"
+  00a8  NewObject            r5
+  00aa  LoadConstString      r1, s2 "e2"
+  00ae  PutNewOwnByIdShort   r5, r1, s18 "tag"
+  00b2  LoadConstString      r1, s14 "y"
+  00b6  Call4                r1, r7, r3, r6, r5, r1
+  00bd  Call3                r1, r4, r3, r2, r1
+  00c3  NewArrayWithBuffer   r1, 2, 2, lit@0x0000
+  00cb  PutById              r0, r1, #c7, s29 "arr"
+  00d1  GetByIdShort         r2, r0, #c4, s29 "arr"
+  00d6  LoadConstString      r1, s29 "arr"
+  00da  PutById              r2, r1, #c8, s18 "tag"
+  00e0  TryGetById           r4, r0, #c2, s17 "print"
+  00e6  GetByIdShort         r5, r0, #c5, s20 "loopThenTail"
+  00eb  GetByIdShort         r2, r0, #c1, s24 "who"
+  00f0  GetByIdShort         r1, r0, #c4, s29 "arr"
+  00f5  Call3                r2, r5, r3, r2, r1
+  00fb  GetByIdShort         r6, r0, #c5, s20 "loopThenTail"
+  0100  GetByIdShort         r5, r0, #c1, s24 "who"
+  0105  TryGetById           r9, r0, #c6, s27 "Object"
+  010b  GetByIdShort         r8, r9, #c7, s30 "assign"
+  0110  NewObject            r7
+  0112  LoadConstString      r1, s15 "zz"
+  0116  PutNewOwnByIdShort   r7, r1, s18 "tag"
+  011a  NewArrayWithBuffer   r1, 2, 2, lit@0x0009
+  0122  Call3                r1, r8, r9, r1, r7
+  0128  Call3                r1, r6, r3, r5, r1
+  012e  Call3                r1, r4, r3, r2, r1
+  0134  TryGetById           r5, r0, #c2, s17 "print"
+  013a  GetByIdShort         r4, r0, #c8, s21 "bySwitch"
+  013f  GetByIdShort         r2, r0, #c1, s24 "who"
+  0144  NewObjectWithBuffer  r1, 2, 2, lit@0x0003, lit@0x0007
+  014e  Call3                r4, r4, r3, r2, r1
+  0154  GetByIdShort         r6, r0, #c8, s21 "bySwitch"
+  0159  GetByIdShort         r2, r0, #c1, s24 "who"
+  015e  NewObjectWithBuffer  r1, 2, 2, lit@0x0003, lit@0x000e
+  0168  Call3                r2, r6, r3, r2, r1
+  016e  GetByIdShort         r7, r0, #c8, s21 "bySwitch"
+  0173  GetByIdShort         r6, r0, #c1, s24 "who"
+  0178  NewObjectWithBuffer  r1, 2, 2, lit@0x0003, lit@0x0015
+  0182  Call3                r1, r7, r3, r6, r1
+  0188  Call4                r1, r5, r3, r4, r2, r1
+  018f  TryGetById           r2, r0, #c2, s17 "print"
+  0195  GetByIdShort         r5, r0, #c9, s32 "mixed"
+  019a  GetByIdShort         r4, r0, #c10, s25 "obj"
+  019f  NewObjectWithBuffer  r1, 2, 2, lit@0x0000, lit@0x001c
+  01a9  Call3                r1, r5, r3, r4, r1
+  01af  GetByIdShort         r5, r0, #c9, s32 "mixed"
+  01b4  GetByIdShort         r4, r0, #c10, s25 "obj"
+  01b9  NewObject            r0
+  01bb  LoadConstString      r6, s9 "m2"
+  01bf  PutNewOwnByIdShort   r0, r6, s18 "tag"
+  01c3  Call3                r0, r5, r3, r4, r0
+  01c9  Call3                r0, r2, r3, r1, r0
+  01cf  Ret                  r0
+
+function #1 "who"  params=3 frame=3 env=0 flags=strict,dbg  @0x00000435 size=59
+  0000  LoadParam            r1, 0
+  0003  LoadConstString      r0, s12 "undef"
+  0007  LoadConstUndefined   r2
+  0009  JStrictEqual         L1, r1, r2
+  000d  GetByIdShort         r2, r1, #c1, s18 "tag"
+  0012  LoadConstString      r1, s11 "this="
+  0016  Add                  r0, r1, r2
+L1:
+  001a  LoadParam            r1, 1
+  001d  GetByIdShort         r2, r1, #c1, s18 "tag"
+  0022  LoadConstString      r1, s0 ":"
+  0026  Add                  r0, r0, r1
+  002a  Add                  r0, r0, r2
+  002e  Add                  r1, r0, r1
+  0032  LoadParam            r0, 2
+  0035  Add                  r0, r1, r0
+  0039  Ret                  r0
+
+function #2 "joinAfterLabel"  params=4 frame=14 env=0 flags=strict,dbg  @0x00000470 size=74
+  0000  LoadParam            r3, 1
+  0003  LoadParam            r2, 2
+  0006  LoadParam            r1, 3
+  0009  GetByIdShort         r0, r2, #c1, s19 "a"
+  000e  JmpTrue              L1, r0
+  0011  LoadConstUndefined   r4
+  0013  LoadConstUInt8       r0, 2
+  0016  Call3                r0, r3, r4, r2, r0
+  001c  Ret                  r0
+L1:
+  001e  GetByIdShort         r4, r1, #c2, s31 "includes"
+  0023  LoadConstString      r0, s13 "x"
+  0027  Call2                r0, r4, r1, r0
+  002c  JmpFalse             L2, r0
+  002f  LoadConstString      r0, s4 "has "
+  0033  Add                  r0, r0, r1
+  0037  PutById              r2, r0, #c1, s16 "message"
+L2:
+  003d  LoadConstUndefined   r1
+  003f  LoadConstUInt8       r0, 1
+  0042  Call3                r0, r3, r1, r2, r0
+  0048  Ret                  r0
+
+function #3 "loopThenTail"  params=3 frame=16 env=0 flags=strict,dbg  @0x000004ba size=55
+  0000  LoadParam            r3, 1
+  0003  LoadParam            r2, 2
+  0006  LoadConstUInt8       r4, 1
+  0009  LoadConstUInt8       r0, 2
+  000c  LoadConstZero        r5
+L1:
+  000e  GetByVal             r6, r2, r5
+  0012  Mov                  r1, r5
+  0015  JmpTrue              L2, r6
+  0018  AddN                 r5, r1, r4
+  001c  JLessN               L1, r5, r0
+  0020  LoadConstUndefined   r4
+  0022  LoadConstUInt8       r0, 9
+  0025  Call3                r0, r3, r4, r2, r0
+  002b  Ret                  r0
+L2:
+  002d  LoadConstUndefined   r0
+  002f  Call3                r0, r3, r0, r2, r1
+  0035  Ret                  r0
+
+function #4 "bySwitch"  params=3 frame=15 env=0 flags=strict,dbg  @0x000004f1 size=64
+  0000  LoadParam            r3, 1
+  0003  LoadParam            r2, 2
+  0006  GetByIdShort         r0, r2, #c1, s22 "k"
+  000b  LoadConstUInt8       r1, 1
+  000e  JStrictEqual         L2, r1, r0
+  0012  LoadConstUInt8       r4, 2
+  0015  JStrictEqual         L1, r4, r0
+  0019  LoadConstUndefined   r5
+  001b  LoadConstUInt8       r0, 3
+  001e  Call3                r0, r3, r5, r2, r0
+  0024  Ret                  r0
+L1:
+  0026  PutById              r2, r1, #c1, s28 "z"
+  002c  LoadConstUndefined   r0
+  002e  Call3                r0, r3, r0, r2, r4
+  0034  Ret                  r0
+L2:
+  0036  LoadConstUndefined   r0
+  0038  Call3                r0, r3, r0, r2, r1
+  003e  Ret                  r0
+
+function #5 "mixed"  params=3 frame=14 env=0 flags=strict,dbg  @0x00000531 size=50
+  0000  LoadParam            r3, 1
+  0003  LoadParam            r2, 2
+  0006  GetByIdShort         r0, r2, #c1, s19 "a"
+  000b  JmpTrue              L1, r0
+  000e  GetGlobalObject      r0
+  0010  GetByIdShort         r4, r0, #c2, s24 "who"
+  0015  LoadConstUndefined   r1
+  0017  LoadConstUInt8       r0, 2
+  001a  Call3                r0, r4, r1, r2, r0
+  0020  Ret                  r0
+L1:
+  0022  GetByIdShort         r1, r3, #c3, s23 "m"
+  0027  LoadConstUInt8       r0, 1
+  002a  Call3                r0, r1, r3, r2, r0
+  0030  Ret                  r0
