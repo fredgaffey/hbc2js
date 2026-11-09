@@ -7,6 +7,7 @@
 import type { LoadedSig } from "./db.ts";
 import type { ModuleInventory } from "./inventory.ts";
 import type { SigDbFile } from "./sigdb-types.ts";
+import { DEFAULT_MIN_COVERAGE } from "./hash-index.ts";
 import { foreignFunctionPackages, foreignSets, isOwnModulePath, viaDependencyCounts, type ForeignSets } from "./module-paths.ts";
 
 export type ConfidenceTier = "high" | "medium" | "low" | "none";
@@ -880,6 +881,30 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
   // a fork, or a package whose own file inlined it, with no such signature
   // loaded, says nothing about who else owns it (measured: hasown and color
   // lost to attributions to unloaded names).
+  // ...and only a package the target holds: at least DEFAULT_MIN_COVERAGE
+  // of one of its loaded files' own eligible code. A path says where a copy
+  // sits, not where the target's copy came from: react-native-svg's pegjs
+  // runtime, which xcode's parser also holds, is svg's in an app without
+  // xcode.
+  const present = new Set<string>();
+  if (attributed.size > 0) {
+    const names = new Set<string>();
+    for (const a of attributed.values()) for (const n of a) names.add(n);
+    for (const entry of eligibleDbs) {
+      const file = entry.file;
+      if (file.toolchainBaseline || !names.has(file.package) || present.has(file.package)) continue;
+      const foreign = foreignSets(file);
+      let own = 0;
+      let hit = 0;
+      for (const fn of file.functions) {
+        if (foreign.functions.has(fn.index) || fn.instrCount < minInstr) continue;
+        own++;
+        if (targetExact.has(schemeKey(file, fn.exactHash))) hit++;
+      }
+      const eligible = file.slim !== undefined ? file.slim.eligible : own;
+      if (eligible > 0 && hit >= eligible * DEFAULT_MIN_COVERAGE) present.add(file.package);
+    }
+  }
   if (attributed.size > 0) {
     const claimed = new Map<string, Set<string>>();
     for (const entry of eligibleDbs) {
@@ -889,7 +914,7 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
         if (foreign.functions.has(fn.index)) continue;
         const key = schemeKey(entry.file, fn.exactHash);
         const a = attributed.get(key);
-        if (a === undefined || !a.has(entry.file.package)) continue;
+        if (a === undefined || !a.has(entry.file.package) || !present.has(entry.file.package)) continue;
         let set = claimed.get(key);
         if (set === undefined) claimed.set(key, (set = new Set()));
         set.add(entry.file.package);
@@ -908,6 +933,11 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
     const foreign = foreignSets(file);
     const functions = new Set<number>();
     if (attributed.size > 0 && !file.toolchainBaseline) {
+      // Own modules the target holds (factory exact hash present), by
+      // localModuleId; `anyHeld` for pathless files' functions.
+      const held = new Set<number | null>();
+      for (const m of file.modules) if (!m.factoryIsBaseline && m.factoryExactHash !== null && !foreign.factories.has(m.factoryFunctionIndex) && targetExact.has(schemeKey(file, m.factoryExactHash))) held.add(m.localModuleId);
+      const anyHeld = held.size > 0;
       for (const fn of file.functions) {
         if (foreign.functions.has(fn.index)) continue;
         const key = schemeKey(file, fn.exactHash);
@@ -915,8 +945,11 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
         // Each attributed claimant accounts for one target instance; a
         // target holding the hash more often than that has another copy,
         // which this claimant may own (lodash.debounce beside
-        // lodash.throttle, whose file inlines debounce's helpers).
-        if (a !== undefined && !a.has(file.package) && (targetCopies.get(key) ?? 0) <= a.size) functions.add(fn.index);
+        // lodash.throttle, whose file inlines debounce's helpers), but only
+        // when the claimant's own module holding it is in the target too
+        // (not a dist carrier the app does not ship).
+        const mine = fn.moduleId !== undefined ? held.has(fn.moduleId) : anyHeld;
+        if (a !== undefined && !a.has(file.package) && !(mine && (targetCopies.get(key) ?? 0) > a.size)) functions.add(fn.index);
       }
     }
     const factories = new Set<number>();

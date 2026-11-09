@@ -175,27 +175,41 @@ test("corpus-db-growth: a hash the target holds more often than its attributed p
   const single = buildInventory(compile(h.path, bundle([APP, THR]))).inventory;
   const r = matchInventory(single, loaded([deb, thr, wrapper]));
   assert.equal(tierOf(r, "deb-real")?.exactHits, 0, JSON.stringify(tierOf(r, "deb-real")));
+  // The second instance belongs only to a claimant whose module the target
+  // holds: a dist carrier of the shared code (@vitest/pretty-format beside
+  // Expensify's two react-is copies) whose own module is not in the app
+  // still has none of it.
+  const dist = signature(h.path, "dist-carrier", [[...shared, ...helpers("dc", 3, 7001)].join("\n") + "\n" + exportAll([...fnNames("dq", 6), ...fnNames("dc", 3)])], { paths: ["dist-carrier/dist/index.js"] });
+  const c = matchInventory(target, loaded([deb, thr, wrapper, dist]));
+  assert.equal(tierOf(c, "dist-carrier")?.exactHits ?? 0, 0, JSON.stringify(tierOf(c, "dist-carrier")));
 });
 
-// Same review: bluesky +pop2 lost react-native-svg to generic 4-24
-// instruction functions that expo/cli path-bearing files attribute to ms,
-// debug, color-convert, xcode. Code that small is not identifying, so a
-// path never makes it someone else's.
-test("corpus-db-growth: generic small functions are never attributed away by paths", (t) => {
+// Same review: bluesky +pop2 lost react-native-svg. Its pegjs-generated
+// transform parser shares the pegjs runtime (factory, 130/148-instruction
+// helpers) with xcode's pbxproj parser; @expo/config's path-bearing file
+// names that code `xcode/...` and xcode's signature claims it, so svg's
+// copy became xcode's although xcode is not in the app (about 7 of its 159
+// eligible functions in the target). A path says whose code a hash is only
+// for an attributed package the target holds: at least a third of its own
+// code (DEFAULT_MIN_COVERAGE). The target's copy of the hash came from
+// another claimant otherwise.
+test("corpus-db-growth: path attribution to a package the target does not hold takes nothing from present claimants", (t) => {
   const h = requireHermesc(t, 96);
   if (h === null) return;
-  // Small generic helpers (8-20 instructions) the claimant shares with an
-  // unrelated package the wrapper bundled under its own path.
-  const small = Array.from({ length: 6 }, (_, i) => `function sm${i}(a) { return a === ${i} ? null : a + ${i}; }`);
-  const S = [...small, ...helpers("sv", 3, 611)].join("\n") + "\n" + exportAll([...fnNames("sm", 6), ...fnNames("sv", 3)]);
-  const svg = signature(h.path, "svg-real", [S]);
-  const msModule = [...small, ...helpers("ms", 4, 7301)].join("\n") + "\n" + exportAll([...fnNames("sm", 6), ...fnNames("ms", 4)]);
-  const ms = signature(h.path, "ms-like", [msModule]);
-  const wrapper = signature(h.path, "wrapper", [moduleOf("wr", 6, 9001), msModule], { paths: ["wrapper/index.js", "ms-like/index.js"] });
-  const target = buildInventory(compile(h.path, bundle([APP, S]))).inventory;
-  const before = matchInventory(target, loaded([svg, ms]));
-  const grown = matchInventory(target, loaded([svg, ms, wrapper]));
-  assert.ok(target.functions.some((f) => f.instrCount >= 8 && f.instrCount < 25), "fixture holds small eligible functions");
+  const runtime = helpers("pg", 3, 51);
+  const SVG = [...runtime, ...helpers("sv", 9, 611)].join("\n") + "\n" + exportAll([...fnNames("pg", 3), ...fnNames("sv", 9)]);
+  const XC = [...runtime, ...helpers("xc", 12, 7301)].join("\n") + "\n" + exportAll([...fnNames("pg", 3), ...fnNames("xc", 12)]);
+  const svg = signature(h.path, "svg-real", [SVG]);
+  const xc = signature(h.path, "xc-absent", [XC]);
+  const wrapper = signature(h.path, "wrapper", [moduleOf("wr", 6, 9001), XC], { paths: ["wrapper/index.js", "xc-absent/index.js"] });
+  const target = buildInventory(compile(h.path, bundle([APP, SVG]))).inventory;
+  const before = matchInventory(target, loaded([svg, xc]));
+  const grown = matchInventory(target, loaded([svg, xc, wrapper]));
   assert.equal(tierOf(grown, "svg-real")?.exactHits, tierOf(before, "svg-real")?.exactHits, "grown: " + JSON.stringify(tierOf(grown, "svg-real")) + " before: " + JSON.stringify(tierOf(before, "svg-real")));
   assert.equal(tierOf(grown, "svg-real")?.tier, tierOf(before, "svg-real")?.tier);
+  // The attributed package present (its own code in the target): its path
+  // still decides, as in the carrier fixture above.
+  const both = buildInventory(compile(h.path, bundle([APP, XC]))).inventory;
+  const r = matchInventory(both, loaded([svg, xc, wrapper]));
+  assert.equal(tierOf(r, "svg-real")?.exactHits, 0, JSON.stringify(tierOf(r, "svg-real")));
 });
