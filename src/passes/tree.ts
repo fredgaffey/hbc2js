@@ -21,7 +21,7 @@ import type { PassContext } from "./types.ts";
 
 export type { BlockId } from "../cfg/types.ts";
 export type { Instruction } from "../disasm/decode.ts";
-export { writtenRegisters } from "../cfg/reg-effects.ts";
+export { hasDestOperand0, writtenRegisters } from "../cfg/reg-effects.ts";
 
 /**
  * F6 (spec `docs/specs/passes/01-framework-fixes.md`): a read-only,

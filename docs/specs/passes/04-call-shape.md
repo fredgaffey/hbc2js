@@ -296,12 +296,53 @@ register-renamed constant loads and the outgoing-register `Mov`s are already
 gone, and every printer change would move its matcher. Deleting the fast arm
 from the IR outright: the stage-A driver's P1 edge check rejects it.
 
+**The `apply` form.** hermesc's LowerBuiltinCalls also splits
+`F.apply(T, arguments)` -- only when the `arguments` object has that call as
+its one user -- into `JmpBuiltinIs Lfast, <functionPrototypeApply>, C`, a
+generic arm `ReifyArguments* A; Call3 Y, C, F, T, A` and a fast arm
+`CallBuiltin X, <applyArguments>, 3` with F and T in the outgoing registers
+(the VM passes `this` = undefined itself). `applyArguments` calls F with
+`this` = T and a copy of the caller frame's actual arguments (TypeError for a
+non-callable F). With C the builtin, ES2024 20.2.3.1 does IsCallable(F)
+(TypeError), CreateListFromArrayLike(A) -- A's own `length` and indices --
+and `Call(F, T, list)`: the same call exactly when A still holds the actual
+arguments. So the rung adds, for this form: the fast callee is the module's
+`applyArguments` builtin with (F, T), the generic callee is the tested
+register, `this` = F, then T, then the value of `ReifyArguments*` in that arm
+(reify is modelled only here); and a whole-function CFG walk from every
+`ReifyArguments* A` reaches no read of A, until A is overwritten, other than
+another reify of A and this generic call (no long-form call's implicit
+outgoing window covers A either). The object therefore never reaches code
+that could write it, and Hermes never writes a frame's argument slots
+(`LoadParam` copies them out), so its array-like view is the actual
+arguments. `f.apply(t, args)` with any other array-like has no diamond (no
+fast path; a null/undefined `args` is plain Function.prototype.apply). The
+printed generic arm is `apply = F.apply; A = arguments; Reflect.apply(apply,
+F, [T, A])`; R3e sinks the reified `arguments` (or the loose
+`__hbc_arguments(arguments)` copy) into its argument position when the
+arguments it moves past are pure and A is read only there and dies at the
+call, giving `F.apply(T, arguments)`, which recompiles to the same diamond.
+In a loose function with simple parameters `arguments-form` keeps the copy
+helper (R-A3: the object escapes into a call), so that form prints
+`F.apply(T, __hbc_arguments(arguments))`; the helper now captures
+`Reflect.apply` at load, so a program overriding `Function.prototype.apply`
+no longer reaches it.
+
+**Long-form `f.call`.** `o.n.call(t, 1, 2, 3)` printed as
+`Reflect.apply(r3, r12, [r11, ...])` not because of the arm shape but because
+`expressionOnlyCheck` refused every fold in a statement list where some
+register was read before its first def (here `r4 = r3.n; r3 = r4.call`: r3 is
+live into the block, then reassigned) -- even when the fold touched other
+registers. The check now refuses only a violation the rewrite introduced: a
+name violating in `before` too is carried when its first def is the same
+statement, in the unchanged prefix or suffix (every read before it is then
+either unchanged or reads the live-in value with no def in between). The
+argument `Mov`s then fold into the call, `C = F.call` becomes adjacent, and
+R3b prints `F.call(T, a1, ..., an)`. expr-rebuild itself is unchanged.
+
 **Known gaps.** `fcall-diamond` labels: the `break L` inside the hidden fast
 arm still counts as a use, so `label-clean` keeps the wrapper (`L0: { ...;
-break L0; }`, compiles identically). A long-form generic `Call` collapses but
-`expr-rebuild` does not yet sink `C = F.call` past the outgoing `Mov`s, so it
-prints as `Reflect.apply(C, F', [...])`. The `functionPrototypeApply`
-(builtin 55) diamond has a `CallBuiltin` fast arm and is not matched.
+break L0; }`, compiles identically).
 
 **Tests.** `tests/gate/passes/fcall-diamond.test.ts`: fixture
 `170-function-call-diamond` (two-argument, zero-argument, constant-argument,
@@ -309,3 +350,11 @@ five-argument, shadowed `.call`, overridden `Function.prototype.call`) is T2
 PASS on the real VMs at 84/94/96/98/99 and has no shim left at 98/99;
 hand-built arms pin the accepted shapes and the refusals (wrong callee, wrong
 `this`, different argument/constant, arity, unmodelled instruction).
+`tests/gate/passes/fapply-diamond.test.ts`: fixture `220-function-apply-diamond`
+(strict, `this`-forwarding, loose, parameterless; negative twins: shadowed
+own `.apply`, overridden `Function.prototype.apply`) is T2 PASS at
+84/94/96/98/99 with no shim at 98/99; fixture 170's three-argument long-form
+`.call` prints as `F.call(T, 1, 2, 3)`; hand-built arms pin the apply proof
+and its refusals (other builtin, other `this`, other function, non-arguments
+array, untested callee, reify outside the apply form); two
+`expressionOnlyCheck` cases pin carried vs introduced read-before-def.
