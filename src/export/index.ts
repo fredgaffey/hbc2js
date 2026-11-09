@@ -133,6 +133,10 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
       flatText: originalText,
     });
     for (const h of tiered.helpersUsed) helpersUsedAll.add(h);
+    // A flat (or stub) module is the split render's text, which calls the
+    // split's own helper set; the readable render's set does not cover it
+    // (export-boot L4: `__hbc_pnames` missing under --tier flat).
+    if (tiered.tier !== "passes" && tiered.tier !== "jsx") for (const h of splitResult.helpersUsed) helpersUsedAll.add(h);
     if (tiered.unresolved !== undefined) unresolved.push(tiered.unresolved);
 
     const rewriteOpts = {
