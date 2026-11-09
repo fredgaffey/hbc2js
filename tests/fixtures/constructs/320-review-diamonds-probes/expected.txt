@@ -1,0 +1,37 @@
+bound this=U args=pre,1,2
+proxy proxy T 2
+nonfn TypeError
+undef TypeError
+zero this=undefined args=
+this=T args=1 | deleted TypeError | overridden U | this=U args=4
+getter this=T args=1 reads=1
+gfn T callReads=1
+this=T args=1 / g U
+nested this=T args=this=U args=1,this=undefined args=this=T args=2,3
+this=T args=0,7,8,9,10
+init caught boom
+init caught boom
+this=T args=0;this=T args=1;ovl;TypeError
+looseReassign this=U args=f,o,1
+strictReassign this=U args=f,o,1
+looseDefault this=U args=f
+looseDefault2 this=U args=f,o,9
+looseMutate this=T args=42,o,1
+strictMutate this=T args=f,o,f
+looseLength this=T args=f
+looseLengthRest this=T args=f,o,1,undefined,undefined rest=1
+escapeArrow this=T args=f,o,null 1
+escapeClosureFirst this=T args=f,99
+twice this=T args=f,o,1 & this=U args=f,o,1
+selfApply this=T args=f,2
+applyDeleteMid deleted TypeError
+applyBound this=U args=pre,f,o,1
+applyProxy proxy T 5
+applyNonFn TypeError
+applyObjWithApply own 3
+looseNonFn TypeError
+loosePrimThis object
+strictPrimThis number
+applyNested this=T args=f,o,1 this=U args=f,7
+applyLoop this=T args=f,o,1;ovl2;
+applyGetter this=T args=o,3 reads=2
