@@ -2836,6 +2836,43 @@ Still open: rainbow's `react-query` (no `@tanstack` string) and rainbow's
 also stays an FP, also not traced.
 Test: `tests/gate/deps/corpus-fork-relabel.test.ts`.
 
+### Inlined dependency (corpus-mm-precision-inlined, 2026-11-09)
+
+After the fork relabel MetaMask had 14 full-v4 false positives. Source-map
+owners of their hit functions, by class: a pathless signature whose hits
+are its dependencies' code (8: `is-regex`, `is-array-buffer`,
+`fast-json-patch` on the es-shim helpers; `jszip` on pako, `mammoth` on
+@xmldom/xmldom, `wagmi` on viem and @tanstack/query-core, `rpc-websockets`
+and `reactotron-react-native` on @babel/runtime and eventemitter3); small
+shared helpers (4: `p-map` on @babel/runtime helpers, `resq` on fuse.js,
+`@shopify/react-native-skia` spread over vision-camera, reanimated and
+others, `typeorm` mostly on app code); a copy inside another package's file
+(2: `react-reconciler` in React Native's renderer modules, `fast-xml-builder`
+in fast-xml-parser's dist). No truth label is wrong: none of the 14 has a
+`node_modules/<pkg>/` source in the map; `reactotron-react-native` is only
+named in the app's bundled `package.json`, `@shopify/react-native-skia` only
+in vision-camera's optional-dependency proxy, `wagmi` only as a token
+ticker. The first class, the largest, has no sound rule on this evidence.
+Two were simulated on dumps of all five apps and rejected. (1) Hits all
+shared with other confirmed packages, with none of the package's own
+functions hit: it also removes `is-typed-array` (metamask) and `d3-array`
+and `d3-color` (rainbow), which are true but at a drifted version. (2) The
+package's entry module must hit: it would cost 30 true packages on
+metamask. The fix takes the copy class instead. `inlined`
+(`demoteExplained`, after `twin`) demotes P when a path-bearing high
+package Q declares P in `subtractedDependencies` and 90% of P's hit
+occurrences sit in target modules that also hold at least 3 of Q's own-file
+hits that are not in P's signature. One target module is one source file,
+so that file is Q's, and P is inlined in Q's dist (fast-xml-parser's
+209-function bundle holding the builder that later releases split out). An
+installed P has modules of its own. Without the declared edge it is
+unsound. React Native does not declare `react-reconciler`, and Expensify's
+real reconciler module also holds renderer-shaped functions from RN's
+signature, so a variant without the edge removed a true `react-reconciler`
+there. Test: `tests/gate/deps/corpus-mm-precision-inlined.test.ts`.
+
+MEASUREMENT_TABLE
+
 **Retry of the failed jobs** (deps-population-widen-3, 2026-11-09). The
 1,445 failed jobs were re-run on deb with main's builder fixes
 (`src/deps/builder-support.ts`: Node built-in shims, peer installs,
