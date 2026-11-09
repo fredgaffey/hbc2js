@@ -146,6 +146,8 @@ call directly.
 | `__hbc_b_getTemplateObject` | `CallBuiltin getTemplateObject` | tagged templates | Frozen, `.raw` non-enumerable, **cached by call-site id** — a tagged template must hand the same object to every call |
 | `__hbc_b_initRegexNamedGroups` | `CallBuiltin initRegexNamedGroups` | named capture groups | Identity: V8 already populates `.groups`. The helper exists so the call has a callee |
 | `__hbc_b_throwTypeError` | `CallBuiltin throwTypeError` | `JmpTypeOfIs` guards, class field checks | Message supplied by the bytecode |
+| `__hbc_privGet` | `GetOwnPrivateBySym` | `obj.#x` reads | Own-only, TypeError on a missing field or primitive base (Hermes `getPrivateField`); `private-fields` folds it back to `obj.#x` (review-1110) |
+| `__hbc_privSet` | `PutOwnPrivateBySym` | `obj.#x = v` | Own-only, TypeError on a missing field or primitive base (Hermes `setPrivateField`); folded back to `obj.#x = v` (review-1110) |
 | `__hbc_b_throwReferenceError` | `CallBuiltin throwReferenceError` | TDZ and unresolved-global checks | Message supplied by the bytecode |
 | `__hbc_b_silentSetPrototypeOf` | `CallBuiltin silentSetPrototypeOf` | `class … extends`, `__proto__` in a literal | "Silent" is the semantics: a failure is swallowed, not thrown |
 | `__hbc_b_exportAll` | `CallBuiltin exportAll` | `export * from` | `for…in`, so inherited names come too; `default` is excluded |

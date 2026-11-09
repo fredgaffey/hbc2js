@@ -1,0 +1,159 @@
+; hbc2js disassembly of 340-closure-in-catch-retry-loop/v84.hbc
+; version=84 layout=B opcodeTable=hbc84 functions=6 strings=20 globalCodeIndex=0
+function #0 "global"  params=1 frame=24 env=0 flags=exc,dbg  @0x000001c4 size=394
+  .try T1..T2 -> L3 ; handler 0
+  .try T3..T4 -> L3 ; handler 1
+  0000  DeclareGlobalVar     s18 "r"
+  0005  DeclareGlobalVar     s19 "wm"
+  000a  DeclareGlobalVar     s13 "gs"
+  000f  DeclareGlobalVar     s15 "i"
+  0014  DeclareGlobalVar     s9 "H"
+  0019  CreateEnvironment    r4
+  001b  CreateClosure        r0, r4, f1 "H"
+  0020  GetGlobalObject      r3
+  0022  PutById              r3, r0, #c1, s9 "H"
+  0028  GetByIdShort         r1, r3, #c1, s9 "H"
+  002d  LoadConstUndefined   r2
+  002f  LoadConstUInt8       r0, 3
+  0032  Call2                r0, r1, r2, r0
+  0037  PutById              r3, r0, #c2, s18 "r"
+  003d  TryGetById           r9, r3, #c2, s11 "print"
+  0043  GetByIdShort         r0, r3, #c3, s18 "r"
+  0048  GetByIdShort         r15, r0, #c4, s8 "length"
+  004d  GetByIdShort         r0, r3, #c3, s18 "r"
+  0052  LoadConstZero        r1
+  0054  GetByVal             r12, r0, r1
+  0058  GetByIdShort         r5, r3, #c3, s18 "r"
+  005d  LoadConstUInt8       r0, 1
+  0060  GetByVal             r6, r5, r0
+  0064  GetByIdShort         r5, r3, #c3, s18 "r"
+  0069  GetByVal             r10, r5, r0
+  006d  GetByIdShort         r5, r3, #c3, s18 "r"
+  0072  LoadConstUInt8       r11, 2
+  0075  GetByVal             r5, r5, r11
+  0079  LoadConstString      r16, s1 "attempts:"
+  007d  StrictNeq            r14, r12, r6
+  0081  StrictNeq            r13, r10, r5
+  0085  LoadConstUndefined   r17
+  0087  Call                 r5, r9, 5
+  008b  TryGetById           r5, r3, #c5, s10 "WeakMap"
+  0091  GetByIdShort         r6, r5, #c6, s16 "prototype"
+  0096  CreateThis           r6, r6, r5
+  009a  Mov                  r17, r6
+  009d  Construct            r5, r5, 1
+  00a1  SelectObject         r5, r6, r5
+  00a5  PutById              r3, r5, #c3, s19 "wm"
+  00ab  GetByIdShort         r7, r3, #c3, s18 "r"
+  00b0  GetByIdShort         r6, r7, #c7, s7 "forEach"
+  00b5  CreateClosure        r5, r4, f4 ""
+  00ba  Call2                r5, r6, r7, r5
+  00bf  TryGetById           r9, r3, #c2, s11 "print"
+  00c5  GetByIdShort         r7, r3, #c8, s19 "wm"
+  00ca  GetByIdShort         r6, r7, #c9, s12 "get"
+  00cf  GetByIdShort         r5, r3, #c3, s18 "r"
+  00d4  GetByVal             r5, r5, r1
+  00d8  Call2                r15, r6, r7, r5
+  00dd  GetByIdShort         r7, r3, #c8, s19 "wm"
+  00e2  GetByIdShort         r6, r7, #c9, s12 "get"
+  00e7  GetByIdShort         r5, r3, #c3, s18 "r"
+  00ec  GetByVal             r5, r5, r0
+  00f0  Call2                r14, r6, r7, r5
+  00f5  GetByIdShort         r10, r3, #c8, s19 "wm"
+  00fa  GetByIdShort         r6, r10, #c9, s12 "get"
+  00ff  GetByIdShort         r5, r3, #c3, s18 "r"
+  0104  GetByVal             r5, r5, r11
+  0108  Call2                r13, r6, r10, r5
+  010d  LoadConstString      r16, s6 "weakmap:"
+  0111  LoadConstUndefined   r17
+  0113  Call                 r5, r9, 5
+  0117  NewArray             r5, 0
+  011b  PutById              r3, r5, #c4, s13 "gs"
+  0121  PutById              r3, r1, #c5, s15 "i"
+T1:
+L1:
+  0127  GetByIdShort         r7, r3, #c10, s13 "gs"
+  012c  GetByIdShort         r6, r7, #c11, s17 "push"
+  0131  CreateClosure        r5, r4, f5 ""
+  0136  Call2                r5, r6, r7, r5
+  013b  GetByIdShort         r5, r3, #c12, s15 "i"
+  0140  ToNumber             r5, r5
+  0143  AddN                 r6, r5, r0
+  0147  PutById              r3, r6, #c5, s15 "i"
+  014d  JLessN               L2, r5, r0
+T2:
+  0151  TryGetById           r8, r3, #c2, s11 "print"
+  0157  GetByIdShort         r5, r3, #c10, s13 "gs"
+  015c  GetByIdShort         r7, r5, #c4, s8 "length"
+  0161  GetByIdShort         r5, r3, #c10, s13 "gs"
+  0166  GetByVal             r9, r5, r1
+  016a  GetByIdShort         r5, r3, #c10, s13 "gs"
+  016f  GetByVal             r5, r5, r0
+  0173  LoadConstString      r6, s5 "throw-continue:"
+  0177  StrictNeq            r5, r9, r5
+  017b  Call4                r5, r8, r2, r6, r7, r5
+  0182  Ret                  r5
+T3:
+L2:
+  0184  Throw                r1
+T4:
+L3:
+  0186  Catch                r5
+  0188  Jmp                  L1
+
+function #1 "H"  params=2 frame=17 env=2 flags=exc,dbg  @0x0000034e size=74
+  .try T1..T2 -> L2 ; handler 0
+  0000  CreateEnvironment    r4
+  0002  LoadConstUInt8       r3, 1
+  0005  LoadParam            r5, 1
+  0008  StoreToEnvironment   r4, 1, r5
+  000c  CreateClosure        r2, r4, f2 "boom"
+  0011  NewArray             r0, 0
+  0015  LoadConstZero        r1
+T1:
+L1:
+  0017  Mov                  r7, r1
+  001a  StoreNPToEnvironment r4, 0, r7
+  001e  Mov                  r8, r0
+  0021  GetByIdShort         r6, r8, #c1, s17 "push"
+  0026  CreateClosure        r5, r4, f3 "f"
+  002b  Call2                r5, r6, r8, r5
+  0030  Mov                  r6, r2
+  0033  LoadConstUndefined   r5
+  0035  Call2                r5, r6, r5, r7
+T2:
+  003a  Mov                  r5, r0
+  003d  Ret                  r5
+L2:
+  003f  Catch                r5
+  0041  Mov                  r5, r1
+  0044  AddN                 r1, r5, r3
+  0048  Jmp                  L1
+
+function #2 "boom"  params=2 frame=2 env=0 flags=dbg  @0x00000398 size=20
+  0000  LoadParam            r0, 1
+  0003  GetEnvironment       r1, 0
+  0006  LoadFromEnvironment  r1, r1, 1
+  000a  JLess                L1, r0, r1
+  000e  LoadConstUndefined   r1
+  0010  Ret                  r1
+L1:
+  0012  Throw                r0
+
+function #3 "f"  params=1 frame=1 env=0 flags=none  @0x000003ac size=9
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r0, r0, 0
+  0007  Ret                  r0
+
+function #4 ""  params=3 frame=13 env=0 flags=dbg  @0x000003b5 size=28
+  0000  GetGlobalObject      r0
+  0002  GetByIdShort         r3, r0, #c1, s19 "wm"
+  0007  GetByIdShort         r2, r3, #c2, s14 "set"
+  000c  LoadParam            r1, 1
+  000f  LoadParam            r0, 2
+  0012  Call3                r0, r2, r3, r1, r0
+  0018  LoadConstUndefined   r0
+  001a  Ret                  r0
+
+function #5 ""  params=1 frame=1 env=0 flags=none  @0x000003d1 size=5
+  0000  LoadConstUInt8       r0, 1
+  0003  Ret                  r0

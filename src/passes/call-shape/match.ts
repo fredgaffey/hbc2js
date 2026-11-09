@@ -488,7 +488,12 @@ function symbolSlotLoad(e: Expr): string | null {
 /** `x = O[rN]` or `O[rN]` for the register `rN`. */
 function symbolKeyRead(e: Expr | undefined, reg: string): boolean {
   const v = e !== undefined && e.k === "assign" ? e.value : e;
-  return v !== undefined && v.k === "member" && v.computed && v.prop.k === "ident" && v.prop.name === reg;
+  if (v === undefined) return false;
+  if (v.k === "member" && v.computed && v.prop.k === "ident" && v.prop.name === reg) return true;
+  // `src/emit/lower.ts`'s own-only private read `__hbc_privGet(o, sym)`
+  // (review-1110 iife/private, fixture 342; fixture 112 is the shape).
+  const k = isHelperCall(v, "__hbc_privGet") ? v.args[1] : undefined;
+  return k !== undefined && k.k === "ident" && k.name === reg;
 }
 
 /** `F.apply(T, arguments)` (section 10, the `apply` diamond's generic arm):

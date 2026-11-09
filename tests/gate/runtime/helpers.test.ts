@@ -394,6 +394,23 @@ test("review-M4-H3: __hbc_b_throwTypeError / __hbc_b_throwReferenceError throw t
   assert.throws(() => h["__hbc_b_throwReferenceError"]("gone"), (e: unknown) => e instanceof ReferenceError && e.message === "gone");
 });
 
+test("review-M4-H3: __hbc_privGet / __hbc_privSet are own-only and throw on a missing field or primitive (review-1110 iife/private)", () => {
+  const h = load("__hbc_privGet", "__hbc_privSet");
+  const sym = Symbol("#x");
+  const o: Record<symbol, unknown> = {};
+  Object.defineProperty(o, sym, { value: 1, writable: true, enumerable: false, configurable: false });
+  assert.equal(h["__hbc_privGet"](o, sym), 1);
+  assert.equal(h["__hbc_privSet"](o, sym, 2), 2);
+  assert.equal(h["__hbc_privGet"](o, sym), 2);
+  const child = Object.create(o);
+  assert.throws(() => h["__hbc_privGet"](child, sym), TypeError);
+  assert.throws(() => h["__hbc_privSet"](child, sym, 3), TypeError);
+  assert.equal(Object.getOwnPropertySymbols(child).length, 0);
+  assert.throws(() => h["__hbc_privGet"](3, sym), TypeError);
+  assert.throws(() => h["__hbc_privSet"]("s", sym, 1), TypeError);
+  assert.throws(() => h["__hbc_privGet"](null, sym), TypeError);
+});
+
 test("review-M4-H3: __hbc_b_silentSetPrototypeOf sets, and swallows a failure", () => {
   const h = load("__hbc_b_silentSetPrototypeOf");
   const proto = { p: 1 };
