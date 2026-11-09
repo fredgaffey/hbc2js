@@ -2452,3 +2452,79 @@ Corpus scale: `com.brex.mobile` (hbc98, `hbc2js deps --offline`, default heap) c
 
 **No cascade (deps-hop-two-cascade).** We first read the react-navigation-example gain as admitting `react-native-pager-view` and `standard-navigation` also making `@react-navigation/native`, `react-native-screens`, `react-native-safe-area-context`, `react-native-gesture-handler` and others confirm. It traced to the stale baseline above. With the current matcher on the same farm and those two packages removed from the candidate set, the app confirms 17. Each of those packages reaches high through `promoteViaDependency`'s fuzzy form with `by: react-native` (`abort-controller` through `event-target-shim`), not through the admitted packages. Admitting them adds `react-native-pager-view` only (also `viaDependency` by `react-native`). `standard-navigation` does not reach high. So hop-two's real gain on react-navigation-example is +1 TP (17 -> 18), and the rest of 10 -> 18 is path recall. On Expensify the same A/B (current code, admitted packages removed vs kept) gives 92 -> 95: exactly the three admitted packages (`abort-controller` via `event-target-shim`, `define-properties` via `has-property-descriptors`, `htmlparser2` via `domhandler`), nothing else moves. Bluesky confirms 39 under the current code. Its 29 "before" is the stale baseline too, and the hop-two share of the gap was not split out. That is principled. A candidate added to the set changes another package's score only through shared evidence: hash ambiguity (`hashOwnerNames`), demotion by a better-explaining package, or a fuzzy-form edge where the new package is the confirmed dependency D. A package that shares no hash with the other candidates moves nothing. `tests/gate/deps/corpus-recall-hop-two.test.ts` (`deps-hop-two-cascade`) pins that invariance. Corpus scale: `com.brex.mobile` (`--offline`, default heap) completes, with the same confirmed set as before, 16 min 24 s wall and 3.56 GB peak RSS (3.37 GB before, on a deb at load 50-70).
 
+### Population widening (deps-population-widen, 2026-11-09)
+
+The never-queued bucket above is a population choice, so this widens the
+population without reading any measured app. `tools/pkgsig/bulk/population-closure.mjs`
+takes the dependency closure (registry `dependencies` + `peerDependencies`,
+2 hops) of every package with an hbc98 file in db-v3-clean or db-v4-paths
+(2,162 names), plus (c) scoped package-name strings from the string tables
+of 24 real-world corpus APKs (`population-corpus.mjs`; MetaMask, rainbow,
+bluesky and the au.gov.nsw app excluded and never opened; Expensify and
+react-navigation are not in the corpus). The truth-chosen
+`db-overlay-recall` is not a source. Not used: an npm "dependents of
+react/react-native/expo" list (the registry search API has no dependents
+query); the bulk build's keyword search already covers RN libraries.
+**Policy:** one version per new name, the one most parent ranges resolve to
+(else `latest`), because matching is by name across versions (building the
+exact version of 68 other-version-only packages recovered 9). A name is new
+when it has no hbc98 file. Skipped: `@types/*`, react, react-native, and
+the build toolchain (typescript, eslint*, jest*, babel presets/plugins/core,
+bundlers). Ranked by distinct dependent *families* (scope, else name, so one
+SDK's 80 packages are one vote) + 2 per corpus app.
+
+**Build** (deb, 6 slots, `build-one.mjs` path-bearing hbc98, then
+`dep-subtract.mjs` against db-v3-clean, into `db-overlay-pop`): 2,347
+planned jobs; the run stopped at job 992 after 67 min because free disk
+fell to 16 GB (outside this run's ~2.5 GB). 727 built (43 reused from
+identical recall-overlay builds, by name@version), 265 failed (mostly peer
+imports unresolved, the known class in docs/BUGS.md; 6 npm timeouts, 2
+hermesc). 739 overlay files, 82 MB.
+
+**Measured** (deb, offline `scoreAgainstTruth`, sha pins matched, matcher
+code at deps-recall-nosig, before the hash-index candidate merge; base =
+db-v3-clean alone; +pop = db-v3-clean + db-overlay-pop, not db-overlay-recall):
+
+| bundle | DB | confirmed / TP / FP | recall all (direct) | signature present | ceiling |
+|---|---|---|---|---|---|
+| Expensify (hbc98) | db-v3-clean | 131 / 89 / 42 | 30.9% (35.2%) | 143 | 125 |
+| Expensify | + db-overlay-pop | 158 / 113 / 45 | 39.2% (42.9%) | 216 | 172 |
+| react-navigation (hbc98) | db-v3-clean | 14 / 14 / 0 | 18.4% (21.7%) | 44 | 33 |
+| react-navigation | + db-overlay-pop | 17 / 16 / 1 | 21.1% (23.3%) | 59 | 43 |
+| bluesky (hbc98) | db-v3-clean | 43 / 34 / 9 | 17.2% (17.2%) | 75 | 70 |
+| bluesky | + db-overlay-pop | 47 / 37 / 10 | 18.7% (18.7%) | 109 | 100 |
+| rainbow (hbc96) | db-v3-clean | 106 / 82 / 24 | 15.8% (20.4%) | 192 | 121 |
+| rainbow | + db-overlay-pop | 108 / 84 / 24 | 16.2% (20.4%) | 192 | 126 |
+| MetaMask (hbc96) | db-v3-clean | 169 / 132 / 37 | 17.6% (20.3%) | 246 | 206 |
+| MetaMask | + db-overlay-pop | 175 / 138 / 37 | 18.4% (20.3%) | 246 | 213 |
+
+No true positive lost. New false positives: `@babel/standalone` on
+Expensify, react-navigation and bluesky (a browser build of Babel that
+embeds copies of its helpers: an embedded-copy case the precision rules do
+not demote), plus `eventemitter3`, `@gorhom/bottom-sheet`, `refa` on
+Expensify (`builtins` left). The toolchain skip list was fixed before the
+build and was not widened after seeing these. Expensify gains 24 TPs
+(`@sentry/{browser,core,react}`, `@formatjs/intl-listformat`, `expo`,
+`expo-asset`, `@react-navigation/*`, `semver`, `source-map`, ...).
+The hbc96 apps get no hbc98 signatures, yet gain 2 and 6 TPs. That was not
+traced: the new packages' names probably change the candidate and
+subtraction context.
+
+**Coverage of truth** (truth read only here, for scoring): planned
+population / built overlay, by name (exact version): Expensify 85 (41) / 73
+(41) of 288; react-navigation 20 / 15 of 76; bluesky 54 / 34 of 198 (both
+truth files have no usable versions); rainbow 162 (95) / 97 (57) of 518;
+MetaMask 190 (108) / 119 (65) of 749. The truth-chosen recall overlay
+reached 58.0% on Expensify, and this run reached 39.2%. Most of the gap is
+the 1,355 jobs not run and the 265 that failed.
+
+Reproduce (deb, `~/_hbc2js/pop/`): `population-corpus.mjs --apk-dir
+../hbc2js-local-corpus/apks --exclude au.gov.nsw --exclude io.metamask
+--exclude me.rainbow --exclude xyz.blueskyweb --out corpus-names.json`;
+`population-closure.mjs --seed-db ../db-v3-clean --seed-db ../db-v4-paths
+--hbc 98 --hops 2 --cap 3000 --corpus-names corpus-names.json --cache
+registry-cache.json --out jobs-all.tsv --plan-out plan.json`; `xargs -a
+jobs-all.tsv -d '\n' -P6 -n1 ./drive.sh` (stops itself below 16 GB);
+`after.sh` (subtract, merge, `measure5.sh pop <dir>`). Next: finish the
+remaining 1,355 jobs once disk allows, and look into why `@babel/standalone`
+is not demoted.
