@@ -316,3 +316,59 @@ which is why the before number was re-measured here rather than quoted.)
 The next lead is NOT more reordering either: it is `E_ESCAPES_CLOSURE` and
 `E_NOT_FRESH`, i.e. an argument about an object the function received rather
 than allocated, which needs a whole-module notion of who else can see it.
+
+## 10. The function's own environment is not a candidate
+
+**Problem.** A function that inlined a callee AND captures its own locals owns
+two kinds of environment: its OWN (`CreateFunctionEnvironment` at offset 0,
+where hermesc always emits a function's own scope) and the callee's (created
+later, at the call). Sections 2-4 treated both as candidates. The own
+environment's statements run from the top of the body to the bottom, so its
+range overlaps every inlined range and BOTH refused as `overlapping statement
+ranges` (react-navigation-example module 0 / fn#2: own env 4 slots plus the
+inlined namespace-interop helper's 2; `statement in two environments`, because
+`w = n` stores the helper's slot into the caller's). That one shape -- every
+module that does `import * as` -- was the bulk of
+`diff:CreateFunctionEnvironment(imm)` (the factory) and
+`diff:LoadFromEnvironment(imm)` (the helper's forEach callback, reading slot 0
+of a merged environment at slot 4).
+
+**Choice.** `ownEnvOf` (`src/emit/function.ts`) names the environment created
+by a `CreateFunctionEnvironment` at offset 0 of this function. Passed as
+`ownEnv`, it is skipped as a candidate (no refusal is recorded), its slots stay
+in the flat prologue, and a range may name its slots (the `foreign` guard
+exempts them): they are bindings of the enclosing function, which a wrapper
+sees unchanged, and inside the inlined body hermesc addresses them through the
+same register. A hoisted closure reading both the own environment and the
+inlined one still refuses (`closure spans two environments`, fixture 121).
+
+Offset 0 is not proof: a function with no own scope that STARTS with an inlined
+callee also creates an environment at offset 0 (fixture 79's `pair`). Both
+readings are checked by the same guards, so either is sound -- wrapping never
+changes behaviour once the guards pass -- and the step runs both and keeps the
+own-scope reading only when it wraps strictly more environments (ties keep the
+section 2 result).
+
+**Rejected.** Deciding own-vs-inlined from the env graph's parent links: every
+`CreateFunctionEnvironment` in a function has the same parent (the closure's
+captured environment), so the graph cannot tell them apart.
+
+**Tests.** `tests/gate/emit/iife-own-env.test.ts` -- fixture
+`120-own-env-plus-iife` (v98/v99 build `3,2`; the round trip reproduces the
+sizes and every slot immediate; failed before this section with
+`actual: [] expected: ['3,2']`) and its negative twin
+`121-own-env-plus-iife-captures-outer` (no wrapper). Fixture 79's five
+wrappers are unchanged.
+
+**Measured** (`node tools/e2e/roundtrip-corpus.ts --only
+react-navigation-example-0.85.3 --passes on`, clean worktrees, `926176b` ->
+this section): IDENTICAL 6272 (43.44%) -> 6590 (45.65%) of 14437; 319
+functions newly IDENTICAL (all from `diff:LoadFromEnvironment(imm)`), 1 newly
+DIFFERENT (module 953 / fn#11791, `tree:unmatched-closure`: a wrapper hermesc
+did not inline back). `diff:LoadFromEnvironment(imm)` 838 -> 208,
+`diff:CreateFunctionEnvironment(imm)` 626 -> 341. Buckets that grew are
+functions whose FIRST difference moved later, not regressions:
+`diff:Call3(reg)` 11 -> 312 (the interop callback, now a register-allocation
+difference from the `Reflect.apply` call shape), `diff:GetGlobalObject/
+CreateFunctionEnvironment` 1 -> 200 (the factory, now differing at where the
+inlined environment is created), `diff:GetById/NewObjectWithBuffer` 665 -> 702.
