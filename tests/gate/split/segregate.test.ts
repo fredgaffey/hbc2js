@@ -17,6 +17,9 @@ import { runDeps } from "../../../src/deps/index.ts";
 import type { DepsReport } from "../../../src/deps/report.ts";
 import { writeSplitResult } from "../../../src/split/write.ts";
 
+// Hermetic: the user-cache sigdb layer (~/.cache/hbc2js/sigdb) must not leak a developer machine's own signatures into this test.
+process.env.XDG_CACHE_HOME = (await import("node:fs")).mkdtempSync((await import("node:path")).join((await import("node:os")).tmpdir(), "hbc2js-xdg-"));
+
 const RN_TEMPLATE = join(repoRoot(), "tests", "fixtures", "bundles", "rn-template-0.72", "index.android.hbc");
 
 // The un-segregated boot test (tests/gate/split/loadable.test.ts) pins 76 as
