@@ -42,6 +42,12 @@ export function buildRegistryJs(substitutions: ReadonlyMap<number, string> = new
     lines.push(`// --instrument=modules: per-module boot timing.`);
     lines.push(`// See this file's own doc comment above for the ring-buffer/flush contract.`);
     lines.push(`var __hbc_now = (function () {`);
+    // The runtime's raw clock first: on RN >= 0.80 \`performance\` is the
+    // app's own polyfill, whose now() calls a TurboModule (a native call the
+    // un-instrumented app never makes; export-boot L4).
+    lines.push(`  if (typeof globalThis.nativePerformanceNow === "function") {`);
+    lines.push(`    return function () { return globalThis.nativePerformanceNow(); };`);
+    lines.push(`  }`);
     lines.push(`  if (typeof globalThis.performance === "object" && globalThis.performance !== null && typeof globalThis.performance.now === "function") {`);
     lines.push(`    return function () { return globalThis.performance.now(); };`);
     lines.push(`  }`);
