@@ -7,6 +7,7 @@
 // response shapes equal the direct `McpResources`/`McpTools` call (never a
 // literal-string compare against a shared fixture's decompiled output,
 // CLAUDE.md / the consolidation notes §B testing rules).
+import { timeScale, tooBusyForTiming, startLoadMonitor, loadTag } from "../support/tiers.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, readFileSync, existsSync } from "node:fs";
@@ -621,16 +622,24 @@ test("the server warms the segregation cache at startup, so the first tree reque
     // the warm-up settles from the DB (sub-ms) rather than spawning a
     // worker — poll briefly rather than assume one macrotask is enough,
     // since `segregation()` no longer computes synchronously (item 3).
+    // State assertion, not a latency claim: wait (generously) until the
+    // cache is warm. A loaded box only delays this; it never makes it false.
     let settled = false;
-    for (let i = 0; i < 100 && !settled; i++) {
+    const settleDeadline = Date.now() + 60000 * timeScale();
+    for (let i = 0; Date.now() < settleDeadline && !settled; i++) {
       await new Promise((r) => setTimeout(r, 20));
       settled = segregationCached(h.ctx);
     }
     assert.equal(settled, true, "startup must not leave the first browser request to pay for segregation");
+    const mon = startLoadMonitor();
     const started = Date.now();
     const r = await fetch(`http://${h.host}:${h.port}/api/segregation`);
     assert.equal(r.status, 200);
-    assert.ok(Date.now() - started < 1000, `a warmed /api/segregation must answer fast, took ${Date.now() - started}ms`);
+    const took = Date.now() - started;
+    const busy = tooBusyForTiming(4, 8, mon.stop());
+    // The fast-answer bound is only meaningful on a quiet box; warmth itself
+    // was asserted above.
+    if (!busy) assert.ok(took < 1000, `a warmed /api/segregation must answer fast, took ${took}ms (${loadTag()})`);
   } finally {
     await h.close();
   }
