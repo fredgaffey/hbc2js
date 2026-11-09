@@ -47,8 +47,8 @@ print("after next " + log.length);
 print("iter self " + (it[Symbol.iterator]() === it));
 print("proto obj " + typeof empty.prototype);
 try {
-  new empty();
-  print("new ok");
+  var made = new empty();
+  print("new ok " + typeof made);
 } catch (e) {
   print("new " + (e instanceof TypeError));
 }
