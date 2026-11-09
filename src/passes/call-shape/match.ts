@@ -85,50 +85,11 @@ export function isSimpleCalleeChain(e: Expr): boolean {
   return isSimpleCalleeChain(e.obj) && (!e.computed || isSimpleCalleeChain(e.prop));
 }
 
-/** Every `expr`-statement store `rX = value` reachable from `stmts`
- *  (including nested statement lists, excluding a nested `func`'s own
- *  frame) — copied from `global-access/match.ts`'s helper of the same
- *  purpose (D12a: a pass may not import a sibling pass's internals). */
-function registerStoreValues(stmts: readonly Stmt[], reg: string): readonly Expr[] {
-  const out: Expr[] = [];
-  const visit = (list: readonly Stmt[]): void => {
-    for (const s of list) {
-      if (s.k === "expr" && s.expr.k === "assign" && s.expr.target.k === "ident" && s.expr.target.name === reg) out.push(s.expr.value);
-      switch (s.k) {
-        case "if":
-          visit(s.then);
-          visit(s.else);
-          break;
-        case "while":
-        case "do-while":
-        case "for":
-        case "labeled":
-        case "iife":
-          visit(s.body);
-          break;
-        case "try":
-          visit(s.block);
-          visit(s.handler);
-          break;
-        case "switch":
-          for (const c of s.cases) visit(c.body);
-          break;
-        default:
-          break; // decl, break, continue, return, throw (no sub-list), func (separate frame)
-      }
-    }
-  };
-  visit(stmts);
-  return out;
-}
-
-/** R3a's `T`: the literal `undefined`, or a register with exactly one write
- *  in `fnBody` whose value is the literal `undefined` (§4). Deliberately
- *  narrower than `global-access`'s `isProvenGlobal` (that one tolerates a
- *  *later* reuse of the register for scratch; this one cannot — a second
- *  write of *any* value, `undefined` or not, means the register no longer
- *  certifies "this call's `this` was always undefined" the way a single
- *  write does).
+/** R3a's `T`: the literal `undefined`, or a register every one of whose
+ *  writes in `fnBody` is the literal `undefined` (§4; R3g widened "exactly
+ *  one write" to "at least one, all `undefined`"). Any write
+ *  of another value, anywhere, refuses here; a register reused for scratch
+ *  is R3h's local reaching-write question (`isLocallyUndefinedThis`).
  *
  *  §4's literal text also asks for "no nested-closure read" on `t.name`
  *  (`identUses(fnBody, t.name).nested === 0`); that check is gone —
@@ -145,15 +106,94 @@ function registerStoreValues(stmts: readonly Stmt[], reg: string): readonly Expr
 export function isProvenUndefinedThis(t: Expr, fnBody: readonly Stmt[]): boolean {
   if (t.k === "lit" && t.text === "undefined") return true;
   if (t.k !== "ident" || !isRegisterName(t.name)) return false;
-  const writes = registerStoreValues(fnBody, t.name);
-  return writes.length === 1 && writes[0]!.k === "lit" && writes[0]!.text === "undefined";
+  const writes = everyRegisterWrite(fnBody, t.name);
+  return writes !== null && writes.length >= 1 && writes.every((w) => w.k === "lit" && w.text === "undefined");
+}
+
+/** R3g (spec 04 section 4): every value `reg` is ever assigned anywhere in
+ *  this frame -- `reg = v` at any expression depth, `let reg = v` -- or
+ *  `null` when `reg` is written some way whose value is not a plain
+ *  expression (a for-in/for-of target, a catch parameter, a destructuring
+ *  target, or any other string field naming it). A bare `let reg;` is a
+ *  write of `undefined` and adds nothing. A nested `func` is a separate
+ *  register frame (see `isProvenUndefinedThis`'s doc) and is skipped.
+ *  Deliberately a generic walk over every field, not the shared
+ *  `registerStoreValues` (statement-level stores only): a proof that every
+ *  write is `undefined` must not miss one hidden in an expression. */
+/** R3h (spec 04 section 4): `t` is a register whose value at this call is
+ *  `undefined` by the write that reaches it, even though the register is
+ *  reused for other values elsewhere in the function. Statement lists are
+ *  entered only at their head and run in order (JS has no goto: a `break`
+ *  leaves a whole labelled statement, `continue` re-enters a loop at its own
+ *  head), so the call statement `list[i]` is reached only by completing
+ *  `list[i-1]`, ..., `list[k]`. Proven when the nearest earlier statement
+ *  `list[k]` that writes `t` at all is exactly `t = undefined`, nothing in
+ *  `list[k+1..i-1]` writes `t` at any depth, and the call statement itself
+ *  writes `t` nowhere except as its own top-level assignment target (that
+ *  store happens after the call). No such `k` in this list -> not proven
+ *  (the enclosing list is not consulted). */
+function isLocallyUndefinedThis(t: Expr, at: SiteAt): boolean {
+  if (t.k !== "ident" || !isRegisterName(t.name)) return false;
+  const reg = t.name;
+  const s = at.list[at.stmtIndex];
+  if (s === undefined) return false;
+  const own = s.k === "expr" && s.expr.k === "assign" && s.expr.target.k === "ident" && s.expr.target.name === reg ? s.expr.value : s.k === "init" && s.name === reg ? s.value : s;
+  const ownWrites = everyRegisterWrite([own as Stmt], reg);
+  if (ownWrites === null || ownWrites.length !== 0) return false;
+  for (let k = at.stmtIndex - 1; k >= 0; k--) {
+    const w = at.list[k]!;
+    if (w.k === "expr" && w.expr.k === "assign" && w.expr.target.k === "ident" && w.expr.target.name === reg) return w.expr.value.k === "lit" && w.expr.value.text === "undefined";
+    const between = everyRegisterWrite([w], reg);
+    if (between === null || between.length !== 0) return false;
+  }
+  return false;
+}
+
+function everyRegisterWrite(fnBody: readonly Stmt[], reg: string): Expr[] | null {
+  const values: Expr[] = [];
+  let opaque = false;
+  const visit = (node: unknown): void => {
+    if (opaque || node === null || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      for (const x of node) visit(x);
+      return;
+    }
+    const n = node as { readonly k?: unknown } & Record<string, unknown>;
+    if (n.k === "func") return;
+    if (n.k === "ident") return; // a read (writes are caught at their parent)
+    if (n.k === "assign" && (n.target as Expr).k === "ident") {
+      if ((n.target as Expr & { k: "ident" }).name === reg) values.push(n.value as Expr);
+      visit(n.value);
+      return;
+    }
+    if (n.k === "init" && n.name === reg) {
+      values.push(n.value as Expr);
+      visit(n.value);
+      return;
+    }
+    if ((n.k === "for-in" || n.k === "for-of") && (n.left as Expr).k === "ident" && (n.left as Expr & { k: "ident" }).name === reg) {
+      opaque = true;
+      return;
+    }
+    for (const [key, v] of Object.entries(n)) {
+      if (n.k === "decl" && key === "names") continue; // `let reg;` = undefined
+      if (v === reg) {
+        opaque = true;
+        return;
+      }
+      visit(v);
+    }
+  };
+  visit(fnBody);
+  return opaque ? null : values;
 }
 
 // ---------------------------------------------------------------------------
 // §4 per-rule classification.
 // ---------------------------------------------------------------------------
 
-function classifyReflectApply(node: Expr & { readonly k: "call" }, fnBody: readonly Stmt[]): ClassifyResult {
+function classifyReflectApply(node: Expr & { readonly k: "call" }, fnBody: readonly Stmt[], at?: SiteAt): ClassifyResult {
+  const undefinedThis = (T: Expr): boolean => isProvenUndefinedThis(T, fnBody) || (at !== undefined && isLocallyUndefinedThis(T, at));
   const [F, T, arr] = node.args;
   if (node.args.length !== 3 || F === undefined || T === undefined || arr === undefined) return { ok: false, reason: "dynamic-args" };
   const args = extractArgsArray(arr);
@@ -168,12 +208,12 @@ function classifyReflectApply(node: Expr & { readonly k: "call" }, fnBody: reado
     // receiver is Babel's interop call `(0, O.p)(a...)`. The sequence makes
     // the callee a plain value, so `this` stays undefined; `O.p` is still the
     // first effect, exactly as in `Reflect.apply`'s argument order.
-    if (isProvenUndefinedThis(T, fnBody)) return { ok: true, rule: "R3f", replacement: { k: "call", callee: { k: "seq", exprs: [{ k: "lit", text: "0" }, F] }, args } };
+    if (undefinedThis(T)) return { ok: true, rule: "R3f", replacement: { k: "call", callee: { k: "seq", exprs: [{ k: "lit", text: "0" }, F] }, args } };
     return { ok: false, reason: "unproven-this" };
   }
 
   if (!isSimpleCalleeChain(F)) return { ok: false, reason: "impure-callee" };
-  if (!isProvenUndefinedThis(T, fnBody)) return { ok: false, reason: "unproven-this" };
+  if (!undefinedThis(T)) return { ok: false, reason: "unproven-this" };
   return { ok: true, rule: "R3a", replacement: { k: "call", callee: F, args } };
 }
 
@@ -221,13 +261,21 @@ function classifyHelperApply(node: Expr & { readonly k: "call" }): ClassifyResul
  *  recognised one, fully re-derives the verdict from `node`/`fnBody` alone —
  *  no captured `match` data is ever trusted (`check.ts` calls this again on
  *  `before`, exactly as `match` does). */
-export function classifyNode(node: Expr, fnBody: readonly Stmt[]): ClassifyResult {
+/** Where a candidate sits: its own statement list and statement index, for
+ *  R3h's local reaching-write proof (spec 04 section 4). Optional so a
+ *  caller with only a bare node keeps the whole-function R3a/R3g proof. */
+export interface SiteAt {
+  readonly list: readonly Stmt[];
+  readonly stmtIndex: number;
+}
+
+export function classifyNode(node: Expr, fnBody: readonly Stmt[], at?: SiteAt): ClassifyResult {
   const variant = variantOf(node);
   if (variant === null) return { ok: false, reason: "not-a-call-shape-site" };
   const call = node as Expr & { readonly k: "call" };
   switch (variant) {
     case "apply":
-      return classifyReflectApply(call, fnBody);
+      return classifyReflectApply(call, fnBody, at);
     case "construct":
       return classifyReflectConstruct(call);
     case "helper-call":
@@ -337,7 +385,7 @@ export function collectCandidates(list: readonly Stmt[]): readonly CandidateSite
 export function match(list: readonly Stmt[], ctx: PassContext): CallShapeMatch | null {
   const fnBody = ctx.fnBody ?? list;
   for (const c of collectCandidates(list)) {
-    const result = classifyNode(c.node, fnBody);
+    const result = classifyNode(c.node, fnBody, { list, stmtIndex: c.stmtIndex });
     if (result.ok) {
       return {
         root: list,

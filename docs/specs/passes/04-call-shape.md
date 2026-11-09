@@ -112,6 +112,45 @@ buckets. Fixture `160-receiverless-member-call` (with the plain method call
 `tests/gate/passes/call-shape-receiverless.test.ts`. The checker additionally
 asserts the callee is exactly `(0, F)` over the source's own `F` node.
 
+**R3g — every write `undefined`** (added 2026-11-09, round-trip review
+`passes-roundtrip-this`). R3a/R3f's register proof is widened from "exactly
+one write, `undefined`" to "at least one write, and every write anywhere in
+the frame is the literal `undefined`". hermesc loads `undefined` into the
+`this` register once per path that reaches a call (two branches each ending
+in `return fn(e, n)`), so the decompiled function writes it two or three
+times. The write census is a generic walk of every field: `r = v` at any
+expression depth and `let r = v` contribute `v`, a bare `let r;` is a write
+of `undefined`, and the register as a for-in/for-of target, a catch
+parameter, a destructuring target (or any other string field naming it)
+refuses outright. That walk also closes a gap in the old proof, which counted
+only statement-level stores and so accepted a register whose second write was
+a for-in target. A nested `func` is a separate register frame (unchanged).
+
+**R3h — local reaching write.** A register reused for scratch elsewhere is
+still proven at one call when, in the call's own statement list, the nearest
+earlier statement that writes it at all is exactly `r = undefined`, no
+statement between writes it at any depth, and the call statement writes it
+nowhere except as its own top-level assignment target (`r = Reflect.apply(f,
+r, …)`, whose store happens after the call). Sound because a statement list
+is entered only at its head and runs in order — JS has no goto; `break`
+leaves a whole labelled statement, `continue` re-enters a loop at its head —
+so reaching statement *i* means completing statements *k…i−1*. No such write
+in the call's own list → refuse (the enclosing list is not consulted). The
+two proofs feed R3a and R3f alike; `check` re-derives them from `before` with
+the same site position. Fixture `190-undefined-receiver-rewritten` (negative
+twin `mixed`: a method call on one path keeps its receiver), test
+`tests/gate/passes/call-shape-undefined-receiver.test.ts`.
+
+**Not done — `this` is the literal `0`.** hermesc v98 passes `LoadConstZero`
+as `this` when it knows the callee closure and that it never reads `this`
+(react-navigation-example: 242 sites, all over env-slot or register
+callees). `F(a…)` would change that `this` from `0` to `undefined`, which is
+sound only when the callee provably ignores `this`, which needs a bytecode
+resolution of the callee closure through env-slot stores. And it would not
+round-trip anyway: recompiling the decompiled `F(a…)` gives
+`LoadConstUndefined`, because hermesc cannot see that the env-slot callee is
+constant. Left as `Reflect.apply(F, 0, […])`, which is exact.
+
 ## 5. Writer
 
 Replace exactly that one `call` node in place; the enclosing statement and every
@@ -129,8 +168,9 @@ asserts that plus what `rewrite` assumed:
    deep-equal, in particular the member read of `O.P` in R3b appears in both;
 2. the rewritten node's argument count equals the source array's length;
 3. the callee is still `impure`-free (recompute, do not trust match data);
-4. R3a: `T` is the literal `undefined`, or its register still has exactly one
-   `undefined` write in `before` and `nested === 0`;
+4. R3a: `T` is the literal `undefined`, or its register passes R3g (every
+   write in `before` is `undefined`) or R3h (the write reaching the call in
+   its own list is `undefined`);
 5. R3b: `O` and `R` are the same identifier name in `before`;
 6. R3c: no third argument, or the third is syntactically identical to `C` and
    `C` is an `ident` (recomputed via `classifyNode`, same as `match`);
