@@ -15,6 +15,7 @@ import { runProgram } from "./harness/runner.ts";
 import type { RunOptions } from "./harness/runner.ts";
 import { compareTraces, TRACE_VERDICT } from "./harness/compare.ts";
 import { hbcVsJsUnderHermes } from "./harness/hbc-equiv.ts";
+import { deriveNativeManifest, overrideFor } from "./harness/native-manifest.ts";
 import { DEFAULT_FIRST_NATIVE, acquireBootSource, bootTrace, compareBootTraces } from "./harness/boot-equiv.ts";
 import { normaliseModule, diffNormalised } from "./harness/roundtrip.ts";
 import { runTier, hbc2jsDecompiler } from "./harness/tiers.ts";
@@ -500,8 +501,10 @@ function runEquivBoot(a: string, b: string, o: EquivArgs): number {
     return 3;
   }
   const opts = { seed: o.seed, firstNative: o.firstNative, timeoutMs: o.timeout, ...(o.vm !== undefined ? { vm: o.vm } : {}) };
-  const ta = bootTrace(srcA.source, opts);
-  const tb = bootTrace(srcB.source, opts);
+  // Spec 31 §4.2 (L4): side A's native-module manifest, for both sides.
+  const natives = deriveNativeManifest(srcA.source, overrideFor(a));
+  const ta = bootTrace(srcA.source, { ...opts, natives });
+  const tb = bootTrace(srcB.source, { ...opts, natives });
   const cmp = compareBootTraces(ta, tb);
   const inconclusive = cmp.verdict === TRACE_VERDICT.INCONCLUSIVE;
   const vmPath = ta.vm?.path ?? tb.vm?.path ?? null;

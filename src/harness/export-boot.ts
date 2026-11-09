@@ -9,6 +9,7 @@
 // probe arrives as `call __HBC_BOOT_PROBE__ [ev, id]` records: emitted by
 // the prelude's wrapped `__d` factories on the original side (§4 a) and by
 // the export registry's `r()` under `--instrument=modules` (§4 b).
+import { deriveNativeManifest, overrideFor } from "./native-manifest.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -266,7 +267,11 @@ export async function exportBootProof(original: string, exportDir: string, opts:
 
   // The control first: if the original cannot boot here, nothing about the
   // export can be concluded, and the (slow) re-bundle is skipped.
-  const a = bootTrace(acquireBootSource(original).source, { ...traceOpts, wrapFactories: true, ...(run !== undefined ? { run } : {}) });
+  // Spec 31 §4.2 (L4): one native-module manifest, derived from the
+  // original (plus its optional boot-native.json), for BOTH sides.
+  const originalSource = acquireBootSource(original).source;
+  const natives = deriveNativeManifest(originalSource, overrideFor(original));
+  const a = bootTrace(originalSource, { ...traceOpts, natives, wrapFactories: true, ...(run !== undefined ? { run } : {}) });
   const ra = observeRun(a.trace);
   const pa = projectBootTrace(a.trace, projOpts(mask));
   const maskedCount = projectBootTrace(a.trace).filter((e) => e.startsWith("enter ")).length - enters(pa);
@@ -301,7 +306,7 @@ export async function exportBootProof(original: string, exportDir: string, opts:
   const compiler = opts.vm === undefined && opts.exportExec !== "source" ? findHermesc(manifestVersion(exportDir)) : null;
   const exportExec = compiler !== null ? "bytecode" as const : "source" as const;
   const bOpts = compiler !== null ? { ...traceOpts, vm: compiler.vm, hermesc: compiler.hermesc } : traceOpts;
-  const b = bootTrace(readFileSync(bundlePath, "utf8"), { ...bOpts, wrapFactories: false, ...(run !== undefined ? { run } : {}) });
+  const b = bootTrace(readFileSync(bundlePath, "utf8"), { ...bOpts, natives, wrapFactories: false, ...(run !== undefined ? { run } : {}) });
   const rb = observeRun(b.trace);
   const pb = projectBootTrace(b.trace, projOpts());
   const runPart = run !== undefined ? { runApplication: { a: ra.runApplication, b: rb.runApplication }, views: { a: ra.views, b: rb.views }, commits: { a: ra.commits, b: rb.commits } } : {};

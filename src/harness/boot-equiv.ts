@@ -23,6 +23,7 @@ import type { HermesRunResult, HermesVm } from "./hermes-vm.ts";
 import { TRACE_VERDICT, compareTraces } from "./compare.ts";
 import type { TraceComparison, TraceVerdict } from "./compare.ts";
 import type { ErrRecord, Trace, TraceRecord } from "./trace.ts";
+import type { NativeManifest } from "./native-manifest.ts";
 
 /** §3, §5: default cap on recorded native-module interactions per side. */
 export const DEFAULT_FIRST_NATIVE = 64;
@@ -75,6 +76,11 @@ export interface BootTraceOptions {
   /** Spec 33 §3 B2: after the boot, drive runApplication and drain the
    *  virtual clock to `horizonMs`. Absent: B1 / spec 31 behaviour. */
   readonly run?: BootRunOptions;
+  /** Spec 31 §4.2 / spec 33 L4: the native-module presence manifest
+   *  (`native-manifest.ts`). Absent: the open host, where every name is a
+   *  present module with no constants beyond `hostConstants`. A comparison
+   *  passes the SAME manifest (derived from the original) to both sides. */
+  readonly natives?: NativeManifest;
 }
 
 export interface BootRunOptions {
@@ -133,10 +139,15 @@ function excerpt(s: string): string {
  *  cannot collide with a top-level `var` the bundle itself declares; only the
  *  specific global names spec §4.1 lists, plus the two boot-orchestration
  *  hooks `__hbcBootEnd`/`__hbcBootErr`, are left on `globalThis`. */
-function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean, run: BootRunOptions | null): string {
+function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean, run: BootRunOptions | null, natives: NativeManifest | null): string {
   return `
 (function () {
   "use strict";
+  // Spec 31 §4.2 (L4): present native modules -> their constants; null is
+  // the open host (every name present).
+  var __hbcNatives = ${JSON.stringify(natives === null ? null : natives.present)};
+  function present(n) { return __hbcNatives === null || Object.prototype.hasOwnProperty.call(__hbcNatives, n); }
+  function consts(n) { return __hbcNatives !== null && Object.prototype.hasOwnProperty.call(__hbcNatives, n) ? __hbcNatives[n] : null; }
   // Spec 33 §3 B2 / §4(c): null in B1 (schedules are only recorded, as in
   // spec 31); in B2 the host keeps callbacks and drains them on the virtual
   // clock after driving runApplication.
@@ -226,13 +237,29 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
           }
           return classes[p];
         }
+        if (p === "modules" && __hbcNatives !== null) {
+          if (!("modules" in others)) others.modules = expoModules();
+          return others.modules;
+        }
         if (!(p in others)) others[p] = hostStub("expo." + p, true);
         return others[p];
       },
       has: function () { return true; },
     });
   }
-  function hostStub(name, jsi) {
+  // \`globalThis.expo.modules\` under a manifest: present names only.
+  function expoModules() {
+    var made = Object.create(null);
+    return new Proxy(Object.create(null), {
+      get: function (t, p) {
+        if (typeof p === "symbol" || !present(p)) return undefined;
+        if (!(p in made)) made[p] = hostStub("expo.modules." + p, true, consts(p));
+        return made[p];
+      },
+      has: function (t, p) { return typeof p === "string" && present(p); },
+    });
+  }
+  function hostStub(name, jsi, cs) {
     var backing = Object.create(null);
     var proxy = new Proxy(backing, {
       get: function (t, p) {
@@ -241,6 +268,9 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
         if (typeof p === "symbol") return undefined;
         if (p === "then") return undefined;
         if (p in t) return t[p];
+        // Manifest constants read as properties (legacy bridge modules and
+        // Expo modules expose them so); getConstants() returns them too.
+        if (cs && p !== "getConstants" && Object.prototype.hasOwnProperty.call(cs, p)) return cs[p];
         var child = function () {
           if (nativeGate()) callRecord(name + "." + String(p), [], undefined);
           if (__hbcRun !== null) {
@@ -249,7 +279,7 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
           }
           // Spec 33 L1 stub-host addition (spec 31 §4.2): getConstants()
           // returns an object (see hostConstants), not undefined.
-          if (p === "getConstants") return hostConstants(name);
+          if (p === "getConstants") return cs ? JSON.parse(JSON.stringify(cs)) : hostConstants(name);
           // Spec 33 stub-host addition (spec 31 §4.2): a JSI library's
           // \`<X>TurboModule.installTurboModule()\` (worklets, reanimated)
           // natively installs \`globalThis.__<x>ModuleProxy\`, which the
@@ -346,7 +376,8 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
 
   globalThis.__turboModuleProxy = function (name) {
     if (nativeGate()) callRecord("__turboModuleProxy", [enc(name)], undefined);
-    return hostStub("turboModule." + String(name));
+    if (!present(String(name))) return null;
+    return hostStub("turboModule." + String(name), false, consts(String(name)));
   };
 
   globalThis.nativeModuleProxy = new Proxy(Object.create(null), {
@@ -354,12 +385,13 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
       if (typeof p === "symbol") return undefined;
       if (nativeGate()) callRecord("nativeModuleProxy.get", [String(p)], undefined);
       if (p in t) return t[p];
-      var stub = hostStub("nativeModule." + String(p));
+      if (!present(p)) return undefined;
+      var stub = hostStub("nativeModule." + String(p), false, consts(p));
       t[p] = stub;
       return stub;
     },
-    has: function () {
-      return true;
+    has: function (t, p) {
+      return typeof p === "string" && present(p);
     },
   });
 
@@ -635,7 +667,12 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
   }
   globalThis.__hbcRunApp = function () {
     if (__hbcRun === null || !__hbcEnded) return;
-    var key = __hbcKeys[0];
+    // Spec 33 L4: RN registers its own "LogBox" surface (opened only for the
+    // LogBox overlay, never as the app's main component); a real host runs
+    // the app's key, so the first registered key that is not LogBox.
+    var key = undefined;
+    for (var ki = 0; ki < __hbcKeys.length && key === undefined; ki++) if (__hbcKeys[ki] !== "LogBox") key = __hbcKeys[ki];
+    if (key === undefined) key = __hbcKeys[0];
     if (key === undefined) { runErr(new Error("no registered app key"), true); return; }
     var EU = globalThis.ErrorUtils;
     if (EU !== null && typeof EU === "object" && typeof EU.setGlobalHandler === "function") {
@@ -669,9 +706,9 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
 `;
 }
 
-function buildBootSource(bundleSource: string, seed: number, firstNative: number, wrapFactories: boolean, run: BootRunOptions | null): string {
+function buildBootSource(bundleSource: string, seed: number, firstNative: number, wrapFactories: boolean, run: BootRunOptions | null, natives: NativeManifest | null): string {
   const drive = run !== null ? "__hbcRunApp();\n" : "";
-  return `${buildPrelude(seed, firstNative, wrapFactories, run)}\ntry {\n${bundleSource}\n__hbcBootEnd();\n} catch (__hbcE) {\n__hbcBootErr(__hbcE);\n}\n${drive}`;
+  return `${buildPrelude(seed, firstNative, wrapFactories, run, natives)}\ntry {\n${bundleSource}\n__hbcBootEnd();\n} catch (__hbcE) {\n__hbcBootErr(__hbcE);\n}\n${drive}`;
 }
 
 const NO_VM_MESSAGE = "no Hermes VM found (tools/hermesc/v<N>/hermes or tools/hermes-vm/v<N>/bin/hermes); the boot oracle runs entirely in source mode, so any discovered VM works regardless of its own HBC version";
@@ -693,7 +730,7 @@ export function bootTrace(bundleSource: string, opts: BootTraceOptions = {}): Bo
   let raw: HermesRunResult;
   try {
     const file = join(dir, "boot.js");
-    writeFileSync(file, buildBootSource(bundleSource, seed, firstNative, opts.wrapFactories ?? true, opts.run ?? null));
+    writeFileSync(file, buildBootSource(bundleSource, seed, firstNative, opts.wrapFactories ?? true, opts.run ?? null, opts.natives ?? null));
     if (opts.hermesc !== undefined) {
       const hbc = join(dir, "boot.hbc");
       const c = spawnSync(opts.hermesc, ["-emit-binary", `-out=${hbc}`, file], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: Math.max(timeout, 120000) });
