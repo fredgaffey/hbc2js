@@ -593,7 +593,7 @@ for (const version of ["v98", "v99"] as const) {
     // The stand-in is gone: both the brand check and the `#x` install now
     // address the literal `this`, which is the receiver `private-fields`
     // (row 20) needs before it can fold anything here.
-    assert.match(ctor, /hasOwnProperty\.call\(this,/);
+    assert.match(ctor, /Reflect\.getOwnPropertyDescriptor\(this,/);
     assert.match(ctor, /Object\.defineProperty\(this,/);
     assert.match(ctor, /\bthis\.y = /);
     // The brand-check store is demoted to its bare call, never `this = f()`.

@@ -464,8 +464,9 @@ child-process spawns), not by assertions. What is shared or overlapped:
 
 - **Export CLI cache** (`tests/gate/export/support.ts` `exportTo`): a successful
   `hbc2js export` is stored under `<tmpdir>/hbc2js-test-export-cache-v1/<key>`,
-  key = sha1(bundle bytes, CLI args, size+mtime of every file in `src/` and
-  `third_party/`, `package-lock.json`). Every call gets its own fresh *copy* of
+  key = sha1(bundle bytes, CLI args, path+CONTENT of every file in `src/` and
+  `third_party/`, `package-lock.json`; content, not size+mtime, so a same-size
+  edit or a touched-back mtime can never serve a stale tree. ~5.7 MB hashed once per process). Every call gets its own fresh *copy* of
   the cached tree (tests may still mutate/build in it); the output path in
   stdout/stderr is stored as a token and re-substituted. Non-zero exits are
   never cached. First cold run in a parallel gate may still export the same
@@ -478,9 +479,35 @@ child-process spawns), not by assertions. What is shared or overlapped:
   438 subtests run with `concurrency: 8` over an async oracle spawn
   (`runOracleAsync`); each uses its own output file.
 - **emit T1**: the per-binary `node --check` runs in a pool of 6 async children.
+- **Round 2.** `tests/gate/parse/fuzz.test.ts` records the xorshift stream's
+  start state per binary (a mutate-only pass), then fuzzes binaries on up to 8
+  worker threads (`tests/support/fuzz-worker.ts`): identical mutants, one
+  `test()`. `llm-readability/name-batch.test.ts` computes `computeSrcScope`
+  once per process and starts its CLI child at module load so it overlaps the
+  in-process test. `cli/render-module.test.ts` launches its three independent
+  rn-template CLI runs together at module load (async spawn) and each test
+  awaits its own. Pattern for more: start independent child processes eagerly,
+  await them in the owning test; never share mutable state between tests.
+  Spot-check when touching the caches: warm the cache, revert a `src/` fix,
+  the owning test must go red (verified for substitute.ts boundary guard,
+  manifest.ts counts, registry.ts instrument ring buffer).
+- Not worth splitting: `decompile/parallel.test.ts` (the cost is the
+  real worker-thread decompile it exists to test), `passes/jsx-recover` and
+  `passes/env-slot-order` (one ~7 s test each; the rest is import time under load).
 
 Invariants: no test is skipped, weakened or moved; test counts are unchanged;
 caches are keyed by inputs so a stale hit needs both an input change and an
 identical key. Never cache a result that depends on the output path or cwd
 without tokenising it. Timings on a shared box are only comparable at similar
 `uptime` load averages.
+
+## Concurrent e2e runs (Playwright)
+`cd ui && npm run e2e` is isolated per run: `ui/e2e/run.mjs` picks two free
+loopback ports (`ui/e2e/select.mjs`, bind port 0) and a unique `mkdtemp`
+fixture root, passes them to `prepare-fixture.mjs` and the Playwright config,
+and deletes the root afterwards. Several worktrees can gate at once. Overrides
+still work: `HBC2JS_E2E_PORT_BASE` (API port; preview = base+1; refused if
+busy, a stranger's server is never reused) and `HBC2JS_E2E_ROOT` (kept, not
+deleted). Under heavy concurrent load a spec can still time out on CPU
+starvation; that is a timing flake, not a collision. Gate test:
+`tests/gate/ui/e2e-select.test.ts`.

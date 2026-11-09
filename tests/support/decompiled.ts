@@ -12,7 +12,7 @@
 // `node:v8`'s structured-clone serializer (not JSON — `DecompileResult` and
 // `SplitResult` carry `Map`s and `Uint8Array`s that JSON can't round-trip),
 // keyed by (bundle bytes hash, options, a fingerprint of every `src/**/*.ts`
-// file's size+mtime). Any edit under `src/` changes the fingerprint and the
+// file's content). Any edit under `src/` changes the fingerprint and the
 // next call recomputes and overwrites the entry — a stale hit is not
 // possible without also touching mtimes, and a partial write can't corrupt a
 // reader because writes land in a temp file first and are renamed into place
@@ -23,7 +23,7 @@
 // …) that read their own bytes and call them internally — those stay
 // uncached here (see the work log's 2026-09-03 entry for the list).
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { deserialize, serialize } from "node:v8";
@@ -37,7 +37,7 @@ import { repoRoot } from "./paths.ts";
 
 let srcFingerprintCache: string | undefined;
 
-/** sha1 of every `src/**\/*.ts` file's path+size+mtime. Cheap (a few hundred
+/** sha1 of every `src/**\/*.ts` file's path+content. Cheap (a few hundred
  *  `stat`s) and memoised per process; recomputing per call would still be
  *  fine but there is no reason to pay it twice in one file. */
 function srcFingerprint(): string {
@@ -51,8 +51,9 @@ function srcFingerprint(): string {
         continue;
       }
       if (!entry.name.endsWith(".ts")) continue;
-      const st = statSync(p);
-      h.update(`${p}:${st.size}:${st.mtimeMs}\n`);
+      h.update(`${p.slice(repoRoot().length)}\0`);
+      h.update(readFileSync(p));
+      h.update("\0");
     }
   };
   walk(join(repoRoot(), "src"));
