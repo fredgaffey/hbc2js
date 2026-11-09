@@ -69,6 +69,7 @@ export function slimSigFile(f: SigDbFile, intern: Map<string, string>, target?: 
     // the container rule the package's whole function count, the
     // embedded rule whether the file has module paths.
     if (f.subtractedDependencies !== undefined) o.subtractedDependencies = f.subtractedDependencies.map(s);
+    if (f.dependencyClosure !== undefined) o.dependencyClosure = f.dependencyClosure.map(s);
     o.totalFunctions = f.totalFunctions;
     o.rawFunctionCount = f.rawFunctionCount;
     if (f.modulePaths !== undefined) o.modulePaths = f.modulePaths;
@@ -132,6 +133,22 @@ export function slimSigFile(f: SigDbFile, intern: Map<string, string>, target?: 
     const keptIds = new Set<number>();
     for (const fn of f.functions) if (keptFn.has(fn.index) && fn.moduleId !== undefined) keptIds.add(fn.moduleId);
     for (const fn of f.functions) if (fn.moduleId !== undefined && keptIds.has(fn.moduleId)) fileSizes[fn.moduleId] = (fileSizes[fn.moduleId] ?? 0) + 1;
+  }
+  // corpus-db-growth: foreign functions holding a target hash stay, with
+  // their (foreign, path-bearing) module, so the matcher's path attribution
+  // (`OwnView` in match.ts) sees whose code they are. They stay foreign.
+  const foreignIdsKept = new Set<number>();
+  for (const fn of f.functions) {
+    if (!foreign.functions.has(fn.index) || !keep(fn.exactHash, target.exactKeys)) continue;
+    keptFn.add(fn.index);
+    if (fn.moduleId !== undefined) foreignIdsKept.add(fn.moduleId);
+  }
+  for (const m of f.modules) {
+    if (keptSet.has(m) || !foreign.factories.has(m.factoryFunctionIndex)) continue;
+    if ((m.localModuleId !== null && foreignIdsKept.has(m.localModuleId)) || keptFn.has(m.factoryFunctionIndex)) {
+      keptSet.add(m);
+      keptModules.push(m);
+    }
   }
   o.functions = f.functions.filter((fn) => keptFn.has(fn.index)).map(fnRec);
   o.modules = keptModules.map(modRec);

@@ -2836,6 +2836,57 @@ Still open: rainbow's `react-query` (no `@tanstack` string) and rainbow's
 also stays an FP, also not traced.
 Test: `tests/gate/deps/corpus-fork-relabel.test.ts`.
 
+### Inlined dependency (corpus-mm-precision-inlined, 2026-11-09)
+
+After the fork relabel MetaMask had 14 full-v4 false positives. Source-map
+owners of their hit functions, by class: a pathless signature whose hits
+are its dependencies' code (8: `is-regex`, `is-array-buffer`,
+`fast-json-patch` on the es-shim helpers; `jszip` on pako, `mammoth` on
+@xmldom/xmldom, `wagmi` on viem and @tanstack/query-core, `rpc-websockets`
+and `reactotron-react-native` on @babel/runtime and eventemitter3); small
+shared helpers (4: `p-map` on @babel/runtime helpers, `resq` on fuse.js,
+`@shopify/react-native-skia` spread over vision-camera, reanimated and
+others, `typeorm` mostly on app code); a copy inside another package's file
+(2: `react-reconciler` in React Native's renderer modules, `fast-xml-builder`
+in fast-xml-parser's dist). No truth label is wrong: none of the 14 has a
+`node_modules/<pkg>/` source in the map; `reactotron-react-native` is only
+named in the app's bundled `package.json`, `@shopify/react-native-skia` only
+in vision-camera's optional-dependency proxy, `wagmi` only as a token
+ticker. The first class, the largest, has no sound rule on this evidence.
+Two were simulated on dumps of all five apps and rejected. (1) Hits all
+shared with other confirmed packages, with none of the package's own
+functions hit: it also removes `is-typed-array` (metamask) and `d3-array`
+and `d3-color` (rainbow), which are true but at a drifted version. (2) The
+package's entry module must hit: it would cost 30 true packages on
+metamask. The fix takes the copy class instead. `inlined`
+(`demoteExplained`, after `twin`) demotes P when a path-bearing high
+package Q declares P in `subtractedDependencies` and 90% of P's hit
+occurrences sit in target modules that also hold at least 3 of Q's own-file
+hits that are not in P's signature. One target module is one source file,
+so that file is Q's, and P is inlined in Q's dist (fast-xml-parser's
+209-function bundle holding the builder that later releases split out). An
+installed P has modules of its own. Without the declared edge it is
+unsound. React Native does not declare `react-reconciler`, and Expensify's
+real reconciler module also holds renderer-shaped functions from RN's
+signature, so a variant without the edge removed a true `react-reconciler`
+there. Test: `tests/gate/deps/corpus-mm-precision-inlined.test.ts`.
+
+Measured offline on deb (`meas2.mjs` `scoreAgainstTruth`, full v4 farm
+`deps-rm/f-v4`), confirmed / TP / FP, precision, recall. A: main before and
+this rule alone on main. B: `deps-db-growth` (no fork relabel) and the
+merge of relabel + db-growth + this rule.
+
+| app | A: main | A: + inlined | B: db-growth | B: merged |
+|---|---|---|---|---|
+| metamask | 176 / 162 / 14, 92.0%, 21.6% | 175 / 162 / 13, 92.6%, 21.6% | 175 / 155 / 20, 88.6%, 20.7% | 174 / 161 / 13, 92.5%, 21.5% |
+| rainbow | 115 / 108 / 7, 93.9%, 20.9% | unchanged | 114 / 108 / 6, 94.7%, 20.9% | unchanged |
+| Expensify J3 | 107 / 102 / 5, 95.3%, 35.4% | unchanged | 105 / 100 / 5, 95.2%, 34.7% | 105 / 102 / 3, 97.1%, 35.4% (relabel) |
+| bluesky | 46 / 45 / 1, 97.8%, 22.7% | unchanged | 44 / 43 / 1, 97.7%, 21.7% | unchanged |
+| react-navigation | 21 / 21 / 0, 100%, 27.6% | unchanged | unchanged | unchanged |
+
+The rule removes `fast-xml-builder` on metamask and nothing else. It costs
+no TP on any app. In B, every other change comes from the fork relabel.
+
 **Retry of the failed jobs** (deps-population-widen-3, 2026-11-09). The
 1,445 failed jobs were re-run on deb with main's builder fixes
 (`src/deps/builder-support.ts`: Node built-in shims, peer installs,
@@ -3038,3 +3089,81 @@ Unmerged branches, reviewed as diffs:
   `evidenced` after a single unique hit of `minInstr` size, with no
   generic-in-target check, which is weak support for keeping a hash shared
   by 20 or more names.
+
+### DB growth must not cost true positives (corpus-db-growth, 2026-11-09)
+
+Adding the population-retry overlay (`db-overlay-pop2`, 1,251 path-bearing files, branch deps-population-widen-3) to db-v3-clean + `db-overlay-pop` lost true packages and added false ones. Traced per package (deb, `scoreAgainstTruth` plus a per-package probe of candidacy, tier, demotion and each hit hash's claimants) to four mechanisms:
+
+| mechanism | TPs lost (+pop2 vs +pop, main) | FPs added |
+|---|---|---|
+| Copies claimed as own: a path-bearing dist file that inlines other packages (`@vitest/pretty-format` holds react-is and pretty-format, `esquery.min.js` holds estraverse), or a pathless file that carries a copy (`buffer-crc32`, `smart-buffer`: buffer's code), counts the copy as its own. It demotes the real package (`embedded`/`twin`) and confirms on the copy. The extra candidates pop2 adds bring more carriers in. | react-is (Expensify) | buffer-crc32, smart-buffer, @vitest/pretty-format (Expensify), esquery (bluesky) |
+| Ambiguity cutoff growing with the candidate set: `AMBIGUOUS_OWNER_THRESHOLD` (20) counts claimants among the loaded candidates. pop2 grew MetaMask's candidates 816 -> 1,253, and the ljharb hashes went from under 20 pathless claimants to 20-21. None of these claimants is path-bearing, so the paths cannot tell copies from owners. | define-properties, es-define-property, has-symbols, hasown (MetaMask); color, react-native-gesture-handler (bluesky: 2.14.0's 23 module hits sit on factories that about 20 files share) | safe-array-concat, is-string (MetaMask, rainbow) |
+| Proposal uniqueness eroded: js-base64's few unique hashes are small base64 helpers that pop2's large own-path bundles also contain (pdfjs inside officeparser, typescript/lib, terser), so the hash index no longer proposes it | js-base64 (Expensify) | none |
+| Truth gap, not a scoring error: `@sentry/{replay,replay-canvas,browser-utils,feedback}` 10.71.0 hit 0.35-0.91 of their own code. Other path-bearing files attribute that code to those same packages, and @sentry/browser 10, a TP, depends on them. Expensify's truth file lists only browser/core/react/react-native. | none | the four @sentry/* (Expensify), @octokit/oauth-methods |
+
+**Fix (first mechanism).** `matchInventory` collects, from every loaded path-bearing file's foreign modules, which packages a target hash is attributed to. It keeps an attributed package only if its own loaded signature also holds the hash as own code. For any other claimant, that hash is a copy. It is not a hit, not in the denominators and adds no owner to `hashOwnerNames`, the same as the own-file rule for foreign modules (`OwnView` in `src/deps/match.ts`). Slim signatures now keep foreign functions that hold a target hash, together with their module, so slim scoring sees the same attribution. The first cut took attributions to packages with no loaded claimant (a fork's path, a dist that inlined the code). On Expensify + pop it lost hasown, es-define-property and define-properties, and on bluesky color, react-native-svg and react-native-gesture-handler. Requiring a loaded claimant fixed that. Tests: `tests/gate/deps/corpus-db-growth.test.ts` (synthetic: the carrier demotes the real packages only when no path evidence exists, an own path-bearing file keeps its code, and an unclaimed attribution takes nothing).
+
+**Measured** (deb, offline `scoreAgainstTruth`, sha pins matched; main 6e6a2ff vs this branch; each layered dir with its own candidate index; confirmed / TP / FP):
+
+| bundle | base main | base fix | +pop main | +pop fix | +pop+pop2 main | +pop+pop2 fix |
+|---|---|---|---|---|---|---|
+| Expensify | 135 / 96 / 39 | same | 163 / 126 / 37 | 160 / 126 / 34 | 169 / 125 / 44 | 155 / 126 / 29 |
+| react-navigation | 16 / 16 / 0 | same | 19 / 19 / 0 | same | 19 / 19 / 0 | same |
+| bluesky | 45 / 37 / 8 | same | 53 / 45 / 8 | same | 51 / 44 / 7 | 48 / 42 / 6 |
+| rainbow | 129 / 106 / 23 | same | 133 / 108 / 25 | same | 135 / 109 / 26 | same |
+| MetaMask | 186 / 148 / 38 | same | 192 / 153 / 39 | same | 188 / 149 / 39 | same |
+
+The pathless base DB scores exactly as before. On Expensify, +pop loses sax, encoding, typeorm and octokit as FPs and gains source-map-js as one. +pop2 restores react-is and drops 16 FPs, mostly buffer carriers. Expensify +pop2 now matches +pop on TPs (126) with fewer FPs (29 vs 34). Not yet met: bluesky +pop2 loses lodash.debounce and react-native-svg against main (+FP web-streams-polyfill), not traced. The ambiguity-cutoff mechanism (MetaMask's four ljharb TPs, bluesky's color and react-native-gesture-handler) is untouched. Every claimant there is a pathless file, so it needs a claimant-independent rule. Candidates for that rule: count only claimants whose recorded dependency closure does not contain another claimant, or a DB-wide rather than candidate-relative count. js-base64's proposal loss is also still open.
+
+### Transitive dependency subtraction (deps-transitive-subtract, 2026-11-10)
+
+`dep-subtract` removes from a package only the own code of its DIRECT
+dependencies that were in the DB at a satisfying version when the file was
+built, so a pathless signature keeps every grand-dependency and every
+dependency the DB lacked: `is-array-buffer@3.0.5` records
+`subtractedDependencies: []` and still holds call-bind, call-bound and
+get-intrinsic. `tools/pkgsig/bulk/dep-closure.mjs` turns the declared
+dependencies `dep-subtract` already cached (dependencies, peer, optional)
+into each release's transitive closure of names, offline, written as a
+layer's `dependency-closure.json` (or a file's `dependencyClosure`), so no
+signature is rebuilt. A step descends only through the in-DB version that
+satisfies the declared range; with any version's edges, old
+which-typed-array (which depended on is-typed-array) made the two each
+other's dependency and removed both. At match time a target hash that a
+loaded signature of a closure member holds as own code is that member's,
+handled like the DB-growth copies (not a hit, not in the denominators, no
+owner). It is all or nothing per package: the closure's code is set aside
+only when no hit is left outside it. Subtracting it always cost
+define-properties and typed-array-buffer on MetaMask, true packages whose own
+code is a few functions. A cycle (the member's closure names the package)
+takes nothing. Test: `tests/gate/deps/corpus-transitive-subtract.test.ts`.
+
+Measured offline on deb (`meas2.mjs`, full v4 farm `deps-rm/f-v4`, closure
+sidecar from the four bulk `dep-cache` dirs: 18,092 closures), confirmed /
+TP / FP, precision, recall. The first cut, which always subtracted, removed
+is-array-buffer, fast-json-patch and typeorm (MetaMask) and typeorm (rainbow),
+but lost define-properties and typed-array-buffer (MetaMask) and one bluesky
+TP. All-or-nothing:
+
+| app | before | after |
+|---|---|---|
+| metamask | 174 / 161 / 13, 92.5%, 21.5% | 173 / 161 / 12, 93.1%, 21.5% |
+| rainbow | 114 / 108 / 6, 94.7%, 20.8% | unchanged |
+| Expensify J3 | 105 / 102 / 3, 97.1%, 35.4% | unchanged |
+| bluesky | 44 / 43 / 1, 97.7%, 21.7% | unchanged |
+| react-navigation | 21 / 21 / 0, 100%, 27.6% | unchanged |
+
+Only is-array-buffer goes. The other seven survive because the dependency
+holding their hits has no signature to match against. call-bind,
+function-bind, pako and @xmldom/xmldom have no file in the farm at all, so
+the es-shim code is held only by other contaminated packages (is-regex,
+fast-json-patch, jszip, mammoth). wagmi, rpc-websockets and
+reactotron-react-native lose their viem, eventemitter3 and query-string hits
+but keep hits outside the closure (@wagmi/core and @babel/runtime are not
+loaded). The next lever is in the DB, not the matcher: build signatures for
+the missing dependencies (call-bind, function-bind, get-intrinsic, pako,
+@xmldom/xmldom, @wagmi/core, @babel/runtime), after which this rule removes
+the hits with no matcher change. The other option is to treat code shared by
+two packages that declare a common dependency (and no edge between them) as
+that dependency's. It was not built: without the dependency's own signature
+it is the rejected shared-hits rule plus a name match.

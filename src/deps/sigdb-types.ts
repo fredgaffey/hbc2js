@@ -88,6 +88,17 @@ export interface SigDbFile {
    *  loading both would let contaminated v1 entries keep winning
    *  collisions). */
   readonly subtractedDependencies?: readonly string[];
+  /** deps-transitive-subtract (docs/DEPS.md "Transitive dependency
+   *  subtraction"): the package NAMES in this release's declared npm
+   *  dependency closure (dependencies + peer + optional, transitively,
+   *  each step through the in-DB version that satisfies the range; an
+   *  unresolved dependency is named but not descended into). Matching
+   *  treats a hash any loaded signature of a closure member holds as its
+   *  own code as that member's, not this package's. Written by
+   *  `tools/pkgsig/bulk/dep-closure.mjs`, either into the file or as a
+   *  layer's `dependency-closure.json` sidecar (`loadSignatures`). Absent =
+   *  no closure known (scored as before). */
+  readonly dependencyClosure?: readonly string[];
   /** LB1 (docs/DEPS.md "Hash scheme 2"): 2 = exact/fuzzy hashes computed
    *  with operand-width variants folded (`SIG_HASH_SCHEME`) AND baseline
    *  subtraction ownership-aware. Absent = scheme 1 (pre-LB1). A package

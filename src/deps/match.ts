@@ -7,7 +7,7 @@
 import type { LoadedSig } from "./db.ts";
 import type { ModuleInventory } from "./inventory.ts";
 import type { SigDbFile } from "./sigdb-types.ts";
-import { foreignSets, isOwnModulePath, viaDependencyCounts } from "./module-paths.ts";
+import { foreignFunctionPackages, foreignSets, isOwnModulePath, viaDependencyCounts, type ForeignSets } from "./module-paths.ts";
 
 export type ConfidenceTier = "high" | "medium" | "low" | "none";
 
@@ -34,7 +34,7 @@ export interface PackageScore {
    *  `embedded` (the hits are a subset of another confirmed, path-bearing
    *  package's own files), `twin` (the same hits as another confirmed
    *  package, which was kept). `by` names the other package. */
-  readonly demotion?: { readonly rule: "few-distinct" | "container" | "scattered" | "embedded" | "twin" | "bundled-dist"; readonly by?: string };
+  readonly demotion?: { readonly rule: "few-distinct" | "container" | "scattered" | "embedded" | "twin" | "inlined" | "bundled-dist"; readonly by?: string };
   /** Set when corpus-path-recall's module-graph rule (`promoteViaDependency`,
    *  docs/PACKAGE-SIGNATURES.md §7 "Recovery through the module graph")
    *  raised a path-bearing package to "high": an app module shaped like one
@@ -275,7 +275,20 @@ function buildIndex<K extends "exactHash" | "fuzzyHash" | "stringSetHash">(funct
   return s;
 }
 
-function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Set<string>, targetFuzzy: Set<string>, targetStringHash: Set<string>, minInstr: number, hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetCopies: ReadonlyMap<string, number>, uniqueHashOwners?: ReadonlyMap<string, string>): { readonly score: PackageScore; readonly hitKeys: ReadonlySet<string>; readonly distinctEligible: number } | null {
+/** corpus-db-growth (docs/DEPS.md "DB growth must not cost true
+ *  positives"): the DB's module paths attribute an exact hash to the
+ *  packages whose files hold it under their own name in another file's
+ *  foreign module, kept only for attributed packages whose own loaded
+ *  signature also holds it. A claimant outside that set (a pathless file carrying a
+ *  copy, a path-bearing dist file that inlined it) holds a copy: the hash is
+ *  neither its evidence nor an owner. `copies` is that set per file (beyond
+ *  `foreignSets`), empty when no loaded file attributes any of its hashes. */
+interface OwnView {
+  readonly foreign: ForeignSets;
+  readonly copies: ForeignSets;
+}
+
+function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Set<string>, targetFuzzy: Set<string>, targetStringHash: Set<string>, minInstr: number, hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetCopies: ReadonlyMap<string, number>, view: OwnView, uniqueHashOwners?: ReadonlyMap<string, string>): { readonly score: PackageScore; readonly hitKeys: ReadonlySet<string>; readonly distinctEligible: number } | null {
   const pkg: SigDbFile = entry.file;
   if (pkg.hbcVersion !== target.hbcVersion) return null;
   // corpus-embedded-copy (module paths v1, docs/PACKAGE-SIGNATURES.md §7):
@@ -283,10 +296,17 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
   // path is another package's file (nested copy, hoisted undeclared
   // dependency, @babel/runtime helper) is neither a hit nor in the
   // denominators. Empty for files without paths (scored as before).
-  const foreign = foreignSets(pkg);
+  // corpus-db-growth: code the DB's paths attribute to other packages is
+  // left out the same way (`view.copies`).
+  const foreign = view.foreign;
+  const copies = view.copies;
+  const notOwn = (i: number): boolean => foreign.functions.has(i) || copies.functions.has(i);
   if (pkg.slim !== undefined && pkg.slim.minInstr !== minInstr) throw new Error(`slim signature prefiltered for minInstr ${pkg.slim.minInstr}, matched with ${minInstr}`);
-  const eligible = pkg.functions.filter((f) => f.instrCount >= minInstr && !foreign.functions.has(f.index));
-  const eligibleCount = pkg.slim !== undefined ? pkg.slim.eligible : eligible.length;
+  const eligible = pkg.functions.filter((f) => f.instrCount >= minInstr && !notOwn(f.index));
+  // A slim file's counts exclude `foreign` only; copies are target hashes,
+  // so the slim file still holds every copy function to subtract.
+  const copyEligible = copies.functions.size === 0 ? [] : pkg.functions.filter((f) => f.instrCount >= minInstr && copies.functions.has(f.index) && !foreign.functions.has(f.index));
+  const eligibleCount = pkg.slim !== undefined ? pkg.slim.eligible - copyEligible.length : eligible.length;
   if (eligibleCount === 0) return null;
 
   // Calibrated, not guessed: an early cutoff of 3 was tried and measured
@@ -316,7 +336,7 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
   // TARGET_GENERIC_COPIES: generic when the target holds the hash at least
   // that often AND more than twice as often as this package itself does.
   const ownCopies = new Map<string, number>();
-  for (const f of pkg.functions) if (!foreign.functions.has(f.index)) ownCopies.set(schemeKey(pkg, f.exactHash), (ownCopies.get(schemeKey(pkg, f.exactHash)) ?? 0) + 1);
+  for (const f of pkg.functions) if (!notOwn(f.index)) ownCopies.set(schemeKey(pkg, f.exactHash), (ownCopies.get(schemeKey(pkg, f.exactHash)) ?? 0) + 1);
   const isGenericInTarget = (hash: string): boolean => {
     const n = targetCopies.get(hash) ?? 0;
     return !pkg.toolchainBaseline && n >= TARGET_GENERIC_COPIES && n > 2 * (ownCopies.get(hash) ?? 0);
@@ -360,7 +380,7 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
     // `moduleTotal` below: dropping it there too would turn some packages
     // into "tiny" ones and unlock the tiny-package path (measured: adds
     // react-shallow-renderer as a false positive on react-navigation-example).
-    if (m.factoryIsBaseline || m.factoryIsDependency === true || foreign.factories.has(m.factoryFunctionIndex)) continue;
+    if (m.factoryIsBaseline || m.factoryIsDependency === true || foreign.factories.has(m.factoryFunctionIndex) || copies.factories.has(m.factoryFunctionIndex)) continue;
     if (m.factoryExactHash !== null && targetExact.has(schemeKey(pkg, m.factoryExactHash)) && isUnambiguous(schemeKey(pkg, m.factoryExactHash))) {
       moduleExactHits++;
       // An empty or re-export factory (under minInstr) is a module hit but
@@ -371,7 +391,8 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
       }
     }
   }
-  const moduleTotal = pkg.slim !== undefined ? pkg.slim.moduleTotal : pkg.modules.filter((m) => !m.factoryIsBaseline && m.factoryExactHash !== null && !foreign.factories.has(m.factoryFunctionIndex)).length;
+  const copyModules = copies.factories.size === 0 ? 0 : pkg.modules.filter((m) => !m.factoryIsBaseline && m.factoryExactHash !== null && !foreign.factories.has(m.factoryFunctionIndex) && copies.factories.has(m.factoryFunctionIndex)).length;
+  const moduleTotal = pkg.slim !== undefined ? pkg.slim.moduleTotal - copyModules : pkg.modules.filter((m) => !m.factoryIsBaseline && m.factoryExactHash !== null && !foreign.factories.has(m.factoryFunctionIndex) && !copies.factories.has(m.factoryFunctionIndex)).length;
 
   const exactCoverage = exactHits / eligibleCount;
   const fuzzyCoverage = (exactHits + fuzzyOnlyHits) / eligibleCount;
@@ -394,7 +415,7 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
   const strongFunctionSignal =
     exactCoverage >= HIGH_EXACT_FUNCTION_COVERAGE ||
     (isTinyPackage && exactHits >= MIN_TINY_PACKAGE_EXACT_FUNCTION_HITS && exactHitInstrSum >= MIN_TINY_PACKAGE_EXACT_FUNCTION_INSTR);
-  const distinctEligible = pkg.slim?.distinctEligible ?? new Set(eligible.map((f) => f.exactHash)).size;
+  const distinctEligible = pkg.slim?.distinctEligible !== undefined ? pkg.slim.distinctEligible - new Set(copyEligible.map((f) => f.exactHash)).size : new Set(eligible.map((f) => f.exactHash)).size;
   const enoughDistinct = hitKeys.size >= Math.min(MIN_DISTINCT_EVIDENCE_HASHES, distinctEligible);
   // corpus-recall-bar: only with enough distinct hashes; otherwise it would
   // turn a plain medium into a few-distinct demotion, which the path-recall
@@ -486,9 +507,16 @@ interface ScoredEntry {
 //    path-bearing package with more hits that outranks it (fork
 //    source-map-js: 40 hits, all among source-map's 46, too few of them
 //    for mutual cover and under the embedded ratio).
-function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInventory, legacyExact: readonly string[]): readonly ScoredEntry[] {
+// `only` (deps-combined-1110): a second pass over the packages the edge rule
+// promoted. Every high package still explains, but only those packages can
+// be demoted, and only by the rules that judge where the hits sit
+// (container, twin, bundled-dist); scattered and few-distinct would undo the
+// promotion's own premise (a small own file, credited through the graph).
+function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInventory, legacyExact: readonly string[], only?: ReadonlySet<ScoredEntry>): readonly ScoredEntry[] {
   const high = (): ScoredEntry[] => scored.filter((s) => s.score.tier === "high" && !s.score.isBaseline && s.hitKeys.size > 0);
+  const runs = (rule: "container" | "twin" | "bundled-dist" | "other"): boolean => only === undefined || rule !== "other";
   const demote = (s: ScoredEntry, rule: NonNullable<PackageScore["demotion"]>["rule"], by?: string): void => {
+    if (only !== undefined && !only.has(s)) return;
     s.score = { ...s.score, tier: "medium", demotion: by === undefined ? { rule } : { rule, by } };
   };
   if (high().length === 0) return scored;
@@ -503,7 +531,7 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
   inventory.functions.forEach((f, i) => addOcc(f.exactHash, i));
   legacyExact.forEach((h, i) => addOcc(LEGACY_PREFIX + h, i));
 
-  for (const s of high()) {
+  if (runs("container")) for (const s of high()) {
     // Path-bearing: the builder bundle's toolchain/runtime modules are
     // separate unowned files, so rawFunctionCount overstates the package
     // (async-lock 21 vs 98, corpus-precision-rainbow-mm). Pathless: keep the
@@ -524,7 +552,7 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
   inventory.modules.forEach((m, mi) => {
     for (const i of m.functionIndices ?? []) moduleOf.set(i, mi);
   });
-  for (const s of high()) {
+  if (runs("other")) for (const s of high()) {
     if (s.hitKeys.size >= s.distinctEligible) continue;
     const keysIn = new Map<number, Set<string>>();
     for (const k of s.hitKeys) {
@@ -568,7 +596,7 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
   // review-1110: hosts are the packages high when this rule starts, not
   // live tiers, so a host demoted earlier in this loop (B embedded in C)
   // still explains A, and the verdict does not depend on DB order.
-  const hosts = high();
+  const hosts = runs("other") ? high() : [];
   for (const s of hosts) {
     const host = hosts.find((q) => q !== s && q.score.package !== s.score.package && (q.entry.file.modulePaths ?? 0) >= 1 && q.hitKeys.size >= EMBEDDED_HOST_SIZE_RATIO * s.hitKeys.size && shared(s.hitKeys, q.hitKeys) >= EXPLAINED_EVIDENCE_SHARE * s.hitKeys.size);
     if (host !== undefined) demote(s, "embedded", host.score.package);
@@ -584,29 +612,96 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
     for (let i = 0; i < ra.length; i++) if (ra[i] !== rb[i]) return ra[i]! > rb[i]!;
     return a.score.package < b.score.package;
   };
-  for (const s of twins) {
-    if (s.score.tier !== "high") continue;
+  // deps-combined-1110: like embedded, the explaining twin is any package
+  // high when this rule starts, so a chain A ~ B ~ C (A not ~ C) demotes A
+  // by B whether or not B was already demoted by C.
+  if (runs("twin")) for (const s of twins) {
     for (const q of twins) {
-      if (q === s || q.score.tier !== "high" || q.score.package === s.score.package || (!pathBearing(s) && !pathBearing(q))) continue;
+      if (q === s || q.score.package === s.score.package || (!pathBearing(s) && !pathBearing(q))) continue;
       const n = shared(s.hitKeys, q.hitKeys);
       const sCovered = n >= EXPLAINED_EVIDENCE_SHARE * s.hitKeys.size;
       const qCovered = n >= EXPLAINED_EVIDENCE_SHARE * q.hitKeys.size;
       // One-sided (corpus-twin-sourcemap): a fork whose hits all sit inside
       // a path-bearing original's larger set (source-map-js in source-map).
       const sInQ = sCovered && !qCovered && q.hitKeys.size > s.hitKeys.size && pathBearing(q) && better(q, s);
-      const qInS = qCovered && !sCovered && s.hitKeys.size > q.hitKeys.size && pathBearing(s) && better(s, q);
-      if (!(sCovered && qCovered) && !sInQ && !qInS) continue;
-      if (sCovered && qCovered ? better(s, q) : qInS) demote(q, "twin", s.score.package);
-      else {
+      if ((sCovered && qCovered && better(q, s)) || sInQ) {
         demote(s, "twin", q.score.package);
         break;
       }
     }
   }
+  // inlined (corpus-mm-precision-inlined): a declared dependency P of a
+  // path-bearing package Q whose hits all sit in target modules holding one
+  // of Q's own files, next to Q code P's signature does not hold. One target
+  // module is one source file, so it is Q's file and P is inlined in it (a
+  // dist build), not installed: installed, P has modules of its own.
+  // deps-combined-1110: hosts are fixed at the start of the rule (a host
+  // inlined in its own dependent still explains its dependencies), and
+  // dependency names come from dependencyName() (scoped file names).
+  const inlinedHosts = !runs("other") ? [] : high().filter((q) => pathBearing(q) && (q.entry.file.subtractedDependencies ?? []).length > 0);
+  if (inlinedHosts.length > 0) {
+    const ownKeysByModule = new Map<ScoredEntry, Map<number, Set<string>[]>>(); // target module -> per own file, Q's hit keys in it
+    for (const q of inlinedHosts) {
+      const f = q.entry.file;
+      const own = new Set(f.modules.filter((m) => typeof m.path === "string" && isOwnModulePath(f.package, m.path)).map((m) => m.localModuleId));
+      const perFile = new Map<number, Set<string>>();
+      for (const fn of f.functions) {
+        const k = schemeKey(f, fn.exactHash);
+        if (fn.moduleId === undefined || !own.has(fn.moduleId) || !q.hitKeys.has(k)) continue;
+        let set = perFile.get(fn.moduleId);
+        if (set === undefined) perFile.set(fn.moduleId, (set = new Set()));
+        set.add(k);
+      }
+      const byModule = new Map<number, Set<string>[]>();
+      for (const keys of perFile.values()) {
+        const inM = new Map<number, Set<string>>();
+        for (const k of keys) {
+          for (const i of occurrences.get(k) ?? []) {
+            const m = moduleOf.get(i);
+            if (m === undefined) continue;
+            let set = inM.get(m);
+            if (set === undefined) inM.set(m, (set = new Set()));
+            set.add(k);
+          }
+        }
+        for (const [m, set] of inM) {
+          const list = byModule.get(m);
+          if (list === undefined) byModule.set(m, [set]);
+          else list.push(set);
+        }
+      }
+      ownKeysByModule.set(q, byModule);
+    }
+    for (const s of high()) {
+      const hosts = inlinedHosts.filter((q) => q.score.package !== s.score.package && (q.entry.file.subtractedDependencies ?? []).some((d) => dependencyName(d) === s.score.package));
+      if (hosts.length === 0) continue;
+      const sigKeys = new Set(s.entry.file.functions.map((fn) => schemeKey(s.entry.file, fn.exactHash)));
+      let all = 0;
+      let inside = 0;
+      let by: string | undefined;
+      for (const k of s.hitKeys) {
+        for (const i of occurrences.get(k) ?? []) {
+          all++;
+          const m = moduleOf.get(i);
+          if (m === undefined) continue;
+          const q = hosts.find((h) => (ownKeysByModule.get(h)!.get(m) ?? []).some((set) => {
+            let foreign = 0;
+            for (const x of set) if (!sigKeys.has(x)) foreign++;
+            return foreign >= MIN_DISTINCT_EVIDENCE_HASHES;
+          }));
+          if (q !== undefined) {
+            inside++;
+            by ??= q.score.package;
+          }
+        }
+      }
+      if (all > 0 && by !== undefined && inside >= EXPLAINED_EVIDENCE_SHARE * all) demote(s, "inlined", by);
+    }
+  }
   // bundled-dist (corpus-precision-bundled-dist): last, so it changes no
   // earlier rule's input. Path-bearing signatures only: a pathless file
   // lumps every module together, so its "file size" is the package's.
-  for (const s of high()) {
+  if (runs("bundled-dist")) for (const s of high()) {
     if ((s.entry.file.modulePaths ?? 0) < 1) continue;
     // A slimmed file has dropped most functions: its own file sizes come
     // precomputed (slim-sigs.ts).
@@ -825,6 +920,150 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
 
   const eligibleDbs = dbs.filter((d) => d.file.hbcVersion === inventory.hbcVersion);
 
+  // corpus-db-growth: which packages the loaded path-bearing files' foreign
+  // modules say a target hash belongs to (see `OwnView`).
+  const attributed = new Map<string, Set<string>>();
+  for (const entry of eligibleDbs) {
+    if ((entry.file.modulePaths ?? 0) < 1 || entry.file.toolchainBaseline) continue;
+    const named = foreignFunctionPackages(entry.file);
+    if (named.size === 0) continue;
+    for (const fn of entry.file.functions) {
+      const name = named.get(fn.index);
+      const key = schemeKey(entry.file, fn.exactHash);
+      if (name === undefined || !targetExact.has(key)) continue;
+      let set = attributed.get(key);
+      if (set === undefined) attributed.set(key, (set = new Set()));
+      set.add(name);
+    }
+  }
+  // Only an attributed package that itself claims the hash (its own
+  // signature holds it as own code) takes it from the others: a path naming
+  // a fork, or a package whose own file inlined it, with no such signature
+  // loaded, says nothing about who else owns it (measured: hasown and color
+  // lost to attributions to unloaded names).
+  if (attributed.size > 0) {
+    const claimed = new Map<string, Set<string>>();
+    for (const entry of eligibleDbs) {
+      if (entry.file.toolchainBaseline) continue;
+      const foreign = foreignSets(entry.file);
+      for (const fn of entry.file.functions) {
+        if (foreign.functions.has(fn.index)) continue;
+        const key = schemeKey(entry.file, fn.exactHash);
+        const a = attributed.get(key);
+        if (a === undefined || !a.has(entry.file.package)) continue;
+        let set = claimed.get(key);
+        if (set === undefined) claimed.set(key, (set = new Set()));
+        set.add(entry.file.package);
+      }
+    }
+    for (const key of [...attributed.keys()]) {
+      const c = claimed.get(key);
+      if (c === undefined) attributed.delete(key);
+      else attributed.set(key, c);
+    }
+  }
+  // deps-transitive-subtract (docs/DEPS.md "Transitive dependency
+  // subtraction"): which target hashes each loaded package holds as own
+  // code, and each package's declared dependency closure (union over its
+  // loaded versions). A hash that a member of P's closure holds is that
+  // member's code, so it is a copy in P, unless the member's own closure
+  // names P (a cycle: the edge cannot tell the two apart).
+  const closureOf = new Map<string, Set<string>>();
+  for (const entry of eligibleDbs) {
+    const c = entry.file.dependencyClosure;
+    if (c === undefined || c.length === 0 || entry.file.toolchainBaseline) continue;
+    let set = closureOf.get(entry.file.package);
+    if (set === undefined) closureOf.set(entry.file.package, (set = new Set()));
+    for (const d of c) if (d !== entry.file.package) set.add(d);
+  }
+  const ownTargetKeys = new Map<string, Set<string>>();
+  if (closureOf.size > 0) {
+    const wanted = new Set<string>();
+    for (const c of closureOf.values()) for (const d of c) wanted.add(d);
+    for (const entry of eligibleDbs) {
+      if (entry.file.toolchainBaseline || !wanted.has(entry.file.package)) continue;
+      const foreign = foreignSets(entry.file);
+      let set = ownTargetKeys.get(entry.file.package);
+      if (set === undefined) ownTargetKeys.set(entry.file.package, (set = new Set()));
+      for (const fn of entry.file.functions) {
+        const key = schemeKey(entry.file, fn.exactHash);
+        if (!foreign.functions.has(fn.index) && targetExact.has(key)) set.add(key);
+      }
+    }
+  }
+  const closureHolders = (file: SigDbFile): Set<string>[] => {
+    const out: Set<string>[] = [];
+    if (file.toolchainBaseline) return out;
+    for (const d of closureOf.get(file.package) ?? []) {
+      const keys = ownTargetKeys.get(d);
+      if (keys !== undefined && keys.size > 0 && closureOf.get(d)?.has(file.package) !== true) out.push(keys);
+    }
+    return out;
+  };
+  // Distinct non-baseline names holding each target hash as non-foreign
+  // code, before any view (hashOwnerNames needs the views): an upper bound
+  // on it, used only by the closure rule's own-evidence check.
+  let preView: Map<string, Set<string>> | undefined;
+  const preViewOwnerNames = (): ReadonlyMap<string, ReadonlySet<string>> => {
+    if (preView !== undefined) return preView;
+    preView = new Map();
+    for (const entry of eligibleDbs) {
+      if (entry.file.toolchainBaseline) continue;
+      const foreign = foreignSets(entry.file);
+      for (const fn of entry.file.functions) {
+        const key = schemeKey(entry.file, fn.exactHash);
+        if (foreign.functions.has(fn.index) || !targetExact.has(key)) continue;
+        let set = preView.get(key);
+        if (set === undefined) preView.set(key, (set = new Set()));
+        set.add(entry.file.package);
+      }
+    }
+    return preView;
+  };
+  const views = new Map<SigDbFile, OwnView>();
+  const viewOf = (file: SigDbFile): OwnView => {
+    let v = views.get(file);
+    if (v !== undefined) return v;
+    const foreign = foreignSets(file);
+    const functions = new Set<number>();
+    const holders = closureHolders(file);
+    if ((attributed.size > 0 || holders.length > 0) && !file.toolchainBaseline) {
+      // All or nothing: the closure's code is set aside only when NO hit is
+      // left outside it. A true package whose own code is a few functions
+      // (define-properties, typed-array-buffer) otherwise sank below its
+      // tier on the subtraction alone.
+      // deps-combined-1110: the own hits that keep the closure's code must
+      // be evidence scorePackage would count (eligible size, not generic in
+      // the target, not claimed by AMBIGUOUS_OWNER_THRESHOLD names) and more
+      // than one hash: one shared boilerplate function kept every
+      // dependency's code otherwise.
+      const inClosure: number[] = [];
+      const ownHits = new Set<string>();
+      const ownCopies = new Map<string, number>();
+      if (holders.length > 0) for (const fn of file.functions) if (!foreign.functions.has(fn.index)) ownCopies.set(schemeKey(file, fn.exactHash), (ownCopies.get(schemeKey(file, fn.exactHash)) ?? 0) + 1);
+      for (const fn of file.functions) {
+        if (foreign.functions.has(fn.index)) continue;
+        const key = schemeKey(file, fn.exactHash);
+        const a = attributed.get(key);
+        if (a !== undefined && !a.has(file.package)) functions.add(fn.index);
+        else if (holders.length > 0 && targetExact.has(key) && fn.instrCount >= minInstr) {
+          if (holders.some((h) => h.has(key))) inClosure.push(fn.index);
+          else {
+            const n = targetCopies.get(key) ?? 0;
+            const generic = n >= TARGET_GENERIC_COPIES && n > 2 * (ownCopies.get(key) ?? 0);
+            if (!generic && (preViewOwnerNames().get(key)?.size ?? 1) < AMBIGUOUS_OWNER_THRESHOLD) ownHits.add(key);
+          }
+        }
+      }
+      if (ownHits.size < 2) for (const i of inClosure) functions.add(i);
+    }
+    const factories = new Set<number>();
+    if (functions.size > 0) for (const m of file.modules) if (functions.has(m.factoryFunctionIndex)) factories.add(m.factoryFunctionIndex);
+    v = { foreign, copies: { functions, factories } };
+    views.set(file, v);
+    return v;
+  };
+
   // Reverse index for per-module attribution: which package(s)' own function
   // set contains a given exact hash. A module can still be named even if its
   // package's overall coverage is low.
@@ -858,9 +1097,9 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
     fnByIndexByEntry.set(entry, fnByIndex);
     // Module paths v1: a path-bearing file never claims another package's
     // file, so a hash both own and copied is attributed to its owner.
-    const foreign = foreignSets(entry.file);
+    const view = viewOf(entry.file);
     for (const fn of entry.file.functions) {
-      if (foreign.functions.has(fn.index)) continue;
+      if (view.foreign.functions.has(fn.index) || view.copies.functions.has(fn.index)) continue;
       const exactKey = schemeKey(entry.file, fn.exactHash);
       let owners = hashOwners.get(exactKey);
       if (owners === undefined) {
@@ -878,7 +1117,7 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
       }
     }
     for (const m of entry.file.modules) {
-      if (m.factoryIsBaseline || m.factoryIsDependency === true || m.factoryFuzzyHash === null || foreignSets(entry.file).factories.has(m.factoryFunctionIndex)) continue;
+      if (m.factoryIsBaseline || m.factoryIsDependency === true || m.factoryFuzzyHash === null || foreignSets(entry.file).factories.has(m.factoryFunctionIndex) || viewOf(entry.file).copies.factories.has(m.factoryFunctionIndex)) continue;
       const factory = fnByIndex.get(m.factoryFunctionIndex);
       if (factory === undefined || !fallbackEligible(factory.instrCount, factory.stringCount)) continue;
       const key = `${schemeKey(entry.file, m.factoryFuzzyHash)}|${factory.stringSetHash}`;
@@ -898,12 +1137,15 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
   const scoreByOwner = new Map<string, PackageScore>();
   const scoredEntries: ScoredEntry[] = [];
   for (const entry of eligibleDbs) {
-    const scored = scorePackage(entry, inventory, targetExact, targetFuzzy, targetStringHash, minInstr, hashOwnerNames, targetCopies, opts.uniqueHashOwners);
+    const scored = scorePackage(entry, inventory, targetExact, targetFuzzy, targetStringHash, minInstr, hashOwnerNames, targetCopies, viewOf(entry.file), opts.uniqueHashOwners);
     if (scored === null) continue;
     scoredEntries.push({ entry, ...scored });
   }
   const afterDemotion = demoteExplained(scoredEntries, inventory, legacyExact);
+  const wasHigh = new Set(afterDemotion.filter((s) => s.score.tier === "high"));
   promoteViaDependency(afterDemotion, inventory, minInstr, targetCopies);
+  const promoted = new Set(afterDemotion.filter((s) => s.score.tier === "high" && !wasHigh.has(s)));
+  if (promoted.size > 0) demoteExplained(afterDemotion, inventory, legacyExact, promoted);
   for (const s of afterDemotion) {
     packages.push(s.score);
     scoreByOwner.set(`${s.entry.file.package}@${s.entry.file.version}`, s.score);
@@ -920,7 +1162,7 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
     if (score === undefined || score.isBaseline || (score.tier !== "high" && score.tier !== "medium")) continue;
     const fnByIndex = fnByIndexByEntry.get(entry)!;
     for (const m of entry.file.modules) {
-      if (m.factoryIsBaseline || m.factoryIsDependency === true || m.factoryFuzzyHash === null || foreignSets(entry.file).factories.has(m.factoryFunctionIndex)) continue;
+      if (m.factoryIsBaseline || m.factoryIsDependency === true || m.factoryFuzzyHash === null || foreignSets(entry.file).factories.has(m.factoryFunctionIndex) || viewOf(entry.file).copies.factories.has(m.factoryFunctionIndex)) continue;
       const factory = fnByIndex.get(m.factoryFunctionIndex);
       if (factory === undefined || factory.instrCount < MIN_FUZZY_ONLY_FACTORY_INSTR) continue;
       const fuzzyKey = schemeKey(entry.file, m.factoryFuzzyHash);
