@@ -805,6 +805,31 @@ locally instead, scoped to `tools/pkgsig/bulk/**`.
 
 Note (2026-11-09): `stringSetHash` covers `LoadConstString` operands only; object/array literal-buffer strings feed module string evidence but are not hashed (docs/DEPS.md "Literal-buffer strings are evidence, not hash input"), so scheme-2 DB files remain valid.
 
+## 6.7 Builder failure classes (BUILDFAIL1)
+
+Both builders (`tools/pkgsig/bulk/build-one.mjs`, `src/deps/confirm.ts`) share
+`src/deps/builder-support.ts`. Measured failures (population build, 265 of 992):
+about 190 `Unable to resolve module <Node built-in>` (`util`, `os`, `fs`, `path`,
+`stream`, `events`, `crypto`, ...) plus about 44 whose Metro error also names a
+built-in deep in the log (`metro-source-map`: `path`, `simple-plist`: `fs`), 32
+unresolved peers or deep imports (`react-dom`, `@firebase/app`, `expo-constants`),
+6 `npx` timeouts, 2 hermesc rejects (`@babel/runtime`); `--confirm` adds 150
+Metro `ENOSPC` inotify errors under load and 8 `maxBuffer` overflows. Fixes:
+(1) a per-job Metro config (`metro.hbc2js-builder.config.js`, passed with
+`--config`, wrapping the project's own config) whose `resolveRequest` falls back to
+an empty module for a built-in (with or without `node:`) only when normal
+resolution fails, so an npm package named `events` still wins; the shim is a
+trivial `module.exports = {}` factory below the fingerprint size floor, so it
+never becomes evidence. (2) After install, non-optional `peerDependencies`
+(`peerDependenciesMeta.optional` respected; `react`/`react-native` skipped) that
+are still absent are installed with `--legacy-peer-deps` at their declared range;
+`build-one` uninstalls them again with the package. (3) The bundle child runs with
+`CI=true`: Metro's file map only watches when `!ci-info.isCI`, so no inotify
+watches are created (no sysctl change). (4) `confirm.ts` child processes get a
+1 GiB `maxBuffer` (`build-one` already had it). Rejected: rewriting package code
+to drop the `require`; Metro `resolver.extraNodeModules` (cannot express the
+`node:` prefix or the "only on failure" rule).
+
 ## 7. Module paths v1 (embedded copies)
 
 **Problem.** A signature is built by bundling `require(<pkg>)`, so it holds
