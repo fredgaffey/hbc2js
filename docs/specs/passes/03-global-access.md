@@ -185,6 +185,19 @@ conditions, all required:
    Fixture `210-global-guard-reused-register` (`pick`, a loop, `def`, an
    absent global, a shadowing local `Math`) is T2 PASS at 84/94/96/98/99;
    tests in `tests/gate/passes/global-access-local-store.test.ts`.
+   *Measured* (react-navigation-example-0.85.3, v98, passes-on, against
+   `integrate-1109n`): IDENTICAL 7382 -> 7489 of 14437; `diff:JmpTrue(label)`
+   308 -> 62, and the other label buckets fall too (`JmpFalse` 106 -> 59,
+   `JStrictEqual` 96 -> 57, `JEqual` 60 -> 26, `JmpTypeOfIs` 57 -> 34,
+   `GetGlobalObject(reg)` 75 -> 19). Growers are next differences in the
+   functions that moved: `diff:GetGlobalObject/CreateClosure` 18 -> 214 (the
+   source `Object.defineProperty(o, k, {get: g})` evaluates `Object` before
+   it creates the getter closure, while the decompiled text creates the
+   closure into a variable first), `TryGetById(reg)` 109 -> 160 and
+   `GetById(reg)` 212 -> 248. Six IDENTICAL functions went DIFFERENT
+   (modules 129, 251, 704). The decompiled text of all six is unchanged. The
+   recompiled module has one function fewer, so the harness pairs them with
+   their neighbours: a pairing artefact, not a decompile change.
 
 Match data: `{ guardIndex: i, useIndex: j, name: p, global: G }`.
 
