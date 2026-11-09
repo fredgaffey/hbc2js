@@ -5,5 +5,6 @@ export interface PathDbReport {
   filesLowCoverage: string[]; duplicates: string[]; missingFromOut: string[]; extraInOut: string[];
   srcFiles: number | null; modulePathCoveragePct: number | null; functionModuleIdCoveragePct: number | null;
   filesWithPathsPct: number | null; ok: boolean;
+  hashIndex: { files: string[]; warnings: string[] };
 }
 export function validateDb(dir: string, opts?: { src?: string }): PathDbReport;

@@ -28,7 +28,7 @@
 // `{hbcVersion, minInstr, maxOwners, packages: string[]}`; every following
 // line is `<exactHash>\t<packageId>[,<packageId>]`, sorted by hash.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { DbLayer } from "./db.ts";
 import type { ModuleInventory } from "./inventory.ts";
 import type { SigDbFile } from "./sigdb-types.ts";
@@ -176,7 +176,7 @@ export function packagesWithOwnStringSets(layers: readonly DbLayer[], inventory:
   const target = new Set<string>();
   for (const fn of inventory.functions) target.add(fn.stringSetHash);
   for (const layer of layers) {
-    const path = join(layer.dir, stringSetIndexFileName(inventory.hbcVersion));
+    const path = join(hashIndexDir(layer), stringSetIndexFileName(inventory.hbcVersion));
     if (!existsSync(path)) continue;
     const text = readFileSync(path, "utf8");
     const nl = text.indexOf("\n");
@@ -201,6 +201,27 @@ export function packagesWithOwnStringSets(layers: readonly DbLayer[], inventory:
   return out;
 }
 
+/** Directory that holds a layer's index files. A sqlite DB keeps the index as a
+ *  sidecar beside the `.sqlite` file (never inside it), so a layer whose `dir`
+ *  names a `.sqlite` file looks in that file's directory. */
+export function hashIndexDir(layer: DbLayer): string {
+  return layer.dir.endsWith(".sqlite") ? dirname(layer.dir) : layer.dir;
+}
+
+/** One-line hint when NO layer has an index for `hbcVersion` but some layer
+ *  has signatures; null when an index exists (or there is no DB at all).
+ *  Informational only: shown in verbose output, never an error. */
+export function hashIndexHint(layers: readonly DbLayer[], hbcVersion: number): string | null {
+  let anyDb = false;
+  for (const layer of layers) {
+    const dir = hashIndexDir(layer);
+    if (existsSync(join(dir, hashIndexFileName(hbcVersion)))) return null;
+    if (layer.dir.endsWith(".sqlite") ? existsSync(layer.dir) : existsSync(dir) && (existsSync(join(dir, "sigdb.sqlite")) || readdirSync(dir).some((n) => n.endsWith(".json")))) anyDb = true;
+  }
+  if (!anyDb) return null;
+  return `no candidate hash index for hbc${hbcVersion} beside the signature DB; build one for better recall: node --experimental-strip-types tools/deps/build-candidate-hash-index.mjs <sigdir>`;
+}
+
 export interface ProposeOptions {
   readonly minHits?: number;
   readonly minCoverage?: number;
@@ -216,7 +237,7 @@ export function proposeFromHashIndex(layers: readonly DbLayer[], inventory: Modu
   const minCoverage = opts.minCoverage ?? DEFAULT_MIN_COVERAGE;
   const out = new Set<string>();
   for (const layer of layers) {
-    const path = join(layer.dir, hashIndexFileName(inventory.hbcVersion));
+    const path = join(hashIndexDir(layer), hashIndexFileName(inventory.hbcVersion));
     if (!existsSync(path)) continue;
     const buf = readFileSync(path);
     const nl = buf.indexOf(10);

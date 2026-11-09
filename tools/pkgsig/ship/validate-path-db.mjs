@@ -10,7 +10,7 @@
 // Reports (not failures): module path coverage, function moduleId coverage,
 // hash-scheme and hbc-version distribution, pathless files (in src, absent
 // from out, or out files lacking modulePaths:1).
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,6 +18,34 @@ const NAME_RE = /^(.*)@([^@]+)__hbc(\d+)\.json$/;
 
 function listSigs(dir) {
   return readdirSync(dir).filter((n) => n.endsWith(".json") && n !== "index.json").sort();
+}
+
+const INDEX_RE = /^candidate-hash-index__hbc(\d+)\.tsv$/;
+const INDEX_MAGIC = "#hbc2js-candidate-hash-index 1 ";
+
+// Candidate hash-index files (src/deps/hash-index.ts): must parse, name only
+// packages present in the DB at that hbc version, and not predate the newest
+// signature file (stale = warning only).
+function checkHashIndexes(dir, files, seen, errors) {
+  const out = { files: [], warnings: [] };
+  const names = readdirSync(dir).filter((n) => INDEX_RE.test(n)).sort();
+  const newestSig = files.reduce((m, f) => Math.max(m, statSync(join(dir, f)).mtimeMs), 0);
+  for (const n of names) {
+    const hbc = INDEX_RE.exec(n)[1];
+    out.files.push(n);
+    let header;
+    try {
+      const text = readFileSync(join(dir, n), "utf8");
+      const first = text.slice(0, Math.max(text.indexOf("\n"), 0));
+      if (!first.startsWith(INDEX_MAGIC)) throw new Error("bad magic");
+      header = JSON.parse(first.slice(INDEX_MAGIC.length));
+      if (!Array.isArray(header.packages) || String(header.hbcVersion) !== hbc) throw new Error("bad header");
+    } catch (e) { errors.push(`${n}: unparseable (${e.message.slice(0, 60)})`); continue; }
+    const have = new Set([...seen.keys()].filter((k) => k.endsWith(`@${hbc}`)).map((k) => k.slice(0, k.indexOf("@", 1))));
+    for (const p of header.packages) if (!have.has(p)) errors.push(`${n}: names package ${p} not in the DB at hbc${hbc}`);
+    if (statSync(join(dir, n)).mtimeMs < newestSig) out.warnings.push(`${n}: stale (older than the newest signature file); rebuild it`);
+  }
+  return out;
 }
 
 export function validateDb(dir, opts = {}) {
@@ -75,6 +103,7 @@ export function validateDb(dir, opts = {}) {
     for (const f of src) if (!out.has(f)) r.missingFromOut.push(f);
     for (const f of out) if (!src.has(f)) { r.extraInOut.push(f); r.errors.push(`${f}: not in source DB`); }
   }
+  r.hashIndex = checkHashIndexes(dir, files, seen, r.errors);
   const pct = (a, b) => (b === 0 ? null : Math.round((1000 * a) / b) / 10);
   r.modulePathCoveragePct = pct(r.modulesWithPath, r.modules);
   r.functionModuleIdCoveragePct = pct(r.functionsWithModuleId, r.functions);
@@ -92,7 +121,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const full = a.includes("--list-pathless");
   const brief = { ...r, errors: r.errors.slice(0, 20), errorCount: r.errors.length,
     pathless: full ? r.pathless : r.pathless.length, missingFromOut: full ? r.missingFromOut : r.missingFromOut.length,
-    filesLowCoverage: r.filesLowCoverage.length, duplicates: r.duplicates.slice(0, 10), extraInOut: r.extraInOut.length };
+    filesLowCoverage: r.filesLowCoverage.length, duplicates: r.duplicates.slice(0, 10), extraInOut: r.extraInOut.length, hashIndexFiles: r.hashIndex.files.length, hashIndexWarnings: r.hashIndex.warnings };
   console.log(JSON.stringify(brief, null, 1));
   process.exit(r.ok ? 0 : 1);
 }
