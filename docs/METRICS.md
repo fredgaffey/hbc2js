@@ -280,3 +280,25 @@ Wall: offline 11-86 s; confirm 279-1386 s (3 workers, loaded host).
 - The one false positive: `semver-truncate@3.0.0`, a 1-module package with 26
   eligible functions, exact 69%, 0 of 1 modules exactly matched, no string
   corroboration (rainbow, v4-paths, tier high).
+
+## Supplement overlay (sigdb-supplement, 2026-11-10, offline, truth-chosen overlay — not an honest recall figure)
+
+525 path-bearing signature files for 46 packages chosen from react-navigation's
+missed truth (docs/PACKAGE-SIGNATURES.md section 9) layered over the v4 farm;
+confirmed / TP / FP, recall; code = deps-rnav-recall.
+
+| app | v4 farm | + supplement |
+|---|---|---|
+| react-navigation (the app the list came from: inflated) | 22 / 22 / 0, 28.9% | 31 / 31 / 0, 40.8% |
+| Expensify J3 | 107 / 100 / 7, 34.7% | 120 / 111 / 9, 38.5% |
+| bluesky | 47 / 46 / 1, 23.2% | 56 / 55 / 1, 27.8% |
+| rainbow | 116 / 109 / 7, 21.0% | 121 / 114 / 7, 22.0% |
+| MetaMask | 179 / 159 / 20, 21.2% | 185 / 166 / 19, 22.2% |
+
+New FPs: Expensify `jose` and `meros`. FP removed: MetaMask `p-map`. Every
+other FP set is unchanged. With deps-transitive-subtract's code and
+`dependency-closure.json` sidecar over the supplement, MetaMask is
+177 / 168 / 9 (precision 94.9%, recall 22.4%); `fast-json-patch`, `is-regex`,
+`jszip`, `mammoth`, `wagmi` stay FPs (also `typeorm`, `resq`,
+`react-reconciler`, `@shopify/react-native-skia`). Those seven dependency
+packages were chosen from the MetaMask FP list: also truth-chosen.
