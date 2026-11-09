@@ -12,3 +12,5 @@ v98: OK - static_h lineage hermesc lowers computed method/accessor names, but
 v99: OK - and this is the build the fixture exists for: every computed member
      here compiles to `CallBuiltin HermesBuiltin.setFunctionName` (builtin 55)
      immediately before its `DefineOwnByVal`.
+     Run check: the v99 VM is pinned to 93d758c8a (build-hermes-vm.sh), which has
+     the builtin; the older 913d31acd10a pin could not execute this v99.hbc.
