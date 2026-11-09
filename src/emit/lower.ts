@@ -555,8 +555,12 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
       // "Arg1 = Arg2[Arg4]" (Arg3 is a cache index).
       return set(V(insn, 0), member(RG(insn, 1), RG(insn, 3), true));
     case "PrivateIsIn":
-      // Own-property check only: no prototype chain, no proxy traps.
-      return set(V(insn, 0), hasOwn(RG(insn, 2), RG(insn, 1)));
+      // Own-property check only: no prototype chain. A non-object right
+      // operand throws a TypeError ("right operand of 'in' is not an object",
+      // Hermes `Interpreter::casePrivateIsIn`), so the lowering must not box
+      // it: `Reflect.getOwnPropertyDescriptor` throws on a primitive where
+      // `hasOwnProperty.call` would answer false (review-1109-2, fixture 201).
+      return set(V(insn, 0), privateIsIn(RG(insn, 2), RG(insn, 1)));
   }
 
   // --- objects and arrays ---------------------------------------------------
@@ -1012,6 +1016,12 @@ function isLiteralUndefinedReg(f: FunctionEmitter, plan: BlockPlan, index: numbe
 
 function hasOwn(obj: Expr, key: Expr): Expr {
   return call(member(prop(prop(id("Object"), "prototype"), "hasOwnProperty"), lit("call"), false), [obj, key]);
+}
+
+/** `Reflect.getOwnPropertyDescriptor(o, sym) !== undefined` -- `PrivateIsIn`:
+ *  own-only like `hasOwn`, but a primitive `o` throws a TypeError as in the VM. */
+function privateIsIn(obj: Expr, key: Expr): Expr {
+  return bin("!==", call(prop(id("Reflect"), "getOwnPropertyDescriptor"), [obj, key]), UNDEF);
 }
 
 function coerceThis(v: Expr): Expr {

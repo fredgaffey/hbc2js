@@ -34,6 +34,8 @@ Test file: `tests/gate/emit/review-1109.test.ts`.
   sym)` boxes the primitive and returns false. v98/v99, both modes. When the
   private-methods fold fires it emits a native `#m in x` and is correct; the bug
   is in the unfolded (refused) lowering.
+  **Fixed**: `PrivateIsIn` now lowers to `Reflect.getOwnPropertyDescriptor(v, sym)
+  !== undefined`, which throws on a primitive as the VM does.
 
 ## Unconfirmed concerns
 
