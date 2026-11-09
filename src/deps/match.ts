@@ -911,8 +911,6 @@ export interface MatchOptions {
  *  remain: candidates loaded with no evidence of their own in the target
  *  are not competing owners, so loading more of them changes nothing. */
 function independentOwnerRule(dbs: readonly LoadedSig[], hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetExact: ReadonlySet<string>, minInstr: number, targetCopies: ReadonlyMap<string, number>): (hash: string, pkg: string) => boolean {
-  const variant = process.env.HBC2JS_AMBIG_VARIANT ?? "v2";
-  if (variant === "off") return (hash) => (hashOwnerNames.get(hash)?.size ?? 1) < AMBIGUOUS_OWNER_THRESHOLD;
   const direct = new Map<string, Set<string>>();
   const evidenced = new Set<string>();
   for (const { file } of dbs) {
@@ -958,11 +956,11 @@ function independentOwnerRule(dbs: readonly LoadedSig[], hashOwnerNames: Readonl
     let r = memo.get(hash);
     if (r === undefined) {
       const owners = new Set([...names].filter((c) => ![...closureOf(c)].some((d) => d !== c && names.has(d))));
-      const supported = variant === "v1" ? owners.size : [...owners].filter((c) => evidenced.has(c)).length;
+      const supported = [...owners].filter((c) => evidenced.has(c)).length;
       memo.set(hash, (r = { owners, supported }));
     }
     if (!r.owners.has(pkg)) return false;
-    return r.owners.size < AMBIGUOUS_OWNER_THRESHOLD || (variant !== "v1" && evidenced.has(pkg) && r.supported < AMBIGUOUS_OWNER_THRESHOLD);
+    return r.owners.size < AMBIGUOUS_OWNER_THRESHOLD || (evidenced.has(pkg) && r.supported < AMBIGUOUS_OWNER_THRESHOLD);
   };
 }
 
