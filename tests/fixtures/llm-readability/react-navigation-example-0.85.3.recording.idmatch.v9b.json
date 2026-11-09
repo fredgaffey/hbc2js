@@ -1126,5 +1126,317 @@
       "fn": 12940,
       "requested": 16
     }
+  },
+  "15154a293d30865113f73c9011e09d6a3fc79393906b959e8e8aa01238cd41af": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12945,\"reg\":0,\"web\":1},\"name\":\"two\",\"confidence\":\"low\",\"evidence\":\"r0 = 2 multiplies dy in the abs(2*dy) comparison\"},{\"bindingId\":{\"fn\":12945,\"reg\":0,\"web\":4},\"name\":\"one\",\"confidence\":\"low\",\"evidence\":\"r0_4 = 1 is subtracted from arr.length\"},{\"bindingId\":{\"fn\":12945,\"reg\":0,\"web\":5},\"name\":\"lastIndex\",\"confidence\":\"med\",\"evidence\":\"length - 1 compared against current index\"},{\"bindingId\":{\"fn\":12945,\"reg\":2},\"name\":\"canSwipeForward\",\"confidence\":\"low\",\"evidence\":\"r7 >= threshold and current > 0 test, then OR'd with the reverse-direction test\"},{\"bindingId\":{\"fn\":12945,\"reg\":3},\"name\":\"isHorizontalSwipe\",\"confidence\":\"med\",\"evidence\":\"abs(dx) > abs(2*dy) and abs(vx) > abs(2*vy); later gates the result\"},{\"bindingId\":{\"fn\":12945,\"reg\":4},\"name\":\"canSwipeBackward\",\"confidence\":\"low\",\"evidence\":\"r7 <= -12 and current < arr.length - 1\"},{\"bindingId\":{\"fn\":12945,\"reg\":5},\"name\":\"falseValue\",\"confidence\":\"low\",\"evidence\":\"constant false compared to _e3119_1 and returned if equal\"},{\"bindingId\":{\"fn\":12945,\"reg\":7,\"web\":1},\"name\":\"directionalDx\",\"confidence\":\"med\",\"evidence\":\"dx, negated when direction is \\\"rtl\\\"\"},{\"bindingId\":{\"fn\":12945,\"reg\":7,\"web\":2},\"name\":\"indexRef\",\"confidence\":\"low\",\"evidence\":\"object whose .current is read as the current index\"},{\"bindingId\":{\"fn\":12945,\"reg\":8,\"web\":1},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"initialised to undefined and never used meaningfully\"},{\"bindingId\":{\"fn\":12945,\"reg\":9,\"web\":1},\"name\":\"direction\",\"confidence\":\"med\",\"evidence\":\"compared with the literal \\\"rtl\\\"\"},{\"bindingId\":{\"fn\":12945,\"reg\":9,\"web\":3},\"name\":\"maybeCallback\",\"confidence\":\"low\",\"evidence\":\"typeof check for function, else throws \\\"Trying to call a non-function\\\"\"},{\"bindingId\":{\"fn\":12945,\"reg\":9,\"web\":4},\"name\":\"throwResult\",\"confidence\":\"low\",\"evidence\":\"result of __hbc_b_throwTypeError call\"},{\"bindingId\":{\"fn\":12945,\"reg\":9,\"web\":6},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"r9_6 = undefined constant\"},{\"bindingId\":{\"fn\":12945,\"reg\":11,\"web\":2},\"name\":\"MathRef\",\"confidence\":\"low\",\"evidence\":\"holds Math, used for Math.abs\"},{\"bindingId\":{\"fn\":12945,\"reg\":12},\"name\":\"gestureState\",\"confidence\":\"med\",\"evidence\":\"copy of a2, reads dx, dy, vx, vy\"},{\"bindingId\":{\"fn\":12945,\"reg\":13,\"web\":1},\"name\":\"MathRef\",\"confidence\":\"low\",\"evidence\":\"holds Math, used for Math.abs\"},{\"bindingId\":{\"fn\":12945,\"reg\":13,\"web\":2},\"name\":\"MathRef\",\"confidence\":\"low\",\"evidence\":\"holds Math, used for Math.abs\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 10726,
+      "tokensOut": 1842,
+      "usd": 0.06132
+    },
+    "meta": {
+      "fn": 12945,
+      "requested": 18
+    }
+  },
+  "9889ef5a46c9595505e326a26ce369f01b84e11c87b45ec196ce5bd728fefd33": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 1}, \"name\": \"event\", \"confidence\": \"low\", \"evidence\": \"first parameter of a pan-gesture release handler; never read, so only the idiomatic name fits\"},\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 2}, \"name\": \"gestureState\", \"confidence\": \"med\", \"evidence\": \"a2 is read for dx, dy, vx and vy, which is the PanResponder gestureState shape\"},\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 15}, \"name\": \"gestureState\", \"confidence\": \"med\", \"evidence\": \"r15 = a2, then r15.dx, r15.dy, r15.vx and r15.vy are read\"},\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 0}, \"name\": \"velocityThreshold\", \"confidence\": \"low\", \"evidence\": \"holds the literal 0.15 and is compared with abs(vx); the register is later reused for a max-index value\"},\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 2, \"web\": 2}, \"name\": \"exceedsThreshold\", \"confidence\": \"low\", \"evidence\": \"result of abs(dx) > distance threshold, or abs(vx) > 0.15\"},\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 1, \"web\": 2}, \"name\": \"isHorizontalSwipe\", \"confidence\": \"low\", \"evidence\": \"abs(dx) > abs(dy) && abs(vx) > abs(vy), then merged with the threshold check\"},\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 4}, \"name\": \"snapResult\", \"confidence\": \"low\", \"evidence\": \"holds undefined first, then the result of Reflect.apply on a captured callback with (index, true)\"},\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 5}, \"name\": \"targetIndex\", \"confidence\": \"med\", \"evidence\": \"starts as currentIndex, may be replaced by the rounded and clamped new index, checked with isFinite, then passed to the callback\"},\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 6}, \"name\": \"currentIndex\", \"confidence\": \"med\", \"evidence\": \"read from a ref's .current if numeric, else from another ref's .current; the swipe offset is added to or subtracted from it\"},\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 7}, \"name\": \"globalScope\", \"confidence\": \"low\", \"evidence\": \"r7 = globalThis, later reused for isFinite\"},\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 8}, \"name\": \"nextIndex\", \"confidence\": \"low\", \"evidence\": \"holds the unclamped index (current ± dx/abs(dx)) and then the rounded value stored to .current\"},\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 9}, \"name\": \"mathRound\", \"confidence\": \"low\", \"evidence\": \"r9 = Math.round, applied through Reflect.apply; elsewhere the register holds Math for abs\"},\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 10}, \"name\": \"mathObj\", \"confidence\": \"med\", \"evidence\": \"r10 = Math, used for Math.abs and as the this value for Math.round\"},\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 13}, \"name\": \"mathMax\", \"confidence\": \"med\", \"evidence\": \"r13 = r14.max, called through Reflect.apply(r13, r14, [0, x]); later reused for a length\"},\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 14}, \"name\": \"mathObj\", \"confidence\": \"med\", \"evidence\": \"r14 = Math, then r14.max\"},\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 16}, \"name\": \"dx\", \"confidence\": \"low\", \"evidence\": \"holds r15.dx as the numerator of the sign computation dx / abs(dx); also briefly holds a captured value\"},\n    {\"bindingId\": {\"fn\": 12946, \"reg\": 18}, \"name\": \"mathObj\", \"confidence\": \"med\", \"evidence\": \"r18 = Math, used for Math.abs\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10852,
+      "tokensOut": 1964,
+      "usd": 0.047081300000000006
+    },
+    "meta": {
+      "fn": 12946,
+      "requested": 15
+    }
+  },
+  "5b057314457945ca7ac8b61c8bca1f4efdab260b919ca84ffc53f8df80d36883": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12947,\"reg\":3},\"name\":\"listener\",\"confidence\":\"med\",\"evidence\":\"a1 is added to a set (_e3119_16.add) and removed by the returned closure via delete — the subscribe/unsubscribe idiom\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9691,
+      "tokensOut": 103,
+      "usd": 0.023827300000000003
+    },
+    "meta": {
+      "fn": 12947,
+      "requested": 1
+    }
+  },
+  "d526a226218d31343b76c1f8c8144a81d29d76c212684f85293e2edc17aef7a1": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12950,\"reg\":4},\"name\":\"deltaX\",\"confidence\":\"high\",\"evidence\":\"r4 = gestureState.dx, negated when direction is \\\"rtl\\\"; compared with 0 and added to the offset\"},{\"bindingId\":{\"fn\":12950,\"reg\":3},\"name\":\"gestureState\",\"confidence\":\"med\",\"evidence\":\"copy of a2, the second pan responder argument; .dx and later reused for _e3119_11/_e3119_13 temporaries\"},{\"bindingId\":{\"fn\":12950,\"reg\":2},\"name\":\"setValueResult\",\"confidence\":\"low\",\"evidence\":\"initialized undefined, finally assigned the result of offset.setValue(r4); never read\"},{\"bindingId\":{\"fn\":12950,\"reg\":0},\"name\":\"zero\",\"confidence\":\"low\",\"evidence\":\"set to 0 for the r4 > 0 / r4 < 0 comparisons, later reused as lastIndex (length - 1)\"},{\"bindingId\":{\"fn\":12950,\"reg\":5},\"name\":\"targetIndex\",\"confidence\":\"med\",\"evidence\":\"holds Math.ceil/Math.floor of r8 (the fractional page index); then compared to the current index r6 and stored in _e4260_0 as the entered index\"},{\"bindingId\":{\"fn\":12950,\"reg\":6},\"name\":\"currentIndex\",\"confidence\":\"med\",\"evidence\":\"r6 = _e3119_11, compared against r8 and against targetIndex r5 to decide whether to fire the 'enter' event\"},{\"bindingId\":{\"fn\":12950,\"reg\":8},\"name\":\"fractionalIndex\",\"confidence\":\"med\",\"evidence\":\"r8 = (offset + deltaX) / -width, then rounded with Math.ceil or Math.floor\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 10443,
+      "tokensOut": 603,
+      "usd": 0.031835300000000004
+    },
+    "meta": {
+      "fn": 12950,
+      "requested": 7
+    }
+  },
+  "13e03749aaac5245e01fbf6bfa4d612a8429ea9b8c7f533b5f38b71b89beba49": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\":{\"fn\":12953,\"reg\":0},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"`let r0 = undefined` is assigned once and never read\"},\n    {\"bindingId\":{\"fn\":12953,\"reg\":1},\"name\":\"containerProps\",\"confidence\":\"med\",\"evidence\":\"holds {ref, onLayout, style: container, children}, then is passed to jsx2(View, r1)\"},\n    {\"bindingId\":{\"fn\":12953,\"reg\":4},\"name\":\"animatedViewProps\",\"confidence\":\"low\",\"evidence\":\"the last value is {style, ...panHandlers, children}, passed as props to jsx(Animated.View, r4)\"},\n    {\"bindingId\":{\"fn\":12953,\"reg\":5},\"name\":\"AnimatedView\",\"confidence\":\"med\",\"evidence\":\"reassigned to Animated.View and passed as the component to jsx\"},\n    {\"bindingId\":{\"fn\":12953,\"reg\":6},\"name\":\"jsx\",\"confidence\":\"med\",\"evidence\":\"holds _e1900_5.jsx and is called as r6(r5, r4)\"},\n    {\"bindingId\":{\"fn\":12953,\"reg\":7},\"name\":\"childElements\",\"confidence\":\"low\",\"evidence\":\"holds the result of children.map(_fn14736), assigned to r4.children\"},\n    {\"bindingId\":{\"fn\":12953,\"reg\":8},\"name\":\"styleList\",\"confidence\":\"med\",\"evidence\":\"`new Array(3)` filled with the sheet style, the width/transform style and _e3119_7, then used as style\"},\n    {\"bindingId\":{\"fn\":12953,\"reg\":9},\"name\":\"children\",\"confidence\":\"low\",\"evidence\":\"copies a1, which is then mapped with _fn14736 into child elements\"},\n    {\"bindingId\":{\"fn\":12953,\"reg\":10},\"name\":\"trackStyle\",\"confidence\":\"low\",\"evidence\":\"null or {width: routes.length * layout.width, transform: [{translateX}]}, stored as styleList[1]\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 11350,
+      "tokensOut": 1222,
+      "usd": 0.041653300000000004
+    },
+    "meta": {
+      "fn": 12953,
+      "requested": 9
+    }
+  },
+  "707c03666ed4d58c8ef35a8396dabc1a1d665c449eddfd923b1323f70abd4f91": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12962,\"reg\":1,\"web\":1},\"name\":\"isReversed\",\"confidence\":\"low\",\"evidence\":\"loaded from captured _e3122_15 and tested to choose between the reversed-index branch (length - 1 - index) and the fallback call\"},{\"bindingId\":{\"fn\":12962,\"reg\":1,\"web\":2},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"assigned undefined on the fallback path and never read\"},{\"bindingId\":{\"fn\":12962,\"reg\":2},\"name\":\"result\",\"confidence\":\"med\",\"evidence\":\"holds the value returned by the function, set from either (length - 1 - index) * step or the fallback call _e3122_20(index, step)\"},{\"bindingId\":{\"fn\":12962,\"reg\":3},\"name\":\"step\",\"confidence\":\"low\",\"evidence\":\"copy of a2, which multiplies the reversed index and is passed as the second argument to the fallback call; the exact unit is unclear\"},{\"bindingId\":{\"fn\":12962,\"reg\":4},\"name\":\"index\",\"confidence\":\"med\",\"evidence\":\"copy of a1, subtracted from (length - 1) in the reversed branch and passed first to the fallback call, so it is a position in a list\"},{\"bindingId\":{\"fn\":12962,\"reg\":5,\"web\":1},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"assigned undefined at function entry and never used afterwards\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9787,
+      "tokensOut": 701,
+      "usd": 0.0301913
+    },
+    "meta": {
+      "fn": 12962,
+      "requested": 6
+    }
+  },
+  "c1f2aabc2193362279db2cb82925ff48beb977cca8c104397378bf75b4e531e3": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12963,\"reg\":9},\"name\":\"rawIndex\",\"confidence\":\"med\",\"evidence\":\"r9 = a1 / a2, a quotient that is then clamped with Math.min and Math.max into a range bounded by the list length\"},{\"bindingId\":{\"fn\":12963,\"reg\":5},\"name\":\"items\",\"confidence\":\"med\",\"evidence\":\"loaded from the captured _e3122_14 and read only through .length, which sets the upper bound of the clamp\"},{\"bindingId\":{\"fn\":12963,\"reg\":1},\"name\":\"lastIndex\",\"confidence\":\"med\",\"evidence\":\"r1 = length - 1 and is passed to Math.min as the upper bound; the register is later reused for the 0 lower bound\"},{\"bindingId\":{\"fn\":12963,\"reg\":7},\"name\":\"MathObj\",\"confidence\":\"high\",\"evidence\":\"r7 = Math, and r7.max is called on it\"},{\"bindingId\":{\"fn\":12963,\"reg\":4},\"name\":\"clampedIndex\",\"confidence\":\"med\",\"evidence\":\"holds Math.max(0, Math.min(lastIndex, rawIndex)); it begins as a captured function reference that is checked but never called\"},{\"bindingId\":{\"fn\":12963,\"reg\":3},\"name\":\"resultIndex\",\"confidence\":\"med\",\"evidence\":\"returned value; it is the clamped index, or (length - 1) - clampedIndex when the captured flag _e3122_15 is truthy\"},{\"bindingId\":{\"fn\":12963,\"reg\":0},\"name\":\"one\",\"confidence\":\"low\",\"evidence\":\"r0 = 1 is used in length - 1; the register is later reused for length - 1 in the reversed branch\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9993,
+      "tokensOut": 845,
+      "usd": 0.0324553
+    },
+    "meta": {
+      "fn": 12963,
+      "requested": 7
+    }
+  },
+  "3c48f62ff4f3b3b750f6d819aa52325c3b6e5009c7640e913006c8bdcabbf465": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\": {\"fn\": 12968, \"reg\": 0, \"web\": 1}, \"name\": \"nullValue\", \"confidence\": \"low\", \"evidence\": \"r0 = null, only compared against current in the `current == r0` guard\"},\n    {\"bindingId\": {\"fn\": 12968, \"reg\": 0, \"web\": 2}, \"name\": \"undefinedValue\", \"confidence\": \"low\", \"evidence\": \"r0_2 = undefined, never read afterwards\"},\n    {\"bindingId\": {\"fn\": 12968, \"reg\": 0, \"web\": 3}, \"name\": \"undefinedResult\", \"confidence\": \"low\", \"evidence\": \"r0_3 = undefined, used only as the return value\"},\n    {\"bindingId\": {\"fn\": 12968, \"reg\": 1, \"web\": 1}, \"name\": \"scrollRef\", \"confidence\": \"med\", \"evidence\": \"its .current is null-checked and then .scrollTo(obj) is called on it, the usual ref-to-scrollable pattern\"},\n    {\"bindingId\": {\"fn\": 12968, \"reg\": 4, \"web\": 1}, \"name\": \"undefinedValue\", \"confidence\": \"low\", \"evidence\": \"r4 = undefined at function entry, never used\"},\n    {\"bindingId\": {\"fn\": 12968, \"reg\": 4, \"web\": 2}, \"name\": \"animated\", \"confidence\": \"med\", \"evidence\": \"stored into obj.animated for the scrollTo options\"},\n    {\"bindingId\": {\"fn\": 12968, \"reg\": 5, \"web\": 2}, \"name\": \"offsetX\", \"confidence\": \"med\", \"evidence\": \"result of r6(index, width), assigned to obj.x for scrollTo\"},\n    {\"bindingId\": {\"fn\": 12968, \"reg\": 6}, \"name\": \"getOffsetX\", \"confidence\": \"low\", \"evidence\": \"captured callee called with (a1, width), and its result becomes the scroll x\"},\n    {\"bindingId\": {\"fn\": 12968, \"reg\": 7}, \"name\": \"index\", \"confidence\": \"low\", \"evidence\": \"copy of a1, passed with the width to the offset function; the exact meaning is a guess\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9946,
+      "tokensOut": 1147,
+      "usd": 0.0352873
+    },
+    "meta": {
+      "fn": 12968,
+      "requested": 9
+    }
+  },
+  "3b1f1a47c366242a810b83632ceddeae8f0979916dd5963f28ef5979c772b6ee": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12972,\"reg\":3},\"name\":\"listener\",\"confidence\":\"med\",\"evidence\":\"a1 is added to a shared set via .add and removed by the returned closure via .delete (subscribe idiom)\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9691,
+      "tokensOut": 92,
+      "usd": 0.0237173
+    },
+    "meta": {
+      "fn": 12972,
+      "requested": 1
+    }
+  },
+  "b2a1a30e9deacbcbc1712e53f97bdb1b911ea71365328b8e48830c13feffc88d": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12975,\"reg\":2},\"name\":\"undefinedResult\",\"confidence\":\"low\",\"evidence\":\"set to undefined and returned unchanged at the end; function returns nothing\"},{\"bindingId\":{\"fn\":12975,\"reg\":4,\"web\":1},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"assigned undefined and never read\"},{\"bindingId\":{\"fn\":12975,\"reg\":4,\"web\":3},\"name\":\"onPageChangeResult\",\"confidence\":\"low\",\"evidence\":\"result of calling the optional callback r5_4 with {index}; never used\"},{\"bindingId\":{\"fn\":12975,\"reg\":5,\"web\":2},\"name\":\"lastReportedIndex\",\"confidence\":\"low\",\"evidence\":\"captured value compared with the computed index r6_2 to decide whether to call the setter\"},{\"bindingId\":{\"fn\":12975,\"reg\":5,\"web\":3},\"name\":\"setIndexResult\",\"confidence\":\"low\",\"evidence\":\"result of _e3122_2(r6_2), called when the index differs; unused\"},{\"bindingId\":{\"fn\":12975,\"reg\":5,\"web\":4},\"name\":\"onIndexChange\",\"confidence\":\"med\",\"evidence\":\"captured callback null-checked then called with {index: r6_2}\"},{\"bindingId\":{\"fn\":12975,\"reg\":6,\"web\":1},\"name\":\"computePageIndex\",\"confidence\":\"med\",\"evidence\":\"captured function called with (x, width) of scroll offset and layout, returning a page index checked for integer-ness\"},{\"bindingId\":{\"fn\":12975,\"reg\":6,\"web\":2},\"name\":\"pageIndex\",\"confidence\":\"med\",\"evidence\":\"result of computePageIndex(x, width); tested with % 1, stored to a ref's current, passed as {index}\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9999,
+      "tokensOut": 608,
+      "usd": 0.030109300000000002
+    },
+    "meta": {
+      "fn": 12975,
+      "requested": 8
+    }
+  },
+  "ddd236e9472914db9742c994f63ce68b63d76d074eb801823756dcaa3c1a5d80": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12976,\"reg\":0},\"name\":\"scrollEventThrottle\",\"confidence\":\"low\",\"evidence\":\"r0 = 1 assigned to r5.scrollEventThrottle; later reused as 100 for percent width calc\"},{\"bindingId\":{\"fn\":12976,\"reg\":1},\"name\":\"booleanFlag\",\"confidence\":\"low\",\"evidence\":\"holds true then false assigned to horizontal/pagingEnabled and scrollToOverflowEnabled/scrollsToTop flags; also undefined temp\"},{\"bindingId\":{\"fn\":12976,\"reg\":2},\"name\":\"containerProps\",\"confidence\":\"high\",\"evidence\":\"object {ref, onLayout, style: container, children} later passed to jsx2(View, r2) and its children set to the scroll view\"},{\"bindingId\":{\"fn\":12976,\"reg\":5},\"name\":\"scrollViewProps\",\"confidence\":\"high\",\"evidence\":\"object built with copyDataProperties then horizontal, pagingEnabled, onScroll etc., passed to jsx3(Animated.ScrollView, r5)\"},{\"bindingId\":{\"fn\":12976,\"reg\":6},\"name\":\"jsxRuntime\",\"confidence\":\"low\",\"evidence\":\"holds _e1906_4 (jsx runtime module, .jsx read from it), later reused for Animated.ScrollView component\"},{\"bindingId\":{\"fn\":12976,\"reg\":8},\"name\":\"visibleChildren\",\"confidence\":\"med\",\"evidence\":\"result of r10.filter(_fn14748) where the predicate is null !== x, assigned to scrollViewProps.children\"},{\"bindingId\":{\"fn\":12976,\"reg\":9},\"name\":\"styles\",\"confidence\":\"med\",\"evidence\":\"holds _e1906_6, read for .container and .scroll style entries\"},{\"bindingId\":{\"fn\":12976,\"reg\":10},\"name\":\"keyboardDismissMode\",\"confidence\":\"med\",\"evidence\":\"assigned 'on-drag' or the external value and stored in r5.keyboardDismissMode; later reused for scrollEnabled and the routes array\"},{\"bindingId\":{\"fn\":12976,\"reg\":11},\"name\":\"keyboardDismissModeProp\",\"confidence\":\"low\",\"evidence\":\"holds _e3122_0 compared against 'auto' to choose keyboardDismissMode; later reused as temp\"},{\"bindingId\":{\"fn\":12976,\"reg\":12},\"name\":\"contentWidth\",\"confidence\":\"med\",\"evidence\":\"holds '100%' or computed percent string (100 * length + '%') stored as contentContainerStyle.width\"}]}",
+    "cost": {
+      "tokensIn": 12022,
+      "tokensOut": 871,
+      "usd": 0.0408313
+    },
+    "meta": {
+      "fn": 12976,
+      "requested": 10
+    }
+  },
+  "dac9d48f7aa479de84734f6b6116e71cacda8ef0eb6677477b2641fe2e267140": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12993,\"reg\":2},\"name\":\"nullValue\",\"confidence\":\"med\",\"evidence\":\"assigned null once and only used in `r2 == r4` / `r2 == r5` null checks\"},{\"bindingId\":{\"fn\":12993,\"reg\":4},\"name\":\"indicatorWidth\",\"confidence\":\"low\",\"evidence\":\"holds the numeric width or the percent-resolved width (`r5 * (r8/100)`) and is returned when non-null\"},{\"bindingId\":{\"fn\":12993,\"reg\":5},\"name\":\"containerWidth\",\"confidence\":\"low\",\"evidence\":\"reused register; its main role is a copy of a1, which is multiplied by a percentage, so a1 is the total width\"},{\"bindingId\":{\"fn\":12993,\"reg\":6},\"name\":\"minWidth\",\"confidence\":\"low\",\"evidence\":\"last holds `_e1908_2.PRIMARY_INDICATOR_MIN_WIDTH`, which is passed to Math.max\"},{\"bindingId\":{\"fn\":12993,\"reg\":7},\"name\":\"ErrorCtor\",\"confidence\":\"low\",\"evidence\":\"holds Error, which is constructed with `new r7(r12)` and thrown for a missing route\"},{\"bindingId\":{\"fn\":12993,\"reg\":8},\"name\":\"percentValue\",\"confidence\":\"low\",\"evidence\":\"holds parseFloat(r10) of the percent string, then divided by 100\"},{\"bindingId\":{\"fn\":12993,\"reg\":9},\"name\":\"routeIndex\",\"confidence\":\"low\",\"evidence\":\"copies a2, which indexes `_e3124_25[r9]` and appears in the \\\"Couldn't find a route at index\\\" message\"},{\"bindingId\":{\"fn\":12993,\"reg\":10},\"name\":\"styleWidth\",\"confidence\":\"low\",\"evidence\":\"initially `r5?.width`; it is tested for number or \\\"%\\\"-suffixed string, then reused for a stored width\"},{\"bindingId\":{\"fn\":12993,\"reg\":12},\"name\":\"errorMessage\",\"confidence\":\"med\",\"evidence\":\"holds the \\\"Trying to call a non-function\\\" string and the route-not-found template, both used as error messages\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 10801,
+      "tokensOut": 1400,
+      "usd": 0.041237300000000005
+    },
+    "meta": {
+      "fn": 12993,
+      "requested": 9
+    }
+  },
+  "822bdf6776d36f41996ea94b2f810a1dba85e7001b8ecea9691ffb6ca20052bc": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12994,\"reg\":6},\"name\":\"containerWidth\",\"confidence\":\"med\",\"evidence\":\"parameter a1; multiplied by percent/100 parsed from margin strings ending in '%', so it is the base width for percentage margins\"},{\"bindingId\":{\"fn\":12994,\"reg\":7},\"name\":\"style\",\"confidence\":\"med\",\"evidence\":\"assigned from free variable then read for marginHorizontal, margin, marginStart, marginEnd, marginLeft; later reused as the resolved left value\"},{\"bindingId\":{\"fn\":12994,\"reg\":4},\"name\":\"horizontalMargin\",\"confidence\":\"med\",\"evidence\":\"r7?.marginHorizontal, falling back to r7?.margin; used as the default for left and right margins via ?? r4\"},{\"bindingId\":{\"fn\":12994,\"reg\":2},\"name\":\"nullValue\",\"confidence\":\"low\",\"evidence\":\"constant null compared with != to implement nullish checks\"},{\"bindingId\":{\"fn\":12994,\"reg\":5},\"name\":\"resolveFn\",\"confidence\":\"low\",\"evidence\":\"holds free var _e1908_15, checked typeof 'function' and throws 'Trying to call a non-function' otherwise; later reused as temp for right value\"},{\"bindingId\":{\"fn\":12994,\"reg\":8},\"name\":\"direction\",\"confidence\":\"low\",\"evidence\":\"holds _e3124_13 compared with 'ltr' and 'rtl' to choose marginStart vs marginEnd; later reused as temp\"},{\"bindingId\":{\"fn\":12994,\"reg\":10},\"name\":\"leftMargin\",\"confidence\":\"med\",\"evidence\":\"marginStart (ltr) or marginEnd, falling back to marginLeft then horizontalMargin; later converted to a number for the left field\"},{\"bindingId\":{\"fn\":12994,\"reg\":9},\"name\":\"rightMargin\",\"confidence\":\"med\",\"evidence\":\"marginEnd (ltr) or marginStart (rtl), falling back to marginRight then horizontalMargin; becomes the right field\"},{\"bindingId\":{\"fn\":12994,\"reg\":11},\"name\":\"errorMessage\",\"confidence\":\"med\",\"evidence\":\"assigned the literal 'Trying to call a non-function' and passed to __hbc_b_throwTypeError\"},{\"bindingId\":{\"fn\":12994,\"reg\":0},\"name\":\"percentFraction\",\"confidence\":\"low\",\"evidence\":\"holds parsed percent value / 100, then multiplied by the container width\"}]}",
+    "cost": {
+      "tokensIn": 11162,
+      "tokensOut": 835,
+      "usd": 0.0370313
+    },
+    "meta": {
+      "fn": 12994,
+      "requested": 10
+    }
+  },
+  "cfff4be1e0b0212b49b5255f51f29db897f39e60a391f8b0fa78458172041860": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12995,\"reg\":7},\"name\":\"availableWidth\",\"confidence\":\"low\",\"evidence\":\"copy of a1; truthy-gated, then r7 - margin.left - margin.right clamped by Math.max(0, ...)\"},{\"bindingId\":{\"fn\":12995,\"reg\":6},\"name\":\"index\",\"confidence\":\"high\",\"evidence\":\"copy of a2; used as _e3124_40[r6] and in the error message \\\"Couldn't find an indicator margin at index ${r6}.\\\"\"},{\"bindingId\":{\"fn\":12995,\"reg\":2},\"name\":\"margin\",\"confidence\":\"med\",\"evidence\":\"loaded from _e3124_40[index], null-checked with error 'Couldn't find an indicator margin', then .left and .right read\"},{\"bindingId\":{\"fn\":12995,\"reg\":4},\"name\":\"MathObj\",\"confidence\":\"low\",\"evidence\":\"holds Math (or Error ctor earlier); Math.max called on it. Register is reused for Error in the throw branch\"},{\"bindingId\":{\"fn\":12995,\"reg\":5},\"name\":\"widthMinusLeft\",\"confidence\":\"low\",\"evidence\":\"r5 = r7 - r2.left, then subtracted by r2.right; earlier holds HermesInternal.concat in throw branch\"},{\"bindingId\":{\"fn\":12995,\"reg\":3},\"name\":\"globalScope\",\"confidence\":\"low\",\"evidence\":\"assigned globalThis in the success path; in the throw branch it holds \\\".\\\"\"},{\"bindingId\":{\"fn\":12995,\"reg\":0},\"name\":\"zero\",\"confidence\":\"low\",\"evidence\":\"constant 0 used as the Math.max lower bound and as the fallback return\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 10171,
+      "tokensOut": 576,
+      "usd": 0.0304773
+    },
+    "meta": {
+      "fn": 12995,
+      "requested": 7
+    }
+  },
+  "6b427626c3be98405a214b692b625f203ea803d480af48aa0449601498c7bc03": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\":{\"fn\":12996,\"reg\":0},\"name\":\"centerOffset\",\"confidence\":\"low\",\"evidence\":\"holds percent fraction, 0, or (containerWidth - indicatorWidth) / 2, then is added to the offset at the end\"},\n    {\"bindingId\":{\"fn\":12996,\"reg\":1},\"name\":\"zero\",\"confidence\":\"low\",\"evidence\":\"constant 0 used as slice start and reduce seed, later reused as the divisor 2\"},\n    {\"bindingId\":{\"fn\":12996,\"reg\":3},\"name\":\"nullValue\",\"confidence\":\"low\",\"evidence\":\"constant null, only used in loose `null == x` checks for missing margin/width\"},\n    {\"bindingId\":{\"fn\":12996,\"reg\":5},\"name\":\"indicatorMargin\",\"confidence\":\"low\",\"evidence\":\"the longest-lived value is _e3124_40[index], checked by the \\\"Couldn't find an indicator margin\\\" error and read with .left at the end; the register is reused earlier for other temporaries\"},\n    {\"bindingId\":{\"fn\":12996,\"reg\":6},\"name\":\"indicatorOffset\",\"confidence\":\"med\",\"evidence\":\"sum of the first `index` entries from slice/reduce plus _e3124_1 * index, then centerOffset and margin.left are added and the result returned\"},\n    {\"bindingId\":{\"fn\":12996,\"reg\":7},\"name\":\"indicatorWidth\",\"confidence\":\"low\",\"evidence\":\"_e3124_39[index] is checked by the \\\"Couldn't find an indicator width\\\" error and is subtracted from the container width for centering\"},\n    {\"bindingId\":{\"fn\":12996,\"reg\":8},\"name\":\"containerWidth\",\"confidence\":\"med\",\"evidence\":\"copies a1; used as the base for the percent width (r8 * pct) and in (r8 - width) / 2 centering\"},\n    {\"bindingId\":{\"fn\":12996,\"reg\":9},\"name\":\"index\",\"confidence\":\"med\",\"evidence\":\"copies a2; used in slice(0, index), the product with _e3124_1, and the lookups _e3124_40[index] and _e3124_39[index]\"},\n    {\"bindingId\":{\"fn\":12996,\"reg\":10},\"name\":\"resolvedStyleWidth\",\"confidence\":\"med\",\"evidence\":\"style.width as a number, or a percent string converted to a fraction of containerWidth, else undefined\"},\n    {\"bindingId\":{\"fn\":12996,\"reg\":11},\"name\":\"comparisonLiteral\",\"confidence\":\"low\",\"evidence\":\"starts undefined, then holds \\\"primary\\\" and \\\"auto\\\" for strict comparisons\"},\n    {\"bindingId\":{\"fn\":12996,\"reg\":12},\"name\":\"style\",\"confidence\":\"med\",\"evidence\":\"_e3124_37, read through optional chaining for .width, .margin and .marginHorizontal\"},\n    {\"bindingId\":{\"fn\":12996,\"reg\":13},\"name\":\"styleWidth\",\"confidence\":\"med\",\"evidence\":\"r12?.width, tested for typeof number, a string ending in \\\"%\\\", and parseFloat\"},\n    {\"bindingId\":{\"fn\":12996,\"reg\":15},\"name\":\"errorMessage\",\"confidence\":\"med\",\"evidence\":\"holds the \\\"Trying to call a non-function\\\" text and the template error messages passed to the throw/Error\"},\n    {\"bindingId\":{\"fn\":12996,\"reg\":16},\"name\":\"messageSuffix\",\"confidence\":\"low\",\"evidence\":\"copy of the \\\".\\\" literal, a trailing piece of the concat for the error text\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 11236,
+      "tokensOut": 1900,
+      "usd": 0.0479773
+    },
+    "meta": {
+      "fn": 12996,
+      "requested": 15
+    }
+  },
+  "7e0bb07106b75e8db0c24504941d0e85c7e460aebeffb86c8fccc2710708cb90": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 12998, \"reg\": 6 },\n      \"name\": \"index\",\n      \"confidence\": \"med\",\n      \"evidence\": \"copies a3, is compared with 0, and is stored as the `index` property of the object passed to the helper\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12998, \"reg\": 1 },\n      \"name\": \"hasPreviousTab\",\n      \"confidence\": \"low\",\n      \"evidence\": \"holds `index > 0`, which gates adding the gap term\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12998, \"reg\": 3 },\n      \"name\": \"baseOffset\",\n      \"confidence\": \"low\",\n      \"evidence\": \"starts as 0 or the gap, then is added to a1 and to the helper's result\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12998, \"reg\": 4 },\n      \"name\": \"computeTabOffset\",\n      \"confidence\": \"low\",\n      \"evidence\": \"closure _e1908_14 is called via Reflect.apply with a tab layout object (index, routes, tabWidths, ...) and its result is added to the offset\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12998, \"reg\": 5 },\n      \"name\": \"gap\",\n      \"confidence\": \"low\",\n      \"evidence\": \"holds undefined first, then _e3126_2, which is assigned to the `gap` property\"\n    },\n    {\n      \"bindingId\": { \"fn\": 12998, \"reg\": 2 },\n      \"name\": \"layoutParams\",\n      \"confidence\": \"low\",\n      \"evidence\": \"register is reused: it holds the gap with a ?? 0 default, then the params object built for the helper call, then the returned sum. The object is the main use\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10021,
+      "tokensOut": 1077,
+      "usd": 0.034887299999999996
+    },
+    "meta": {
+      "fn": 12998,
+      "requested": 6
+    }
+  },
+  "36f9e73f142e11dae4d300732545c2764384bcb827493c795310d3c55d955d78": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":12999,\"reg\":6},\"name\":\"index\",\"confidence\":\"med\",\"evidence\":\"copy of a3, passed as `index` in the object given to the helper and compared with `> 0` and against _e3125_0\"},{\"bindingId\":{\"fn\":12999,\"reg\":4},\"name\":\"tabWidth\",\"confidence\":\"low\",\"evidence\":\"result of Reflect.apply on a helper taking layout/tabWidths/gap fields; later used as a width that is halved or kept whole\"},{\"bindingId\":{\"fn\":12999,\"reg\":3},\"name\":\"gap\",\"confidence\":\"low\",\"evidence\":\"loaded from _e3125_3 and stored as the `gap` key; later reused for a1 plus the leading gap\"},{\"bindingId\":{\"fn\":12999,\"reg\":5},\"name\":\"leadingGap\",\"confidence\":\"low\",\"evidence\":\"set to the gap when index > 0, otherwise 0, then added to a1\"},{\"bindingId\":{\"fn\":12999,\"reg\":1},\"name\":\"hasPreviousTab\",\"confidence\":\"low\",\"evidence\":\"holds `index > 0` and gates whether the gap is applied\"},{\"bindingId\":{\"fn\":12999,\"reg\":2},\"name\":\"tabContribution\",\"confidence\":\"low\",\"evidence\":\"holds either the full tab width or half of it, depending on a comparison with index, and is added to the returned sum\"},{\"bindingId\":{\"fn\":12999,\"reg\":0},\"name\":\"zero\",\"confidence\":\"low\",\"evidence\":\"constant 0 used as the this value in Reflect.apply and the comparison base, then reused as the divisor 2\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 10079,
+      "tokensOut": 961,
+      "usd": 0.0339593
+    },
+    "meta": {
+      "fn": 12999,
+      "requested": 7
+    }
+  },
+  "c43e289604bacca246bde7f967137847411b59e8db3be3dd217eab8528fe8041": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\":{\"fn\":13000,\"reg\":11},\"name\":\"values\",\"confidence\":\"med\",\"evidence\":\"copy of a1; indexed, mapped into inputRange/outputRange, and iterated pairwise for interpolate\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":15},\"name\":\"easingSamples\",\"confidence\":\"low\",\"evidence\":\"holds a2 and is later indexed as 'easing sample at index' in the error message\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":13},\"name\":\"range\",\"confidence\":\"low\",\"evidence\":\"holds _e3127_3 and its .from/.to are read to build the clamp input range\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":10},\"name\":\"nullValue\",\"confidence\":\"low\",\"evidence\":\"assigned null and only compared with == to detect missing values\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":12},\"name\":\"result\",\"confidence\":\"low\",\"evidence\":\"reused for thrown Error, config object, then interpolate result\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":14},\"name\":\"interpolation\",\"confidence\":\"low\",\"evidence\":\"holds the config object passed to interpolate and its result, or a thrown Error\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":17},\"name\":\"outputRange\",\"confidence\":\"med\",\"evidence\":\"pushed to in the loop and used as outputRange in interpolate config\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":16},\"name\":\"nextValue\",\"confidence\":\"med\",\"evidence\":\"r16 = r11[r5+1] in the outer loop, the upper end of the segment\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":19},\"name\":\"currentValue\",\"confidence\":\"med\",\"evidence\":\"r19 = r11[r5], the lower end of the segment, used in lerp r19 + (r16 - r19) * sample\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":5},\"name\":\"index\",\"confidence\":\"med\",\"evidence\":\"outer loop counter starting at 0, stepped by limit (1)\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":6},\"name\":\"nextIndex\",\"confidence\":\"med\",\"evidence\":\"r6 = r5 + 1, used to index the next value and in the error message\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":4},\"name\":\"segmentIndex\",\"confidence\":\"low\",\"evidence\":\"copy of outer index used in the input-range offset; also reused as a length bound\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":0},\"name\":\"sampleIndex\",\"confidence\":\"med\",\"evidence\":\"inner loop counter starting at 0 indexing the easing samples\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":2},\"name\":\"sampleIndexCopy\",\"confidence\":\"low\",\"evidence\":\"copy of sampleIndex used in the error message and the r2 / _e1911_4 term; also holds the loop bound\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":1},\"name\":\"loopBound\",\"confidence\":\"low\",\"evidence\":\"holds length - 1 for the loop continuation comparisons\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":20},\"name\":\"easingLength\",\"confidence\":\"med\",\"evidence\":\"r20 = r15.length, the easing samples length\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":22},\"name\":\"easingSample\",\"confidence\":\"med\",\"evidence\":\"r22 = r15[r0], with error message 'Couldn't find an easing sample'\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":24},\"name\":\"errorMessage\",\"confidence\":\"med\",\"evidence\":\"template string 'Couldn't find a value at index ...' passed to new Error\"},\n    {\"bindingId\":{\"fn\":13000,\"reg\":25},\"name\":\"periodSuffix\",\"confidence\":\"low\",\"evidence\":\"holds the \\\".\\\" string, the trailing piece of the concat call for the error message\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 12306,
+      "tokensOut": 1881,
+      "usd": 0.0520673
+    },
+    "meta": {
+      "fn": 13000,
+      "requested": 19
+    }
+  },
+  "af10dcba9288056330812cf3ddc7d417c13d86a05605cc591686843e641126c7": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":13001,\"reg\":1},\"name\":\"result\",\"confidence\":\"low\",\"evidence\":\"holds the Error thrown on missing offset, then reassigned to offset + a1 which is returned\"},{\"bindingId\":{\"fn\":13001,\"reg\":2},\"name\":\"offset\",\"confidence\":\"med\",\"evidence\":\"loaded from _e3127_0[index]; null-checked with error message \\\"Couldn't find an offset at index\\\", then added to a1\"},{\"bindingId\":{\"fn\":13001,\"reg\":3},\"name\":\"ErrorCtor\",\"confidence\":\"med\",\"evidence\":\"holds global Error, used in `new r3(...)` to build the thrown error\"},{\"bindingId\":{\"fn\":13001,\"reg\":5},\"name\":\"index\",\"confidence\":\"med\",\"evidence\":\"copy of a2; used to index _e3127_0 and interpolated into \\\"Couldn't find an offset at index ${r5}.\\\"\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 10024,
+      "tokensOut": 322,
+      "usd": 0.0273493
+    },
+    "meta": {
+      "fn": 13001,
+      "requested": 4
+    }
+  },
+  "f302b19d1089123bedf5dd9d9ecbd055e10321a79d46b7d0c0d0215f649fd452": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":13003,\"reg\":1},\"name\":\"isValid\",\"confidence\":\"low\",\"evidence\":\"holds a1 > 0, then null != r3, then r3 >= limit; the final value is the returned conjunction of those checks\"},{\"bindingId\":{\"fn\":13003,\"reg\":3},\"name\":\"entry\",\"confidence\":\"low\",\"evidence\":\"loaded as _e3127_0[a2], a lookup by index/key, then null-checked and compared >= limit (0)\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9726,
+      "tokensOut": 177,
+      "usd": 0.024707299999999998
+    },
+    "meta": {
+      "fn": 13003,
+      "requested": 2
+    }
+  },
+  "9672783c899471c362ab77fac95853aa707de147d76b8f76b2ebc5df74dfcfe9": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":13012,\"reg\":5},\"name\":\"focused\",\"confidence\":\"med\",\"evidence\":\"copies a1; stored as `focused` in the label props object and selects between two colors (_e3128_8/_e3128_9)\"},{\"bindingId\":{\"fn\":13012,\"reg\":3},\"name\":\"renderLabel\",\"confidence\":\"med\",\"evidence\":\"loaded from _e3128_0, truthiness-checked, and called with the props object r2 as a custom renderer; else falls back to TabBarItemLabel\"},{\"bindingId\":{\"fn\":13012,\"reg\":2},\"name\":\"labelProps\",\"confidence\":\"low\",\"evidence\":\"object with focused/color/style/labelText/allowFontScaling/route passed to r3(r2); in the other branch holds the TabBarItemLabel component\"},{\"bindingId\":{\"fn\":13012,\"reg\":1},\"name\":\"result\",\"confidence\":\"med\",\"evidence\":\"holds either renderLabel(labelProps) or jsx(...) output and is returned; in the jsx branch it temporarily holds props\"},{\"bindingId\":{\"fn\":13012,\"reg\":7},\"name\":\"labelColor\",\"confidence\":\"med\",\"evidence\":\"chosen by the focused flag between _e3128_8 and _e3128_9, then used as `color` in the TabBarItemLabel props; later reused for allowFontScaling\"},{\"bindingId\":{\"fn\":13012,\"reg\":4},\"name\":\"route\",\"confidence\":\"low\",\"evidence\":\"initially undefined, later assigned _e3128_7 and stored as r2.route\"},{\"bindingId\":{\"fn\":13012,\"reg\":0},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"only ever assigned undefined, never read\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 10171,
+      "tokensOut": 590,
+      "usd": 0.0306173
+    },
+    "meta": {
+      "fn": 13012,
+      "requested": 7
+    }
+  },
+  "1a80feb81af4f43e6d11a185751fd2303d86cbe26f4dcfd8f18b27f25ab3d29d": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":13014,\"reg\":0},\"name\":\"undefinedResult\",\"confidence\":\"low\",\"evidence\":\"r0 = undefined and returned as the function's implicit return value\"},{\"bindingId\":{\"fn\":13014,\"reg\":1,\"web\":3},\"name\":\"setLayoutResult\",\"confidence\":\"low\",\"evidence\":\"holds the return of r2({width, height}), a layout-size setter/callback called in onLayout; result unused\"},{\"bindingId\":{\"fn\":13014,\"reg\":2},\"name\":\"setLayoutSize\",\"confidence\":\"med\",\"evidence\":\"loaded from captured _e3128_2 and called with {width, height} taken from nativeEvent.layout in an onLayout handler\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9691,
+      "tokensOut": 253,
+      "usd": 0.0253273
+    },
+    "meta": {
+      "fn": 13014,
+      "requested": 3
+    }
+  },
+  "7146d13d33367ffe384947b4abdafaa7c6faa2e0b5a8a4670be59ab98d3a6e61": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":13015,\"reg\":0},\"name\":\"undefinedResult\",\"confidence\":\"low\",\"evidence\":\"r0 = undefined is the value returned at the end; the function returns nothing\"},{\"bindingId\":{\"fn\":13015,\"reg\":1,\"web\":3},\"name\":\"setLayoutResult\",\"confidence\":\"low\",\"evidence\":\"r1_3 holds the return value of r2(obj), a captured callee given {width, height}; the result is unused\"},{\"bindingId\":{\"fn\":13015,\"reg\":2},\"name\":\"setLayout\",\"confidence\":\"low\",\"evidence\":\"r2 loads captured _e3128_3 and is called with {width, height} taken from the onLayout event, so it likely stores the layout size\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9691,
+      "tokensOut": 257,
+      "usd": 0.025367300000000002
+    },
+    "meta": {
+      "fn": 13015,
+      "requested": 3
+    }
+  },
+  "03ff9924ec9f764cb8f362a4f42e732f3986ae19aa8acd2b08149fd2b910445a": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":13017,\"reg\":0,\"web\":1},\"name\":\"nullValue\",\"confidence\":\"low\",\"evidence\":\"r0 = null, used only in the `r2 == r0` null check that guards the call\"},{\"bindingId\":{\"fn\":13017,\"reg\":0,\"web\":2},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"r0_2 = undefined, assigned and never read\"},{\"bindingId\":{\"fn\":13017,\"reg\":0,\"web\":3},\"name\":\"returnValue\",\"confidence\":\"low\",\"evidence\":\"r0_3 = undefined, returned directly as the function's result\"},{\"bindingId\":{\"fn\":13017,\"reg\":1,\"web\":1},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"r1 = undefined, a constant temporary that is never read\"},{\"bindingId\":{\"fn\":13017,\"reg\":1,\"web\":2},\"name\":\"callbackResult\",\"confidence\":\"low\",\"evidence\":\"r1_2 = r2(a1), the result of calling the guarded callback, which is discarded\"},{\"bindingId\":{\"fn\":13017,\"reg\":2},\"name\":\"callback\",\"confidence\":\"med\",\"evidence\":\"r2 is loaded from the captured _e3131_3, null-checked, then called with a1 (optional-call pattern)\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9764,
+      "tokensOut": 720,
+      "usd": 0.0302893
+    },
+    "meta": {
+      "fn": 13017,
+      "requested": 6
+    }
+  },
+  "e6a5c0e973674c48bd05b0c267aa9230e9f4fa3730cb56d2884309daed003f70": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\": {\"fn\": 13025, \"reg\": 4}, \"name\": \"props\", \"confidence\": \"med\", \"evidence\": \"copies a1; reads .key twice, once for arr[0] and once to index list\"},\n    {\"bindingId\": {\"fn\": 13025, \"reg\": 2}, \"name\": \"mergedObject\", \"confidence\": \"low\", \"evidence\": \"holds props.key briefly, then {} filled by copyDataProperties from _e3133_9 and the keyed lookup, stored as arr[1]\"},\n    {\"bindingId\": {\"fn\": 13025, \"reg\": 3}, \"name\": \"keyedEntry\", \"confidence\": \"low\", \"evidence\": \"undefined unless list is non-null, then list[props.key]; passed as the source of the second copyDataProperties\"},\n    {\"bindingId\": {\"fn\": 13025, \"reg\": 6}, \"name\": \"spreadSource\", \"confidence\": \"low\", \"evidence\": \"passed as the source argument of __hbc_b_copyDataProperties both times\"},\n    {\"bindingId\": {\"fn\": 13025, \"reg\": 7}, \"name\": \"spreadTarget\", \"confidence\": \"low\", \"evidence\": \"alias of r2, passed as the target argument of __hbc_b_copyDataProperties\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10084,
+      "tokensOut": 698,
+      "usd": 0.031349300000000004
+    },
+    "meta": {
+      "fn": 13025,
+      "requested": 5
+    }
+  },
+  "79f07d4975fa3a96d1accca0346e47f5e15ff607c2f97b1219edae59fe42ebbe": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":13026,\"reg\":2},\"name\":\"newIndex\",\"confidence\":\"med\",\"evidence\":\"copy of a1 in function named onIndexChange; compared with captured state .index and passed to the captured setter _e3133_0 when different\"},{\"bindingId\":{\"fn\":13026,\"reg\":1,\"web\":2},\"name\":\"setIndexResult\",\"confidence\":\"low\",\"evidence\":\"holds the return value of _e3133_0(r2), the call that applies the new index; never used afterward\"},{\"bindingId\":{\"fn\":13026,\"reg\":1,\"web\":1},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"assigned undefined and never read before the register is reused\"},{\"bindingId\":{\"fn\":13026,\"reg\":0,\"web\":1},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"assigned undefined on the changed-index path and never read\"},{\"bindingId\":{\"fn\":13026,\"reg\":0,\"web\":2},\"name\":\"returnValue\",\"confidence\":\"low\",\"evidence\":\"r0_2 is undefined and is returned, so the function returns nothing\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9749,
+      "tokensOut": 386,
+      "usd": 0.0268893
+    },
+    "meta": {
+      "fn": 13026,
+      "requested": 5
+    }
   }
 }
