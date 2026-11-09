@@ -251,19 +251,23 @@ test("private-fields: refuses (R-PF1) when the defining frame still reads the sy
 });
 
 for (const version of ["v98", "v99"] as const) {
-  test(`private-fields: ${version} fixture 81 refuses #x (R-PF1) and stays a running program`, () => {
+  test(`private-fields: ${version} fixture 81 folds #x once inline-new rebuilds the inlined new B(7), and stays a running program`, () => {
     const code = decompile(new Uint8Array(readFileSync(join(repoRoot(), "tests", "fixtures", "constructs", "81-derived-ctor-private-fields", `${version}.hbc`))), {
       resolveV98Ambiguity: true,
       passes: {},
     }).code;
     // Fixture 81's `new B(7)` is INLINED by hermesc into the same frame that
-    // defines the class, and that inlined copy installs `#x` by symbol on an
-    // object that never runs B's constructor. Folding the class body there
-    // makes `b.x` throw (and strands the register: forcing the fold makes the
-    // pass checker refuse the whole function, E_UNBOUND_IDENT). The rung must
-    // refuse, so the fixture keeps its symbol-keyed shape.
-    assert.match(code, /Symbol\("#x"\)/);
-    assert.doesNotMatch(code, /#x = 1/);
+    // defines the class. While that inlined copy stayed (inline-new refused
+    // it R-IN1: B's constructor keeps the dead `Object.getPrototypeOf(<B>)`
+    // store ahead of `super(a)`), it installed `#x` by symbol on an object
+    // that never ran B's constructor, and R-PF1 had to refuse. Since spec 24
+    // section 9.2 (6) (docs/BUGS.md row "E2E tier 1 -- bucket
+    // `diff:GetOwnPrivateBySym/GetByVal`", inline-new-3) the copy is rebuilt as
+    // `new B(7)`, nothing outside the class names the symbol, and #x folds.
+    // The refusal itself stays pinned by fixture 95.
+    assert.doesNotMatch(code, /Symbol\("#x"\)/);
+    assert.match(code, /#x = 1;/);
+    assert.match(code, /= new \w+\(7\);/);
     assert.doesNotMatch(code, /could not decompile/);
   });
 }
@@ -358,4 +362,25 @@ test("private-fields R-PF1 def-use: a class in a nested list refuses when the fr
   const fnBody = [{ k: "labeled", label: "L0", body: list }, leak("r5")];
   assert.deepEqual(foldAll(list, { fnBody }).folded, []);
   assert.deepEqual(foldAll(list, { fnBody: list }).folded, ["#x"]);
+});
+
+// REGRESSION (docs/BUGS.md row "E2E tier 1 -- bucket
+// `diff:GetOwnPrivateBySym/GetByVal`", inline-new-3 item): once inline-new
+// rebuilt the six R-IN1 constructions on react-navigation, R-PF1 still refused
+// them because the symbol's register had held an unrelated value BEFORE the
+// `Symbol()` store. A function body runs once per call, so a top-level
+// statement ahead of the creation cannot observe it; only a list that may be
+// re-entered (a loop body) keeps that conservative rule. Spec 24 section 1.7.
+test("private-fields R-PF1 def-use: a register used before the symbol's creation in the function body folds", async () => {
+  const { foldAll } = (await import("../../../src/passes/private-fields/match.ts")) as Any;
+  const body = [setReg("r5", id("Object")), leak("r5"), ...oneHopBefore()];
+  assert.deepEqual(foldAll(body).folded, ["#x"]);
+  assert.deepEqual(foldAll(body, { fnBody: body }).folded, ["#x"]);
+});
+
+test("private-fields R-PF1 def-use: the same list as a loop body still refuses (the creation may reach the earlier read next iteration)", async () => {
+  const { foldAll } = (await import("../../../src/passes/private-fields/match.ts")) as Any;
+  const list = [setReg("r5", id("Object")), leak("r5"), ...oneHopBefore()];
+  const fnBody = [{ k: "while", label: null, test: id("c"), body: list }];
+  assert.deepEqual(foldAll(list, { fnBody }).folded, []);
 });
