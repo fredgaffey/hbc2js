@@ -247,11 +247,20 @@ test("runNamePass equiv backstop: NameService.render() (whole module) is called 
     },
   });
 
-  const result = await runNamePass(targets, { backend, service });
+  const result = await runNamePass(targets, { backend, service, backstopScope: "module" });
   assert.equal(result.equiv.verdict, "PASS");
   assert.ok(namedCount(result.outcomes) > 0, "at least one register across the several functions must actually get written");
   assert.equal(wholeModuleRenderCalls, 2, "the backstop must call the whole-module render exactly twice (before, restored) regardless of target/function count");
-  assert.equal(scopedRenderCalls, 0, "runNamePass's own backstop never needs a scoped render -- only the whole-module one");
+  assert.equal(scopedRenderCalls, 0, "backstopScope \"module\" never needs a scoped render -- only the whole-module one");
+
+  // Default scope ("touched"): the backstop renders only the functions the targets
+  // name, scoped -- never the whole module (render-cost item).
+  wholeModuleRenderCalls = 0;
+  scopedRenderCalls = 0;
+  const touchedResult = await runNamePass(targets, { backend, service });
+  assert.equal(touchedResult.equiv.verdict, "PASS");
+  assert.equal(wholeModuleRenderCalls, 0, "the default backstop must not re-emit the whole module");
+  assert.equal(scopedRenderCalls, 2 * new Set(targets.map((t) => t.fn)).size, "one scoped render per touched function, before and after");
 });
 
 test("CLI: name llm-fill --only src actually restricts targets to computeSrcScope's srcFns (was documented, never implemented)", async () => {
