@@ -240,6 +240,18 @@ test("object-literal refuses a PutById run on a fresh object even for plain data
   }
 });
 
+// D27a: a `PutById` into a key the literal already OWNS (a v84-v96
+// `NewObjectWithBuffer` placeholder) is a plain value update of an own
+// writable data property -- no prototype walk -- and still folds.
+test("object-literal folds a PutById fill of a key the literal already owns, and refuses a new key", () => {
+  const list = [def("r0", [{ key: "a", computed: false, value: { k: "lit", text: "null" } }], "NewObjectWithBuffer"), store("r0", "a", false, id("r1"), "PutByIdLoose"), store("r0", "b", false, id("r2"), "PutByIdLoose")];
+  const after = fold(list);
+  assert.ok(after !== null);
+  const props = ((after![0] as { expr: { value: Expr } }).expr.value as Extract<Expr, { k: "object" }>).props;
+  assert.deepEqual(props.map((p) => ("k" in p ? "…" : p.key)), ["a"]);
+  assert.equal(after!.length, 2); // the literal, then the refused `.b =` store
+});
+
 test("object-literal refuses a PutById store's __proto__ key even on a fresh object", () => {
   const list = [def("r0", []), store("r0", "__proto__", false, id("r1"), "PutByIdLoose")];
   assert.equal(match(list, ctxFor()), null);

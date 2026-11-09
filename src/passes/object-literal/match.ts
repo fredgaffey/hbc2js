@@ -73,19 +73,29 @@ const OWN_DEFINE: ReadonlySet<string> = new Set([
  */
 const OWN_DEFINE_COMPUTED: ReadonlySet<string> = new Set(["PutOwnByVal", "DefineOwnByVal"]);
 
-/*
+/**
  * docs/DECISIONS.md D27a (supersedes the 2026-09-05 `object-literal-putbyid`
- * resolution): a `PutById`/`PutByIdLoose`/`PutByIdStrict`/`TryPutById` store
- * never folds, fresh object or not. It is a full `[[Set]]`, and whether that
- * `[[Set]]` is observably a define depends on `Object.prototype` (or the
- * literal's prototype) carrying no accessor / non-writable property for the
- * key -- which code that ran *before* the object existed can break, and
- * which this rung cannot prove (fixture 390-putbyid-fold-inherited-setter).
- * The printed assignment is the faithful form: it recompiles to the same
- * `PutById`. The one provably sound exception D27a allows -- a literal with
- * no prototype chain (`__proto__: null`) -- is not built by `FRESH_OBJECT`
- * opcodes at all, so there is nothing to fold here.
+ * resolution). A `PutById`/`PutByIdLoose`/`PutByIdStrict`/`TryPutById` store
+ * is a full `[[Set]]`. Into a key the object does NOT own yet it never folds,
+ * fresh object or not: whether that `[[Set]]` is observably a define depends
+ * on `Object.prototype` carrying no accessor / non-writable property for the
+ * key, which code that ran *before* the object existed can break and this
+ * rung cannot rule out (fixture 390-putbyid-fold-inherited-setter). The
+ * printed assignment is the faithful form; it recompiles to the same
+ * `PutById`.
+ *
+ * Into a key the literal already owns as a plain data property (a
+ * `NewObjectWithBuffer` placeholder -- hermesc before v97 fills those with
+ * `PutById`, not `PutOwnBySlotIdx` -- or an earlier fold of this run) it
+ * does fold: `OrdinarySet` finds the own writable data property first and
+ * only updates its value (OrdinarySetWithOwnDescriptor), no prototype walk,
+ * no setter, position kept -- the same argument as `object-literal-arg` kind
+ * C (spec 20 §9.1). Nothing can have reconfigured the property in between:
+ * the object has not escaped (precondition 6). The other provably sound
+ * case D27a allows, a literal with no prototype (`__proto__: null`), is not
+ * built by `FRESH_OBJECT` opcodes, so there is nothing to fold there.
  */
+const PUT_BY_ID: ReadonlySet<string> = new Set(["PutById", "PutByIdLoose", "PutByIdStrict", "TryPutById"]);
 
 /** `{ a: 1 }`'s `a` — the exact set `src/emit`'s `isSafePropertyName` lets
  *  through as a bare (non-computed) member name. Kept as a regex here rather
@@ -364,7 +374,11 @@ export function match(list: readonly Stmt[], ctx: PassContext): ObjectLiteralMat
       const op = opcodeOf(list[j]!, ctx);
       const st = storeOf(list[j]!, def.reg);
       const isOwnDefine = op !== null && OWN_DEFINE.has(op);
-      if (st !== null && !sawComputedKey && isOwnDefine && !isProtoKey(st.key, st.computed)) {
+      // D27a: a `PutById`-family store folds only into a key the literal
+      // already owns (a placeholder or an earlier fold) -- see `PUT_BY_ID`.
+      const ownsKey = st !== null && props.some((p) => !("k" in p) && keyIdentity(p.key, p.computed) === keyIdentity(st.key, st.computed));
+      const isPutById = op !== null && PUT_BY_ID.has(op);
+      if (st !== null && !sawComputedKey && (isOwnDefine || (isPutById && ownsKey)) && !isProtoKey(st.key, st.computed)) {
         // §4 precondition 6: a value that reads (or writes) the half-built
         // object observes it — `r3.b = r3.a + 1` is not a literal.
         const u = identUses([{ k: "expr", expr: st.value }], def.reg);
