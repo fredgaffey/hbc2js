@@ -96,7 +96,7 @@ hbc2js deps <bundle.hbc|app.apk> [--out <dir>] [--confirm] [--confirm-cache] [--
 
    | Tier | Condition |
    |---|---|
-   | High | `moduleExactHits >= 3` (`STRONG_MODULE_HIT_COUNT`); or, for packages with **≥3 non-baseline hashed modules** (`TINY_PACKAGE_MODULE_TOTAL`), `moduleExactHits >= 2` **and** module coverage ≥5% **and** overall exact-function coverage ≥10%; or, for **tiny** packages (<3 modules), ≥5 exact-matched functions totalling ≥150 instructions; or overall exact-function coverage ≥90% (any package size) |
+   | High | `moduleExactHits >= 3` (`STRONG_MODULE_HIT_COUNT`); or, for packages with **≥3 non-baseline hashed modules** (`TINY_PACKAGE_MODULE_TOTAL`), `moduleExactHits >= 2` **and** module coverage ≥5% **and** overall exact-function coverage ≥10%; or, for **tiny** packages (<3 modules), ≥5 exact-matched functions totalling ≥150 instructions; or, for tiny packages, an exact-matched module factory of ≥`minInstr` instructions **and** ≥50% exact-function coverage (`TINY_PACKAGE_MIN_EXACT_COVERAGE`, corpus-recall-bar); or overall exact-function coverage ≥90% (any package size) |
    | Medium | overall fuzzy coverage ≥50%, or exactly 1–2 module-exact hits |
    | Low | any exact/fuzzy hit at all, below Medium's floor |
    | None | zero hits after the `--min-instr` floor |
@@ -2528,3 +2528,78 @@ jobs-all.tsv -d '\n' -P6 -n1 ./drive.sh` (stops itself below 16 GB);
 `after.sh` (subtract, merge, `measure5.sh pop <dir>`). Next: finish the
 remaining 1,355 jobs once disk allows, and look into why `@babel/standalone`
 is not demoted.
+
+### Bar losses: tiny packages (corpus-recall-bar, 2026-11-09)
+
+With the overlay, 57-60 Expensify truth packages had a signature, were
+candidates and still ended below "high". `tools/deps/recall-bar-probe.mjs`
+(`R=<repo> node recall-bar-probe.mjs <hbc> <truth> <db> <label>`, deb)
+records, per non-high candidate, the best-scoring version's tier, the gate
+that stopped it, hit counts, coverage, ambiguity-dropped hits, paths and
+dependency edges. Stopping reason → truth packages / non-truth candidates
+(a non-truth candidate is the FP the gate would add if relaxed):
+
+| stopped by | Exp v3-clean | Exp v4-partial | Exp v3 + overlay | Exp v4p + overlay | rnav v3 + overlay | rnav v4p + overlay |
+|---|---|---|---|---|---|---|
+| tiny package (<3 modules), under 5 exact functions / 150 instr | 18 / 37 | 25 / 40 | 28 / 37 | 33 / 40 | 8 / 8 | 9 / 9 |
+| one module-exact hit (medium) | 6 / 17 | 2 / 20 | 14 / 17 | 10 / 20 | 9 / 1 | 8 / 1 |
+| exact function hits, no module hit | 3 / 46 | 2 / 58 | 4 / 47 | 5 / 59 | 8 / 19 | 10 / 16 |
+| 2 module hits, coverage path fails (5% modules / 10% functions) | 2 / 3 | 2 / 3 | 0 / 3 | 0 / 3 | 0 / 0 | 1 / 0 |
+| demotion rule (few-distinct, container, scattered, embedded, twin) | 0 / 7 | 0 / 11 | 1 / 10 | 2 / 13 | 1 / 0 | 0 / 0 |
+| fuzzy hits only (incl. tiny) | 6 / 78 | 6 / 83 | 6 / 80 | 6 / 85 | 2 / 78 | 3 / 75 |
+| no hit | 1 / 78 | 1 / 87 | 4 / 81 | 4 / 90 | 1 / 97 | 1 / 102 |
+
+Ambiguity (the 20-owner cutoff) is not a lever: it removes hits from 1-2
+truth packages per run and 2-7 non-truth ones. The demotion rules cost
+0-2 truth packages per run (`es-errors`, few-distinct: its module hits are empty
+factories; `abort-controller`, twin of `event-target-shim` on pathless
+files). One module hit does not separate (Expensify: `psl` 10 of 20
+functions, `jose` 107, a false positive, against true packages at 2-46%).
+
+The tiny-package row separates. A true tiny package is one or two
+modules, and its copy in the app is that module: the factory matches and
+most of its few functions do (`base64-js` 4 of 5, `object-assign` 3 of
+4, `memoize-one` 4 of 6), but there are fewer than 5 of them, or they total
+under 150 instructions. A false one with a factory hit matches a quarter
+of its functions or less (`abbrev`, `wrappy` 1 of 4, `meros` 5 of 24,
+`p-map`, `idb`); a false one with half its functions matched has no
+factory hit (`immediate` 7 of 9). So a tiny package is now also high when
+an own module factory of at least `minInstr` instructions (an empty
+re-export factory does not count) exact-matches and at least half its
+eligible functions do (`TINY_PACKAGE_MIN_EXACT_COVERAGE`, 0.5). The
+probe found 26 truth packages and no non-truth one that pass it on
+Expensify v4-partial + overlay. `few-distinct` still applies after it, so
+packages whose evidence is 1-2 hashes (`boolbase`, `nullthrows`,
+`call-bound`, `fast-deep-equal`) stay medium. Rejected: path-bearing
+signature as evidence (the one-module true packages are mostly
+path-bearing and the false ones pathless, but only because the overlay
+was built path-bearing from the truth files), and a dependency edge to a
+confirmed package (most true tiny packages have one, but so does
+`minimist`, and it would not lift the one-module row, where
+`react-shallow-renderer` has one too).
+
+Measured on deb (`meas2.mjs` offline `scoreAgainstTruth`, sha pins
+matched; before = main 87ec7b8; confirmed / TP / FP, recall):
+
+| app | DB | before | after | TPs gained |
+|---|---|---|---|---|
+| Expensify J3 | db-v3-clean | 128 / 89 / 39, 30.9% | 133 / 94 / 39, 32.6% | `base-64`, `base64-js`, `memoize-one`, `object-assign`, `react-fast-compare` |
+| Expensify J3 | db-v4-paths-partial | 90 / 87 / 3, 30.2% | 96 / 93 / 3, 32.3% | the same + `hoist-non-react-statics` |
+| Expensify J3 | db-v3-clean + overlay | 204 / 167 / 37, 58.0% | 215 / 178 / 37, 61.8% | the same + `functions-have-names`, `side-channel`, `stacktrace-parser`, `use-latest-callback`, `utf8` |
+| Expensify J3 | db-v4-paths-partial + overlay | 166 / 164 / 2, 56.9% | 177 / 175 / 2, 60.8% | as the row above |
+| react-navigation | db-v3-clean | 14 / 14 / 0, 18.4% | 16 / 16 / 0, 21.1% | `base64-js`, `memoize-one` |
+| react-navigation | db-v4-paths-partial | 10 / 10 / 0, 13.2% | 12 / 12 / 0, 15.8% | as above |
+| react-navigation | either + overlay | 18 / 18 / 0, 23.7%; 15 / 15 / 0, 19.7% | 21 / 21 / 0, 27.6%; 18 / 18 / 0, 23.7% | + `stacktrace-parser` |
+| bluesky | db-v3-clean | 42 / 34 / 8, 17.2% | 45 / 37 / 8, 18.7% | `base64-js`, `memoize-one`, `shallow-equal` |
+| bluesky | db-v4-paths-partial | 29 / 29 / 0, 14.6% | 33 / 33 / 0, 16.7% | the same + `hoist-non-react-statics` |
+| bluesky | v3 + overlay; v4p + overlay | 47 / 40 / 7; 35 / 35 / 0 | 52 / 45 / 7; 41 / 41 / 0 | + `stacktrace-parser`, `use-latest-callback` |
+| rainbow | all four | 104 / 82 / 22, 15.8% | 106 / 84 / 22, 16.2% | `ieee754`, `minimalistic-crypto-utils` |
+| metamask | db-v3-clean, v4-partial | 169 / 132 / 37, 17.6% | 173 / 136 / 37, 18.2% | `ieee754`, `minimalistic-crypto-utils`, `querystringify`, `redux-thunk` |
+| metamask | + overlay | 172 / 135 / 37, 18.0% | 176 / 139 / 37, 18.6% | as above |
+
+No false positive added and none lost anywhere; react-navigation stays at
+0 FP. The overlay rows use a truth-chosen population (see "The
+no-signature bucket"); the rows without it are the honest numbers. The
+"before" overlay numbers differ from that section's (207 / 167 / 40)
+because the precision rules landed in between. Test:
+`tests/gate/deps/corpus-recall-bar.test.ts`.
