@@ -68,7 +68,7 @@ for (const v of VERSIONS) {
       // closure is created, as in the original. (The rest of the function --
       // the descriptor literal built before `.defineProperty` is read -- is
       // a separate object-literal difference, not asserted here.)
-      const order = (text: string): number[] => {
+      const order = (text: string): [number, number] => {
         const lines = text.split("\n");
         return [lines.findIndex((l) => l.includes('"Object"')), lines.findIndex((l) => l.startsWith("CreateClosure"))];
       };
