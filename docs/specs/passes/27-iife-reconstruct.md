@@ -425,3 +425,52 @@ numbered in a different order). `tree:unmatched-closure(orig 1 vs recompiled
 `diff:CreateGenerator/GetGlobalObject` 4 -> 32, `diff:GetById/
 NewObjectWithBuffer` 702 -> 740, and a few +25s) are functions that are now
 paired with their recompiled twin and differ later, not regressions.
+
+## 12. A closure created more than once per activation is an expression
+
+**Problem.** review-1109-1 (fixture `200-closure-in-loop-identity`, every
+version v84-v99, both `--passes` modes). Every nested function was emitted as
+a declaration hoisted to the top of its host, and each `CreateClosure` site
+read that one binding. A declaration makes ONE function object per activation
+of the host; a `CreateClosure` makes a new one every time it executes. In
+`for (...) fs.push(function () { return hv; })` the VM prints
+`fs[0] !== fs[1]` true, the decompiled source printed false. Section 11
+restored per-call identity (the right host); this restores per-execution
+identity inside the host.
+
+**Choice.** A function `g` is emitted as a function expression at each of its
+creation sites (the `inlineFunctions` route the loop-local environments of
+section 6 already use: `r7 = function _fn3() {...}`) when all of the
+following hold: every creation site of `g` in the module is in its host `h`
+(by the final `parentOf`); every site is a `CreateClosure` /
+`CreateGeneratorClosure` / `CreateAsyncClosure` (a pre-v97 `CreateGenerator`
+reads the inner function by name and keeps the declaration); `g` has no
+creation-context copies (section "closure copies" owns those); and some site
+CAN EXECUTE TWICE in one activation: it lies on a cycle of `h`'s normal CFG,
+or one site reaches another (same block, later offset, or a CFG path). The
+function expression keeps its own `this`, `arguments` and `new.target`, so it
+is the same closure kind as the declaration; it is never an arrow. The name
+stays `_fn<n>`, so a named expression still binds itself inside its body.
+
+**Soundness of the hoisted form that remains.** If no site can execute twice,
+each activation of `h` creates at most one object for `g`, and the declaration
+creates exactly one. The two differ only in WHEN the object exists (activation
+entry vs the site) and in a site that never runs. Neither is observable:
+creating a closure runs no user code, and the synthetic name `_fn<n>` is read
+only at `g`'s creation sites (each lowered to `rX = _fn<n>`), so no code
+before a site can reach the object, and an unreached site exposes nothing. A
+function whose sites lie in another function than its host (orphans, several
+creators) is outside this rule and keeps the declaration; for several
+creators the function is shared across them, which section 11's rejected
+alternative already records.
+
+**Rejected.** Inlining every nested function at its site. That is sound too
+but turns every function-top declaration into a statement-position expression
+(a readability loss for the common once-per-activation case) and duplicates
+the body when hermesc duplicated a site on exclusive paths (a `finally` copied
+into the normal and the exceptional exit), where at most one runs.
+
+**Tests.** `tests/gate/emit/review-1109.test.ts` review-1109-1 cases (fixture
+200 at v84, v94, v96, v98, v99 x `--passes none|on`; failed before with
+`distinct: false`). T2 under the real Hermes VMs
+(`tests/gate/decompile/equivalence.test.ts`) passes for fixture 200.

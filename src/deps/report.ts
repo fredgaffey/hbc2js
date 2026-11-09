@@ -34,6 +34,11 @@ export interface ConfirmedDep {
    *  that care (the OSV gate) treat `undefined` as `"exact-hash"` for
    *  `db-match` and as unknown/non-direct for `"confirmed"`. */
   readonly versionEvidence?: "exact-hash" | "date-inferred";
+  /** corpus-fork-relabel: the upstream package whose signature matched,
+   *  when the bundle names this fork of it instead (`src/deps/fork-relabel.ts`).
+   *  `version` is then the upstream version whose code matched. */
+  readonly forkOf?: string;
+  readonly forkEvidence?: readonly string[];
 }
 
 export interface GuessedDep {
@@ -280,8 +285,10 @@ export function buildReport(input: string, matchReport: MatchReport, guesses: re
   const confirmedNamesFromRealPackages = new Set<string>();
   for (const p of matchReport.packages) {
     if (p.tier === "high" && !p.isBaseline) {
-      confirmedDeps.push({ package: p.package, version: p.version, confidence: p.tier, modulesCovered: p.moduleExactHits, moduleTotal: p.moduleTotal, source: "db-match", versionEvidence: "exact-hash" });
-      confirmedNamesFromRealPackages.add(p.package);
+      const name = p.fork?.package ?? p.package;
+      if (confirmedNamesFromRealPackages.has(name)) continue;
+      confirmedDeps.push({ package: name, version: p.version, confidence: p.tier, modulesCovered: p.moduleExactHits, moduleTotal: p.moduleTotal, source: "db-match", versionEvidence: "exact-hash", ...(p.fork === undefined ? {} : { forkOf: p.package, forkEvidence: p.fork.evidence }) });
+      confirmedNamesFromRealPackages.add(name);
     }
   }
   // Baseline entries only fill in react/react-native when no real,
