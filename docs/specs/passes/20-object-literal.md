@@ -173,20 +173,15 @@ structure-recovery block.
 **Resolved, under a condition** (docs/BUGS.md `object-literal-putbyid`,
 `object-literal-interleaved`, `object-literal-computed-key`):
 
-* **`PutById`/`PutByIdLoose`/`PutByIdStrict`/`TryPutById` on a fresh object**
-  now folds like an own-define for a plain data key, **unless** the key is
-  `__proto__` (still a `[[Set]]` that hits `Object.prototype`'s own
-  accessor, never a define) **or** anything in the run so far — including
-  the store's own value — has an `effectSequence` (a call, `new`, a member
-  read, …): `OrdinarySet` on a fresh object with an unmodified prototype
-  chain falls through to `CreateDataProperty`, exactly `[[DefineOwnProperty]]`'s
-  outcome, but only while nothing has had a chance to have put an accessor
-  or non-writable data property on `Object.prototype` first. See
-  `src/passes/object-literal/match.ts`'s `PUT_BY_ID` doc comment for the
-  full argument. Scope: this is a *local* proof over the run being folded,
-  not a whole-program one — code that mutates `Object.prototype` earlier in
-  the same function, before the object is even created, is out of scope the
-  same way it always has been.
+* **`PutById`/`PutByIdLoose`/`PutByIdStrict`/`TryPutById`** — *superseded
+  2026-11-10 by docs/DECISIONS.md D27a.* The 2026-09-05 resolution folded
+  such a store on a fresh object while nothing in the run had an effect; that
+  is unsound against an accessor or non-writable property put on
+  `Object.prototype` by code that ran *before* the object existed (construct
+  fixture `390-putbyid-fold-inherited-setter`). A `PutById`-family store now
+  ends the run as §4 precondition 4 originally said; only a literal with no
+  prototype chain (`__proto__: null`) could ever be folded soundly, and the
+  rung does not build those.
 * **An interleaved statement inside the run** (v98/v99 `NewObjectWithBuffer`
   computing a value *between* two stores, `63-object-literal` fn `table`) no
   longer ends the run outright: a **pure register def** (`rX = <expr>` with
@@ -252,7 +247,7 @@ structure-recovery block.
 
 | Shape | Why refused | Ledger |
 |---|---|---|
-| `PutById`-family key `__proto__`, or a run that has already had an effect | still a full `[[Set]]` on `Object.prototype`, or the prototype chain may have changed since the object was created | `docs/BUGS.md` `object-literal-putbyid` |
+| any `PutById`-family store (D27a) | a full `[[Set]]`: an inherited setter or non-writable property installed before the object existed would observe it | docs/DECISIONS.md D27a; fixture `390-putbyid-fold-inherited-setter` |
 | an interleaved statement that is not a *pure register def*, or one `canHoist` refuses (reads the object being built, or redefines a register an earlier fold already read) | commuting it above the run is not proven safe | `docs/BUGS.md` `object-literal-interleaved` |
 | a computed-key store whose key or value reads/writes the object's own register | precondition 6, same as every other store | `docs/BUGS.md` `object-literal-computed-key` |
 | a plain-key store that follows an already-folded computed-key store in the same run | the computed key might alias it at runtime; folding both risks the wrong write winning (see above) | same row |
@@ -377,6 +372,7 @@ function lost IDENTICAL; `diff:NewObjectWithBuffer/CreateClosure` 312 -> 7,
 `diff:PutOwnBySlotIdx/PutByIdLoose` 172 -> 2 (`.../PutByIdStrict` 257 -> 248
 is a different shape, untouched).
 
-**Found on the way, not fixed here.** `object-literal`'s `PutById` fold is
+**Found on the way, fixed separately.** `object-literal`'s `PutById` fold was
 unsound against an inherited setter installed *before* the object existed —
-docs/BUGS.md 2026-11-10, adversarial fixture 50 (`todo`).
+docs/BUGS.md 2026-11-10; the fold is gone (docs/DECISIONS.md D27a), the
+reproducer is construct fixture `390-putbyid-fold-inherited-setter`.
