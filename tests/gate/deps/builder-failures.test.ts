@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import * as nodePath from "node:path";
 import { test } from "node:test";
-import { builderMetroConfigJs, bundleEnv, missingPeers, peerInstallArgv, builderConfigArgs } from "../../../src/deps/builder-support.ts";
+import { unresolvedBareModule, builderMetroConfigJs, bundleEnv, missingPeers, peerInstallArgv, builderConfigArgs } from "../../../src/deps/builder-support.ts";
 
 function loadConfig(prev?: (c: unknown, n: string, p: string) => unknown) {
   const src = builderMetroConfigJs();
@@ -52,6 +52,17 @@ test("BUILDFAIL1(a): non-optional absent peers are planned; optional, installed,
   assert.deepEqual(missingPeers({}, () => false), []);
 });
 
+test("BUILDFAIL1(a2): the unresolved bare package is extracted from Metro output (scoped, deep path); built-ins and relatives are not", () => {
+  const e = (m: string) => `error \x1b[31mUnable to resolve module ${m} from /s/node_modules/x/index.js: ${m} could not be found`;
+  assert.equal(unresolvedBareModule(e("tslib")), "tslib");
+  assert.equal(unresolvedBareModule(e("drizzle-orm/pg-core")), "drizzle-orm");
+  assert.equal(unresolvedBareModule(e("@aws-sdk/client-sfn/dist")), "@aws-sdk/client-sfn");
+  assert.equal(unresolvedBareModule(e("./Icon.js")), null);
+  assert.equal(unresolvedBareModule(e("node:sqlite")), null);
+  assert.equal(unresolvedBareModule(e("fs")), null);
+  assert.equal(unresolvedBareModule("some other failure"), null);
+});
+
 test("BUILDFAIL1(c): bundle child env sets CI=true (Metro watcher off, no inotify) and keeps the rest", () => {
   const e = bundleEnv({ PATH: "/bin", CI: undefined });
   assert.equal(e.CI, "true");
@@ -66,6 +77,7 @@ test("BUILDFAIL1: both builders wire the support module (config, CI env, peers, 
     assert.ok(/builderConfigArgs\(/.test(s), `${name}: --config`);
     assert.ok(/bundleEnv\(/.test(s), `${name}: CI env`);
     assert.ok(/missingPeers\(/.test(s), `${name}: peers`);
+    assert.ok(name === "confirm" || /unresolvedBareModule\(/.test(s), `${name}: retry`);
     assert.ok(/builderMetroConfigJs\(/.test(s), `${name}: config written`);
   }
   assert.ok(/maxBuffer/.test(cf), "confirm: maxBuffer");

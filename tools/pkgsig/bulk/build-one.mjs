@@ -105,7 +105,7 @@ const { decodeFunction } = await import(join(REPO_ROOT, "src/disasm/decode.ts"))
 const { parseHbc } = await import(join(REPO_ROOT, "src/parse/module.ts"));
 const { fingerprintModule, SIG_HASH_SCHEME } = await import(join(REPO_ROOT, "src/deps/fingerprint.ts"));
 const { writeSignature } = await import(join(REPO_ROOT, "src/deps/db.ts"));
-const { BUILDER_METRO_CONFIG_NAME, builderConfigArgs, builderMetroConfigJs, bundleEnv, missingPeers, peerInstallArgv } = await import(join(REPO_ROOT, "src/deps/builder-support.ts"));
+const { BUILDER_METRO_CONFIG_NAME, builderConfigArgs, builderMetroConfigJs, bundleEnv, missingPeers, peerInstallArgv, unresolvedBareModule } = await import(join(REPO_ROOT, "src/deps/builder-support.ts"));
 const { attachModulePaths, MODULE_PATHS_VERSION, modulePathsFromSourceMap } = await import(join(REPO_ROOT, "src/deps/module-paths.ts"));
 
 const rawArgs = process.argv.slice(2);
@@ -185,7 +185,10 @@ function bundleAndCompile(workDir) {
   let lastErr;
   for (const specs of attempts) {
     writeFileSync(entryFile, entrySource(specs));
-    try {
+    // BUILDFAIL1(a2): an undeclared/optional dependency Metro cannot resolve is
+    // installed (with the target repeated: --no-save prunes it otherwise) and
+    // the bundle retried, at most 3 rounds.
+    for (let round = 0; ; round++) try {
       execFileSync(
         "npx",
         ["react-native", "bundle", ...builderConfigArgs(scaffoldDir), "--platform", "android", "--dev", "false", "--minify", "true", "--max-workers", "1", "--reset-cache", "--entry-file", entryFile, "--bundle-output", bundlePath, "--sourcemap-output", mapPath, "--assets-dest", assetsDir],
@@ -195,9 +198,20 @@ function bundleAndCompile(workDir) {
       break;
     } catch (e) {
       lastErr = e;
-    } finally {
-      rmSync(entryFile, { force: true });
+      const miss = round < 3 ? unresolvedBareModule(`${e?.stderr ?? ""}${e?.message ?? ""}`) : null;
+      if (miss !== null && !existsSync(join(scaffoldDir, "node_modules", ...miss.split("/"), "package.json"))) {
+        try {
+          execFileSync("npm", peerInstallArgv(`${pkg}@${version}`, [...installedPeers.map((name) => ({ name, range: "*" })), { name: miss, range: "latest" }]), pipedOpts({ cwd: scaffoldDir, timeout: 180_000 }));
+          installedPeers.push(miss);
+          continue;
+        } catch {
+          // fall through to the recorded bundle error
+        }
+      }
+      break;
     }
+    rmSync(entryFile, { force: true });
+    if (lastErr === undefined) break;
   }
   if (lastErr !== undefined) throw lastErr;
   const hbcPath = join(workDir, "out.hbc");

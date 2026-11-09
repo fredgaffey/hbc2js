@@ -79,3 +79,18 @@ export function missingPeers(pkgJson: { peerDependencies?: Record<string, string
 export function peerInstallArgv(spec: string, peers: readonly PeerSpec[]): string[] {
   return ["install", spec, ...peers.map((p) => `${p.name}@${p.range}`), "--ignore-scripts", "--no-save", "--no-audit", "--no-fund", "--legacy-peer-deps"];
 }
+
+/** Bare package name of the first `Unable to resolve module X from ...` in
+ *  Metro output, or null for relative paths / Node built-ins / no match. The
+ *  builders install it (undeclared or optional peer, e.g. `tslib`,
+ *  `drizzle-orm`) and retry, a bounded number of rounds. */
+export function unresolvedBareModule(output: string): string | null {
+  const text = output.replace(/\x1b\[[0-9;]*m/g, "");
+  const m = /Unable to resolve module (\S+?) from /.exec(text);
+  if (!m) return null;
+  const spec = m[1]!;
+  if (spec.startsWith(".") || spec.startsWith("/") || spec.startsWith("node:") || NODE_BUILTINS.includes(spec)) return null;
+  const parts = spec.split("/");
+  const name = spec.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0]!;
+  return /^(@[a-z0-9._~-]+\/)?[a-z0-9._~-]+$/i.test(name) ? name : null;
+}
