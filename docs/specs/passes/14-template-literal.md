@@ -311,3 +311,28 @@ the project status is part of the deliverable.
    the ≥ 80 % floor.
 3. `String.raw` is itself a tagged template; nothing here special-cases it and
    nothing should.
+
+## 9. Residual callee spill (R17, `hermes-internal-dead-store`)
+
+**Problem.** When `hermesc` hoists the `HermesInternal.concat` read into a
+register (a template in a branch, or two templates in sibling branches sharing
+one read), the T1 rewrite folds every call but leaves the spill `rN =
+__hbc_HermesInternal.concat` (or the pair `rM = __hbc_HermesInternal; rN =
+rM.concat` when `rM` was reused). `__hbc_HermesInternal` is a prelude global
+`var`, so the dead store recompiles to `TryGetById` + `GetById`, which
+`hermesc -O` must keep (a global read may throw); the template literal then
+reads `HermesInternal` a second time. That was the largest shape behind the
+round-trip `diff:TryGetById(reg)` bucket (5 of 10 react-navigation samples,
+2026-11-10). **Choice.** A separate stage-B deleting rung right after
+`template-literal`, sharing `globalthis-dead-store`'s deadness scan
+(`analyzeWith`) with a shim-store recogniser, iterated to a fixed point, plus
+one extension: in a function with no `try`, a `return`/`throw` reached before
+any read ends the register's life. Sound because the shim is our own object
+with data properties only (no read of it can throw or run user code), and the
+`rM.concat` form is accepted only directly after `rM = __hbc_HermesInternal`
+in the same list; a `.concat` read off anything else (a user getter, fixture
+290's negative twin) is never touched. **Rejected:** deleting the spill inside
+`template-literal`'s own rewrite -- that rung is per-list and the spill often
+sits in a different list from the call it fed; and moving
+`globalthis-dead-store` after `template-literal` would change what
+`call-shape`/`destructure` see between the two.

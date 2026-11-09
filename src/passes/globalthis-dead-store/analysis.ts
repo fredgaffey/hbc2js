@@ -66,7 +66,7 @@ function isGlobalThisStore(s: Stmt): { readonly reg: string } | null {
  */
 type LocalVerdict = "dead" | "not-dead" | "unknown";
 
-function isDeadLocally(list: readonly Stmt[], fromIndex: number, reg: string, isFnBody: boolean): LocalVerdict {
+function isDeadLocally(list: readonly Stmt[], fromIndex: number, reg: string, isFnBody: boolean, exitIsDead = false): LocalVerdict {
   for (let m = fromIndex; m < list.length; m++) {
     const s = list[m]!;
     const u = identUses([s], reg);
@@ -75,6 +75,10 @@ function isDeadLocally(list: readonly Stmt[], fromIndex: number, reg: string, is
       const isPlainWrite = (s.k === "expr" && s.expr.k === "assign" && s.expr.target.k === "ident" && s.expr.target.name === reg) || (s.k === "init" && s.name === reg);
       return isPlainWrite ? "dead" : "unknown";
     }
+    // `exitIsDead` (the caller has proved the function has no `try`, so no
+    // `finally`/`catch` can observe the register after this): a `return` or
+    // `throw` that does not read `reg` leaves the frame for good.
+    if (exitIsDead && (s.k === "return" || s.k === "throw")) return "dead";
   }
   return isFnBody ? "dead" : "unknown";
 }
@@ -93,15 +97,28 @@ function isDeadLocally(list: readonly Stmt[], fromIndex: number, reg: string, is
  * (see `IdentUses.nested`'s doc in `src/passes/ast.ts`).
  */
 export function analyze(fnBody: readonly Stmt[]): Analysis {
+  return analyzeWith(fnBody, (list, k) => isGlobalThisStore(list[k]!));
+}
+
+/** Which statement shape a dead-store rung may delete: `list[k]` is a store
+ *  of an effect-free value into register `reg`, or null. Positional so a
+ *  recogniser can prove a register's value from the statement before it. */
+export type StoreRecogniser = (list: readonly Stmt[], k: number) => { readonly reg: string } | null;
+
+/** `analyze`'s scan with the store shape as a parameter — shared with
+ *  `hermes-internal-dead-store` (R17), whose stores are equally effect-free. */
+export function analyzeWith(fnBody: readonly Stmt[], recognise: StoreRecogniser, opts: { readonly exitIsDead?: boolean } = {}): Analysis {
   const deadStores = new Set<Stmt>();
   const deadRegisters = new Map<Stmt, string>();
-  for (const list of stmtLists(fnBody)) {
+  const lists = stmtLists(fnBody);
+  const exitIsDead = opts.exitIsDead === true && !lists.some((l) => l.some((s) => s.k === "try"));
+  for (const list of lists) {
     const isFnBody = list === fnBody;
     for (let k = 0; k < list.length; k++) {
       const s = list[k]!;
-      const store = isGlobalThisStore(s);
+      const store = recognise(list, k);
       if (store === null) continue;
-      const local = isDeadLocally(list, k + 1, store.reg, isFnBody);
+      const local = isDeadLocally(list, k + 1, store.reg, isFnBody, exitIsDead);
       const dead = local === "dead" || (local === "unknown" && identUses(fnBody, store.reg).reads === 0);
       if (!dead) continue;
       deadStores.add(s);
