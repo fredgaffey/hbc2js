@@ -5,7 +5,7 @@
 // quadratic -- the `fn-naming`/M5 lesson, `identUsesMany`'s doc), and
 // `rewrite` moves all the accepted ones at once. The moves are independent: a
 // read inside another moved function is a nested use and is refused.
-import { identUsesMany, isRegisterName, stmtLists, walk } from "../ast.ts";
+import { identUsesMany, stmtLists, walk } from "../ast.ts";
 import type { Stmt } from "../ast.ts";
 import type { Match, PassContext } from "../types.ts";
 
@@ -60,22 +60,33 @@ function nestedBindings(body: readonly Stmt[]): Set<string> {
 }
 
 /** Names whose read is exactly the stored value of `x = name` / `let x =
- *  name` with `x` NOT a register (a member, an env slot, a named binding).
- *  That is how a source function DECLARATION surfaces (`r1.m = m`,
- *  `_e14_3 = _fn5`): Hermes created its closure at entry, where the store
- *  already sits, so a move would change no bytecode and would only cost the
- *  declaration form. A read copied into a register, or nested in a larger
- *  expression (an argument, a descriptor literal), is a function
- *  EXPRESSION's position. */
+ *  name`, whatever `x` is. That is how a source function DECLARATION
+ *  surfaces (`r1.m = m`, `_e14_3 = _fn5`) and how the emitter spells a
+ *  plain `CreateClosure` into a register (`r3 = _fn1`), which later rungs
+ *  and readers key on (the class constructor binding, a reference copy). A
+ *  store already sits where Hermes created the closure, so a move would
+ *  only cost the declaration form. A read nested in a larger expression (an
+ *  argument, a descriptor literal) is a function EXPRESSION's position. */
 function declarationStores(body: readonly Stmt[]): Set<string> {
   const out = new Set<string>();
   for (const list of stmtLists(body)) {
     for (const s of list) {
-      if (s.k === "expr" && s.expr.k === "assign" && s.expr.value.k === "ident") {
-        if (!(s.expr.target.k === "ident" && isRegisterName(s.expr.target.name))) out.add(s.expr.value.name);
-      } else if (s.k === "init" && s.value.k === "ident" && !isRegisterName(s.name)) out.add(s.value.name);
+      if (s.k === "expr" && s.expr.k === "assign" && s.expr.value.k === "ident") out.add(s.expr.value.name);
+      else if (s.k === "init" && s.value.k === "ident") out.add(s.value.name);
     }
   }
+  return out;
+}
+
+/** Names passed directly to a runtime helper (`__hbc_makeGenerator(_fn4)`,
+ *  the async spawn driver): the enclosing function's own generator/async
+ *  rungs (spec 25/29) run LATER, in the parent's pipeline, and read this
+ *  body's hoisted factory declarations as their evidence. */
+function helperArgs(body: readonly Stmt[]): Set<string> {
+  const out = new Set<string>();
+  walk(body, { expr: (e) => {
+    if (e.k === "call" && e.callee.k === "ident" && e.callee.name.startsWith("__hbc_")) for (const a of e.args) if (a.k === "ident") out.add(a.name);
+  } });
   return out;
 }
 
@@ -97,6 +108,7 @@ export function analyze(body: readonly Stmt[]): Map<string, string> {
   const inLoop = identUsesMany(outermostLoops(body), names);
   const stores = declarationStores(body);
   const shadow = nestedBindings(body);
+  const helpers = helperArgs(body);
   const seen = new Set<string>();
   for (const f of funcs) {
     const n = f.name;
@@ -111,6 +123,7 @@ export function analyze(body: readonly Stmt[]): Map<string, string> {
     else if (u.reads !== 1) reason = u.reads === 0 ? "unused" : "multi-use";
     else if (inLoop.get(n)!.reads > 0) reason = "in-loop";
     else if (stores.has(n)) reason = "declaration-store";
+    else if (helpers.has(n)) reason = "helper-arg";
     else for (const m of mine) if (shadow.has(m)) { reason = "shadowed"; break; }
     verdicts.set(n, reason);
   }

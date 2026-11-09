@@ -107,7 +107,9 @@ test("closure-inline: refusals -- two reads, a loop, a declaration store, a shad
   // a declaration's own store (`r1.m = m`, `_e14_3 = _fn5`) keeps the declaration
   assert.equal(verdict([fn("_fn5"), exprStmt({ k: "assign", target: { k: "member", obj: id("r1"), prop: lit("m"), computed: false }, value: id("_fn5") })]), "declaration-store");
   assert.equal(verdict([fn("_fn5"), exprStmt({ k: "assign", target: id("_e14_3"), value: id("_fn5") })]), "declaration-store");
-  assert.equal(verdict([fn("_fn5"), exprStmt({ k: "assign", target: id("r3"), value: id("_fn5") })]), "ok");
+  assert.equal(verdict([fn("_fn5"), exprStmt({ k: "assign", target: id("r3"), value: id("_fn5") })]), "declaration-store");
+  // a helper argument is the parent's generator/async evidence
+  assert.equal(verdict([fn("_fn5"), exprStmt({ k: "call", callee: id("__hbc_makeGenerator"), args: [id("_fn5")] })]), "helper-arg");
   const usesX = fn("_fn5", [{ k: "return", arg: id("x") } as Stmt]);
   assert.equal(verdict([usesX, { k: "if", test: id("c"), then: [{ k: "init", kind: "let", name: "x", value: lit("2") } as Stmt, callOf(id("_fn5"))], else: [] } as Stmt]), "shadowed");
   assert.equal(verdict([fn("_fn5", [{ k: "return", arg: id("_fn5") } as Stmt]), callOf(id("_fn5"))]), "self-reference");
