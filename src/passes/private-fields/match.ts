@@ -751,7 +751,6 @@ function registerReadReached(before: readonly Stmt[], reg: string, isCreation: (
     const u = identUses([s], reg);
     return u.reads + u.writes + u.nested > 0;
   };
-  for (let i = 0; i < at; i++) if (before[i]!.k !== "decl" && mentions(before[i]!)) return true;
   // The list is the body of a labelled block sitting directly in the
   // function body (class-recover F1): that block runs once per call, so the
   // statements before it run before the creation and cannot observe it, and
@@ -760,6 +759,12 @@ function registerReadReached(before: readonly Stmt[], reg: string, isCreation: (
   // same top-level rule as below (spec 24 section 1.7).
   const host = scope?.fnBody !== undefined && scope.list !== undefined && scope.fnBody !== scope.list
     ? scope.fnBody.findIndex((s) => s.k === "labeled" && s.body === scope.list) : -1;
+  // A mention BEFORE the creation can only observe it if the list is
+  // re-entered after the creation ran (a loop body). The function body itself,
+  // and a labelled block directly in it, run once per call: their earlier
+  // statements have completed before the creation, so they are not reached.
+  const runsOnce = scope?.fnBody === undefined || scope.list === undefined || scope.fnBody === scope.list || host >= 0;
+  if (!runsOnce) for (let i = 0; i < at; i++) if (before[i]!.k !== "decl" && mentions(before[i]!)) return true;
   if (host >= 0) {
     const fb = scope!.fnBody!;
     let killed = false;

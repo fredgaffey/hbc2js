@@ -363,3 +363,24 @@ test("private-fields R-PF1 def-use: a class in a nested list refuses when the fr
   assert.deepEqual(foldAll(list, { fnBody }).folded, []);
   assert.deepEqual(foldAll(list, { fnBody: list }).folded, ["#x"]);
 });
+
+// REGRESSION (docs/BUGS.md row "E2E tier 1 -- bucket
+// `diff:GetOwnPrivateBySym/GetByVal`", inline-new-3 item): once inline-new
+// rebuilt the six R-IN1 constructions on react-navigation, R-PF1 still refused
+// them because the symbol's register had held an unrelated value BEFORE the
+// `Symbol()` store. A function body runs once per call, so a top-level
+// statement ahead of the creation cannot observe it; only a list that may be
+// re-entered (a loop body) keeps that conservative rule. Spec 24 section 1.7.
+test("private-fields R-PF1 def-use: a register used before the symbol's creation in the function body folds", async () => {
+  const { foldAll } = (await import("../../../src/passes/private-fields/match.ts")) as Any;
+  const body = [setReg("r5", id("Object")), leak("r5"), ...oneHopBefore()];
+  assert.deepEqual(foldAll(body).folded, ["#x"]);
+  assert.deepEqual(foldAll(body, { fnBody: body }).folded, ["#x"]);
+});
+
+test("private-fields R-PF1 def-use: the same list as a loop body still refuses (the creation may reach the earlier read next iteration)", async () => {
+  const { foldAll } = (await import("../../../src/passes/private-fields/match.ts")) as Any;
+  const list = [setReg("r5", id("Object")), leak("r5"), ...oneHopBefore()];
+  const fnBody = [{ k: "while", label: null, test: id("c"), body: list }];
+  assert.deepEqual(foldAll(list, { fnBody }).folded, []);
+});

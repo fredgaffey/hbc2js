@@ -373,6 +373,15 @@ own register `r3` read as newly free. A name now passes when the function body
 declares it at top level and no mention of it is left inside a nested function
 or class.
 
+**Mentions before the creation (2026-11-09).** R-PF1's register scan counted
+any mention of the register ahead of the `Symbol()` store, because the list
+may be a loop body re-entered with the symbol still in it. That holds only
+for a re-entered list. The function body, and a labelled block directly in it,
+run once per call, so statements before the creation have completed and
+cannot observe it; there the earlier mentions no longer count. This was the
+remaining refusal on the six R-IN1 frames once section 9.2 (6) rebuilt their
+construction (hermesc had used the register for `Object` first).
+
 **Loops in a member (2026-11-09).** A member that reads `#x` inside a loop
 copies the symbol from its slot into a register in the loop body (`r12 =
 _eD_S; r12 = list[r12];`). `foldInBody` scanned a loop as one leaf, so the
