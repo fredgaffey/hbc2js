@@ -86,3 +86,11 @@ test("spec 28: the skill parser refuses a malformed skill rather than prompting 
     "a skill without an abstain rule is not shippable",
   );
 });
+
+test("readability-lowconf: hbc-name v7 carries the calibration rules and documents the v7 hint fields", () => {
+  const skill = loadSkill("hbc-name");
+  assert.ok(skill.version >= 7, `hbc-name is v${String(skill.version)}`);
+  for (const needle of ["`assigns`", "`propsRead`", "`comparedWith`", "`argOf`", "REUSED REGISTER", "not `undefinedValue`", "two independent uses"]) {
+    assert.ok(skill.body.includes(needle), `skill body lacks ${needle}`);
+  }
+});

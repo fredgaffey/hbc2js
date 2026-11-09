@@ -612,6 +612,21 @@ Coverage is unchanged (the abstentions are skill/prompt-bound, not model-bound);
 
 Coverage rises 2.5x and tokens per name fall 55%, with high-confidence accuracy unchanged. All-confidence accuracy drops because the extra names are mostly `low`: low-confidence names are lower-accuracy by design (about 20% lenient), so a consumer or UI must show the confidence tier and not present `low` names as equal to `high` ones. `quality.test.ts` now grades the v6 recording (floors: coverage >= 0.8, lenient all-confidence >= 40% with n >= 30, high-confidence exact >= 0.6 with n >= 5).
 
+**Skill v7: calibrate the middle and low tiers (2026-11-09).** Graded errors in the v6 recording (med/low names whose reference author name did not match, 3+ each): (1) parameter copies named from one property, comparison or callee instead of the parameter's broad role (`options` for `pathConfig`, `item` for `props`: `routeNames <- routePath`); (2) reused registers named for a later value (`index <- matchedRoute`, `initialRoutes <- routesLength`, `options <- scratch`); (3) constant temporaries named for their value, not their role (`undefinedValue`, `one`, `hyphen` where the author wrote `previous`, `match`, `segment`); (4) synonyms of the author's name that no rater can accept (`frame <- layout`, `acc <- groups`, `width <- value`; not fixable by prompting); (5) one-use `med` names that were guesses (`custom` names inferred from a single call). `binding-hints.ts` now also sends `assigns` (reuse), `propsRead`, `comparedWith`, `returned` and `argOf` (callee#argument position), and `skills/hbc-name.md` v7 adds calibration rules: a reused register is `low`, a constant is named for its role, a parameter copy takes the broad role, a call result is not named after its callee, and `med` needs two independent agreeing uses. Same 60-function recipe, sonnet (`<app>.recording.idmatch.v7.json`):
+
+| id-match, 60 fns, 850 bindings | v6 | v7 |
+| --- | --- | --- |
+| coverage | 86.8% (738) | 89.5% (761) |
+| confidence mix high / med / low | 171 / 260 / 309 | 48 / 265 / 448 |
+| graded lenient, high | 15/17 (exact 12) | 9/10 (exact 7) |
+| graded lenient, med | 15/34 (exact 14) | 14/30 (exact 12) |
+| graded lenient, low | 5/24 (exact 4) | 14/35 (exact 9) |
+| graded lenient, all | 35/75 (exact 30) | 37/75 (exact 28) |
+| tokens in / out | 645k / 83k | 683k / 96k |
+| tokens per named binding | 986 | 1,025 |
+
+The honest reading: coverage and low-tier accuracy rise (low 21% to 40% lenient), the high tier stays as accurate (about 90% lenient) but shrinks by 72% (171 to 48 names), because the model now keeps `high` for literal-backed names only; med accuracy is flat (about 45%); exact all-confidence is 2 lower. The graded sample is small (75 names), so the med/low differences are within noise; the robust effects are the high-tier shrinkage and the better-calibrated low tier. `quality.test.ts` now grades v7 (floors: coverage >= 0.85, high exact >= 0.6 with n >= 5, plus per-tier floors med >= 0.35 and low >= 0.25 lenient with n >= 15).
+
 ## Render cost (2026-11-09)
 
 Profile on the held-out app (box at load ~15): `prepareModule` 0.3 s, the first whole-module raw emit (`rawFrames`, what the reuse gate used to build on the first `setName`) ~19 s, `NameService.render({fn})` 77-96 s each (it re-emitted all 15,551 functions through stage A + B and sliced one out; the hooks' whole-module views were rebuilt every call), whole-module `render()` ~66 s. Nothing was cached between calls except the analysis. Fix: scoped emit (`emitModule`'s `onlyFunction`) in `render({fn})`, hooks built once per `NameService`, per-function raw frames for the gate, and a touched-functions backstop in `runNamePass` (docs/RENAME.md "Rendering"). The sweep fidelity test now compares scoped renders of its touched functions instead of two whole-module renders. Measured after (same app, same load): `render({fn})` 1.1 s for the first call (hook build) then ~50-300 ms per call (was 77-96 s); `runNamePass` on one target 0.2 s (was two whole-module renders, ~130 s, plus ~19 s for the gate's first whole-module raw emit); scoped output is byte-identical to the whole-module slice on the held-out app (fns 2079 and 2080, plus 40 construct fixtures x 12 fns, with and without names). The ~21 min sweep test was not re-run in this pass.
