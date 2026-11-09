@@ -148,7 +148,11 @@ const CONSTRUCT_WITH_NEW_TARGET = new Set(["CallWithNewTarget", "CallWithNewTarg
 const CALL_N = new Set(["Call1", "Call2", "Call3", "Call4"]);
 // Instructions that neither read nor write state a getter could observe or
 // change: registers, constants, environments being created, fresh allocations.
-const FRAME_LOCAL = /^(Mov|MovLong|LoadConst\w*|LoadParam|LoadParamLong|GetGlobalObject|GetEnvironment|GetParentEnvironment|GetClosureEnvironment|Create(Function|Inner)?Environment\w*|CreateClosure\w*|CreateGeneratorClosure\w*|CreateAsyncClosure\w*|GetNewTarget|GetArgumentsLength|CreateRegExp|GetBuiltinClosure)$/;
+const FRAME_LOCAL = /^(Mov|MovLong|LoadConst\w*|LoadParam|LoadParamLong|GetGlobalObject|GetEnvironment|GetParentEnvironment|GetClosureEnvironment|Create(Function|Inner)?Environment\w*|CreateClosure\w*|CreateGeneratorClosure\w*|CreateAsyncClosure\w*|GetNewTarget|GetArgumentsLength|ReifyArguments\w*|CreateRegExp|GetBuiltinClosure)$/;
+// Closure-variable reads run no code; like global-object property reads below
+// they are treated as unobservable (modelled assumption, spec 05 section 7.4:
+// a getter on the method that writes a binding read in between is not tracked).
+const BINDING_READ = /^LoadFromEnvironment\w*$/;
 // A fresh object, and own-property definitions on it before it escapes.
 const FRESH_OBJECT = /^(NewObject|NewObjectWithBuffer\w*|NewArray|NewArrayWithBuffer\w*|NewFastArray)$/;
 const FRESH_OBJECT_INIT = /^(PutOwnBySlotIdx\w*|PutNewOwnById\w*|PutNewOwnNEById\w*|PutOwnByIndex\w*|DefineOwnInDenseArray\w*)$/;
@@ -294,6 +298,7 @@ export function planBlock(block: BasicBlock, functionInstructions: readonly Inst
       const c = ins[j]!;
       const ok =
         FRAME_LOCAL.test(c.name) ||
+        BINDING_READ.test(c.name) ||
         FRESH_OBJECT.test(c.name) ||
         (FRESH_OBJECT_INIT.test(c.name) && fresh.has(V(c, 0))) ||
         (GETBYID.test(c.name) && (globals.has(V(c, 1)) || globalOnly(V(c, 1))));

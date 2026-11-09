@@ -6,7 +6,7 @@ import type { ArgInlineMatch } from "./match.ts";
 export function rewrite(m: ArgInlineMatch): readonly Stmt[] {
   const { root: list, data: site } = m;
   const use = list[site.useIndex]!;
-  const call = callOf(use)!;
+  const call = callOf(use, site.kind === "callee-base")!;
   const isReg = (e: Expr): boolean => e.k === "ident" && e.name === site.reg;
   const next: Expr =
     site.kind === "literal-arg"

@@ -511,6 +511,9 @@ export function matchCondArg(list: readonly Stmt[], fnBody: readonly Stmt[]): Ca
       if (identUses(mid, r).writes !== 0 || fu.reads !== 0 || fu.writes !== 0) continue;
     }
     if (args.length === 0 && seq.length > 0) continue;
+    // A `methodRead` call with work in between is the `method-read` rung's
+    // (spec 05 section 7.4), after `object-literal` has folded that work.
+    if (proven && seq.length > 0) continue;
     const callArgs = seq.length === 0 ? args : [{ k: "seq", exprs: [...seq, args[0]!] } as Expr, ...args.slice(1)];
     const replacement: Expr = { k: "call", callee: read, args: callArgs };
     const newStmt = applyReplacement(list[j]!, call, replacement);

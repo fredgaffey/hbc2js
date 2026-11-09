@@ -49,16 +49,25 @@ function defOf(s: Stmt): { readonly reg: string; readonly value: Expr } | null {
 /** The call a statement evaluates as its whole top-level work: `call(...)`,
  *  `rZ = call(...)` (ident target: evaluates nothing before the call),
  *  `return call(...)`, `let x = call(...)`. */
-export function callOf(s: Stmt): Extract<Expr, { k: "call" }> | null {
+export function callOf(s: Stmt, memberTarget = false): Extract<Expr, { k: "call" }> | null {
   let e: Expr | null = null;
-  if (s.k === "expr") e = s.expr.k === "assign" && s.expr.target.k === "ident" ? s.expr.value : s.expr;
+  if (s.k === "expr") e = s.expr.k === "assign" && (s.expr.target.k === "ident" || (memberTarget && plainMemberTarget(s.expr.target))) ? s.expr.value : s.expr;
   else if (s.k === "return") e = s.arg;
   else if (s.k === "init") e = s.value;
   return e !== null && e.k === "call" ? e : null;
 }
 
+/** Kind B only: `X.p = call(...)` with `X` a non-global identifier. The
+ *  assignment evaluates the binding `X` (a frame-local or closure read, which
+ *  runs no code) before the call, then the call, then the store; so the call's
+ *  callee base is still the first effect of the statement (spec 05 section
+ *  7.4: R3e's re-fused `rC.m(...)` lands here for `C.prototype = Object.create(...)`). */
+function plainMemberTarget(t: Expr): boolean {
+  return t.k === "member" && !t.computed && t.prop.k === "lit" && t.obj.k === "ident" && t.obj.global !== true;
+}
+
 export function withCall(s: Stmt, call: Expr): Stmt {
-  if (s.k === "expr") return s.expr.k === "assign" && s.expr.target.k === "ident" && s.expr.value.k === "call" ? { ...s, expr: { ...s.expr, value: call } } : { ...s, expr: call };
+  if (s.k === "expr") return s.expr.k === "assign" && (s.expr.target.k === "ident" || plainMemberTarget(s.expr.target)) && s.expr.value.k === "call" ? { ...s, expr: { ...s.expr, value: call } } : { ...s, expr: call };
   if (s.k === "return") return { ...s, arg: call };
   if (s.k === "init") return { ...s, value: call };
   return s;
@@ -185,7 +194,7 @@ function calleeBase(list: readonly Stmt[], fnBody: readonly Stmt[], ctx: PassCon
     let j = i + 1;
     while (j < list.length && isPureStmt(list[j]!) && !mentions(list[j]!, def.reg)) j++;
     if (j >= list.length) continue;
-    const call = callOf(list[j]!);
+    const call = callOf(list[j]!, true);
     if (call === null || call.callee.k !== "member" || call.callee.obj.k !== "ident" || call.callee.obj.name !== def.reg) continue;
     if (identUses([list[j]!], def.reg).reads !== 1 || !deadAfterUse(list, fnBody, j - 1, def.reg)) continue;
     return { root: list, nodes: [list], data: { kind: "callee-base", reg: def.reg, defIndex: i, useIndex: j, value: def.value }, at: atOf(list[i]!, ctx) };
