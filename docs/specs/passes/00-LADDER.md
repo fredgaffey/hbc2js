@@ -363,7 +363,7 @@ a measured count of decodable sites in the hardened tier.
 ## 6. Measurement
 
 Reported in the project status per rung and in aggregate, produced by one script
-(`tools/passes-metrics.ts`, batch 1) over `tests/fixtures/constructs/**` at all
+(`tools/passes-metrics.mjs`, batch 1) over `tests/fixtures/constructs/**` at all
 five versions × base/`.min`/`.obf`, plus the RN template bundle.
 
 **Per rung:** `sites rewritten / abandoned` (from the driver records, already

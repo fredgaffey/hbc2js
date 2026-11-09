@@ -181,7 +181,7 @@ an effect — `isPure` returns false for `member`, which is what forces that).
 `two-reads`, `impure-move`, `nested-capture`; ≥1 site the `check` refuses.
 Red→green at all five HBC versions plus `.min`/`.obf`.
 
-**Corpus metric** (`tools/passes-metrics.ts`, 01): total `rN` identifier
+**Corpus metric** (`tools/passes-metrics.mjs`, 01): total `rN` identifier
 occurrences over `tests/fixtures/constructs/**` at v94 must fall by **≥ 50 %**,
 and median statements per emitted function by **≥ 35 %**, with 492/492 fixture
 PASS unchanged and PL-09 (PASS with passes on *and* off) holding.

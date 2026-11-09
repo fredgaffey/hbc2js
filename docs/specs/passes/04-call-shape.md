@@ -217,6 +217,8 @@ the histogram in the project status is the deliverable, not just the percentage.
 **Estimated size:** ~150 lines across `match/rewrite/check`, ~200 lines of
 tests.
 
+*(There is no section 8: it was never written, and the numbering is kept so that the `section 9`/`section 10` anchors cited from code comments and other docs stay valid.)*
+
 ## 9. R3e -- the method read separated from its call by the arguments
 
 **Problem.** hermesc evaluates `o.m(args)` as GetById (the method), then the

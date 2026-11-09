@@ -332,7 +332,7 @@ out-of-order index, a non-empty `then`, a guard whose register is reassigned
 later, an impure statement before the guard, `arguments[k]` with a computed
 index; ≥1 site the `check` refuses.
 
-**Corpus metric** (`tools/passes-metrics.ts`): count of *default-guard
+**Corpus metric** (`tools/passes-metrics.mjs`): count of *default-guard
 prologue runs* — statement pairs matching shape (a)+(b) — remaining in the
 printed output. Baseline is 9 in `51` + 4 in `39` per version. **Floor: ≥ 90 %
 of them removed** across `tests/fixtures/constructs/**` at all five versions ×

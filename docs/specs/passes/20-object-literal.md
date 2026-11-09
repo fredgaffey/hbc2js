@@ -269,6 +269,8 @@ hazard). All five HBC versions.
 **Metrics.** rn-template `diff:PutNewOwnById/PutById`
 bucket counts, before/after — reported in the landing report.
 
+*(There is no section 8: it was never written, and the numbering is kept so that the `section 9`/`section 10` anchors cited from code comments and other docs stay valid.)*
+
 ## 9. Amendment 2026-11-09 — `object-literal-arg` (round-trip bucket `diff:GetById/NewObjectWithBuffer`)
 
 **Problem.** The re-export header `Object.defineProperty(exports, "x",
