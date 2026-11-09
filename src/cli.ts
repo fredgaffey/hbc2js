@@ -48,6 +48,7 @@ import { rawFrameBodies } from "./name-overlay/frames.ts";
 import { analyseModuleParallel } from "./parallel/analysis-pool.ts";
 import type { Stmt } from "./emit/ast.ts";
 import type { WorkerBackend } from "./workers/backend.ts";
+import { bindingHints } from "./readability/binding-hints.ts";
 import { backendForId, resolveBackendId, BackendSelectionError } from "./readability/backends.ts";
 import { runNamePass, namedCount } from "./readability/name-pass.ts";
 import { runAdversarialRecheck } from "./readability/evaluate.ts";
@@ -2185,7 +2186,7 @@ function llmFillTargetsForFn(
   if (nameable.length === 0) return [];
   const source = renderFn(fn);
   const ids = nameable.map((reg) => regId(fn, reg.reg));
-  return [{ kind: "suggest-name", fn, regs: ids, context: { fn, targets: ids.map((id) => shortForm(id)), source } }];
+  return [{ kind: "suggest-name", fn, regs: ids, context: { fn, targets: ids.map((id) => shortForm(id)), hints: bindingHints(source, fn, ids), source } }];
 }
 
 /** `--per-register`'s old landing-1 shape: one `NamePassTarget` (one backend

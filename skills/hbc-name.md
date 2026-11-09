@@ -1,7 +1,7 @@
 ---
 id: hbc-name
 kind: suggest-name
-version: 5
+version: 6
 ---
 
 # hbc-name -- naming registers and functions in decompiled Hermes bytecode
@@ -21,14 +21,19 @@ You are given, and may use, only what is in the request:
 - `xrefs` -- callers and callees by name where a name is known.
 - `strings` -- string literals the function loads: endpoint paths, keys,
   action types, error messages. These are the strongest evidence available.
+- `hints` -- OPTIONAL, one entry per requested target: `{id, ident, def,
+  uses, flowsInto}`. `def` is the line that assigns the binding, `uses` up to
+  three lines that read it, `flowsInto` the callees it is passed to; each line
+  is prefixed `L<n>:` with its 1-based line in `source`. Start from these --
+  they are the evidence for that binding, already extracted.
 - `role` -- the module's segregation bucket and role signal, when classified.
 - `targets` -- OPTIONAL. When present, this request is about the WHOLE
   function, not one register: a list of every nameable `{fn,reg}` in it,
-  in the `{fn,reg}` short form. Propose a name for as many of them as you
-  have real evidence for, in one `names[]` array (the output contract
-  already allows more than one entry). Leave a target out of `names[]`
-  entirely -- do not emit a low-effort guess -- when you would abstain on
-  it individually. A request with no `targets` field is the single-register
+  in the `{fn,reg}` short form. ANSWER EVERY TARGET: put one entry per
+  target in `names[]`. When the evidence is thin, still give the best
+  role-based name and mark it `low`; `low` is the honest way to say "usable
+  role, no proof". Leave a target out only when there is truly nothing to
+  go on (it is never assigned, or every use is opaque). A request with no `targets` field is the single-register
   form: propose at most one name, for the one binding `source`/`summary`
   describe.
   A target may also be a LIVE RANGE `{fn,reg,web}`: the decompiler split a
@@ -60,6 +65,24 @@ You never fetch anything else. If the evidence you need is absent, abstain.
    something `sanitizeInput`, `verifySignature` or `decryptToken` unless the
    body actually does that work.
 7. Be consistent: the same underlying helper seen twice gets the same name.
+8. A role is enough. You do not need the original author's name; you need a
+   name that says what the binding does HERE. Derive it, in this order, from:
+   - the callee it is passed to or the callee that produced it
+     (`r3 = navigate(...)` -> `navigationResult`; `r1` passed to
+     `setOptions(r1)` -> `options`);
+   - the property it is read from or written to (`r3 = r0.path` -> `path`;
+     `r4 = r0.initialRouteName` -> `initialRouteName`);
+   - the parameter it copies (`r0 = a1` -> the name its uses imply, e.g.
+     `props`, `options`, `state`, `action`);
+   - the operator pattern: a counter stepped by one (`index`), an
+     accumulator pushed to in a loop (`result`/`entries`), a value compared
+     with a constant (`isEmpty`), the caught value of a `catch` (`error`).
+   A constant temporary (`r2 = undefined`, `r3 = null`, `r0 = 0`) takes the
+   role it plays at its uses (`undefinedValue`, `nullValue`, `startIndex`,
+   `zero`) at `low`.
+9. Interior helper plumbing counts too: a binding that holds `globalThis`,
+   `Array`, `Reflect`, a bound method or a closure over a named callee is
+   named for that thing (`globalScope`, `ArrayCtor`, `reflectApply`).
 
 ## Output contract
 
@@ -91,10 +114,9 @@ was missing); an answer that abstains without one is rejected:
   present, one that matches exactly one entry of it. A `bindingId` that is
   not in `targets` is dropped by the caller and never written, so do not
   invent one.
-- When `targets` is present, `names` normally has FEWER entries than
-  `targets` -- one per binding you actually have evidence for, not a padded
-  list. `abstained: true` (with `names: []`) means none of them, not that
-  you are unsure about all of them individually.
+- When `targets` is present, `names` should have one entry per target. Only a
+  target with no usable role is left out. `abstained: true` (with `names: []`)
+  means none of them could be named at all.
 - `confidence` is `high` only when a literal or an unambiguous call names the
   value; `med` for a strong contextual inference; `low` for anything else.
 - `evidence` cites the specific literal, endpoint or call site. It is not a
@@ -105,14 +127,15 @@ was missing); an answer that abstains without one is rejected:
 
 Emit `{"names": [], "abstained": true, "reason": "<why>"}` (the `reason` is required) when:
 
-- there is no evidence at all (no literals, no named callees, no meaningful
-  structure), or
-- every binding in scope already has a good name, or
-- naming would require inventing behaviour you cannot see in the body.
+- NOTHING in the request has any usable evidence: no target is assigned or
+  used in a way that shows a role, or
+- every binding in scope already has a good name.
 
-Abstaining is a correct answer and costs nothing. Inventing a plausible name
-for an unknown binding is the single worst thing you can do here: a confident
-wrong label is more damaging than `r4`.
+Abstain per target, not per function: one unreadable temporary is not a
+reason to skip the other targets. A guess with a usable role is a `low`
+answer, not an abstention. What you must not do is state a `high` or `med`
+name you cannot support or invent behaviour you cannot see: a confident wrong
+label is more damaging than `r4`, a hedged `low` role name is not.
 
 ## Rewrite
 
