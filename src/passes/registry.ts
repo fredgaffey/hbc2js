@@ -24,6 +24,7 @@ import { forIn } from "./for-in/index.ts";
 import { forOf } from "./for-of/index.ts";
 import { globalAccess } from "./global-access/index.ts";
 import { globalthisDeadStore } from "./globalthis-dead-store/index.ts";
+import { closureInline } from "./closure-inline/index.ts";
 import { ifChain } from "./if-chain/index.ts";
 import { labelClean } from "./label-clean/index.ts";
 import { loopCond } from "./loop-cond/index.ts";
@@ -172,6 +173,10 @@ export const REGISTRY: readonly Pass[] = [
   privateFields as Pass,
   jsxRecover as Pass,
   fnNaming as Pass,
+  // R17 (docs/specs/passes/32-closure-inline.md): after every rung that may
+  // still look for a hoisted declaration and after `fn-naming` (the moved
+  // function keeps its recovered name), before the register renaming rungs.
+  closureInline as Pass,
   regSplit as Pass,
   varNaming as Pass,
 ];
