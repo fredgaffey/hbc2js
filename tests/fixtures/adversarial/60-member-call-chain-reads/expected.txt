@@ -1,0 +1,3 @@
+42 a.b b.c d.e b.ok call c(21) this.ok=1
+42 a.b b.c d.e a.b b.ok b.ok call c(21) this.ok=1
+42 a.b b.c d.e call c(21) this.ok=9

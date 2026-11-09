@@ -1,0 +1,6 @@
+1 obj rhs
+2 2 o ky p kz v
+2,2,0 3
+5 2
+1,2,2
+10 first inner

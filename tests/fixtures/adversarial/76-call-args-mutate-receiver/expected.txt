@@ -1,0 +1,6 @@
+first:arg
+second first
+f1 g
+20 get m n=1
+a00 a10
+true null

@@ -1,0 +1,5 @@
+0 get m s1 boom a caught a
+0 s1 boom b caught b
+null s3 boom c caught c
+false sk boom d caught d
+s5 boom e caught e
