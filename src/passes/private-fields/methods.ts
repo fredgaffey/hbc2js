@@ -21,7 +21,7 @@
 // below); `before` is then untouched and the field fold proceeds as before.
 import type { Expr, Stmt } from "../ast.ts";
 import { identUses, identUsesMany, isHelperCall, mapStmts, walk } from "../ast.ts";
-import { ctorBody, ENV_SLOT, findCandidates, findClass, foldOne, hasOwnCall, simpleStore } from "./match.ts";
+import { ctorBody, ENV_SLOT, findCandidates, findClass, foldOne, hasOwnCall, registerReadReached, simpleStore } from "./match.ts";
 import type { FoldScope } from "./match.ts";
 
 type ClassExpr = Extract<Expr, { k: "class" }>;
@@ -119,7 +119,10 @@ export function foldMethods(before: readonly Stmt[], scope?: FoldScope, outerFns
     if (f.reads !== 1 || f.writes !== 0 || seen.has(m.display) || seen.has(m.slot)) return refuse(PM_REFUSAL.methodEscape, `${m.display}: ${m.fn.name} is mentioned outside its one slot store`);
     seen.add(m.display);
     seen.add(m.slot);
-    if (m.reg !== null && identUses(frameOf, m.reg).reads !== 1) return refuse(PM_REFUSAL.methodEscape, `${m.display}: register ${m.reg} holding ${m.fn.name} is read again`);
+    const reg = m.reg;
+    // The hop register is def-use checked like a symbol's (spec 24 section
+    // 1.7): only a read the `reg = _fnK` store still reaches counts.
+    if (reg !== null && registerReadReached(before, reg, (x) => { const st = simpleStore(x); return st !== null && st.name === reg && st.value.k === "ident" && st.value.name === m.fn.name; }, (x) => { const st = simpleStore(x); return st !== null && st.name === m.slot && st.value.k === "ident" && st.value.name === reg; }, scope)) return refuse(PM_REFUSAL.methodEscape, `${m.display}: register ${m.reg} holding ${m.fn.name} is read where the function may still be in it`);
     if (uses.get(m.slot)!.writes !== 1) return refuse(PM_REFUSAL.slotRewritten, `${m.display}: slot ${m.slot} written more than once`);
     if (cls.name !== null) {
       const u = identUses(m.fn.body, cls.name);

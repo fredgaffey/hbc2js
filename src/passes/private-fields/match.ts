@@ -692,7 +692,7 @@ export function foldOne(before: readonly Stmt[], candidate: PrivateFieldCandidat
  *  function body, any mention of `reg` outside it does, because the register
  *  is frame-wide. Registers never appear inside a nested function (a closure
  *  reads the frame through env slots only; `identUses` never credits one). */
-function registerReadReached(before: readonly Stmt[], reg: string, isCreation: (s: Stmt) => boolean, isHop: (s: Stmt) => boolean, scope: FoldScope | undefined): boolean {
+export function registerReadReached(before: readonly Stmt[], reg: string, isCreation: (s: Stmt) => boolean, isHop: (s: Stmt) => boolean, scope: FoldScope | undefined): boolean {
   const at = before.findIndex(isCreation);
   if (at < 0) return true;
   const mentions = (s: Stmt): boolean => {
