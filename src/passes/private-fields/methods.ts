@@ -122,7 +122,9 @@ export function foldMethods(before: readonly Stmt[], scope?: FoldScope, outerFns
     const reg = m.reg;
     // The hop register is def-use checked like a symbol's (spec 24 section
     // 1.7): only a read the `reg = _fnK` store still reaches counts.
-    if (reg !== null && registerReadReached(before, reg, (x) => { const st = simpleStore(x); return st !== null && st.name === reg && st.value.k === "ident" && st.value.name === m.fn.name; }, (x) => { const st = simpleStore(x); return st !== null && st.name === m.slot && st.value.k === "ident" && st.value.name === reg; }, scope)) return refuse(PM_REFUSAL.methodEscape, `${m.display}: register ${m.reg} holding ${m.fn.name} is read where the function may still be in it`);
+    const isCreation = (x: Stmt): boolean => { const st = simpleStore(x); return st !== null && st.name === reg && st.value.k === "ident" && st.value.name === m.fn.name; };
+    const isHop = (x: Stmt): boolean => { const st = simpleStore(x); return st !== null && st.name === m.slot && st.value.k === "ident" && st.value.name === reg; };
+    if (reg !== null && !(runsOnce(before, scope) ? hopDead(before, reg, isCreation, isHop, scope) : !registerReadReached(before, reg, isCreation, isHop, scope))) return refuse(PM_REFUSAL.methodEscape, `${m.display}: register ${m.reg} holding ${m.fn.name} is read where the function may still be in it`);
     if (uses.get(m.slot)!.writes !== 1) return refuse(PM_REFUSAL.slotRewritten, `${m.display}: slot ${m.slot} written more than once`);
     if (cls.name !== null) {
       const u = identUses(m.fn.body, cls.name);
@@ -172,6 +174,42 @@ export function foldMethods(before: readonly Stmt[], scope?: FoldScope, outerFns
   // (4) the slots' declarations.
   const tree = tree4.map((st) => (st.k === "decl" ? { ...st, names: st.names.filter((n) => !slots.has(n)) } : st)).filter((st) => !(st.k === "decl" && st.names.length === 0));
   return { tree, methods: methods.map((m) => m.display), fnNames: [...fnNames], slots: [...slots.keys(), brand.envName] };
+}
+
+/** The list is the function body, or a labelled block placed directly in it:
+ *  it runs at most once per call, so a mention of a register BEFORE a store
+ *  cannot observe that store (the loop-re-entry case `registerReadReached`
+ *  guards against does not exist). */
+function runsOnce(list: readonly Stmt[], scope: FoldScope | undefined): boolean {
+  if (scope?.fnBody === undefined || scope.fnBody === list) return true;
+  return scope.fnBody.some((s) => s.k === "labeled" && s.body === list);
+}
+
+/** Forward def-use from the `reg = _fnK` store in a run-once list: the next
+ *  mention of `reg` other than the hop must be a top-level plain store that
+ *  does not read it; for a hosted block, falling off its end continues in the
+ *  function body after the block (and a `break` out of it lands there too). */
+function hopDead(list: readonly Stmt[], reg: string, isCreation: (s: Stmt) => boolean, isHop: (s: Stmt) => boolean, scope: FoldScope | undefined): boolean {
+  const at = list.findIndex(isCreation);
+  if (at < 0) return false;
+  const scan = (xs: readonly Stmt[], from: number): boolean | null => {
+    for (let i = from; i < xs.length; i++) {
+      const x = xs[i]!;
+      if (isHop(x)) continue;
+      const u = identUses([x], reg);
+      if (u.reads + u.writes + u.nested === 0) continue;
+      const st = simpleStore(x);
+      return st !== null && st.name === reg && identUses([{ k: "expr", expr: st.value }], reg).reads === 0;
+    }
+    return null;
+  };
+  const here = scan(list, at + 1);
+  if (scope?.fnBody === undefined || scope.fnBody === list) return here ?? true;
+  if (here === false) return false;
+  // A `break` out of the block may skip the in-block kill, so the code after
+  // the block must be safe on its own either way.
+  const host = scope.fnBody.findIndex((s) => s.k === "labeled" && s.body === list);
+  return scan(scope.fnBody, host + 1) ?? true;
 }
 
 /** `obj.#name` member nodes (reads, writes and calls). The brand fold must not
