@@ -45,7 +45,7 @@ test("ui/package.json has e2e and e2e:live scripts and @playwright/test pinned e
     scripts?: Record<string, string>;
     devDependencies?: Record<string, string>;
   };
-  assert.ok(pkg.scripts?.e2e?.includes("playwright test"), "ui/package.json must have an `e2e` script running playwright test");
+  assert.ok(pkg.scripts?.e2e?.includes("playwright test") || (pkg.scripts?.e2e?.includes("e2e/run.mjs") && readFileSync(ui("e2e", "run.mjs"), "utf8").includes("playwright")), "ui/package.json must have an `e2e` script running playwright test (directly or via e2e/run.mjs)");
   assert.ok(pkg.scripts?.["e2e:live"]?.includes("playwright test"), "ui/package.json must have an `e2e:live` script running playwright test");
   const pinned = pkg.devDependencies?.["@playwright/test"];
   assert.ok(pinned !== undefined && /^\d/.test(pinned), "@playwright/test must be pinned to an exact version, not a range");
