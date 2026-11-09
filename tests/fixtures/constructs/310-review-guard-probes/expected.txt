@@ -1,0 +1,5 @@
+3string 6string 3 4 3
+E43EE
+1 1 undefined {"value":7,"done":true}
+cfunction 1function 2
+async 3

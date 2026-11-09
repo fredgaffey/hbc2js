@@ -1,0 +1,96 @@
+; hbc2js disassembly of 313-review-guard-reassigned-global-fn/v99.hbc
+; version=99 layout=E opcodeTable=hbc99-mar2026 functions=6 strings=10 globalCodeIndex=0
+function #0 "global"  params=1 frame=17 env=0 flags=dbg,overflowed  @0x0000014c size=186
+  0000  DeclareGlobalVar     s7 "helper313"
+  0005  DeclareGlobalVar     s9 "reader"
+  000a  DeclareGlobalVar     s6 "loopReader"
+  000f  GetGlobalObject      r3
+  0011  LoadConstUndefined   r2
+  0013  CreateClosure        r4, r2, f1 "helper313"
+  0018  PutByIdLoose         r3, r4, #c0, s7 "helper313"
+  001e  CreateClosure        r4, r2, f2 "reader"
+  0023  PutByIdLoose         r3, r4, #c1, s9 "reader"
+  0029  CreateClosure        r4, r2, f3 "loopReader"
+  002e  PutByIdLoose         r3, r4, #c2, s6 "loopReader"
+  0034  TryGetById           r6, r3, #c0, s8 "print"
+  003a  GetByIdShort         r4, r3, #c1, s9 "reader"
+  003f  LoadConstZero        r0
+  0041  Call2                r5, r4, r2, r0
+  0046  GetByIdShort         r4, r3, #c2, s6 "loopReader"
+  004b  LoadConstUInt8       r1, 2
+  004e  Call2                r4, r4, r2, r1
+  0053  Call3                r4, r6, r2, r5, r4
+  0059  CreateClosure        r4, r2, f4 "helper313"
+  005e  PutByIdLoose         r3, r4, #c0, s7 "helper313"
+  0064  TryGetById           r6, r3, #c0, s8 "print"
+  006a  GetByIdShort         r4, r3, #c1, s9 "reader"
+  006f  Call2                r5, r4, r2, r0
+  0074  GetByIdShort         r4, r3, #c2, s6 "loopReader"
+  0079  Call2                r4, r4, r2, r1
+  007e  Call3                r4, r6, r2, r5, r4
+  0084  TryGetById           r5, r3, #c3, s5 "globalThis"
+  008a  CreateClosure        r4, r2, f5 ""
+  008f  PutByIdLoose         r5, r4, #c0, s7 "helper313"
+  0095  TryGetById           r5, r3, #c0, s8 "print"
+  009b  GetByIdShort         r4, r3, #c1, s9 "reader"
+  00a0  Call2                r4, r4, r2, r0
+  00a5  GetByIdShort         r3, r3, #c1, s9 "reader"
+  00aa  LoadConstUInt8       r0, 1
+  00ad  Call2                r3, r3, r2, r0
+  00b2  Call3                r3, r5, r2, r4, r3
+  00b8  Ret                  r3
+
+function #1 "helper313"  params=1 frame=1 env=0 flags=none  @0x00000206 size=6
+  0000  LoadConstString      r0, s1 "orig"
+  0004  Ret                  r0
+
+function #2 "reader"  params=2 frame=11 env=0 flags=dbg,overflowed  @0x0000020c size=29
+  0000  LoadParam            r2, 1
+  0003  LoadConstZero        r1
+  0005  JmpFalse             L1, r2
+  0008  Mov                  r1, r2
+L1:
+  000b  JmpTrue              L2, r1
+  000e  GetGlobalObject      r2
+  0010  GetByIdShort         r2, r2, #c0, s7 "helper313"
+  0015  LoadConstUndefined   r0
+  0017  Call1                r1, r2, r0
+L2:
+  001b  Ret                  r1
+
+function #3 "loopReader"  params=2 frame=22 env=0 flags=dbg,overflowed  @0x00000229 size=77
+  0000  LoadParam            r10, 1
+  0003  LoadConstZero        r3
+  0005  Less                 r5, r3, r10
+  0009  LoadConstString      r9, s0 ""
+  000d  GetGlobalObject      r8
+  000f  LoadConstUndefined   r4
+  0011  LoadConstUInt8       r2, 1
+  0014  LoadConstZero        r0
+  0016  Mov                  r7, r9
+  0019  Mov                  r6, r7
+  001c  JmpFalse             L3, r5
+L1:
+  001f  Mov                  r1, r0
+  0022  Mov                  r13, r7
+  0025  Mov                  r11, r9
+  0028  JNotLessN            L2, r3, r1
+  002c  Mov                  r11, r1
+L2:
+  002f  GetByIdShort         r12, r8, #c0, s7 "helper313"
+  0034  Call1                r12, r12, r4
+  0038  Add                  r11, r13, r11
+  003c  Add                  r7, r11, r12
+  0040  AddN                 r0, r1, r2
+  0044  Mov                  r6, r7
+  0047  JLess                L1, r0, r10
+L3:
+  004b  Ret                  r6
+
+function #4 "helper313"  params=1 frame=1 env=0 flags=none  @0x00000276 size=6
+  0000  LoadConstString      r0, s3 "replaced"
+  0004  Ret                  r0
+
+function #5 ""  params=1 frame=1 env=0 flags=none  @0x0000027c size=6
+  0000  LoadConstString      r0, s4 "viaGlobalThis"
+  0004  Ret                  r0
