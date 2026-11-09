@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { repoRoot } from "../../support/paths.ts";
 import { parseForDecompile } from "../../../src/decompile.ts";
@@ -27,6 +27,31 @@ import { listNameable } from "../../../src/artifact/frame-queries.ts";
 import type { RenderOptions, RenderResult } from "../../../src/name-overlay/render.ts";
 
 const FIXTURE = "04-for-loop-basic";
+
+// The two slow tests below both need computeSrcScope(rn-template-0.72) (~25s)
+// and the second also spawns the CLI (which recomputes it). Compute the scope
+// once per process, and start the CLI child at module load so it overlaps the
+// in-process work of the first slow test. Both are only awaited inside the tests.
+const RN_HBC = join(repoRoot(), "tests", "fixtures", "bundles", "rn-template-0.72", "index.android.hbc");
+let rnScopeMemo: ReturnType<typeof computeSrcScope> | undefined;
+function rnScope(): ReturnType<typeof computeSrcScope> {
+  rnScopeMemo ??= computeSrcScope(RN_HBC, new Uint8Array(readFileSync(RN_HBC)));
+  return rnScopeMemo;
+}
+interface CliRun { status: number | null; stdout: string; stderr: string }
+let onlySrcCli: Promise<CliRun> | undefined;
+let onlySrcDir: string | undefined;
+function startOnlySrcCli(): Promise<CliRun> {
+  if (onlySrcCli !== undefined) return onlySrcCli;
+  onlySrcDir = mkdtempSync(join(tmpdir(), "hbc2js-llmfill-only-src-"));
+  const child = spawn(process.execPath, [join(repoRoot(), "src", "cli.ts"), "name", "llm-fill", RN_HBC, "--backend", "fake", "--only", "src", "--store", join(onlySrcDir, "store.json"), "--json"]);
+  let stdout = "";
+  let stderr = "";
+  child.stdout.setEncoding("utf8").on("data", (d: string) => (stdout += d));
+  child.stderr.setEncoding("utf8").on("data", (d: string) => (stderr += d));
+  onlySrcCli = new Promise<CliRun>((resolve) => child.once("close", (status) => resolve({ status, stdout, stderr })));
+  return onlySrcCli;
+}
 
 function analysisFor(name: string): ReturnType<typeof analyseModule> {
   const bytes = new Uint8Array(readFileSync(join(repoRoot(), "tests", "fixtures", "constructs", name, "v94.hbc")));
@@ -202,9 +227,9 @@ test("BUGS 2026-09-11 (render O(whole-bundle)): name llm-fill's target builders 
 });
 
 test("runNamePass equiv backstop: NameService.render() (whole module) is called O(1) times per run, never once per function/target", async () => {
-  const hbc = join(repoRoot(), "tests", "fixtures", "bundles", "rn-template-0.72", "index.android.hbc");
-  const bytes = new Uint8Array(readFileSync(hbc));
-  const scope = await computeSrcScope(hbc, bytes);
+  startOnlySrcCli(); // overlaps the child with this test's in-process work
+  const hbc = RN_HBC;
+  const scope = await rnScope();
   const store = new OverlayStore({ bundle: hbc });
   const service = new NameService(scope.analysis, store, { strictEnv: false });
   const frames = rawFrameBodies(scope.analysis, { strictEnv: false });
@@ -247,30 +272,33 @@ test("runNamePass equiv backstop: NameService.render() (whole module) is called 
     },
   });
 
-  const result = await runNamePass(targets, { backend, service });
+  const result = await runNamePass(targets, { backend, service, backstopScope: "module" });
   assert.equal(result.equiv.verdict, "PASS");
   assert.ok(namedCount(result.outcomes) > 0, "at least one register across the several functions must actually get written");
   assert.equal(wholeModuleRenderCalls, 2, "the backstop must call the whole-module render exactly twice (before, restored) regardless of target/function count");
-  assert.equal(scopedRenderCalls, 0, "runNamePass's own backstop never needs a scoped render -- only the whole-module one");
+  assert.equal(scopedRenderCalls, 0, "backstopScope \"module\" never needs a scoped render -- only the whole-module one");
+
+  // Default scope ("touched"): the backstop renders only the functions the targets
+  // name, scoped -- never the whole module (render-cost item).
+  wholeModuleRenderCalls = 0;
+  scopedRenderCalls = 0;
+  const touchedResult = await runNamePass(targets, { backend, service });
+  assert.equal(touchedResult.equiv.verdict, "PASS");
+  assert.equal(wholeModuleRenderCalls, 0, "the default backstop must not re-emit the whole module");
+  assert.equal(scopedRenderCalls, 2 * new Set(targets.map((t) => t.fn)).size, "one scoped render per touched function, before and after");
 });
 
 test("CLI: name llm-fill --only src actually restricts targets to computeSrcScope's srcFns (was documented, never implemented)", async () => {
-  const hbc = join(repoRoot(), "tests", "fixtures", "bundles", "rn-template-0.72", "index.android.hbc");
-  const bytes = new Uint8Array(readFileSync(hbc));
-  const scope = await computeSrcScope(hbc, bytes);
+  const scope = await rnScope();
   assert.ok(scope.srcFns.size > 0 && scope.srcFns.size < scope.analysis.module.functions.length, "the fixture must have a proper src subset for this test to mean anything");
 
-  const dir = mkdtempSync(join(tmpdir(), "hbc2js-llmfill-only-src-"));
+  const r = await startOnlySrcCli();
   try {
-    const storePath = join(dir, "store.json");
-    const r = spawnSync(process.execPath, [join(repoRoot(), "src", "cli.ts"), "name", "llm-fill", hbc, "--backend", "fake", "--only", "src", "--store", storePath, "--json"], {
-      encoding: "utf8",
-    });
     assert.equal(r.status, 0, r.stderr);
     const summary = JSON.parse(r.stdout) as { targets: number };
     assert.ok(summary.targets > 0, "the src scope must yield at least one target on this fixture");
     assert.ok(summary.targets <= scope.srcFns.size, "--only src must never build more function-batch targets than there are src-bucket functions");
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    if (onlySrcDir !== undefined) rmSync(onlySrcDir, { recursive: true, force: true });
   }
 });

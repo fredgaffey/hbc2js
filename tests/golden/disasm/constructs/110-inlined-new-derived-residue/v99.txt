@@ -1,0 +1,211 @@
+; hbc2js disassembly of 110-inlined-new-derived-residue/v99.hbc
+; version=99 layout=E opcodeTable=hbc99-mar2026 functions=13 strings=22 globalCodeIndex=0
+function #0 "global"  params=1 frame=22 env=0 flags=dbg,overflowed  @0x00000270 size=350
+  0000  CreateFunctionEnvironment r3, 4
+  0003  DeclareGlobalVar     s16 "Subscribable"
+  0008  GetGlobalObject      r2
+  000a  LoadConstUndefined   r0
+  000c  CreateClosure        r4, r0, f1 "Subscribable"
+  0011  PutByIdLoose         r2, r4, #c0, s16 "Subscribable"
+  0017  GetByIdShort         r4, r2, #c0, s16 "Subscribable"
+  001c  GetByIdShort         r5, r4, #c1, s14 "prototype"
+  0021  CreateClosure        r4, r0, f2 ""
+  0026  PutByIdLoose         r5, r4, #c1, s21 "subscribe"
+  002c  GetByIdShort         r4, r2, #c0, s16 "Subscribable"
+  0031  GetByIdShort         r5, r4, #c1, s14 "prototype"
+  0036  CreateClosure        r4, r0, f3 ""
+  003b  PutByIdLoose         r5, r4, #c2, s7 "onSubscribe"
+  0041  GetByIdShort         r8, r2, #c0, s16 "Subscribable"
+  0046  CreatePrivateName    r6, s11 "#focused"
+  004c  StoreToEnvironment   r3, 0, r6
+  0050  CreatePrivateName    r4, s9 "#cleanup"
+  0056  StoreToEnvironment   r3, 1, r4
+  005a  CreatePrivateName    r5, s13 "#setup"
+  0060  StoreToEnvironment   r3, 2, r5
+  0064  CreateDerivedClass   r8, r7, r3, r8, 4
+  006b  Mov                  r10, r7
+  006e  LoadConstString      r9, s7 "onSubscribe"
+  0072  CreateClosure        r7, r3, f5 "onSubscribe"
+  0077  DefineOwnByVal       r10, r7, r9, 0
+  007c  LoadConstString      r9, s19 "setEventListener"
+  0080  CreateClosure        r7, r3, f6 "setEventListener"
+  0085  DefineOwnByVal       r10, r7, r9, 0
+  008a  LoadConstString      r9, s18 "isFocused"
+  008e  CreateClosure        r7, r3, f7 "isFocused"
+  0093  DefineOwnByVal       r10, r7, r9, 0
+  0098  StoreToEnvironment   r3, 3, r8
+  009c  LoadParentNoTraps    r3, r8
+  009f  CreateThisForSuper   r7, r3, r8, 1
+  00a4  Mov                  r14, r7
+  00a7  CallWithNewTarget    r3, r3, r8, 1
+  00ac  SelectObject         r3, r7, r3
+  00b0  LoadConstEmpty       r7
+  00b2  ThrowIfThisInitialized r7
+  00b4  PrivateIsIn          r1, r6, r3, r0
+  00b9  JmpTrueLong          L1, r1
+  00bf  AddOwnPrivateBySym   r3, r0, r6
+  00c3  AddOwnPrivateBySym   r3, r0, r4
+  00c7  AddOwnPrivateBySym   r3, r0, r5
+  00cb  CreateClosure        r4, r0, f11 ""
+  00d0  PutOwnPrivateBySym   r3, r4, 1, r5
+  00d5  TryGetById           r7, r2, #c2, s10 "print"
+  00db  GetByIdShort         r4, r3, #c3, s18 "isFocused"
+  00e0  Call1                r6, r4, r3
+  00e4  GetByIdShort         r4, r3, #c4, s8 "listeners"
+  00e9  GetByIdShort         r5, r4, #c5, s20 "size"
+  00ee  LoadConstString      r4, s4 "before:"
+  00f2  Call4                r4, r7, r0, r4, r6, r5
+  00f9  GetByIdShort         r5, r3, #c6, s21 "subscribe"
+  00fe  CreateClosure        r4, r0, f8 ""
+  0103  Call2                r4, r5, r3, r4
+  0108  TryGetById           r7, r2, #c2, s10 "print"
+  010e  GetByIdShort         r4, r3, #c3, s18 "isFocused"
+  0113  Call1                r6, r4, r3
+  0117  GetByIdShort         r4, r3, #c4, s8 "listeners"
+  011c  GetByIdShort         r5, r4, #c5, s20 "size"
+  0121  LoadConstString      r4, s3 "after:"
+  0125  Call4                r4, r7, r0, r4, r6, r5
+  012c  GetByIdShort         r5, r3, #c7, s19 "setEventListener"
+  0131  CreateClosure        r4, r0, f9 ""
+  0136  Call2                r4, r5, r3, r4
+  013b  TryGetById           r4, r2, #c2, s10 "print"
+  0141  GetByIdShort         r2, r3, #c3, s18 "isFocused"
+  0146  Call1                r3, r2, r3
+  014a  LoadConstString      r2, s6 "set:"
+  014e  Call3                r2, r4, r0, r2, r3
+  0154  Ret                  r2
+L1:
+  0156  LoadConstString      r13, s1 "Cannot initialize private field …"
+  015a  CallBuiltin          r2, b44 "throwTypeError", 2
+
+function #1 "Subscribable"  params=1 frame=11 env=0 flags=dbg,overflowed  @0x000003ce size=35
+  0000  GetGlobalObject      r1
+  0002  TryGetById           r1, r1, #c0, s15 "Set"
+  0008  CreateThisForNew     r2, r1, 1
+  000c  Mov                  r3, r2
+  000f  Construct            r1, r1, 1
+  0013  SelectObject         r2, r2, r1
+  0017  LoadThisNS           r1
+  0019  PutByIdLoose         r1, r2, #c0, s8 "listeners"
+  001f  LoadConstUndefined   r0
+  0021  Ret                  r0
+
+function #2 ""  params=2 frame=14 env=0 flags=dbg,overflowed  @0x000003f1 size=47
+  0000  LoadThisNS           r2
+  0002  CreateFunctionEnvironment r0, 2
+  0005  StoreToEnvironment   r0, 1, r2
+  0009  LoadParam            r4, 1
+  000c  StoreToEnvironment   r0, 0, r4
+  0010  GetByIdShort         r3, r2, #c0, s8 "listeners"
+  0015  GetByIdShort         r1, r3, #c1, s17 "add"
+  001a  Call2                r1, r1, r3, r4
+  001f  GetByIdShort         r1, r2, #c2, s7 "onSubscribe"
+  0024  Call1                r1, r1, r2
+  0028  CreateClosure        r0, r0, f10 ""
+  002d  Ret                  r0
+
+function #3 ""  params=1 frame=1 env=0 flags=none  @0x00000420 size=4
+  0000  LoadConstUndefined   r0
+  0002  Ret                  r0
+
+function #4 "FocusManager"  params=1 frame=14 env=0 flags=strict,dbg,overflowed,ctor  @0x00000424 size=87
+  0000  GetParentEnvironment r2, 0
+  0003  GetNewTarget         r4
+  0005  LoadFromEnvironment  r1, r2, 3
+  0009  LoadParentNoTraps    r1, r1
+  000c  CreateThisForSuper   r3, r1, r4, 0
+  0011  Mov                  r6, r3
+  0014  CallWithNewTarget    r1, r1, r4, 1
+  0019  SelectObject         r1, r3, r1
+  001d  LoadConstEmpty       r3
+  001f  ThrowIfThisInitialized r3
+  0021  LoadFromEnvironment  r3, r2, 0
+  0025  PrivateIsIn          r0, r3, r1, r0
+  002a  JmpTrue              L1, r0
+  002d  LoadConstUndefined   r0
+  002f  AddOwnPrivateBySym   r1, r0, r3
+  0033  LoadFromEnvironment  r3, r2, 1
+  0037  AddOwnPrivateBySym   r1, r0, r3
+  003b  LoadFromEnvironment  r3, r2, 2
+  003f  AddOwnPrivateBySym   r1, r0, r3
+  0043  CreateClosure        r2, r0, f11 ""
+  0048  PutOwnPrivateBySym   r1, r2, 1, r3
+  004d  Ret                  r1
+L1:
+  004f  LoadConstString      r5, s1 "Cannot initialize private field …"
+  0053  CallBuiltin          r1, b44 "throwTypeError", 2
+
+function #5 "onSubscribe"  params=1 frame=13 env=0 flags=strict,dbg,overflowed,nc  @0x0000047b size=41
+  0000  LoadParam            r3, 0
+  0003  GetParentEnvironment r1, 0
+  0006  LoadFromEnvironment  r2, r1, 1
+  000a  GetOwnPrivateBySym   r2, r3, 0, r2
+  000f  JmpTrue              L1, r2
+  0012  GetByIdShort         r2, r3, #c0, s19 "setEventListener"
+  0017  LoadFromEnvironment  r1, r1, 2
+  001b  GetOwnPrivateBySym   r1, r3, 1, r1
+  0020  Call2                r1, r2, r3, r1
+L1:
+  0025  LoadConstUndefined   r0
+  0027  Ret                  r0
+
+function #6 "setEventListener"  params=2 frame=15 env=0 flags=strict,dbg,overflowed,nc  @0x000004a4 size=48
+  0000  LoadParam            r3, 0
+  0003  GetParentEnvironment r2, 0
+  0006  CreateFunctionEnvironment r1, 1
+  0009  StoreToEnvironment   r1, 0, r3
+  000d  LoadParam            r4, 1
+  0010  LoadFromEnvironment  r5, r2, 2
+  0014  PutOwnPrivateBySym   r3, r4, 0, r5
+  0019  LoadFromEnvironment  r2, r2, 1
+  001d  LoadConstUndefined   r0
+  001f  CreateClosure        r1, r1, f12 ""
+  0024  Call2                r1, r4, r0, r1
+  0029  PutOwnPrivateBySym   r3, r1, 1, r2
+  002e  Ret                  r0
+
+function #7 "isFocused"  params=1 frame=3 env=0 flags=strict,dbg,overflowed,nc  @0x000004d4 size=23
+  0000  GetParentEnvironment r1, 0
+  0003  LoadFromEnvironment  r2, r1, 0
+  0007  LoadParam            r1, 0
+  000a  GetOwnPrivateBySym   r1, r1, 0, r2
+  000f  LoadConstFalse       r0
+  0011  StrictNeq            r0, r1, r0
+  0015  Ret                  r0
+
+function #8 ""  params=1 frame=1 env=0 flags=nc  @0x000004eb size=4
+  0000  LoadConstZero        r0
+  0002  Ret                  r0
+
+function #9 ""  params=2 frame=12 env=0 flags=dbg,overflowed,nc  @0x000004ef size=14
+  0000  LoadConstFalse       r0
+  0002  LoadConstUndefined   r1
+  0004  LoadParam            r2, 1
+  0007  Call2                r2, r2, r1, r0
+  000c  Ret                  r2
+
+function #10 ""  params=1 frame=12 env=0 flags=dbg,overflowed,nc  @0x000004fd size=28
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r1, r0, 1
+  0007  GetByIdShort         r2, r1, #c0, s8 "listeners"
+  000c  GetByIdShort         r1, r2, #c1, s12 "delete"
+  0011  LoadFromEnvironment  r0, r0, 0
+  0015  Call2                r0, r1, r2, r0
+  001a  Ret                  r0
+
+function #11 ""  params=2 frame=12 env=0 flags=strict,dbg,overflowed,nc  @0x00000519 size=14
+  0000  LoadConstTrue        r0
+  0002  LoadConstUndefined   r1
+  0004  LoadParam            r2, 1
+  0007  Call2                r2, r2, r1, r0
+  000c  Ret                  r2
+
+function #12 ""  params=2 frame=4 env=0 flags=strict,dbg,overflowed,nc  @0x00000527 size=27
+  0000  GetParentEnvironment r1, 0
+  0003  LoadFromEnvironment  r3, r1, 0
+  0007  GetParentEnvironment r1, 1
+  000a  LoadFromEnvironment  r2, r1, 0
+  000e  LoadParam            r1, 1
+  0011  PutOwnPrivateBySym   r3, r1, 0, r2
+  0016  LoadConstUInt8       r0, 1
+  0019  Ret                  r0

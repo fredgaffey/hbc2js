@@ -14,10 +14,11 @@
 // shape it always resolves to either a rule + replacement or one of the
 // named §7 refuse reasons.
 import type { Expr, Stmt } from "../ast.ts";
-import { isHelperCall, isRegisterName } from "../ast.ts";
+import { identUses, isHelperCall, isRegisterName } from "../ast.ts";
+import { applyReplacement } from "./rewrite.ts";
 import type { Match, PassContext } from "../types.ts";
 
-export type CallShapeRule = "R3a" | "R3b" | "R3c" | "R3d";
+export type CallShapeRule = "R3a" | "R3b" | "R3c" | "R3d" | "R3e" | "R3f";
 
 export type RefuseReason = "dynamic-args" | "impure-callee" | "unproven-this" | "member-callee-with-undefined-this" | "explicit-new-target" | "duplicated-construct-callee" | "helper-arity" | "not-a-call-shape-site";
 
@@ -28,6 +29,8 @@ export interface CallShapeSite {
    *  `rewrite`/`check` find it again inside `list[stmtIndex]`. */
   readonly target: Expr;
   readonly replacement: Expr;
+  /** R3e only: `list[from..to]` (inclusive) is replaced by `stmts`. */
+  readonly splice?: { readonly from: number; readonly to: number; readonly stmts: readonly Stmt[] };
 }
 
 export type CallShapeMatch = Match<readonly Stmt[], CallShapeSite>;
@@ -161,7 +164,11 @@ function classifyReflectApply(node: Expr & { readonly k: "call" }, fnBody: reado
     const O = F.obj;
     const sameIdent = O.k === "ident" && T.k === "ident" && T.name === O.name;
     if (sameIdent) return { ok: true, rule: "R3b", replacement: { k: "call", callee: F, args } };
-    if (isProvenUndefinedThis(T, fnBody)) return { ok: false, reason: "member-callee-with-undefined-this" };
+    // R3f (spec 04 section 4): a member callee called with a proven-undefined
+    // receiver is Babel's interop call `(0, O.p)(a...)`. The sequence makes
+    // the callee a plain value, so `this` stays undefined; `O.p` is still the
+    // first effect, exactly as in `Reflect.apply`'s argument order.
+    if (isProvenUndefinedThis(T, fnBody)) return { ok: true, rule: "R3f", replacement: { k: "call", callee: { k: "seq", exprs: [{ k: "lit", text: "0" }, F] }, args } };
     return { ok: false, reason: "unproven-this" };
   }
 
@@ -339,6 +346,168 @@ export function match(list: readonly Stmt[], ctx: PassContext): CallShapeMatch |
         at: { functionIndex: ctx.functionIndex, offset: c.stmtIndex },
       };
     }
+  }
+  const r3e = matchCondArg(list, fnBody);
+  if (r3e !== null) return { root: list, nodes: [list], data: r3e, at: { functionIndex: ctx.functionIndex, offset: r3e.stmtIndex } };
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// R3e (spec 04 section 9) -- the callee read separated from its call by the
+// arguments' own control flow: `F = R.P; <args>; Reflect.apply(F, R, [A...])`
+// -> `R.P((<args as expressions>, A1), A2, ...)`.
+// ---------------------------------------------------------------------------
+
+/** The `Reflect.apply` call `s` evaluates FIRST (statement value, an
+ *  assignment's value, or the object of a member read), else null. */
+function leadingCall(s: Stmt, assigned: string[] = []): (Expr & { readonly k: "call" }) | null {
+  let e: Expr | null = s.k === "expr" ? s.expr : s.k === "init" ? s.value : s.k === "return" ? s.arg : null;
+  while (e !== null) {
+    if (e.k === "call") return isReflectMember(e.callee, "apply") ? e : null;
+    if (e.k === "assign" && e.target.k === "ident") {
+      assigned.push(e.target.name);
+      e = e.value;
+    }
+    else if (e.k === "member") e = e.obj;
+    else return null;
+  }
+  return null;
+}
+
+function isBreakTo(s: Stmt | undefined, label: string): boolean {
+  return s !== undefined && s.k === "break" && s.label === label;
+}
+
+/** `stmts` (the tail of a block labelled `label`, or one top-level statement
+ *  when `label` is null) as expressions evaluated in the same order with the
+ *  same effects: `if (C) break L; T...` is `C || (T...)`, a trailing
+ *  `break L` ends the block, a nested labelled block is flattened the same
+ *  way. Anything else (declarations, loops, other jumps) is null. */
+function toExprs(stmts: readonly Stmt[], label: string | null): Expr[] | null {
+  const out: Expr[] = [];
+  for (let i = 0; i < stmts.length; i++) {
+    const s = stmts[i]!;
+    if (s.k === "expr") out.push(s.expr);
+    else if (label !== null && isBreakTo(s, label)) return i === stmts.length - 1 ? out : null;
+    else if (label !== null && s.k === "if" && s.then.length >= 1 && isBreakTo(s.then[s.then.length - 1], label) && s.else.length === 0) {
+      const rest = toExprs(stmts.slice(i + 1), label);
+      if (rest === null) return null;
+      if (s.then.length > 1) {
+        // `if (C) { T; break L; } E; break L;` is `C ? (T) : (E)` (`C && (T)` with no E).
+        const then = toExprs(s.then, label);
+        if (then === null || then.length === 0) return null;
+        const seqOf = (es: readonly Expr[]): Expr => (es.length === 1 ? es[0]! : { k: "seq", exprs: es });
+        out.push(rest.length === 0 ? { k: "logical", op: "&&", left: s.test, right: seqOf(then) } : { k: "cond", test: s.test, then: seqOf(then), else: seqOf(rest) });
+        return out;
+      }
+      // `if (!C) break L; T` is `C && (T)`; `if (C) break L; T` is `C || (T)`.
+      const negated = s.test.k === "unary" && s.test.op === "!";
+      const test = negated && s.test.k === "unary" ? s.test.arg : s.test;
+      out.push(rest.length === 0 ? s.test : { k: "logical", op: negated ? "&&" : "||", left: test, right: rest.length === 1 ? rest[0]! : { k: "seq", exprs: rest } });
+      return out;
+    } else if (s.k === "labeled") {
+      const inner = toExprs(s.body, s.label);
+      if (inner === null) return null;
+      out.push(...inner);
+    } else return null;
+  }
+  return out;
+}
+
+/** Any `break`/`continue` naming `label` inside `stmts`. */
+function mentionsLabel(stmts: readonly Stmt[], label: string): boolean {
+  return JSON.stringify(stmts).includes(`"label":${JSON.stringify(label)}`);
+}
+
+function isMemberOf(e: Expr, r: string): e is Expr & { readonly k: "member" } {
+  return e.k === "member" && e.obj.k === "ident" && e.obj.name === r && isSimpleCalleeChain(e);
+}
+
+/** `F = R.P` exactly. */
+function readOf(s: Stmt, f: string, r: string): (Expr & { readonly k: "member" }) | null {
+  if (s.k !== "expr" || s.expr.k !== "assign" || s.expr.target.k !== "ident" || s.expr.target.name !== f) return null;
+  return isMemberOf(s.expr.value, r) ? s.expr.value : null;
+}
+
+/** `rN = _eX_Y` (a closure-env slot load into a register), else null. */
+function symbolSlotLoad(e: Expr): string | null {
+  return e.k === "assign" && e.target.k === "ident" && e.value.k === "ident" && /^_e\d+_\d+$/.test(e.value.name) ? e.target.name : null;
+}
+
+/** `x = O[rN]` or `O[rN]` for the register `rN`. */
+function symbolKeyRead(e: Expr | undefined, reg: string): boolean {
+  const v = e !== undefined && e.k === "assign" ? e.value : e;
+  return v !== undefined && v.k === "member" && v.computed && v.prop.k === "ident" && v.prop.name === reg;
+}
+
+export function matchCondArg(list: readonly Stmt[], fnBody: readonly Stmt[]): CallShapeSite | null {
+  for (let j = 1; j < list.length; j++) {
+    const assigned: string[] = [];
+    const call = leadingCall(list[j]!, assigned);
+    if (call === null || call.args.length !== 3) continue;
+    const [F, R, arr] = call.args;
+    if (F!.k !== "ident" || R!.k !== "ident" || !isRegisterName(F!.name) || !isRegisterName(R!.name) || F!.name === R!.name) continue;
+    // Order with R3f: a provably-undefined receiver is R3f's (`(0, O.p)` keeps
+    // `this` undefined); R3e applies only when R is the real receiver.
+    if (isProvenUndefinedThis(R!, fnBody)) continue;
+    const args = extractArgsArray(arr!);
+    if (args === null || args.length === 0) continue;
+    const f = F!.name;
+    const r = R!.name;
+    // The value `F = R.P` stores must die at this call: F read once in it,
+    // and either F used nowhere else or this statement overwrites F.
+    const uses = identUses(fnBody, f);
+    if (identUses([list[j]!], f).reads !== 1) continue;
+    if (!(uses.reads === 1 && uses.writes === 1) && !assigned.includes(f)) continue;
+    // The statement writing F, scanning back from the call.
+    let k = j - 1;
+    while (k >= 0 && identUses([list[k]!], f).writes === 0) k--;
+    if (k < 0) continue;
+    const def = list[k]!;
+    let read: (Expr & { readonly k: "member" }) | null = readOf(def, f, r);
+    let hoisted: readonly Stmt[] = [];
+    const seq: Expr[] = [];
+    if (read === null) {
+      if (def.k !== "labeled") continue;
+      const i = def.body.findIndex((s) => readOf(s, f, r) !== null);
+      if (i < 0) continue;
+      read = readOf(def.body[i]!, f, r);
+      hoisted = def.body.slice(0, i);
+      // Hoisting the prefix out of the block must not move a block-scoped
+      // declaration, nor a jump that would skip the read.
+      if (mentionsLabel(hoisted, def.label) || hoisted.some((h) => h.k === "decl" || h.k === "init" || h.k === "func" || h.k === "classdecl")) continue;
+      const tail = toExprs(def.body.slice(i + 1), def.label);
+      if (tail === null) continue;
+      seq.push(...tail);
+    }
+    const decls: Stmt[] = [];
+    let ok = true;
+    for (let m = k + 1; m < j && ok; m++) {
+      const s = list[m]!;
+      if (s.k === "init" && s.kind !== "const") {
+        decls.push({ k: "decl", kind: s.kind, names: [s.name] });
+        seq.push({ k: "assign", target: { k: "ident", name: s.name }, value: s.value });
+        continue;
+      }
+      const e = toExprs([s], null);
+      if (e === null) ok = false;
+      else seq.push(...e);
+    }
+    if (!ok || read === null) continue;
+    // An argument that loads a closure-env slot (a private-name symbol, say) stays
+    // in statement form: private-fields folds `this[symbolSlot]` only there
+    // (review "passes-roundtrip-integrate", fixture 112).
+    if (seq.some((e, i) => symbolSlotLoad(e) !== null && symbolKeyRead(seq[i + 1], symbolSlotLoad(e)!))) continue;
+    // `this` must be the value R held when P was read: no write to R between.
+    if (seq.length > 0) {
+      const mid: Stmt[] = [{ k: "expr", expr: { k: "seq", exprs: seq } }];
+      const fu = identUses(mid, f);
+      if (identUses(mid, r).writes !== 0 || fu.reads !== 0 || fu.writes !== 0) continue;
+    }
+    const callArgs = seq.length === 0 ? args : [{ k: "seq", exprs: [...seq, args[0]!] } as Expr, ...args.slice(1)];
+    const replacement: Expr = { k: "call", callee: read, args: callArgs };
+    const newStmt = applyReplacement(list[j]!, call, replacement);
+    return { rule: "R3e", stmtIndex: j, target: call, replacement, splice: { from: k, to: j, stmts: [...hoisted, ...decls, newStmt] } };
   }
   return null;
 }

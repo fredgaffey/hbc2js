@@ -1,0 +1,93 @@
+; hbc2js disassembly of 150-closure-created-in-inner-fn/v99.hbc
+; version=99 layout=E opcodeTable=hbc99-mar2026 functions=5 strings=20 globalCodeIndex=0
+function #0 "global"  params=1 frame=16 env=0 flags=dbg,overflowed  @0x000001a0 size=156
+  0000  DeclareGlobalVar     s15 "makeParser"
+  0005  DeclareGlobalVar     s11 "p"
+  000a  GetGlobalObject      r1
+  000c  LoadConstUndefined   r0
+  000e  CreateClosure        r2, r0, f1 "makeParser"
+  0013  PutByIdLoose         r1, r2, #c0, s15 "makeParser"
+  0019  GetByIdShort         r3, r1, #c0, s15 "makeParser"
+  001e  LoadConstString      r2, s3 "#"
+  0022  Call2                r2, r3, r0, r2
+  0027  PutByIdLoose         r1, r2, #c1, s11 "p"
+  002d  TryGetById           r3, r1, #c1, s17 "print"
+  0033  GetByIdShort         r5, r1, #c2, s11 "p"
+  0038  GetByIdShort         r4, r5, #c3, s12 "parse"
+  003d  LoadConstString      r2, s2 "#a\nb\n#c"
+  0041  Call2                r4, r4, r5, r2
+  0046  GetByIdShort         r2, r4, #c4, s14 "join"
+  004b  LoadConstString      r5, s6 ","
+  004f  Call2                r2, r2, r4, r5
+  0054  Call2                r2, r3, r0, r2
+  0059  TryGetById           r3, r1, #c1, s17 "print"
+  005f  GetByIdShort         r6, r1, #c2, s11 "p"
+  0064  GetByIdShort         r4, r6, #c3, s12 "parse"
+  0069  LoadConstString      r2, s4 "#d"
+  006d  Call2                r4, r4, r6, r2
+  0072  GetByIdShort         r2, r4, #c4, s14 "join"
+  0077  Call2                r2, r2, r4, r5
+  007c  Call2                r2, r3, r0, r2
+  0081  TryGetById           r2, r1, #c1, s17 "print"
+  0087  GetByIdShort         r3, r1, #c2, s11 "p"
+  008c  GetByIdShort         r1, r3, #c5, s9 "count"
+  0091  Call1                r1, r1, r3
+  0095  Call2                r1, r2, r0, r1
+  009a  Ret                  r1
+
+function #1 "makeParser"  params=2 frame=15 env=0 flags=strict,dbg,overflowed  @0x0000023c size=81
+  0000  CreateFunctionEnvironment r2, 2
+  0003  GetGlobalObject      r1
+  0005  TryGetById           r4, r1, #c0, s10 "RegExp"
+  000b  LoadConstString      r3, s7 "^"
+  000f  LoadParam            r1, 1
+  0012  Add                  r5, r3, r1
+  0016  CreateThisForNew     r3, r4, 1
+  001a  LoadConstString      r1, s5 "(\\w+)"
+  001e  AddS                 r6, r5, r1
+  0022  Mov                  r7, r3
+  0025  Construct            r1, r4, 2
+  0029  SelectObject         r1, r3, r1
+  002d  StoreToEnvironment   r2, 0, r1
+  0031  LoadConstZero        r0
+  0033  StoreNPToEnvironment r2, 1, r0
+  0037  NewObjectWithBuffer  r1, sh0(numProps=2), lit@0x0000
+  003d  CreateClosure        r3, r2, f2 "parse"
+  0042  PutOwnBySlotIdx      r1, r3, 0
+  0046  CreateClosure        r2, r2, f3 "count"
+  004b  PutOwnBySlotIdx      r1, r2, 1
+  004f  Ret                  r1
+
+function #2 "parse"  params=2 frame=14 env=0 flags=strict,dbg,overflowed  @0x0000028d size=42
+  0000  LoadParam            r2, 1
+  0003  GetByIdShort         r1, r2, #c0, s19 "split"
+  0008  LoadConstString      r0, s1 "\n"
+  000c  Call2                r3, r1, r2, r0
+  0011  GetByIdShort         r2, r3, #c1, s16 "reduce"
+  0016  NewArray             r1, 0
+  001a  GetParentEnvironment r0, 0
+  001d  CreateClosure        r0, r0, f4 ""
+  0022  Call3                r0, r2, r3, r0, r1
+  0028  Ret                  r0
+
+function #3 "count"  params=1 frame=2 env=0 flags=strict  @0x000002b7 size=9
+  0000  GetParentEnvironment r1, 0
+  0003  LoadFromEnvironment  r0, r1, 1
+  0007  Ret                  r0
+
+function #4 ""  params=3 frame=16 env=0 flags=strict,dbg,overflowed  @0x000002c0 size=53
+  0000  GetParentEnvironment r3, 0
+  0003  LoadParam            r2, 1
+  0006  LoadFromEnvironment  r6, r3, 0
+  000a  GetByIdShort         r5, r6, #c0, s13 "exec"
+  000f  LoadParam            r4, 2
+  0012  Call2                r4, r5, r6, r4
+  0017  JmpFalse             L1, r4
+  001a  GetByIdShort         r5, r2, #c1, s18 "push"
+  001f  GetByIndex           r4, r4, 1
+  0023  Call2                r4, r5, r2, r4
+L1:
+  0028  LoadFromEnvironment  r1, r3, 1
+  002c  Inc                  r0, r1
+  002f  StoreNPToEnvironment r3, 1, r0
+  0033  Ret                  r2

@@ -157,6 +157,26 @@ function inCycle(cfg: import("../cfg/types.ts").FunctionCfg, block: number): boo
   return false;
 }
 
+/** True when `to` is reachable from `from` along at least one normal edge. */
+function reaches(cfg: import("../cfg/types.ts").FunctionCfg, from: number, to: number): boolean {
+  const seen = new Set<number>();
+  const stack = [...cfg.blocks[from]!.succs.map((e) => e.to)];
+  while (stack.length > 0) {
+    const b = stack.pop()!;
+    if (b === to) return true;
+    if (seen.has(b)) continue;
+    seen.add(b);
+    for (const e of cfg.blocks[b]!.succs) stack.push(e.to);
+  }
+  return false;
+}
+
+const CREATE_CLOSURE_OPS: ReadonlySet<string> = new Set([
+  "CreateClosure", "CreateClosureLongIndex",
+  "CreateGeneratorClosure", "CreateGeneratorClosureLongIndex",
+  "CreateAsyncClosure", "CreateAsyncClosureLongIndex",
+]);
+
 export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): EmitResult {
   const mod = analysis.module;
   const provenanceComments = opts.provenanceComments ?? true;
@@ -384,6 +404,31 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
         }
       }
     }
+  }
+
+  // Spec 27 section 11 (round-trip bucket `tree:unmatched-closure`): a
+  // function whose every creation site is in ONE function `C`, strictly below
+  // the owner `H` of its closure environment, is emitted inside `C`, not
+  // beside `C` in `H`. `C` owns no environment the body names (the env graph
+  // put the body's environment at `H`), so every `_e<env>_<slot>` the body
+  // reads is declared at `H` or above and resolves the same from inside `C`;
+  // a declaration hoisted to the top of `C` is visible at every site in `C`.
+  // Without this, hermesc compiles the declaration as `H`'s closure: one
+  // instance per `H` call instead of one per `C` call, and `C` creates none.
+  // Several creators keep `H`; several environments at the sites are the LCA
+  // rule's. Runs AFTER the joined/LCA moves above, so `isAncestor(home, host)`
+  // sees where the creator finally sits (a creator moved above `H` keeps the
+  // leftover-7 rule's placement for its children).
+  for (const [f, sites] of envGraph.closureCreationSites) {
+    if (f === globalIndex || envGraph.closureCopies.has(f)) continue;
+    const home = parentOf.get(f) ?? null;
+    if (home === null || sites.size === 0) continue;
+    if (new Set(sites.values()).size > 1) continue;
+    const creators = new Set([...sites.keys()].map((k) => Number(k.slice(0, k.indexOf(":")))));
+    if (creators.size !== 1) continue;
+    const host = [...creators][0]!;
+    if (host === home || host === f || isAncestor(f, host) || !isAncestor(home, host)) continue;
+    parentOf.set(f, host);
   }
 
   // §6 "Function nesting" (placement, docs/BUGS.md 2026-09-04): an orphan used
@@ -662,6 +707,50 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
     for (const child of node.closures) inlineFunctions.add(child);
   }
 
+  // Spec 27 §12 (review-1109-1): a `CreateClosure` that can execute more than
+  // once per activation of its host makes a fresh function object every time,
+  // but a hoisted declaration is ONE object per activation, so every
+  // iteration of `for (...) fs.push(function () {...})` got the same function
+  // (VM `fs[0] !== fs[1]` is true; ours was false). Such a closure is emitted
+  // as a function expression at its creation site instead — the same
+  // `inlineFunctions` route the loop-local environments above use. The
+  // hoisted declaration stays only when every site is in the host, none lies
+  // on a cycle, and no site reaches another (at most one execution per
+  // activation); creating it earlier (at entry) is unobservable because
+  // closure creation runs no user code and the synthetic `_fn<n>` name is
+  // read only at the creation sites themselves.
+  for (const [host, kids] of childrenOf) {
+    let cfg: FunctionCfg;
+    try {
+      cfg = analysis.cfg(host);
+    } catch {
+      continue;
+    }
+    const localSites = new Map<number, { block: number; offset: number; plain: boolean }[]>();
+    for (const b of cfg.blocks) {
+      for (const insn of b.instructions) {
+        const child = closureFunctionId(insn);
+        if (child === undefined) continue;
+        const entry = { block: b.id, offset: insn.offset, plain: CREATE_CLOSURE_OPS.has(insn.name) };
+        const list = localSites.get(child);
+        if (list === undefined) localSites.set(child, [entry]);
+        else list.push(entry);
+      }
+    }
+    for (const child of kids) {
+      if (inlineFunctions.has(child) || envGraph.closureCopies.has(child)) continue;
+      const here = localSites.get(child);
+      if (here === undefined || here.length === 0 || !here.every((s) => s.plain)) continue;
+      const all = envGraph.closureCreationSites.get(child);
+      if (all !== undefined && [...all.keys()].some((k) => Number(k.slice(0, k.indexOf(":"))) !== host)) continue;
+      const repeats =
+        here.some((s) => inCycle(cfg, s.block)) ||
+        here.some((a, i) => here.some((b, j) => i !== j && (a.block === b.block ? a.offset < b.offset : reaches(cfg, a.block, b.block))));
+      if (!repeats) continue;
+      inlineFunctions.add(child);
+    }
+  }
+
   /** True when a copy hosted in `host` must be emitted INLINE at its creation
    *  site rather than hoisted: it captured an environment `host` declares
    *  inside a loop body's block (report §5 "Landing item 3"). */
@@ -763,7 +852,7 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
       const inlined = new Map<number, Stmt>();
       for (const child of kids) {
         const body = emitOne(child, childCtx);
-        if (inlineFunctions.has(child)) inlined.set(child, body);
+        if (inlineFunctions.has(child) && body.k === "func") inlined.set(child, body);
         else hoisted.push(body);
       }
       // They travel with their whole lexical subtree, under the composed

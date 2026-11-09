@@ -9,7 +9,8 @@ import { analyzeApk, apkHintsFromEvidence, extractBundleFromApk, extractHermesBu
 import { selectBundleInventory } from "./bundles.ts";
 import type { BundleSummary } from "./bundles.ts";
 import type { ApkEvidence } from "./apk.ts";
-import { deriveCandidatePackages } from "./candidates.ts";
+import { deriveCandidatePackages, listCandidatePackageNamesForLayers } from "./candidates.ts";
+import { relabelForks } from "./fork-relabel.ts";
 import { hashIndexHint } from "./hash-index.ts";
 import { classifyInventory, loadCommonalityIndex, DEFAULT_COMMONALITY_INDEX_PATH } from "./classify.ts";
 import type { ClassificationReport } from "./classify.ts";
@@ -105,7 +106,10 @@ export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promis
   const layers = resolveDbLayers({ ...(opts.out !== undefined ? { outDir: opts.out } : {}), ...(opts.sigdb !== undefined ? { sigdb: opts.sigdb } : {}), noSharedDb: opts.noSharedDb === true });
   const otherHbcPackages = new Set<string>();
   const dbs = loadSignatures(layers, opts.exhaustive === true ? { slim: slimTargetFor(inventory, opts.minInstr) } : { candidates: deriveCandidatePackages(layers, inventory), hbcVersion: inventory.hbcVersion, otherHbcPackages, slim: slimTargetFor(inventory, opts.minInstr) });
-  const matchReport = matchInventory(inventory, dbs, opts.minInstr !== undefined ? { minInstr: opts.minInstr } : {});
+  const matched = matchInventory(inventory, dbs, opts.minInstr !== undefined ? { minInstr: opts.minInstr } : {});
+  // corpus-fork-relabel (docs/DEPS.md "Fork relabel"): a confirmed upstream
+  // whose fork the bundle names is reported under the fork's name.
+  const matchReport = { ...matched, packages: relabelForks(matched.packages, inventory, new Set(listCandidatePackageNamesForLayers(layers))) };
 
   const apkHints = apkEvidence !== null ? apkHintsFromEvidence(apkEvidence) : undefined;
   const knownPackages = new Set([...dbs.map((d) => d.file.package), ...otherHbcPackages]);

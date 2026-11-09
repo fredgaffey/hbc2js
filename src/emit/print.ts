@@ -327,7 +327,22 @@ function printBody(body: readonly Stmt[], depth: number, out: string[], opts: Pr
   for (const s of body) printStmt(s, depth, out, opts);
 }
 
+/** Indent depth of the statement being printed; an inline function expression
+ *  (`render()`'s `"func"` case) indents its body one level below and aligns
+ *  its closing brace with it. */
+let curDepth = 0;
+
 function printStmt(s: Stmt, depth: number, out: string[], opts: PrintOptions): void {
+  const saved = curDepth;
+  curDepth = depth;
+  try {
+    printStmtInner(s, depth, out, opts);
+  } finally {
+    curDepth = saved;
+  }
+}
+
+function printStmtInner(s: Stmt, depth: number, out: string[], opts: PrintOptions): void {
   const p = pad(depth, opts);
   if (originMarks !== undefined) {
     // `out.length` is the index of the entry this statement is about to push
@@ -626,6 +641,8 @@ function render(e: Expr): string {
       return withMarksSuspended(() => renderClass(e));
     case "func": {
       const out: string[] = [];
+      const d = curDepth;
+      const closer = `\n${"  ".repeat(d)}}`;
       const header = `${e.async === true ? "async " : ""}function${e.generator === true ? "*" : ""} ${e.name ?? ""}(${paramList(e.params)}) {`;
       // §16.2: this body prints into a SEPARATE array whose text is then
       // spliced into the middle of an enclosing `out` entry, so a mark taken
@@ -633,8 +650,8 @@ function render(e: Expr): string {
       // to collect and nothing to insert — the hookless path below is exactly
       // the code that shipped before the sentinel existed.
       if (inlineRecords === undefined) {
-        printBody(e.body, 1, out, { indent: "  " });
-        return `${header}\n${out.join("\n")}\n}`;
+        printBody(e.body, d + 1, out, { indent: "  " });
+        return `${header}\n${out.join("\n")}${closer}`;
       }
       // With a hook live: collect this body's marks against its OWN array,
       // convert them to lines relative to this function's own text (line 1 is
@@ -647,7 +664,7 @@ function render(e: Expr): string {
       originMarks = mine;
       funcMarks = mineFuncs;
       try {
-        printBody(e.body, 1, out, { indent: "  " });
+        printBody(e.body, d + 1, out, { indent: "  " });
       } finally {
         originMarks = savedOrigins;
         funcMarks = savedFuncs;
@@ -663,7 +680,7 @@ function render(e: Expr): string {
       if (typeof e.name === "string" && e.name.length > 0) ranges.push({ name: e.name, relStart: 1, relEnd: relStart[out.length]! });
       const id = inlineRecords.length;
       inlineRecords.push({ marks, ranges });
-      return `${SENTINEL_OPEN}${id.toString(36)}${SENTINEL_CLOSE}${header}\n${out.join("\n")}\n}`;
+      return `${SENTINEL_OPEN}${id.toString(36)}${SENTINEL_CLOSE}${header}\n${out.join("\n")}${closer}`;
     }
   }
 }
