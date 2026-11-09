@@ -678,6 +678,11 @@ export function foldSuperBody(module: readonly Stmt[], cls: ClassExpr, body: rea
   // Delete the dead "super() called twice" guard, and its `T = <empty>` store
   // when nothing can read `T` before the next write to it.
   let guardName: string | null = null;
+  // A dead store that is also `T`'s own declaration (`let T = __hbc_empty;`)
+  // leaves a bare `let T;` behind when `T` is still mentioned after it:
+  // deleting it outright left the next `T = ...` undeclared, a ReferenceError
+  // in a (strict) class body (rt-fcall4, fixture 110's FocusManager).
+  const replaced = new Map<number, Stmt>();
   for (let i = at + 1; i + 1 < body.length; i++) {
     const name = isSuperTwiceGuard(body[i]!, body[i + 1]);
     if (name === null) continue;
@@ -686,13 +691,18 @@ export function foldSuperBody(module: readonly Stmt[], cls: ClassExpr, body: rea
     const after = simpleStore(rest[0] ?? { k: "comment", text: "" });
     const deadStore = (after !== null && after.name === name && identUses([{ k: "expr", expr: after.value }], name).reads === 0)
       || (identUses(rest, name).reads + identUses(rest, name).writes === 0 && !mentionedInNestedFunction(rest, name));
-    if (deadStore) consumed.add(i);
+    if (deadStore) {
+      const decl = body[i]!;
+      const stillNamed = identUses(rest, name).reads + identUses(rest, name).writes > 0 || mentionedInNestedFunction(rest, name);
+      if (decl.k === "init" && stillNamed) replaced.set(i, { k: "decl", kind: decl.kind, names: [name], ...(decl.origin !== undefined ? { origin: decl.origin } : {}) });
+      else consumed.add(i);
+    }
     guardName = name;
     break;
   }
   void guardName;
 
-  const tailStmts = body.filter((_s, i) => i > at && !consumed.has(i));
+  const tailStmts = body.map((s, i) => replaced.get(i) ?? s).filter((_s, i) => i > at && !consumed.has(i));
   for (const name of standins) {
     if (mentionedInNestedFunction(body, name)) return { code: "R-SC5", reason: `the stand-in register ${name} also occurs inside a nested closure, where it is a different frame's local` };
     // A store whose value is a call and whose very next statement is an
