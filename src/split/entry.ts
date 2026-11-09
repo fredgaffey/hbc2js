@@ -12,9 +12,17 @@ function assignedIdent(s: Stmt): { readonly name: string; readonly value: Expr }
 }
 
 export function resolveEntryModuleId(globalBody: readonly Stmt[]): number | null {
+  const ids = resolveStartupModuleIds(globalBody);
+  return ids.length > 0 ? ids[ids.length - 1]! : null;
+}
+
+/** Every top-level `<globalObj>.__r(<literal id>)` call, in order: Metro's
+ *  run-before-main modules (e.g. RN's InitializeCore) followed by the entry
+ *  module (spec 33 L1: an export must run all of them, not just the last). */
+export function resolveStartupModuleIds(globalBody: readonly Stmt[]): number[] {
   const regs = new Map<string, Tag>();
   const noParams = new Set<string>();
-  let lastEntry: number | null = null;
+  const ids: number[] = [];
 
   const checkCall = (call: Extract<Expr, { k: "call" }>): void => {
     if (!isReflectApply(call.callee) || call.args.length !== 3) return;
@@ -23,7 +31,7 @@ export function resolveEntryModuleId(globalBody: readonly Stmt[]): number | null
     const arr = call.args[2]!;
     if (arr.k !== "array" || arr.elements.length !== 1) return;
     const argTag = classify(arr.elements[0]!, regs, noParams);
-    if (argTag.kind === "num") lastEntry = argTag.value;
+    if (argTag.kind === "num") ids.push(argTag.value);
   };
 
   for (const s of globalBody) {
@@ -39,5 +47,5 @@ export function resolveEntryModuleId(globalBody: readonly Stmt[]): number | null
     }
     if (s.k === "expr" && s.expr.k === "call") checkCall(s.expr);
   }
-  return lastEntry;
+  return ids;
 }

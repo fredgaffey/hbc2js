@@ -88,8 +88,20 @@ export function buildRegistryJs(substitutions: ReadonlyMap<number, string> = new
   lines.push(`  requireFn.importDefault = importDefault;`);
   lines.push(`  requireFn.importAll = importAll;`);
   if (instrument) {
+    // Spec 33 §4(b): the boot-proof probe, keyed by ORIGINAL module id. A
+    // host that defines \`__HBC_BOOT_PROBE__\` (the headless boot proof)
+    // sees enter/exit/throw; on a device it is undefined and costs one read.
+    lines.push(`  var __hbc_probe = globalThis.__HBC_BOOT_PROBE__;`);
+    lines.push(`  if (typeof __hbc_probe !== "function") __hbc_probe = null;`);
+    lines.push(`  if (__hbc_probe !== null) __hbc_probe("enter", id);`);
     lines.push(`  var __hbc_t0 = __hbc_now();`);
-    lines.push(`  entry.factory(globalThis, requireFn, importDefault, importAll, mod, mod.exports, entry.deps);`);
+    lines.push(`  try {`);
+    lines.push(`    entry.factory(globalThis, requireFn, importDefault, importAll, mod, mod.exports, entry.deps);`);
+    lines.push(`  } catch (e) {`);
+    lines.push(`    if (__hbc_probe !== null) __hbc_probe("throw", id, e);`);
+    lines.push(`    throw e;`);
+    lines.push(`  }`);
+    lines.push(`  if (__hbc_probe !== null) __hbc_probe("exit", id, mod.exports);`);
     lines.push(`  var __hbc_dt = __hbc_now() - __hbc_t0;`);
     lines.push(`  var __hbc_ring = globalThis.__HBC_BOOT_TIMINGS__;`);
     lines.push(`  __hbc_ring.push({ id: id, t0: __hbc_t0, dt: __hbc_dt });`);

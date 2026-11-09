@@ -59,6 +59,12 @@ export interface BootTraceOptions {
    *  of the VM is irrelevant (spec §1 item 1). */
   readonly vm?: string;
   readonly timeoutMs?: number;
+  /** Spec 33 §4(a): wrap every factory the trapped `__d` registers so it
+   *  reports `enter`/`exit`/`throw` through `__HBC_BOOT_PROBE__`. Default
+   *  true (the original side). The export side of `export-boot.ts` passes
+   *  false: there `__d` carries Metro's re-bundle ids, and the export's own
+   *  registry calls the probe with original ids instead (§4(b)). */
+  readonly wrapFactories?: boolean;
 }
 
 export interface BootTraceResult {
@@ -113,7 +119,7 @@ function excerpt(s: string): string {
  *  cannot collide with a top-level `var` the bundle itself declares; only the
  *  specific global names spec §4.1 lists, plus the two boot-orchestration
  *  hooks `__hbcBootEnd`/`__hbcBootErr`, are left on `globalThis`. */
-function buildPrelude(seed: number, firstNative: number): string {
+function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean): string {
   return `
 (function () {
   "use strict";
@@ -122,6 +128,7 @@ function buildPrelude(seed: number, firstNative: number): string {
   var __hbcNativeCount = 0;
   var __hbcNativeLimited = false;
   var __hbcRealPrint = globalThis.print;
+  var __hbcWrapFactories = ${JSON.stringify(wrapFactories)};
 
   function emit(rec) {
     var line;
@@ -180,6 +187,9 @@ function buildPrelude(seed: number, firstNative: number): string {
         if (p in t) return t[p];
         var child = function () {
           if (nativeGate()) callRecord(name + "." + String(p), [], undefined);
+          // Spec 33 L1 stub-host addition (spec 31 §4.2): getConstants()
+          // returns an object (see hostConstants), not undefined.
+          if (p === "getConstants") return hostConstants(name);
           return undefined;
         };
         t[p] = child;
@@ -194,6 +204,17 @@ function buildPrelude(seed: number, firstNative: number): string {
         return true;
       },
     });
+  }
+
+  // Spec 33 L1 stub-host addition (spec 31 §4.2). RN reads native-module
+  // constants unguarded at module-eval time (0.72: PaperUIManager reads
+  // .ViewManagerNames, Dimensions reads DeviceInfo's .Dimensions.screen), so
+  // a getConstants() returning undefined made those modules throw on BOTH
+  // sides. Fixed, app-independent values; an unknown module gets {}.
+  function hostConstants(name) {
+    var dims = function () { return { width: 1080, height: 2340, scale: 2.75, fontScale: 1, densityDpi: 440 }; };
+    if (/DeviceInfo$/.test(name)) return { Dimensions: { window: dims(), screen: dims(), windowPhysicalPixels: dims(), screenPhysicalPixels: dims() } };
+    return {};
   }
 
   globalThis.global = globalThis;
@@ -294,11 +315,78 @@ function buildPrelude(seed: number, firstNative: number): string {
   // runtime assigns them onto globalThis at the top of the IIFE, spec §5),
   // never host-provided. A set-trap on each intercepts the assignment and
   // substitutes a recording wrapper before delegating.
+  // Spec 33 §4: the factory probe. Called with original module ids: by the
+  // wrapped factories below (original side), or by an exported tree's
+  // registry under --instrument=modules (export side). On "exit" the
+  // module's exports are offered so an AppRegistry-shaped object gets its
+  // registerComponent observed (spec 33 §3 item 3). Only own DATA
+  // properties are inspected: a getter (RN's lazy index re-exports) would
+  // run a require out of order.
+  function ownData(o, k) {
+    var d = Object.getOwnPropertyDescriptor(o, k);
+    return d !== undefined && "value" in d ? d.value : undefined;
+  }
+  function hookRegister(x) {
+    try {
+      if (x === null || (typeof x !== "object" && typeof x !== "function")) return;
+      var targets = [x, ownData(x, "default"), ownData(x, "AppRegistry")];
+      for (var i = 0; i < targets.length; i++) {
+        var t = targets[i];
+        if (t === null || (typeof t !== "object" && typeof t !== "function")) continue;
+        var orig = ownData(t, "registerComponent");
+        if (typeof orig !== "function" || orig.__hbcBootWrapped === true) continue;
+        var w = (function (o) {
+          return function (key) {
+            emit({ k: "call", fn: "registerComponent", args: [enc(key)], ret: undefined, throws: undefined });
+            return o.apply(this, arguments);
+          };
+        })(orig);
+        w.__hbcBootWrapped = true;
+        t.registerComponent = w;
+      }
+    } catch (e) {
+      // A frozen exports object stays unobserved; the key list then differs
+      // on both sides alike, never silently on one.
+    }
+  }
+  // On "throw" the third argument is the error: recorded as the call's
+  // \`throws\` text for diagnosis; the projection never reads it.
+  globalThis.__HBC_BOOT_PROBE__ = function (ev, id, extra) {
+    var exportsObj = extra;
+    var thrown = undefined;
+    if (ev === "throw") {
+      exportsObj = undefined;
+      try {
+        thrown = extra !== null && typeof extra === "object" ? String(extra.name) + ": " + String(extra.message) : String(extra);
+      } catch (e) {
+        thrown = "<unstringifiable>";
+      }
+    }
+    emit({ k: "call", fn: "__HBC_BOOT_PROBE__", args: [String(ev), id], ret: undefined, throws: thrown });
+    if (ev === "exit") hookRegister(exportsObj);
+  };
+  function wrapFactory(factory, id) {
+    if (!__hbcWrapFactories || typeof factory !== "function") return factory;
+    return function (g, rq, iD, iA, mod) {
+      var probe = globalThis.__HBC_BOOT_PROBE__;
+      probe("enter", id);
+      var ret;
+      try {
+        ret = factory.apply(this, arguments);
+      } catch (e) {
+        probe("throw", id, e);
+        throw e;
+      }
+      probe("exit", id, mod !== null && mod !== undefined ? mod.exports : undefined);
+      return ret;
+    };
+  }
+
   function wrapMetro(name, fn) {
     if (name === "__d") {
       return function (factory, id, deps) {
         callRecord("__d", [enc(id), deps === undefined ? "[]" : enc(deps)], undefined);
-        return fn(factory, id, deps);
+        return fn(wrapFactory(factory, id), id, deps);
       };
     }
     if (name === "__r") {
@@ -359,8 +447,8 @@ function buildPrelude(seed: number, firstNative: number): string {
 `;
 }
 
-function buildBootSource(bundleSource: string, seed: number, firstNative: number): string {
-  return `${buildPrelude(seed, firstNative)}\ntry {\n${bundleSource}\n__hbcBootEnd();\n} catch (__hbcE) {\n__hbcBootErr(__hbcE);\n}\n`;
+function buildBootSource(bundleSource: string, seed: number, firstNative: number, wrapFactories: boolean): string {
+  return `${buildPrelude(seed, firstNative, wrapFactories)}\ntry {\n${bundleSource}\n__hbcBootEnd();\n} catch (__hbcE) {\n__hbcBootErr(__hbcE);\n}\n`;
 }
 
 const NO_VM_MESSAGE = "no Hermes VM found (tools/hermesc/v<N>/hermes or tools/hermes-vm/v<N>/bin/hermes); the boot oracle runs entirely in source mode, so any discovered VM works regardless of its own HBC version";
@@ -381,7 +469,7 @@ export function bootTrace(bundleSource: string, opts: BootTraceOptions = {}): Bo
   let raw: HermesRunResult;
   try {
     const file = join(dir, "boot.js");
-    writeFileSync(file, buildBootSource(bundleSource, seed, firstNative));
+    writeFileSync(file, buildBootSource(bundleSource, seed, firstNative, opts.wrapFactories ?? true));
     raw = runHermes(vm.path, file, { timeout, bytecode: false });
   } finally {
     rmSync(dir, { recursive: true, force: true });

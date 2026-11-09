@@ -36,6 +36,10 @@ const HO_DIR = join(repoRoot(), "tests", "fixtures", "bundles", "react-navigatio
 const HO_BUNDLE = join(HO_DIR, "index.android.bundle");
 const HO_HBC = join(HO_DIR, "react-navigation-example.hbc");
 
+// The first function declared in an exported module file is its factory
+// (the decompiled render names it `_fn<idx>`, not `factory`).
+const FACTORY_HEAD = /(function [\w$]+\([^)]*\)\s*\{)/;
+
 const GATE_EXPORT = ["--instrument=modules", "--substitute", "none"];
 
 /** Find the exported file for original module `id` via EXPORT.json. */
@@ -46,7 +50,7 @@ function moduleFile(out: string, id: number): string {
   return join(out, row.path);
 }
 
-test("spec 33 test 1: rn-template export boots like the original (B1 register)", TODO, async () => {
+test("spec 33 test 1: rn-template export boots like the original (B1 register)", async () => {
   if (!IMPLEMENTED) return;
   const { exportBootProof } = await load();
   const { out, run } = exportTo(RN_HBC, GATE_EXPORT);
@@ -63,7 +67,7 @@ test("spec 33 test 1: rn-template export boots like the original (B1 register)",
   }
 });
 
-test("spec 33 test 2: the projection of the original against itself is stable and non-trivial", TODO, async () => {
+test("spec 33 test 2: the projection of the original against itself is stable and non-trivial", async () => {
   if (!IMPLEMENTED) return;
   const { projectBootTrace } = await load();
   const { bootTrace } = await import("../../../src/harness/boot-equiv.ts");
@@ -76,7 +80,7 @@ test("spec 33 test 2: the projection of the original against itself is stable an
   assert.ok(!a.some((e: string) => /^call __[dr] /.test(e)), "raw Metro __d/__r never reach the projection");
 });
 
-test("spec 33 test 3: an export factory that throws is DIVERGENT, not INCONCLUSIVE", TODO, async () => {
+test("spec 33 test 3: an export factory that throws is DIVERGENT, not INCONCLUSIVE", async () => {
   if (!IMPLEMENTED) return;
   const { exportBootProof } = await load();
   const { out, run } = exportTo(RN_HBC, GATE_EXPORT);
@@ -84,9 +88,9 @@ test("spec 33 test 3: an export factory that throws is DIVERGENT, not INCONCLUSI
     assert.equal(run.status, 0, run.stderr);
     // Throw from the entry module's factory (the original boots it cleanly).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const entry = (readManifest(out) as any).entry as number;
+    const entry = (readManifest(out) as any).source.entryModule as number;
     const f = moduleFile(out, entry);
-    writeFileSync(f, readFileSync(f, "utf8").replace(/(function factory\([^)]*\)\s*\{)/, `$1 throw new Error("boot-proof-injected");`));
+    writeFileSync(f, readFileSync(f, "utf8").replace(FACTORY_HEAD, `$1 throw new Error("boot-proof-injected");`));
     const r = await exportBootProof(RN_BUNDLE, out, { phase: "register" });
     assert.equal(r.verdict, "DIVERGENT");
     assert.match(JSON.stringify(r.divergence), /boot-proof-injected|throw/);
@@ -95,7 +99,7 @@ test("spec 33 test 3: an export factory that throws is DIVERGENT, not INCONCLUSI
   }
 });
 
-test("spec 33 test 4: a reordered eager require is caught at the first differing factory enter", TODO, async () => {
+test("spec 33 test 4: a reordered eager require is caught at the first differing factory enter", async () => {
   if (!IMPLEMENTED) return;
   const { exportBootProof, projectBootTrace } = await load();
   const { bootTrace } = await import("../../../src/harness/boot-equiv.ts");
@@ -108,7 +112,7 @@ test("spec 33 test 4: a reordered eager require is caught at the first differing
     assert.equal(run.status, 0, run.stderr);
     // Make the first factory eagerly require the last one: `late` now enters early.
     const f = moduleFile(out, first);
-    writeFileSync(f, readFileSync(f, "utf8").replace(/(function factory\([^)]*\)\s*\{)/, `$1 __hbc.r(${late});`));
+    writeFileSync(f, readFileSync(f, "utf8").replace(FACTORY_HEAD, `$1 __hbc.r(${late});`));
     const r = await exportBootProof(RN_BUNDLE, out, { phase: "register" });
     assert.equal(r.verdict, "DIVERGENT");
     assert.match(String(r.divergence.b), new RegExp(`enter ${late}\\b`));
@@ -117,7 +121,7 @@ test("spec 33 test 4: a reordered eager require is caught at the first differing
   }
 });
 
-test("spec 33 test 5: an original that cannot boot under the stub host is INCONCLUSIVE, never PASS", TODO, async () => {
+test("spec 33 test 5: an original that cannot boot under the stub host is INCONCLUSIVE, never PASS", async () => {
   if (!IMPLEMENTED) return;
   const { exportBootProof } = await load();
   const { out, run } = exportTo(RN_HBC, GATE_EXPORT);
@@ -133,7 +137,7 @@ test("spec 33 test 5: an original that cannot boot under the stub host is INCONC
   }
 });
 
-test("spec 33 test 6: code outside any tracked factory and substituted ids are excluded symmetrically", TODO, async () => {
+test("spec 33 test 6: code outside any tracked factory and substituted ids are excluded symmetrically", async () => {
   if (!IMPLEMENTED) return;
   const { projectBootTrace } = await load();
   const rec = (fn: string, args: unknown[]) => ({ k: "call", fn, args });

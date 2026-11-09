@@ -181,7 +181,15 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
     splitResult.entryModuleId !== null && !plan.replacedModules.has(splitResult.entryModuleId)
       ? (exportInfoById.get(splitResult.entryModuleId)?.path ?? null)
       : null;
-  files.set("index.js", buildIndexJs(splitResult.entryModuleId, entryPath));
+  // Spec 33 L1: the run-before-main modules (RN's InitializeCore) run
+  // first, in the original's order; a substituted-away one is left out.
+  const runBeforeMain = splitResult.startupModuleIds
+    .filter((id) => id !== splitResult.entryModuleId && !plan.replacedModules.has(id))
+    .flatMap((id) => {
+      const path = exportInfoById.get(id)?.path;
+      return path !== undefined ? [{ id, path }] : [];
+    });
+  files.set("index.js", buildIndexJs(splitResult.entryModuleId, entryPath, runBeforeMain));
   files.set(".gitignore", buildGitignore());
 
   const bundleSha256 = createHash("sha256").update(bytes).digest("hex");
