@@ -240,7 +240,7 @@ test("the .obf variants of 52/53 stay PASS with passes on (hardened tier, trace 
 // lowering this rung explicitly refuses until batch 4's rungs exist). The
 // asserted floor is 5% — the whole measured movement, kept as a regression
 // guard.
-test("corpus metric (spec §7 floors, measured): switch-local breaks fall to 0 and `L\\d+: {` declarations fall >=5% at v94", () => {
+test("corpus metric (spec §7 floors, measured): switch-local breaks fall to 0 and `L\\d+: {` declarations fall by the 52/53 nests' 11 at v94", () => {
   const m = measureSwitchRaise([94]);
   const v94 = m.perVersion[94]!;
   for (const name of ["52-switch-jumptable", "53-switch-jumptable-large", "10-switch-no-fallthrough"]) {
@@ -249,5 +249,10 @@ test("corpus metric (spec §7 floors, measured): switch-local breaks fall to 0 a
     assert.equal(f.doubledBreaks, 0, `${name}: doubled breaks inside a switch`);
   }
   assert.ok(v94.labelDecls.after < v94.labelDecls.before, "label declarations did not fall at all");
-  assert.ok(v94.labelDecls.reductionPct >= 5, `v94 label-declaration reduction ${v94.labelDecls.reductionPct.toFixed(1)}% < 5%`);
+  // 2026-11-10 (roundtrip-trygetreg, fixture 290): the 5% share was the
+  // 11 labels of the 52/53 nests over a 197-label corpus; every new fixture
+  // with an ordinary labelled block grows the denominator (225 by fixture
+  // 290, 11/225 = 4.9%) without touching what this rung removes. The guard
+  // is now the removal itself: at least those 11 declarations go.
+  assert.ok(v94.labelDecls.before - v94.labelDecls.after >= 11, `v94 label declarations fell by only ${v94.labelDecls.before - v94.labelDecls.after} (< 11)`);
 });
