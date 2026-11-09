@@ -2,7 +2,7 @@
 // body, exactly as `globalthis-dead-store` (one-shot fixed point).
 import type { Stmt } from "../ast.ts";
 import type { Match, PassContext } from "../types.ts";
-import type { Analysis } from "../globalthis-dead-store/analysis.ts";
+import type { DeadStoreAnalysis as Analysis } from "../ast.ts";
 import { analyzeHermesInternal } from "./analysis.ts";
 
 export function match(list: readonly Stmt[], ctx: PassContext): Match<readonly Stmt[], Analysis> | null {

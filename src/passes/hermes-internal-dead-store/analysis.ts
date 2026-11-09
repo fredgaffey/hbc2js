@@ -24,8 +24,8 @@
 // register ends its life (no `finally` or `catch` can see it afterwards).
 import type { Expr, Stmt } from "../ast.ts";
 import { isRegisterName } from "../ast.ts";
-import type { Analysis } from "../globalthis-dead-store/analysis.ts";
-import { analyzeWith, applyAnalysis } from "../globalthis-dead-store/analysis.ts";
+import type { DeadStoreAnalysis as Analysis } from "../ast.ts";
+import { analyzeWith, applyAnalysis } from "../ast.ts";
 
 export const HERMES_INTERNAL_SHIM = "__hbc_HermesInternal";
 

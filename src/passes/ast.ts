@@ -2196,3 +2196,104 @@ export function deadCallStores(body: readonly Stmt[], reg: string): number {
   }
   return n;
 }
+
+// ---------------------------------------------------------------------------
+// Dead register stores (shared by globalthis-dead-store R11 and
+// hermes-internal-dead-store R17).
+// ---------------------------------------------------------------------------
+
+export interface DeadStoreAnalysis {
+  /** Every statement this rung deletes, by identity. Empty means "no site". */
+  readonly deadStores: ReadonlySet<Stmt>;
+  /** `deadStores`, plus the register name each one wrote — for `check`. */
+  readonly deadRegisters: ReadonlyMap<Stmt, string>;
+}
+
+/**
+ * "Is `reg`'s value, as stored by the candidate at `list[fromIndex - 1]`,
+ * ever read before something redefines it?" — a purely local, position-
+ * sensitive scan of `list[fromIndex..]`, the same shape of question
+ * `expr-rebuild`'s own R1b deadness rule asks (`isDeadAfter`/D-a there),
+ * needed here for exactly the reason expr-rebuild's own check cannot
+ * answer it for us: this rung looks at the function *after*
+ * `global-access` has already folded the guarded read away, so a
+ * whole-function "is `reg` read anywhere at all" count (D-b's shortcut)
+ * can be fooled by a read that belongs to a *later*, unrelated write of
+ * the same register (Hermes reuses a dead register for the next unrelated
+ * value — the same reuse `global-access`'s own `isProvenGlobal` and
+ * `reg-split`'s webs both already model) rather than to this one.
+ *
+ * - A read of `reg` anywhere in a scanned statement (`identUses([s], reg)
+ *   .reads > 0`, which already recurses into that statement's own nested
+ *   lists): "not-dead" — the store's value really does reach a read.
+ * - A write with no accompanying read: "dead" when it is exactly the plain
+ *   top-level shape `reg = …` / `let reg = …` (an unconditional
+ *   redefinition — nothing between the candidate and here read the old
+ *   value, so it never will), else "unknown" — a write buried in a
+ *   branch/loop does not *prove* every path redefines `reg`, and this
+ *   scan has no reachability analysis to settle it (§4 condition 6 of
+ *   `global-access` names the same limit for the same reason).
+ * - No mention of `reg` at all in a scanned statement: transparent, keep
+ *   scanning.
+ * - Reaching the end of `list`: "dead" when `list` is the function's own
+ *   top-level body (`isFnBody`) — there is nothing left to reach.
+ *   Otherwise "unknown": whatever follows the enclosing block might still
+ *   read the old value, and this scan does not look past `list`'s own end.
+ */
+type LocalVerdict = "dead" | "not-dead" | "unknown";
+
+function isDeadLocally(list: readonly Stmt[], fromIndex: number, reg: string, isFnBody: boolean, exitIsDead = false): LocalVerdict {
+  for (let m = fromIndex; m < list.length; m++) {
+    const s = list[m]!;
+    const u = identUses([s], reg);
+    if (u.reads > 0) return "not-dead";
+    if (u.writes > 0) {
+      const isPlainWrite = (s.k === "expr" && s.expr.k === "assign" && s.expr.target.k === "ident" && s.expr.target.name === reg) || (s.k === "init" && s.name === reg);
+      return isPlainWrite ? "dead" : "unknown";
+    }
+    // `exitIsDead` (the caller has proved the function has no `try`, so no
+    // `finally`/`catch` can observe the register after this): a `return` or
+    // `throw` that does not read `reg` leaves the frame for good.
+    if (exitIsDead && (s.k === "return" || s.k === "throw")) return "dead";
+  }
+  return isFnBody ? "dead" : "unknown";
+}
+
+/** Which statement shape a dead-store rung may delete: `list[k]` is a store
+ *  of an effect-free value into register `reg`, or null. Positional so a
+ *  recogniser can prove a register's value from the statement before it. */
+export type StoreRecogniser = (list: readonly Stmt[], k: number) => { readonly reg: string } | null;
+
+/** `analyze`'s scan with the store shape as a parameter — shared with
+ *  `hermes-internal-dead-store` (R17), whose stores are equally effect-free. */
+export function analyzeWith(fnBody: readonly Stmt[], recognise: StoreRecogniser, opts: { readonly exitIsDead?: boolean } = {}): DeadStoreAnalysis {
+  const deadStores = new Set<Stmt>();
+  const deadRegisters = new Map<Stmt, string>();
+  const lists = stmtLists(fnBody);
+  const exitIsDead = opts.exitIsDead === true && !lists.some((l) => l.some((s) => s.k === "try"));
+  for (const list of lists) {
+    const isFnBody = list === fnBody;
+    for (let k = 0; k < list.length; k++) {
+      const s = list[k]!;
+      const store = recognise(list, k);
+      if (store === null) continue;
+      const local = isDeadLocally(list, k + 1, store.reg, isFnBody, exitIsDead);
+      const dead = local === "dead" || (local === "unknown" && identUses(fnBody, store.reg).reads === 0);
+      if (!dead) continue;
+      deadStores.add(s);
+      deadRegisters.set(s, store.reg);
+    }
+  }
+  return { deadStores, deadRegisters };
+}
+
+/** Delete every statement `analyze` named, leaving everything else (order,
+ *  identity, every other field) untouched. */
+export function applyAnalysis(fnBody: readonly Stmt[], a: DeadStoreAnalysis): readonly Stmt[] {
+  let current = fnBody;
+  for (const list of stmtLists(fnBody)) {
+    const keep = list.filter((s) => !a.deadStores.has(s));
+    if (keep.length !== list.length) current = spliceList(current, list, keep);
+  }
+  return current;
+}

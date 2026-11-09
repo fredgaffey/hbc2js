@@ -1,6 +1,6 @@
 import type { Stmt } from "../ast.ts";
 import type { Pass } from "../types.ts";
-import type { Analysis } from "../globalthis-dead-store/analysis.ts";
+import type { DeadStoreAnalysis as Analysis } from "../ast.ts";
 import { check } from "./check.ts";
 import { match } from "./match.ts";
 import { rewrite } from "./rewrite.ts";

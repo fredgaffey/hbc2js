@@ -4,7 +4,7 @@
 import { freeNames, parses } from "../ast.ts";
 import type { Stmt } from "../ast.ts";
 import type { CheckResult, PassContext } from "../types.ts";
-import { applyAnalysis } from "../globalthis-dead-store/analysis.ts";
+import { applyAnalysis } from "../ast.ts";
 import { match } from "./match.ts";
 
 export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: PassContext): CheckResult {

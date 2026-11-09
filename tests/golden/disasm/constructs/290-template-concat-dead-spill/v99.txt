@@ -1,0 +1,177 @@
+; hbc2js disassembly of 290-template-concat-dead-spill/v99.hbc
+; version=99 layout=E opcodeTable=hbc99-mar2026 functions=7 strings=29 globalCodeIndex=0
+function #0 "global"  params=1 frame=21 env=0 flags=exc,dbg,overflowed  @0x00000228 size=398
+  .try T1..T2 -> L1 ; handler 0
+  0000  DeclareGlobalVar     s15 "msg"
+  0005  DeclareGlobalVar     s24 "pick"
+  000a  DeclareGlobalVar     s25 "plural"
+  000f  DeclareGlobalVar     s18 "hits"
+  0014  DeclareGlobalVar     s22 "holder"
+  0019  DeclareGlobalVar     s17 "touch"
+  001e  DeclareGlobalVar     s19 "boom"
+  0023  GetGlobalObject      r0
+  0025  LoadConstUndefined   r3
+  0027  CreateClosure        r1, r3, f1 "msg"
+  002c  PutByIdLoose         r0, r1, #c0, s15 "msg"
+  0032  CreateClosure        r1, r3, f2 "pick"
+  0037  PutByIdLoose         r0, r1, #c1, s24 "pick"
+  003d  CreateClosure        r1, r3, f3 "plural"
+  0042  PutByIdLoose         r0, r1, #c2, s25 "plural"
+  0048  CreateClosure        r1, r3, f4 "touch"
+  004d  PutByIdLoose         r0, r1, #c3, s17 "touch"
+  0053  CreateClosure        r1, r3, f5 "boom"
+  0058  PutByIdLoose         r0, r1, #c4, s19 "boom"
+  005e  LoadConstZero        r2
+  0060  PutByIdLoose         r0, r2, #c5, s18 "hits"
+  0066  NewObject            r1
+  0068  LoadConstString      r5, s16 "concat"
+  006c  CreateClosure        r4, r3, f6 "get concat"
+  0071  DefineOwnGetterSetterByVal r1, r5, r4, r3, 1
+  0077  PutByIdLoose         r0, r1, #c6, s22 "holder"
+  007d  TryGetById           r5, r0, #c0, s26 "print"
+  0083  GetByIdShort         r4, r0, #c1, s15 "msg"
+  0088  LoadConstTrue        r7
+  008a  LoadConstString      r1, s8 "a"
+  008e  Call3                r4, r4, r3, r1, r7
+  0094  GetByIdShort         r6, r0, #c1, s15 "msg"
+  0099  LoadConstFalse       r8
+  009b  LoadConstString      r1, s11 "b"
+  009f  Call3                r1, r6, r3, r1, r8
+  00a5  Call3                r1, r5, r3, r4, r1
+  00ab  TryGetById           r5, r0, #c0, s26 "print"
+  00b1  GetByIdShort         r1, r0, #c2, s24 "pick"
+  00b6  LoadConstUInt8       r9, 2
+  00b9  LoadConstUInt8       r6, 1
+  00bc  Call4                r4, r1, r3, r6, r9, r2
+  00c3  GetByIdShort         r1, r0, #c2, s24 "pick"
+  00c8  LoadConstUInt8       r2, 3
+  00cb  Call4                r1, r1, r3, r6, r9, r2
+  00d2  Call3                r1, r5, r3, r4, r1
+  00d8  TryGetById           r5, r0, #c0, s26 "print"
+  00de  GetByIdShort         r1, r0, #c3, s25 "plural"
+  00e3  Call3                r1, r1, r3, r2, r7
+  00e9  GetByIdShort         r4, r1, #c4, s23 "other"
+  00ee  GetByIdShort         r1, r0, #c3, s25 "plural"
+  00f3  Call3                r1, r1, r3, r2, r8
+  00f9  GetByIdShort         r2, r1, #c4, s23 "other"
+  00fe  GetByIdShort         r1, r0, #c3, s25 "plural"
+  0103  Call3                r1, r1, r3, r6, r7
+  0109  GetByIdShort         r1, r1, #c4, s23 "other"
+  010e  Call4                r1, r5, r3, r4, r2, r1
+  0115  TryGetById           r4, r0, #c0, s26 "print"
+  011b  GetByIdShort         r2, r0, #c5, s17 "touch"
+  0120  GetByIdShort         r1, r0, #c6, s22 "holder"
+  0125  Call2                r2, r2, r3, r1
+  012a  GetByIdShort         r1, r0, #c7, s18 "hits"
+  012f  Call3                r1, r4, r3, r2, r1
+T1:
+  0135  GetByIdShort         r2, r0, #c8, s19 "boom"
+  013a  NewObject            r1
+  013c  Call2                r1, r2, r3, r1
+  0141  Jmp                  L2
+T2:
+L1:
+  0143  Catch                r4
+  0145  TryGetById           r2, r0, #c0, s26 "print"
+  014b  TryGetById           r1, r0, #c9, s21 "TypeError"
+  0151  InstanceOf           r1, r4, r1
+  0155  Call2                r1, r2, r3, r1
+L2:
+  015a  TryGetById           r2, r0, #c0, s26 "print"
+  0160  GetByIdShort         r4, r0, #c8, s19 "boom"
+  0165  LoadConstNull        r1
+  0167  Call2                r1, r4, r3, r1
+  016c  GetByIdShort         r4, r0, #c8, s19 "boom"
+  0171  NewObjectWithBuffer  r0, sh0(numProps=1), lit@0x0003
+  0177  NewObjectWithBuffer  r5, sh1(numProps=1), lit@0x0004
+  017d  PutOwnBySlotIdx      r0, r5, 0
+  0181  Call2                r0, r4, r3, r0
+  0186  Call3                r0, r2, r3, r1, r0
+  018c  Ret                  r0
+
+function #1 "msg"  params=3 frame=15 env=0 flags=dbg,overflowed  @0x000003b6 size=42
+  0000  LoadConstString      r0, s27 "x"
+  0004  LoadParam            r1, 2
+  0007  JmpFalse             L1, r1
+  000a  LoadParam            r4, 1
+  000d  GetGlobalObject      r1
+  000f  TryGetById           r1, r1, #c0, s20 "HermesInternal"
+  0015  GetByIdShort         r3, r1, #c1, s16 "concat"
+  001a  LoadConstString      r2, s10 "?"
+  001e  LoadConstString      r1, s0 ""
+  0022  Call3                r0, r3, r1, r4, r2
+L1:
+  0028  Ret                  r0
+
+function #2 "pick"  params=4 frame=19 env=0 flags=dbg,overflowed  @0x000003e0 size=65
+  0000  LoadParam            r6, 1
+  0003  LoadParam            r5, 2
+  0006  GetGlobalObject      r0
+  0008  TryGetById           r0, r0, #c0, s20 "HermesInternal"
+  000e  GetByIdShort         r4, r0, #c1, s16 "concat"
+  0013  LoadConstString      r3, s0 ""
+  0017  LoadParam            r0, 3
+  001a  JmpTrue              L1, r0
+  001d  LoadConstString      r0, s1 " and "
+  0021  Call4                r0, r4, r3, r5, r0, r6
+  0028  Jmp                  L2
+L1:
+  002a  LoadConstString      r7, s9 ">"
+  002e  LoadConstString      r9, s3 " in <"
+  0032  Mov                  r11, r3
+  0035  Mov                  r10, r6
+  0038  Mov                  r8, r5
+  003b  Call                 r0, r4, 5
+L2:
+  003f  Ret                  r0
+
+function #3 "plural"  params=3 frame=17 env=0 flags=dbg,overflowed  @0x00000421 size=69
+  0000  LoadParam            r6, 1
+  0003  NewObjectWithBuffer  r1, sh2(numProps=2), lit@0x0000
+  0009  LoadConstUInt8       r0, 1
+  000c  JNotGreater          L3, r6, r0
+  0010  LoadParam            r2, 2
+  0013  GetGlobalObject      r3
+  0015  TryGetById           r3, r3, #c0, s20 "HermesInternal"
+  001b  GetByIdShort         r5, r3, #c1, s16 "concat"
+  0020  LoadConstString      r4, s0 ""
+  0024  JmpTrue              L1, r2
+  0027  LoadConstString      r2, s6 " items"
+  002b  Call3                r2, r5, r4, r6, r2
+  0031  Jmp                  L2
+L1:
+  0033  LoadConstString      r3, s2 " few"
+  0037  Call3                r2, r5, r4, r6, r3
+L2:
+  003d  PutByIdLoose         r1, r2, #c0, s23 "other"
+L3:
+  0043  Ret                  r1
+
+function #4 "touch"  params=2 frame=2 env=0 flags=dbg,overflowed  @0x00000466 size=13
+  0000  LoadParam            r1, 1
+  0003  GetByIdShort         r1, r1, #c0, s16 "concat"
+  0008  LoadConstUInt8       r0, 7
+  000b  Ret                  r0
+
+function #5 "boom"  params=2 frame=12 env=0 flags=dbg,overflowed  @0x00000473 size=46
+  0000  LoadParam            r0, 1
+  0003  JmpTrue              L1, r0
+  0006  LoadConstString      r1, s4 "none"
+  000a  Ret                  r1
+L1:
+  000c  GetByIdShort         r0, r0, #c0, s27 "x"
+  0011  GetByIdShort         r2, r0, #c1, s28 "y"
+  0016  GetGlobalObject      r0
+  0018  TryGetById           r0, r0, #c2, s20 "HermesInternal"
+  001e  GetByIdShort         r1, r0, #c3, s16 "concat"
+  0023  LoadConstString      r0, s13 "v="
+  0027  Call2                r0, r1, r0, r2
+  002c  Ret                  r0
+
+function #6 "get concat"  params=1 frame=3 env=0 flags=dbg,overflowed  @0x000004a1 size=21
+  0000  GetGlobalObject      r2
+  0002  GetByIdShort         r1, r2, #c0, s18 "hits"
+  0007  Inc                  r1, r1
+  000a  PutByIdLoose         r2, r1, #c0, s18 "hits"
+  0010  LoadConstUInt8       r0, 1
+  0013  Ret                  r0
