@@ -302,3 +302,14 @@ other FP set is unchanged. With deps-transitive-subtract's code and
 `jszip`, `mammoth`, `wagmi` stay FPs (also `typeorm`, `resq`,
 `react-reconciler`, `@shopify/react-native-skia`). Those seven dependency
 packages were chosen from the MetaMask FP list: also truth-chosen.
+
+Open item (deps-rnav-recall): `invariant`, `react-freeze` and `stacktrace-parser`
+reach `high` through the DB-unique tiny path (react-navigation, supplemented
+farm, `runDeps`), then lose it to the `scattered` demotion: with only 2 exact hits
+the package can never reach `MIN_DISTINCT_EVIDENCE_HASHES` (3) anchored hashes, so
+`tier` ends `medium` and they are not reported. (`stacktrace-parser@0.1.11` stays
+`high` with 3 hits, a version the app does not pin.) Exempting `tinyUniqueSignal`
+from `scattered` is the candidate fix; not tried here, so its FP cost is unmeasured.
+The new Expensify FPs `jose` and `meros` are not supplement packages; the
+before run used the farm's index from 2026-11-09 and the after run an index rebuilt
+for the layered dir, so the index rebuild is an unseparated confounder (not run).
