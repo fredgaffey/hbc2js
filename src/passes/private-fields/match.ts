@@ -705,6 +705,12 @@ export function foldOne(before: readonly Stmt[], candidate: PrivateFieldCandidat
   //   last read it, the register's later writes and reads are unrelated values
   //   (fixtures 90, 94). Those keep the register, and its declaration.
   const slotNames = [envName, createdIn].filter((n) => ENV_SLOT.test(n));
+  // The slot rule is frame-wide. When the matched list is nested in the
+  // function body (a class hosted in `L0: {...}`), a function hermesc hoisted
+  // to the body's top level -- outside the list -- may still read the slot
+  // (fixture 180-private-field-hosted-hoisted-escape); the scan of `mapped`
+  // below never sees it, so count the frame's mentions outside the list too.
+  for (const n of slotNames) if (mentionedOutsideList(scope, n)) return null;
   if (!ENV_SLOT.test(createdIn) && registerReadReached(before, createdIn, isCreation, isHop, scope)) return null;
 
   const recycled = (() => {
@@ -731,6 +737,16 @@ export function foldOne(before: readonly Stmt[], candidate: PrivateFieldCandidat
     return u.reads + u.writes + u.nested === 0;
   }));
   return mapped.map((st) => (st.k === "decl" ? { ...st, names: st.names.filter((n) => !dead.has(n)) } : st)).filter((st) => !(st.k === "decl" && st.names.length === 0));
+}
+
+/** Is `name` mentioned anywhere in the function body OUTSIDE the matched
+ *  list (`scope.list`, which `scope.fnBody` contains)? Nested functions
+ *  count: an env slot is read by closures. */
+function mentionedOutsideList(scope: FoldScope | undefined, name: string): boolean {
+  if (scope?.fnBody === undefined || scope.list === undefined || scope.fnBody === scope.list) return false;
+  const whole = identUses(scope.fnBody, name);
+  const here = identUses(scope.list, name);
+  return whole.reads + whole.writes + whole.nested !== here.reads + here.writes + here.nested;
 }
 
 /** Does any read of `reg` in the defining frame observe the value the
