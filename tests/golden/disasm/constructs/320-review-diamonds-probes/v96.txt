@@ -855,21 +855,21 @@ L1:
   0023  Call3                r0, r1, r3, r2, r0
   0029  Ret                  r0
 
-function #18 "looseMutate"  params=3 frame=14 env=0 flags=dbg  @0x0000160c size=38
+function #18 "looseMutate"  params=3 frame=14 env=0 flags=dbg  @0x0000160c size=39
   0000  LoadParam            r3, 1
   0003  LoadConstUndefined   r0
   0005  ReifyArguments       r0
   0007  Mov                  r4, r0
   000a  LoadConstUInt8       r2, 42
-  000d  LoadConstZero        r1
-  000f  PutByVal             r4, r1, r2
-  0013  GetByIdShort         r2, r3, #c1, s62 "apply"
-  0018  Mov                  r1, r0
-  001b  LoadParam            r0, 2
-  001e  Call3                r0, r2, r3, r0, r1
-  0024  Ret                  r0
+  000d  LoadConstUInt8       r1, 2
+  0010  PutByVal             r4, r1, r2
+  0014  GetByIdShort         r2, r3, #c1, s62 "apply"
+  0019  Mov                  r1, r0
+  001c  LoadParam            r0, 2
+  001f  Call3                r0, r2, r3, r0, r1
+  0025  Ret                  r0
 
-function #19 "strictMutate"  params=3 frame=14 env=0 flags=strict,dbg  @0x00001632 size=43
+function #19 "strictMutate"  params=3 frame=14 env=0 flags=strict,dbg  @0x00001633 size=43
   0000  LoadParam            r3, 1
   0003  LoadConstUndefined   r0
   0005  GetGlobalObject      r1
@@ -884,7 +884,7 @@ function #19 "strictMutate"  params=3 frame=14 env=0 flags=strict,dbg  @0x000016
   0023  Call3                r0, r2, r3, r0, r1
   0029  Ret                  r0
 
-function #20 "looseLength"  params=3 frame=13 env=0 flags=dbg  @0x0000165d size=38
+function #20 "looseLength"  params=3 frame=13 env=0 flags=dbg  @0x0000165e size=38
   0000  LoadParam            r3, 1
   0003  LoadConstUndefined   r0
   0005  ReifyArguments       r0
@@ -897,7 +897,7 @@ function #20 "looseLength"  params=3 frame=13 env=0 flags=dbg  @0x0000165d size=
   001e  Call3                r0, r2, r3, r0, r1
   0024  Ret                  r0
 
-function #21 "looseLengthRest"  params=4 frame=14 env=0 flags=dbg  @0x00001683 size=62
+function #21 "looseLengthRest"  params=4 frame=14 env=0 flags=dbg  @0x00001684 size=62
   0000  LoadParam            r4, 1
   0003  LoadConstUndefined   r1
   0005  LoadConstUInt8       r6, 2
@@ -916,7 +916,7 @@ function #21 "looseLengthRest"  params=4 frame=14 env=0 flags=dbg  @0x00001683 s
   0038  Add                  r0, r1, r0
   003c  Ret                  r0
 
-function #22 "escapeArrow"  params=3 frame=15 env=0 flags=dbg  @0x000016c1 size=68
+function #22 "escapeArrow"  params=3 frame=15 env=0 flags=dbg  @0x000016c2 size=68
   0000  LoadParam            r5, 1
   0003  LoadConstUndefined   r3
   0005  LoadConstUndefined   r4
@@ -938,16 +938,16 @@ function #22 "escapeArrow"  params=3 frame=15 env=0 flags=dbg  @0x000016c1 size=
   003e  Add                  r0, r1, r0
   0042  Ret                  r0
 
-function #23 "escapeClosureFirst"  params=3 frame=14 env=0 flags=dbg  @0x00001705 size=51
+function #23 "escapeClosureFirst"  params=3 frame=14 env=0 flags=dbg  @0x00001706 size=51
   0000  LoadParam            r3, 1
   0003  LoadConstUndefined   r0
   0005  ReifyArguments       r0
   0007  Mov                  r4, r0
   000a  LoadConstUInt8       r2, 99
-  000d  LoadConstUInt8       r1, 1
+  000d  LoadConstUInt8       r1, 2
   0010  PutByVal             r4, r1, r2
   0014  Mov                  r2, r0
-  0017  LoadConstUInt8       r1, 2
+  0017  LoadConstUInt8       r1, 3
   001a  PutById              r2, r1, #c1, s107 "length"
   0020  GetByIdShort         r2, r3, #c1, s62 "apply"
   0025  Mov                  r1, r0
@@ -955,7 +955,7 @@ function #23 "escapeClosureFirst"  params=3 frame=14 env=0 flags=dbg  @0x0000170
   002b  Call3                r0, r2, r3, r0, r1
   0031  Ret                  r0
 
-function #24 "twice"  params=3 frame=14 env=0 flags=dbg  @0x00001738 size=56
+function #24 "twice"  params=3 frame=14 env=0 flags=dbg  @0x00001739 size=56
   0000  LoadParam            r4, 1
   0003  LoadConstUndefined   r0
   0005  GetByIdShort         r3, r4, #c1, s62 "apply"
@@ -972,7 +972,7 @@ function #24 "twice"  params=3 frame=14 env=0 flags=dbg  @0x00001738 size=56
   0032  Add                  r0, r1, r0
   0036  Ret                  r0
 
-function #25 "selfApply"  params=1 frame=13 env=0 flags=dbg  @0x00001770 size=28
+function #25 "selfApply"  params=1 frame=13 env=0 flags=dbg  @0x00001771 size=28
   0000  LoadConstUndefined   r0
   0002  LoadConstZero        r1
   0004  GetArgumentsPropByVal r3, r1, r0
@@ -983,7 +983,7 @@ function #25 "selfApply"  params=1 frame=13 env=0 flags=dbg  @0x00001770 size=28
   0014  Call3                r0, r2, r3, r0, r1
   001a  Ret                  r0
 
-function #26 "applyDeleteMid"  params=3 frame=17 env=0 flags=strict,exc,dbg  @0x0000178c size=147
+function #26 "applyDeleteMid"  params=3 frame=17 env=0 flags=strict,exc,dbg  @0x0000178d size=147
   .try T1..T2 -> L1 ; handler 0
   .try T1..T2 -> L2 ; handler 1
   .try T3..T4 -> L2 ; handler 2
@@ -1030,7 +1030,7 @@ L2:
   008b  PutById              r2, r1, #c1, s62 "apply"
   0091  Throw                r0
 
-function #27 "applyExotic"  params=3 frame=15 env=0 flags=strict,exc,dbg  @0x0000181f size=44
+function #27 "applyExotic"  params=3 frame=15 env=0 flags=strict,exc,dbg  @0x00001820 size=44
   .try T1..T2 -> L1 ; handler 0
   0000  LoadConstUndefined   r2
   0002  LoadConstUndefined   r0
@@ -1050,7 +1050,7 @@ L1:
   0025  Call2                r0, r0, r2, r1
   002a  Ret                  r0
 
-function #28 "applyLooseExotic"  params=3 frame=15 env=0 flags=exc,dbg  @0x0000181f size=44
+function #28 "applyLooseExotic"  params=3 frame=15 env=0 flags=exc,dbg  @0x00001820 size=44
   .try T1..T2 -> L1 ; handler 0
   0000  LoadConstUndefined   r2
   0002  LoadConstUndefined   r0
@@ -1070,7 +1070,7 @@ L1:
   0025  Call2                r0, r0, r2, r1
   002a  Ret                  r0
 
-function #29 "applyNested"  params=3 frame=14 env=0 flags=strict,dbg  @0x0000184b size=63
+function #29 "applyNested"  params=3 frame=14 env=0 flags=strict,dbg  @0x0000184c size=63
   0000  LoadParam            r3, 1
   0003  LoadConstUndefined   r4
   0005  LoadConstUndefined   r0
@@ -1090,7 +1090,7 @@ function #29 "applyNested"  params=3 frame=14 env=0 flags=strict,dbg  @0x0000184
   0039  Add                  r0, r1, r0
   003d  Ret                  r0
 
-function #30 ""  params=2 frame=14 env=0 flags=strict,dbg  @0x0000188a size=27
+function #30 ""  params=2 frame=14 env=0 flags=strict,dbg  @0x0000188b size=27
   0000  LoadParam            r3, 1
   0003  LoadConstUndefined   r0
   0005  GetByIdShort         r2, r3, #c1, s62 "apply"
@@ -1100,7 +1100,7 @@ function #30 ""  params=2 frame=14 env=0 flags=strict,dbg  @0x0000188a size=27
   0013  Call3                r0, r2, r3, r1, r0
   0019  Ret                  r0
 
-function #31 "applyLoop"  params=3 frame=22 env=0 flags=dbg  @0x000018a5 size=89
+function #31 "applyLoop"  params=3 frame=22 env=0 flags=dbg  @0x000018a6 size=89
   0000  CreateEnvironment    r10
   0002  LoadParam            r9, 1
   0005  LoadParam            r8, 2
@@ -1129,14 +1129,14 @@ L2:
   0053  JLess                L1, r1, r4
   0057  Ret                  r0
 
-function #32 ""  params=1 frame=2 env=0 flags=dbg  @0x000018fe size=15
+function #32 ""  params=1 frame=2 env=0 flags=dbg  @0x000018ff size=15
   0000  LoadConstUndefined   r0
   0002  GetArgumentsLength   r1, r0
   0005  LoadConstString      r0, s43 "ovl"
   0009  Add                  r0, r0, r1
   000d  Ret                  r0
 
-function #33 "applyGetter"  params=2 frame=14 env=0 flags=strict,dbg  @0x0000190d size=32
+function #33 "applyGetter"  params=2 frame=14 env=0 flags=strict,dbg  @0x0000190e size=32
   0000  LoadConstUndefined   r0
   0002  LoadParam            r1, 1
   0005  GetByIdShort         r3, r1, #c1, s82 "fn"
@@ -1147,7 +1147,7 @@ function #33 "applyGetter"  params=2 frame=14 env=0 flags=strict,dbg  @0x0000190
   0018  Call3                r0, r2, r3, r1, r0
   001e  Ret                  r0
 
-function #34 "apply"  params=4 frame=3 env=0 flags=dbg  @0x0000192d size=44
+function #34 "apply"  params=4 frame=3 env=0 flags=dbg  @0x0000192e size=44
   0000  LoadParam            r0, 2
   0003  Mov                  r1, r0
   0006  JmpFalse             L1, r1
@@ -1162,7 +1162,7 @@ L1:
   0026  Add                  r0, r0, r1
   002a  Ret                  r0
 
-function #35 "get fn"  params=1 frame=2 env=0 flags=dbg  @0x00001959 size=23
+function #35 "get fn"  params=1 frame=2 env=0 flags=dbg  @0x0000195a size=23
   0000  GetGlobalObject      r0
   0002  GetByIdShort         r1, r0, #c1, s67 "reads"
   0007  Inc                  r1, r1
@@ -1170,7 +1170,7 @@ function #35 "get fn"  params=1 frame=2 env=0 flags=dbg  @0x00001959 size=23
   0010  GetByIdShort         r0, r0, #c2, s101 "show"
   0015  Ret                  r0
 
-function #36 "gfn"  params=1 frame=3 env=0 flags=dbg  @0x00001970 size=23
+function #36 "gfn"  params=1 frame=3 env=0 flags=dbg  @0x00001971 size=23
   0000  LoadThisNS           r0
   0002  Mov                  r1, r0
   0005  JmpFalse             L1, r1
@@ -1180,7 +1180,7 @@ L1:
   0011  Add                  r0, r0, r1
   0015  Ret                  r0
 
-function #37 "get"  params=1 frame=2 env=0 flags=dbg  @0x00001987 size=34
+function #37 "get"  params=1 frame=2 env=0 flags=dbg  @0x00001988 size=34
   0000  GetGlobalObject      r0
   0002  GetByIdShort         r1, r0, #c1, s65 "callReads"
   0007  Inc                  r1, r1
@@ -1190,34 +1190,34 @@ function #37 "get"  params=1 frame=2 env=0 flags=dbg  @0x00001987 size=34
   001b  GetByIdShort         r0, r0, #c4, s64 "call"
   0020  Ret                  r0
 
-function #38 ""  params=1 frame=2 env=0 flags=dbg  @0x000019a9 size=17
+function #38 ""  params=1 frame=2 env=0 flags=dbg  @0x000019aa size=17
   0000  LoadThisNS           r0
   0002  GetByIdShort         r1, r0, #c1, s85 "tag"
   0007  LoadConstString      r0, s18 "g "
   000b  Add                  r0, r0, r1
   000f  Ret                  r0
 
-function #39 ""  params=1 frame=1 env=0 flags=none  @0x000019ba size=6
+function #39 ""  params=1 frame=1 env=0 flags=none  @0x000019bb size=6
   0000  LoadConstString      r0, s17 "orig"
   0004  Ret                  r0
 
-function #40 ""  params=1 frame=1 env=0 flags=none  @0x000019ba size=6
+function #40 ""  params=1 frame=1 env=0 flags=none  @0x000019bb size=6
   0000  LoadConstString      r0, s17 "orig"
   0004  Ret                  r0
 
-function #41 "apply"  params=3 frame=2 env=0 flags=dbg  @0x000019c0 size=18
+function #41 "apply"  params=3 frame=2 env=0 flags=dbg  @0x000019c1 size=18
   0000  LoadParam            r0, 2
   0003  GetByIdShort         r1, r0, #c1, s107 "length"
   0008  LoadConstString      r0, s53 "own "
   000c  Add                  r0, r0, r1
   0010  Ret                  r0
 
-function #42 ""  params=1 frame=1 env=0 flags=none  @0x000019d2 size=7
+function #42 ""  params=1 frame=1 env=0 flags=none  @0x000019d3 size=7
   0000  LoadThisNS           r0
   0002  TypeOf               r0, r0
   0005  Ret                  r0
 
-function #43 ""  params=1 frame=1 env=0 flags=strict  @0x000019d9 size=8
+function #43 ""  params=1 frame=1 env=0 flags=strict  @0x000019da size=8
   0000  LoadParam            r0, 0
   0003  TypeOf               r0, r0
   0006  Ret                  r0

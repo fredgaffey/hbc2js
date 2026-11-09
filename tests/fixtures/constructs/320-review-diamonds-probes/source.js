@@ -115,7 +115,7 @@ function looseDefault(f, t = ctx) {
 print("looseDefault " + looseDefault(show));
 print("looseDefault2 " + looseDefault(show, ctx, 9));
 function looseMutate(f, t) {
-  arguments[0] = 42;
+  arguments[2] = 42;
   return f.apply(t, arguments);
 }
 print("looseMutate " + looseMutate(show, ctx, 1));
@@ -144,7 +144,7 @@ function escapeArrow(f, t) {
 print("escapeArrow " + escapeArrow(show, ctx, null));
 function escapeClosureFirst(f, t) {
   var a = arguments;
-  var mut = function () { a[1] = 99; a.length = 2; };
+  var mut = function () { a[2] = 99; a.length = 3; };
   mut();
   return f.apply(t, arguments);
 }

@@ -16,12 +16,12 @@ looseReassign this=U args=f,o,1
 strictReassign this=U args=f,o,1
 looseDefault this=U args=f
 looseDefault2 this=U args=f,o,9
-looseMutate this=T args=42,o,1
+looseMutate this=T args=f,o,42
 strictMutate this=T args=f,o,f
 looseLength this=T args=f
 looseLengthRest this=T args=f,o,1,undefined,undefined rest=1
 escapeArrow this=T args=f,o,null 1
-escapeClosureFirst this=T args=f,99
+escapeClosureFirst this=T args=f,o,99
 twice this=T args=f,o,1 & this=U args=f,o,1
 selfApply this=T args=f,2
 applyDeleteMid deleted TypeError
