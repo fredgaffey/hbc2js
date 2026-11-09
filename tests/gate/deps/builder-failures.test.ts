@@ -82,3 +82,13 @@ test("BUILDFAIL1: both builders wire the support module (config, CI env, peers, 
   }
   assert.ok(/maxBuffer/.test(cf), "confirm: maxBuffer");
 });
+
+test("BUILDFAIL1: the path-rebuild transplant (transplant-multi) wires the support module too", () => {
+  const tm = readFileSync(new URL("../../../tools/pkgsig/bulk/transplant-multi.mjs", import.meta.url), "utf8");
+  assert.ok(/builderConfigArgs\(/.test(tm), "transplant-multi: --config");
+  assert.ok(/bundleEnv\(/.test(tm), "transplant-multi: CI env");
+  assert.ok(/missingPeers\(/.test(tm), "transplant-multi: peers");
+  assert.ok(/unresolvedBareModule\(/.test(tm), "transplant-multi: retry");
+  assert.ok(/builderMetroConfigJs\(/.test(tm), "transplant-multi: config written");
+  assert.ok(/timeout: 300_000/.test(tm), "transplant-multi: 300 s per-job timeout");
+});
