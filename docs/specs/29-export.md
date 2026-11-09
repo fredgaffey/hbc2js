@@ -601,7 +601,7 @@ Listed here so nobody reads an omission as an oversight; each is also in the
 manifest's `leftOut`.
 
 - **Booting.** Running the exported app on a device or emulator. The bundle
-  builds; whether it boots is a later spec.
+  builds; whether it boots is spec 33 (headless boot proof).
 - **The native host projects** `android/` and `ios/`. The user supplies them
   (`npx react-native init` at the pinned version, then copy this tree over its
   JS half). Reconstructing them is spec 27's territory.
