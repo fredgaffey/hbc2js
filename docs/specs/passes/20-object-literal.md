@@ -178,10 +178,14 @@ structure-recovery block.
   such a store on a fresh object while nothing in the run had an effect; that
   is unsound against an accessor or non-writable property put on
   `Object.prototype` by code that ran *before* the object existed (construct
-  fixture `390-putbyid-fold-inherited-setter`). A `PutById`-family store now
-  ends the run as §4 precondition 4 originally said; only a literal with no
-  prototype chain (`__proto__: null`) could ever be folded soundly, and the
-  rung does not build those.
+  fixture `390-putbyid-fold-inherited-setter`). A `PutById`-family store into
+  a key the object does not own yet now ends the run, as §4 precondition 4
+  originally said. One case still folds: a `PutById` into a key the literal
+  already owns as a plain data property (a v84–v96 `NewObjectWithBuffer`
+  placeholder fill, or an earlier fold) — a value update of an own writable
+  data property, no prototype walk (the §9.1 kind C argument). A literal with
+  no prototype chain (`__proto__: null`) would also be sound; the rung does
+  not build those.
 * **An interleaved statement inside the run** (v98/v99 `NewObjectWithBuffer`
   computing a value *between* two stores, `63-object-literal` fn `table`) no
   longer ends the run outright: a **pure register def** (`rX = <expr>` with
@@ -247,7 +251,7 @@ structure-recovery block.
 
 | Shape | Why refused | Ledger |
 |---|---|---|
-| any `PutById`-family store (D27a) | a full `[[Set]]`: an inherited setter or non-writable property installed before the object existed would observe it | docs/DECISIONS.md D27a; fixture `390-putbyid-fold-inherited-setter` |
+| a `PutById`-family store into a key the object does not own yet (D27a) | a full `[[Set]]`: an inherited setter or non-writable property installed before the object existed would observe it | docs/DECISIONS.md D27a; fixture `390-putbyid-fold-inherited-setter` |
 | an interleaved statement that is not a *pure register def*, or one `canHoist` refuses (reads the object being built, or redefines a register an earlier fold already read) | commuting it above the run is not proven safe | `docs/BUGS.md` `object-literal-interleaved` |
 | a computed-key store whose key or value reads/writes the object's own register | precondition 6, same as every other store | `docs/BUGS.md` `object-literal-computed-key` |
 | a plain-key store that follows an already-folded computed-key store in the same run | the computed key might alias it at runtime; folding both risks the wrong write winning (see above) | same row |
