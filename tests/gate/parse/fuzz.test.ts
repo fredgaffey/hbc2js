@@ -5,82 +5,44 @@ import assert from "node:assert/strict";
 import { parseHbc } from "../../../src/index.ts";
 import { Hbc2jsError } from "../../../src/errors.ts";
 import { listFixtures } from "../../support/fixtures.ts";
-import { timeScale } from "../../support/tiers.ts";
+import { Worker } from "node:worker_threads";
+import { availableParallelism } from "node:os";
+import { makeRng, mutate } from "../../support/fuzz-mutants.ts";
+import type { FuzzJob } from "../../support/fuzz-worker.ts";
 
 // xorshift32, seeded — deterministic and printed on failure.
-function makeRng(seed: number): () => number {
-  let state = seed >>> 0 || 1;
-  return () => {
-    state ^= state << 13;
-    state >>>= 0;
-    state ^= state >>> 17;
-    state ^= state << 5;
-    state >>>= 0;
-    return state;
-  };
-}
-
-function mutate(base: Uint8Array, rng: () => number): Uint8Array {
-  const bytes = base.slice();
-  const kind = rng() % 4;
-  if (kind === 0) {
-    // single byte flip
-    const i = rng() % bytes.length;
-    bytes[i] = rng() & 0xff;
-  } else if (kind === 1) {
-    // byte-range zeroing
-    const start = rng() % bytes.length;
-    const len = 1 + (rng() % Math.min(64, bytes.length - start));
-    bytes.fill(0, start, start + len);
-  } else if (kind === 2) {
-    // truncation at a random length
-    return bytes.slice(0, rng() % (bytes.length + 1));
-  } else {
-    // count-field maximisation: write 0xFFFFFFFF at a random header u32 slot
-    const slot = (rng() % 32) * 4;
-    if (slot + 4 <= bytes.length) {
-      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-      view.setUint32(slot, 0xffffffff, true);
-    }
-  }
-  return bytes;
-}
-
-// M1 review Finding 3: spec 01 §8 T8 asks for 2000 mutants/binary; that is now the
-// default (matching the spec exactly), overridable via env var so a fast local/CI
-// run can lower it. `HBC2JS_FUZZ_MUTANTS_PER_BINARY=200 npm test` for a quick pass.
 const MUTANTS_PER_BINARY = Number(process.env["HBC2JS_FUZZ_MUTANTS_PER_BINARY"] ?? 2000);
 
-test(`${MUTANTS_PER_BINARY} deterministic mutants per gate binary (spec 01 §8 T8 default) never throw anything but Hbc2jsError, and always terminate quickly`, () => {
+test(`${MUTANTS_PER_BINARY} deterministic mutants per gate binary (spec 01 §8 T8 default) never throw anything but Hbc2jsError, and always terminate quickly`, async () => {
   const seed = 0x2b3c4d5e;
   const rng = makeRng(seed);
-  const fixtures = listFixtures();
-  let mutantsChecked = 0;
-  for (const f of fixtures) {
+  // One xorshift stream across all binaries, in fixture order. Advance it
+  // here (mutate only) to record every binary's start state, then fuzz the
+  // binaries on worker threads: same mutants as the old single-thread loop.
+  const jobs: FuzzJob[] = [];
+  for (const f of listFixtures()) {
     for (const b of f.binaries) {
       const base = b.bytes();
-      for (let i = 0; i < MUTANTS_PER_BINARY; i++) {
-        const mutant = mutate(base, rng);
-        const start = performance.now();
-        try {
-          const m = parseHbc(mutant);
-          for (const fn of m.functions) {
-            const body = fn.body();
-            assert.ok(body.byteOffset + body.length <= mutant.length, `${f.group}/${f.name} v${b.version} seed ${seed}: function body view escapes the file`);
-          }
-        } catch (e) {
-          assert.ok(
-            e instanceof Hbc2jsError,
-            `${f.group}/${f.name} v${b.version} mutant ${i} (seed ${seed}) threw non-Hbc2jsError: ${e instanceof Error ? e.stack : String(e)}`,
-          );
-        }
-        const elapsed = performance.now() - start;
-        const budgetMs = Math.max(200 * timeScale(), 500);
-        assert.ok(elapsed < budgetMs, `${f.group}/${f.name} v${b.version} mutant ${i} took ${elapsed}ms (budget ${budgetMs}ms)`);
-        mutantsChecked++;
-      }
+      jobs.push({ label: `${f.group}/${f.name} v${b.version}`, bytes: base, rngState: rng.state(), count: MUTANTS_PER_BINARY });
+      for (let i = 0; i < MUTANTS_PER_BINARY; i++) mutate(base, rng);
     }
   }
+  const nWorkers = Math.max(1, Math.min(8, availableParallelism()));
+  const batches: FuzzJob[][] = Array.from({ length: nWorkers }, () => []);
+  jobs.forEach((j, i) => batches[i % nWorkers]!.push(j));
+  const results = await Promise.all(
+    batches.filter((b) => b.length > 0).map(
+      (batch) =>
+        new Promise<{ checked: number; failures: string[] }>((resolve, reject) => {
+          const w = new Worker(new URL("../../support/fuzz-worker.ts", import.meta.url), { workerData: { jobs: batch, seed } });
+          w.once("message", resolve);
+          w.once("error", reject);
+        }),
+    ),
+  );
+  const failures = results.flatMap((r) => r.failures);
+  assert.deepEqual(failures, [], failures.slice(0, 5).join("\n"));
+  const mutantsChecked = results.reduce((n, r) => n + r.checked, 0);
   assert.ok(mutantsChecked > 1000, `expected >1000 mutants checked, got ${mutantsChecked}`);
 });
 

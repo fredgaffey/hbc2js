@@ -40,7 +40,7 @@ export function runCli(args: readonly string[]): CliRun {
 const OUT_TOKEN = "\u0000OUT\u0000";
 let fingerprintMemo: string | undefined;
 
-/** sha1 of path+size+mtime of every file under src/ and third_party/ plus the
+/** sha1 of path+CONTENT of every file under src/ and third_party/ plus the
  *  lockfile: any change to the exporter or its data tables invalidates the
  *  export cache (see docs/TESTING.md "Test suite performance"). */
 function inputFingerprint(): string {
@@ -51,7 +51,7 @@ function inputFingerprint(): string {
     for (const e of readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
       const p = join(dir, e.name);
       if (e.isDirectory()) visit(p);
-      else { const st = statSync(p); h.update(`${p}:${st.size}:${st.mtimeMs}\n`); }
+      else { h.update(`${p.slice(repoRoot().length)}\0`); h.update(readFileSync(p)); h.update("\0"); }
     }
   };
   visit(join(repoRoot(), "src"));
