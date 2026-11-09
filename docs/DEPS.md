@@ -2947,3 +2947,94 @@ No false positive was added and no true positive was lost. On
 react-navigation, `invariant`, `react-freeze` and `stacktrace-parser`
 qualify in the classification run but are still not reported by the
 pipeline. That is an open item. Test: `tests/gate/deps/deps-rnav-recall.test.ts`.
+
+### Rule review (review-1110 deps, 2026-11-10)
+
+An adversarial pass over the demotion and promotion rules in
+`src/deps/match.ts`, on synthetic hermesc fixtures only (no five-app
+measurement was run; the fixes below change verdicts only in the shapes
+named). Tests: `tests/gate/deps/review-1110-deps.test.ts`.
+
+Fixed:
+
+- **Twin rank ignored scoped dependencies.** `subtractedDependencies`
+  holds sibling file names (`@s__p@1.0.0__hbc96.json`). The twin rule cut
+  them at the last `@`, giving `@s__p`, which never equals `@s/p`, so "keep
+  the declared dependency of another high package" never fired for a scoped
+  package. `dependencyName` now parses the file name as
+  `packageNameFromSigFilename` does.
+- **DB-unique hits trusted the index over the loaded candidates.** The
+  candidate hash index exists only for indexed layers. A package in a layer
+  without one (a local or curated layer) can hold the same hash, and the
+  tiny DB-unique path still counted it as unique. A hit now counts only when
+  no loaded candidate of another name holds it.
+- **`embedded` depended on DB order.** The host had to be high at the
+  moment it was checked. With A inside B inside C (C holding too little of A
+  to host it), A was demoted when judged before B and kept when judged after
+  B had been demoted by C. Hosts are now the packages high when the rule
+  starts.
+- **The module-graph rule credited another package's module.**
+  `promoteViaDependency` promoted P (zero exact hits, fuzzy form) on an app
+  module that another high package Q matched exactly as its own file. That
+  counts the module twice, and because promotion runs after the demotion
+  rules, the twin rule never saw P. An app module whose factory, or at least
+  half of whose eligible functions, are hit hashes of another high package is
+  now skipped (both edge forms).
+
+Open:
+
+- **Twin is still order-dependent for chains.** The one-sided cover is not
+  transitive: A inside B (fewer than twice its hits, so not `embedded`), B
+  inside C, A not inside C. A keeps or loses `high` depending on whether B
+  was demoted first. This needs function-level fixture control (about 20 / 39
+  / C missing 3 of A's hits); not written. The fix is the same as for
+  `embedded`: judge against the tiers at rule start.
+- **Promoted packages skip every demotion rule.** `promoteViaDependency`
+  runs last, so a promoted package is never checked for `container`,
+  `twin` or `bundled-dist`. The fix above covers the double-counted module
+  only.
+- **The fuzzy edge needs no exact evidence and no hub check.** A package at
+  tier `none` becomes `high` when one app module has at least 3 of its own
+  file's fuzzy hashes (half of each side) and requires a module with 3 of a
+  high dependency's hit hashes. For a hub dependency (`react-native`'s index
+  module, required by most library files) the edge half is always true, so
+  the whole decision is a fuzzy shape match. Fuzzy hashes get no ambiguity
+  or generic-in-target filter. Suggested: drop fuzzy hashes held by several
+  target modules, or by several loaded packages, before counting.
+- **Verdicts depend on the candidate set.** `hashOwnerNames`, `embedded`,
+  `twin` and now the DB-unique check look only at loaded candidates. Hop-two
+  expansion or population widening can change an unrelated package's
+  verdict. This is by design, but measurements that compare rule changes must
+  keep the candidate set fixed.
+- **The DB-unique path turns off silently.** It is off for layers without an
+  index for the target HBC version and for scheme-1 files. Nothing in the
+  report says so.
+- **Constants tuned on one app.** `TARGET_GENERIC_COPIES` (3) and
+  `TINY_PACKAGE_MIN_EXACT_COVERAGE` (0.5) were measured on Expensify only.
+  `TINY_PACKAGE_MIN_DB_UNIQUE_HITS` (2) has a margin of one hit over the
+  nearest false packages (`btoa`, `quickselect`). The `scattered` anchor
+  clauses (all-of-module, 5 from one own file) were added after specific TP
+  losses (`tslib`, `define-properties`). `AMBIGUOUS_OWNER_THRESHOLD` (20) is
+  well separated (7 vs 55) and is not a concern.
+
+Unmerged branches, reviewed as diffs:
+
+- `deps-metamask-fp` (`inlined`): reads the dependency name with the same
+  last-`@` cut as the twin rule, so `inlined` never fires for a scoped
+  dependency (most of the metamask family is scoped). Use `dependencyName`.
+  The live `q.score.tier === "high"` host check has the same order problem
+  as `embedded` had. The branch predates deps-rnav-recall, so
+  `scorePackage`'s signature will conflict.
+- `deps-transitive-subtract` (closure subtraction, all or nothing): one
+  target hit outside the closure (`ownHit`) keeps all the closure's code,
+  and that hit is not passed through the ambiguity or generic-in-target
+  filters that scoring applies. One boilerplate hash therefore turns the
+  subtraction off for an impostor. Apply `isUnambiguous` to the `ownHit`
+  test. The subtraction also happens only when the dependency is a loaded
+  candidate.
+- `deps-ambiguity-cutoff` (`independentOwnerRule`): verdicts depend on the
+  environment variable `HBC2JS_AMBIG_VARIANT` in core matching code. Remove
+  it or move it into a measurement tool before merging. A package counts as
+  `evidenced` after a single unique hit of `minInstr` size, with no
+  generic-in-target check, which is weak support for keeping a hash shared
+  by 20 or more names.
