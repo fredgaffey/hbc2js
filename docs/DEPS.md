@@ -2568,9 +2568,16 @@ an own module factory of at least `minInstr` instructions (an empty
 re-export factory does not count) exact-matches and at least half its
 eligible functions do (`TINY_PACKAGE_MIN_EXACT_COVERAGE`, 0.5). The
 probe found 26 truth packages and no non-truth one that pass it on
-Expensify v4-partial + overlay. `few-distinct` still applies after it, so
-packages whose evidence is 1-2 hashes (`boolbase`, `nullthrows`,
-`call-bound`, `fast-deep-equal`) stay medium. Rejected: path-bearing
+Expensify v4-partial + overlay. The path also needs `few-distinct`'s minimum
+(3 distinct hashes, or all of a smaller package's), so packages whose
+evidence is 1-2 hashes (`boolbase`, `nullthrows`, `call-bound`,
+`fast-deep-equal`) stay plain medium rather than demoted. The first
+version let them reach "high" and be demoted, and the path-recall edge
+rule (corpus-path-recall) skips demoted packages, so it lost
+`call-bound`, `es-shim-unscopables` and `define-properties` on Expensify;
+a test now holds that order. The path-recall small-file case
+(`hoist-non-react-statics`, 3 of 4 functions with the factory) is now
+high through this path, with or without its edge. Rejected: path-bearing
 signature as evidence (the one-module true packages are mostly
 path-bearing and the false ones pathless, but only because the overlay
 was built path-bearing from the truth files), and a dependency edge to a
@@ -2579,27 +2586,31 @@ confirmed package (most true tiny packages have one, but so does
 `react-shallow-renderer` has one too).
 
 Measured on deb (`meas2.mjs` offline `scoreAgainstTruth`, sha pins
-matched; before = main 87ec7b8; confirmed / TP / FP, recall):
+matched; before = main 8c3cc77 and again 1812137 (identical numbers),
+after = this branch merged with each;
+confirmed / TP / FP, recall):
 
 | app | DB | before | after | TPs gained |
 |---|---|---|---|---|
 | Expensify J3 | db-v3-clean | 128 / 89 / 39, 30.9% | 133 / 94 / 39, 32.6% | `base-64`, `base64-js`, `memoize-one`, `object-assign`, `react-fast-compare` |
-| Expensify J3 | db-v4-paths-partial | 90 / 87 / 3, 30.2% | 96 / 93 / 3, 32.3% | the same + `hoist-non-react-statics` |
-| Expensify J3 | db-v3-clean + overlay | 204 / 167 / 37, 58.0% | 215 / 178 / 37, 61.8% | the same + `functions-have-names`, `side-channel`, `stacktrace-parser`, `use-latest-callback`, `utf8` |
-| Expensify J3 | db-v4-paths-partial + overlay | 166 / 164 / 2, 56.9% | 177 / 175 / 2, 60.8% | as the row above |
+| Expensify J3 | db-v4-paths-partial | 93 / 90 / 3, 31.2% | 99 / 96 / 3, 33.3% | the same + `hoist-non-react-statics` |
+| Expensify J3 | db-v3-clean + overlay | 209 / 175 / 34, 60.8% | 219 / 185 / 34, 64.2% | the same + `functions-have-names`, `stacktrace-parser`, `use-latest-callback`, `utf8` |
+| Expensify J3 | db-v4-paths-partial + overlay | 176 / 175 / 1, 60.8% | 186 / 185 / 1, 64.2% | as the row above |
 | react-navigation | db-v3-clean | 14 / 14 / 0, 18.4% | 16 / 16 / 0, 21.1% | `base64-js`, `memoize-one` |
-| react-navigation | db-v4-paths-partial | 10 / 10 / 0, 13.2% | 12 / 12 / 0, 15.8% | as above |
-| react-navigation | either + overlay | 18 / 18 / 0, 23.7%; 15 / 15 / 0, 19.7% | 21 / 21 / 0, 27.6%; 18 / 18 / 0, 23.7% | + `stacktrace-parser` |
+| react-navigation | db-v4-paths-partial | 17 / 17 / 0, 22.4% | 19 / 19 / 0, 25.0% | as above |
+| react-navigation | db-v3-clean + overlay | 24 / 24 / 0, 31.6% | 27 / 27 / 0, 35.5% | + `stacktrace-parser` |
+| react-navigation | db-v4-paths-partial + overlay | 23 / 23 / 0, 30.3% | 26 / 26 / 0, 34.2% | as above |
 | bluesky | db-v3-clean | 42 / 34 / 8, 17.2% | 45 / 37 / 8, 18.7% | `base64-js`, `memoize-one`, `shallow-equal` |
-| bluesky | db-v4-paths-partial | 29 / 29 / 0, 14.6% | 33 / 33 / 0, 16.7% | the same + `hoist-non-react-statics` |
-| bluesky | v3 + overlay; v4p + overlay | 47 / 40 / 7; 35 / 35 / 0 | 52 / 45 / 7; 41 / 41 / 0 | + `stacktrace-parser`, `use-latest-callback` |
+| bluesky | db-v4-paths-partial | 39 / 39 / 0, 19.7% | 43 / 43 / 0, 21.7% | the same + `hoist-non-react-statics` |
+| bluesky | db-v3-clean + overlay | 54 / 47 / 7, 23.7% | 59 / 52 / 7, 26.3% | `base64-js`, `memoize-one`, `shallow-equal`, `stacktrace-parser`, `use-latest-callback` |
+| bluesky | db-v4-paths-partial + overlay | 47 / 47 / 0, 23.7% | 53 / 53 / 0, 26.8% | the same + `hoist-non-react-statics` |
 | rainbow | all four | 104 / 82 / 22, 15.8% | 106 / 84 / 22, 16.2% | `ieee754`, `minimalistic-crypto-utils` |
 | metamask | db-v3-clean, v4-partial | 169 / 132 / 37, 17.6% | 173 / 136 / 37, 18.2% | `ieee754`, `minimalistic-crypto-utils`, `querystringify`, `redux-thunk` |
 | metamask | + overlay | 172 / 135 / 37, 18.0% | 176 / 139 / 37, 18.6% | as above |
 
-No false positive added and none lost anywhere; react-navigation stays at
-0 FP. The overlay rows use a truth-chosen population (see "The
-no-signature bucket"); the rows without it are the honest numbers. The
-"before" overlay numbers differ from that section's (207 / 167 / 40)
-because the precision rules landed in between. Test:
+No false positive added and no true positive lost anywhere;
+react-navigation stays at 0 FP. The overlay rows use a truth-chosen
+population (see "The no-signature bucket"); the rows without it are the
+honest numbers. The stopping-reason table above was measured at main
+87ec7b8, before the path-recall and hash-index merges. Test:
 `tests/gate/deps/corpus-recall-bar.test.ts`.
