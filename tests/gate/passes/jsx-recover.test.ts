@@ -159,7 +159,10 @@ test("D20: jsx-recover is registered last of the structure-recovery block (befor
   // rungs (`fn-naming`, `reg-split`, `var-naming`) — jsx-recover is a
   // structure rung, so it is last of *that* block, not last overall.
   const names = REGISTRY.map((p) => p.name);
-  const renamingBlock = ["fn-naming", "reg-split", "var-naming"];
+  // docs/specs/passes/20-object-literal.md section 9: `object-literal-arg`
+  // inlines a props/descriptor literal into its call, so it must come after
+  // the rung that reads that literal out of its own `rN = {...}` statement.
+  const renamingBlock = ["object-literal-arg", "fn-naming", "reg-split", "var-naming"];
   const jsxAt = names.indexOf("jsx-recover");
   assert.ok(jsxAt >= 0 && jsxAt === names.length - 1 - renamingBlock.length, `expected jsx-recover immediately before the renaming block, got index ${jsxAt} of ${names.join(",")}`);
   assert.deepEqual(names.slice(jsxAt + 1), renamingBlock);
