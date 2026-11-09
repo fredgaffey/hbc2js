@@ -7,7 +7,7 @@
 import type { LoadedSig } from "./db.ts";
 import type { ModuleInventory } from "./inventory.ts";
 import type { SigDbFile } from "./sigdb-types.ts";
-import { foreignSets, isOwnModulePath, viaDependencyCounts } from "./module-paths.ts";
+import { foreignFunctionPackages, foreignSets, isOwnModulePath, viaDependencyCounts, type ForeignSets } from "./module-paths.ts";
 
 export type ConfidenceTier = "high" | "medium" | "low" | "none";
 
@@ -263,7 +263,19 @@ function buildIndex<K extends "exactHash" | "fuzzyHash" | "stringSetHash">(funct
   return s;
 }
 
-function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Set<string>, targetFuzzy: Set<string>, targetStringHash: Set<string>, minInstr: number, hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetCopies: ReadonlyMap<string, number>): { readonly score: PackageScore; readonly hitKeys: ReadonlySet<string>; readonly distinctEligible: number } | null {
+/** corpus-db-growth (docs/DEPS.md "DB growth must not cost true
+ *  positives"): the DB's module paths attribute an exact hash to the
+ *  packages whose files hold it under their own name in another file's
+ *  foreign module. A claimant outside that set (a pathless file carrying a
+ *  copy, a path-bearing dist file that inlined it) holds a copy: the hash is
+ *  neither its evidence nor an owner. `copies` is that set per file (beyond
+ *  `foreignSets`), empty when no loaded file attributes any of its hashes. */
+interface OwnView {
+  readonly foreign: ForeignSets;
+  readonly copies: ForeignSets;
+}
+
+function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Set<string>, targetFuzzy: Set<string>, targetStringHash: Set<string>, minInstr: number, hashOwnerNames: ReadonlyMap<string, ReadonlySet<string>>, targetCopies: ReadonlyMap<string, number>, view: OwnView): { readonly score: PackageScore; readonly hitKeys: ReadonlySet<string>; readonly distinctEligible: number } | null {
   const pkg: SigDbFile = entry.file;
   if (pkg.hbcVersion !== target.hbcVersion) return null;
   // corpus-embedded-copy (module paths v1, docs/PACKAGE-SIGNATURES.md §7):
@@ -271,10 +283,17 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
   // path is another package's file (nested copy, hoisted undeclared
   // dependency, @babel/runtime helper) is neither a hit nor in the
   // denominators. Empty for files without paths (scored as before).
-  const foreign = foreignSets(pkg);
+  // corpus-db-growth: code the DB's paths attribute to other packages is
+  // left out the same way (`view.copies`).
+  const foreign = view.foreign;
+  const copies = view.copies;
+  const notOwn = (i: number): boolean => foreign.functions.has(i) || copies.functions.has(i);
   if (pkg.slim !== undefined && pkg.slim.minInstr !== minInstr) throw new Error(`slim signature prefiltered for minInstr ${pkg.slim.minInstr}, matched with ${minInstr}`);
-  const eligible = pkg.functions.filter((f) => f.instrCount >= minInstr && !foreign.functions.has(f.index));
-  const eligibleCount = pkg.slim !== undefined ? pkg.slim.eligible : eligible.length;
+  const eligible = pkg.functions.filter((f) => f.instrCount >= minInstr && !notOwn(f.index));
+  // A slim file's counts exclude `foreign` only; copies are target hashes,
+  // so the slim file still holds every copy function to subtract.
+  const copyEligible = copies.functions.size === 0 ? [] : pkg.functions.filter((f) => f.instrCount >= minInstr && copies.functions.has(f.index) && !foreign.functions.has(f.index));
+  const eligibleCount = pkg.slim !== undefined ? pkg.slim.eligible - copyEligible.length : eligible.length;
   if (eligibleCount === 0) return null;
 
   // Calibrated, not guessed: an early cutoff of 3 was tried and measured
@@ -304,7 +323,7 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
   // TARGET_GENERIC_COPIES: generic when the target holds the hash at least
   // that often AND more than twice as often as this package itself does.
   const ownCopies = new Map<string, number>();
-  for (const f of pkg.functions) if (!foreign.functions.has(f.index)) ownCopies.set(schemeKey(pkg, f.exactHash), (ownCopies.get(schemeKey(pkg, f.exactHash)) ?? 0) + 1);
+  for (const f of pkg.functions) if (!notOwn(f.index)) ownCopies.set(schemeKey(pkg, f.exactHash), (ownCopies.get(schemeKey(pkg, f.exactHash)) ?? 0) + 1);
   const isGenericInTarget = (hash: string): boolean => {
     const n = targetCopies.get(hash) ?? 0;
     return !pkg.toolchainBaseline && n >= TARGET_GENERIC_COPIES && n > 2 * (ownCopies.get(hash) ?? 0);
@@ -341,7 +360,7 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
     // `moduleTotal` below: dropping it there too would turn some packages
     // into "tiny" ones and unlock the tiny-package path (measured: adds
     // react-shallow-renderer as a false positive on react-navigation-example).
-    if (m.factoryIsBaseline || m.factoryIsDependency === true || foreign.factories.has(m.factoryFunctionIndex)) continue;
+    if (m.factoryIsBaseline || m.factoryIsDependency === true || foreign.factories.has(m.factoryFunctionIndex) || copies.factories.has(m.factoryFunctionIndex)) continue;
     if (m.factoryExactHash !== null && targetExact.has(schemeKey(pkg, m.factoryExactHash)) && isUnambiguous(schemeKey(pkg, m.factoryExactHash))) {
       moduleExactHits++;
       // An empty or re-export factory (under minInstr) is a module hit but
@@ -352,7 +371,8 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
       }
     }
   }
-  const moduleTotal = pkg.slim !== undefined ? pkg.slim.moduleTotal : pkg.modules.filter((m) => !m.factoryIsBaseline && m.factoryExactHash !== null && !foreign.factories.has(m.factoryFunctionIndex)).length;
+  const copyModules = copies.factories.size === 0 ? 0 : pkg.modules.filter((m) => !m.factoryIsBaseline && m.factoryExactHash !== null && !foreign.factories.has(m.factoryFunctionIndex) && copies.factories.has(m.factoryFunctionIndex)).length;
+  const moduleTotal = pkg.slim !== undefined ? pkg.slim.moduleTotal - copyModules : pkg.modules.filter((m) => !m.factoryIsBaseline && m.factoryExactHash !== null && !foreign.factories.has(m.factoryFunctionIndex) && !copies.factories.has(m.factoryFunctionIndex)).length;
 
   const exactCoverage = exactHits / eligibleCount;
   const fuzzyCoverage = (exactHits + fuzzyOnlyHits) / eligibleCount;
@@ -375,7 +395,7 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
   const strongFunctionSignal =
     exactCoverage >= HIGH_EXACT_FUNCTION_COVERAGE ||
     (isTinyPackage && exactHits >= MIN_TINY_PACKAGE_EXACT_FUNCTION_HITS && exactHitInstrSum >= MIN_TINY_PACKAGE_EXACT_FUNCTION_INSTR);
-  const distinctEligible = pkg.slim?.distinctEligible ?? new Set(eligible.map((f) => f.exactHash)).size;
+  const distinctEligible = pkg.slim?.distinctEligible !== undefined ? pkg.slim.distinctEligible - new Set(copyEligible.map((f) => f.exactHash)).size : new Set(eligible.map((f) => f.exactHash)).size;
   const enoughDistinct = hitKeys.size >= Math.min(MIN_DISTINCT_EVIDENCE_HASHES, distinctEligible);
   // corpus-recall-bar: only with enough distinct hashes; otherwise it would
   // turn a plain medium into a few-distinct demotion, which the path-recall
@@ -768,6 +788,42 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
 
   const eligibleDbs = dbs.filter((d) => d.file.hbcVersion === inventory.hbcVersion);
 
+  // corpus-db-growth: which packages the loaded path-bearing files' foreign
+  // modules say a target hash belongs to (see `OwnView`).
+  const attributed = new Map<string, Set<string>>();
+  for (const entry of eligibleDbs) {
+    if ((entry.file.modulePaths ?? 0) < 1 || entry.file.toolchainBaseline) continue;
+    const named = foreignFunctionPackages(entry.file);
+    if (named.size === 0) continue;
+    for (const fn of entry.file.functions) {
+      const name = named.get(fn.index);
+      const key = schemeKey(entry.file, fn.exactHash);
+      if (name === undefined || !targetExact.has(key)) continue;
+      let set = attributed.get(key);
+      if (set === undefined) attributed.set(key, (set = new Set()));
+      set.add(name);
+    }
+  }
+  const views = new Map<SigDbFile, OwnView>();
+  const viewOf = (file: SigDbFile): OwnView => {
+    let v = views.get(file);
+    if (v !== undefined) return v;
+    const foreign = foreignSets(file);
+    const functions = new Set<number>();
+    if (attributed.size > 0 && !file.toolchainBaseline) {
+      for (const fn of file.functions) {
+        if (foreign.functions.has(fn.index)) continue;
+        const a = attributed.get(schemeKey(file, fn.exactHash));
+        if (a !== undefined && !a.has(file.package)) functions.add(fn.index);
+      }
+    }
+    const factories = new Set<number>();
+    if (functions.size > 0) for (const m of file.modules) if (functions.has(m.factoryFunctionIndex)) factories.add(m.factoryFunctionIndex);
+    v = { foreign, copies: { functions, factories } };
+    views.set(file, v);
+    return v;
+  };
+
   // Reverse index for per-module attribution: which package(s)' own function
   // set contains a given exact hash. A module can still be named even if its
   // package's overall coverage is low.
@@ -801,9 +857,9 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
     fnByIndexByEntry.set(entry, fnByIndex);
     // Module paths v1: a path-bearing file never claims another package's
     // file, so a hash both own and copied is attributed to its owner.
-    const foreign = foreignSets(entry.file);
+    const view = viewOf(entry.file);
     for (const fn of entry.file.functions) {
-      if (foreign.functions.has(fn.index)) continue;
+      if (view.foreign.functions.has(fn.index) || view.copies.functions.has(fn.index)) continue;
       const exactKey = schemeKey(entry.file, fn.exactHash);
       let owners = hashOwners.get(exactKey);
       if (owners === undefined) {
@@ -821,7 +877,7 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
       }
     }
     for (const m of entry.file.modules) {
-      if (m.factoryIsBaseline || m.factoryIsDependency === true || m.factoryFuzzyHash === null || foreignSets(entry.file).factories.has(m.factoryFunctionIndex)) continue;
+      if (m.factoryIsBaseline || m.factoryIsDependency === true || m.factoryFuzzyHash === null || foreignSets(entry.file).factories.has(m.factoryFunctionIndex) || viewOf(entry.file).copies.factories.has(m.factoryFunctionIndex)) continue;
       const factory = fnByIndex.get(m.factoryFunctionIndex);
       if (factory === undefined || !fallbackEligible(factory.instrCount, factory.stringCount)) continue;
       const key = `${schemeKey(entry.file, m.factoryFuzzyHash)}|${factory.stringSetHash}`;
@@ -841,7 +897,7 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
   const scoreByOwner = new Map<string, PackageScore>();
   const scoredEntries: ScoredEntry[] = [];
   for (const entry of eligibleDbs) {
-    const scored = scorePackage(entry, inventory, targetExact, targetFuzzy, targetStringHash, minInstr, hashOwnerNames, targetCopies);
+    const scored = scorePackage(entry, inventory, targetExact, targetFuzzy, targetStringHash, minInstr, hashOwnerNames, targetCopies, viewOf(entry.file));
     if (scored === null) continue;
     scoredEntries.push({ entry, ...scored });
   }
@@ -863,7 +919,7 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
     if (score === undefined || score.isBaseline || (score.tier !== "high" && score.tier !== "medium")) continue;
     const fnByIndex = fnByIndexByEntry.get(entry)!;
     for (const m of entry.file.modules) {
-      if (m.factoryIsBaseline || m.factoryIsDependency === true || m.factoryFuzzyHash === null || foreignSets(entry.file).factories.has(m.factoryFunctionIndex)) continue;
+      if (m.factoryIsBaseline || m.factoryIsDependency === true || m.factoryFuzzyHash === null || foreignSets(entry.file).factories.has(m.factoryFunctionIndex) || viewOf(entry.file).copies.factories.has(m.factoryFunctionIndex)) continue;
       const factory = fnByIndex.get(m.factoryFunctionIndex);
       if (factory === undefined || factory.instrCount < MIN_FUZZY_ONLY_FACTORY_INSTR) continue;
       const fuzzyKey = schemeKey(entry.file, m.factoryFuzzyHash);
