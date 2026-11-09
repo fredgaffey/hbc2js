@@ -76,7 +76,7 @@ test("passes-inside-generators: resume entry -- a guard with no globalThis store
   const sw: Stmt = { k: "switch", disc: id("__state"), cases: [{ test: lit("1"), body: caseBody }] } as unknown as Stmt;
   const tail: Stmt[] = [set("r1", id("globalThis")), guard("Math", id("r1")), read("r0", "r1", "Math")];
   const body = frame([sw, ...tail]);
-  const inner = (body[1] as { arg: { body: Stmt[] } }).arg.body;
+  const inner = (body[1] as unknown as { arg: { body: Stmt[] } }).arg.body;
   // the case reads a register stored by an earlier resume: refused
   assert.equal(classifySite(caseBody, body, 0, "Math", id("r1")).ok, false);
   // the store-then-guard in the same resume: folds
