@@ -141,6 +141,15 @@ export interface IfChainVersionMetric {
    *  are in the printer's printable single-`if` shape. */
   readonly elseIfAnnotated: number;
   readonly elseIfPrintable: number;
+  readonly perFixture: Readonly<Record<string, IfChainFixtureMetric>>;
+}
+
+/** Per-fixture depth sums behind `meanMaxDepth`, so a test can pin its
+ *  fixture set (if-chain.test.ts). */
+export interface IfChainFixtureMetric {
+  readonly functions: number;
+  readonly beforeDepthSum: number;
+  readonly afterDepthSum: number;
 }
 
 export interface IfChainMetricsResult {
