@@ -113,6 +113,18 @@ export interface Pass<TNode = unknown, TData = unknown> {
   readonly after?: readonly string[];
   readonly before?: readonly string[];
   /**
+   * Stage B only (docs/specs/passes/00-LADDER.md "Resumable bodies"): this
+   * rung has been audited as sound inside a `sameFrame` resume closure (the
+   * v84/94/96 generator/async state machine, `src/emit/ast.ts`'s
+   * `func.sameFrame`), so the driver also hands it the statement lists
+   * inside that closure as sites, with `ctx.fnBody` still the whole enclosing
+   * function. Every whole-function helper the rung uses must then treat the
+   * closure body as part of this frame AND as re-entered on every resume
+   * (a loop body whose entry has unknown register state). Absent: the
+   * closure stays invisible to the rung, as before.
+   */
+  readonly sameFrame?: true;
+  /**
    * F7: restrict a rung to bytecode versions/layouts it has actually been
    * measured against. Applied by `runPasses` (stage A) and `astPassHook`
    * (stage B) when the pass list is built *for a module* (they have a

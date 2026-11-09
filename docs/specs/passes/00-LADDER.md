@@ -204,6 +204,33 @@ are never rewritten by any rung except the generator rungs.
 | `try-clean` | `try`, `assign`/`init` of `__pc`/`__exc` | anything the handler still reads |
 | `jsx-recover` | `call` trees rooted at a proven React callee | non-React calls |
 
+**Resumable bodies (2026-11-10, `Pass.sameFrame`).** At v84/94/96 a
+generator or `async function` body is emitted as `return function (__sent,
+__isReturn, __isThrow) { switch (__state) ... }`, a `func` marked
+`sameFrame`: not a second Hermes function but this frame's own body,
+re-entered at its top on every resume with whatever registers the previous
+resume left. `stmtLists` skips it by default; a stage-B rung that sets
+`sameFrame: true` is also handed the lists inside it (`stmtLists(body, {
+sameFrame: true })`, `spliceList` splices through it), with `ctx.fnBody`
+still the whole enclosing function. Opting in is an audit claim: every
+whole-function helper the rung uses must (1) see writes inside the closure
+as writes of this frame (`identUses`/`defUse` already do) and (2) treat the
+closure body as the outermost loop body whose entry has unknown register
+state, so a chronological "earlier in the text" fact never crosses a
+resume. Opted in: `global-access` (store/prefix walks see the closure, it is
+condition 5's outermost loop, and condition 6 refuses a guard with no
+`globalThis` store earlier in the same resume -- the cross-resume reuse
+Hermes emits for every later resume stays guarded on purpose),
+`call-shape` (R3h's every-write proof counts closure writes; "every write is
+`undefined`" is order-free), `object-literal` (list-local proofs only), and
+`globalthis-dead-store` (whole-body rung; its analysis walks the closure
+and the end of a closure list is "unknown", never dead). Not opted in, so
+still blind there: `expr-rebuild` (its live-in carry assumes one entry),
+the sugar rungs, and the renamers; `yield-recovery`/`yield-loop`/
+`async-recovery` consume the closure from the parent function as before and
+are unaffected by what ran inside it (fixture 370; 310 keeps 3 of its 6
+guards, all cross-resume).
+
 ### 3.3 Invariants every rung preserves (in addition to PL-01…PL-11)
 
 * **D14**: the rewrite prints what the bytecode does — one shared `let` per

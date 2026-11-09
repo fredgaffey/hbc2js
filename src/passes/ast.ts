@@ -588,11 +588,19 @@ function mapStmtChildren(s: Stmt, fs: (s: Stmt) => Stmt, fx: (e: Expr) => Expr):
  * recurses child-first). Lists compare by object identity, so the driver's
  * `refused` set works exactly as in stage A.
  */
-export function stmtLists(body: readonly Stmt[]): readonly (readonly Stmt[])[] {
+export function stmtLists(body: readonly Stmt[], opts?: { readonly sameFrame?: boolean }): readonly (readonly Stmt[])[] {
   const out: (readonly Stmt[])[] = [];
+  const intoSameFrame = opts?.sameFrame === true;
   const visit = (list: readonly Stmt[]): void => {
     for (const s of list) {
       switch (s.k) {
+        case "return": {
+          // `opts.sameFrame` (Pass.sameFrame): the generator/async resume
+          // closure is this frame's own body, re-entered per resume.
+          const resume = intoSameFrame ? sameFrameBody(s) : null;
+          if (resume !== null) visit(resume);
+          break;
+        }
         case "if":
           visit(s.then);
           visit(s.else);
@@ -622,6 +630,26 @@ export function stmtLists(body: readonly Stmt[]): readonly (readonly Stmt[])[] {
   };
   visit(body);
   return out;
+}
+
+/** The body of the `sameFrame` resume closure when `s` is the emitter's
+ *  `return function (__sent, __isReturn, __isThrow) { ... }` (v84/94/96
+ *  generator and async lowering, `src/emit/function.ts`), else `null`. That
+ *  closure is not a second Hermes function: it shares this frame's registers
+ *  and is re-entered at its top on every resume. */
+export function sameFrameBody(s: Stmt): readonly Stmt[] | null {
+  return s.k === "return" && s.arg !== null && s.arg.k === "func" && s.arg.sameFrame === true ? s.arg.body : null;
+}
+
+/** The `sameFrame` resume-closure body (see `sameFrameBody`) among
+ *  `fnBody`'s top-level statements that contains `target` (by identity, at
+ *  any depth short of a nested `func`), or `null`. */
+export function enclosingResumeBody(fnBody: readonly Stmt[], target: readonly Stmt[]): readonly Stmt[] | null {
+  for (const s of fnBody) {
+    const resume = sameFrameBody(s);
+    if (resume !== null && stmtLists(resume, { sameFrame: true }).includes(target)) return resume;
+  }
+  return null;
 }
 
 /** Replace `target` (by identity) with `repl`, rebuilding only the spine —
@@ -669,6 +697,13 @@ function spliceInStmt(s: Stmt, target: readonly Stmt[], repl: readonly Stmt[]): 
         return cbody === c.body ? c : { ...c, body: cbody };
       });
       return changed ? { ...s, cases } : s;
+    }
+    case "return": {
+      // A `sameFrame` resume closure is this frame's own body (`sameFrameBody`).
+      const resume = sameFrameBody(s);
+      if (resume === null || s.arg === null || s.arg.k !== "func") return s;
+      const body = spliceList(resume, target, repl);
+      return body === resume ? s : { ...s, arg: { ...s.arg, body } };
     }
     default:
       return s; // "func": a separate site, never spliced through its parent's list
@@ -2219,7 +2254,7 @@ export function applyAstPasses(fnBody: readonly Stmt[], passes: readonly StmtLis
 }
 
 function firstAstMatch(fnBody: readonly Stmt[], pass: StmtListPass, ctx: PassContext, refused: ReadonlySet<readonly Stmt[]>): { list: readonly Stmt[]; match: NonNullable<ReturnType<StmtListPass["match"]>> } | null {
-  for (const list of stmtLists(fnBody)) {
+  for (const list of stmtLists(fnBody, { sameFrame: pass.sameFrame === true })) {
     if (refused.has(list)) continue;
     let m: ReturnType<StmtListPass["match"]>;
     try {

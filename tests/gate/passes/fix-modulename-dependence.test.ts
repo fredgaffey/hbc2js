@@ -5,7 +5,9 @@
 // the split/scoped-render banners, never a pass. The guards kept at 84/94/96
 // are a structural missed fold, independent of the name (see
 // docs/specs/passes/03-global-access.md section 7, "Lowered generator bodies").
-// These tests pin both facts.
+// These tests pin both facts. passes-inside-generators (00-LADDER "Resumable
+// bodies") then folded the 3 first-resume guards; the 3 kept read a register
+// an earlier resume stored and are refused on purpose.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -30,8 +32,8 @@ test("fix-modulename-dependence: fixture 310 decompiles identically modulo the p
   }
 });
 
-test("fix-modulename-dependence: guard count for fixture 310 is name-independent (6 kept at 84/94/96, 0 at 98/99)", () => {
-  const expected: Record<number, number> = { 84: 6, 94: 6, 96: 6, 98: 0, 99: 0 };
+test("fix-modulename-dependence: guard count for fixture 310 is name-independent (3 kept at 84/94/96, 0 at 98/99)", () => {
+  const expected: Record<number, number> = { 84: 3, 94: 3, 96: 3, 98: 0, 99: 0 };
   for (const [v, want] of Object.entries(expected)) {
     for (const n of NAMES) {
       const code = decompile(bytesAt(Number(v)), { moduleName: n, resolveV98Ambiguity: true }).code;
