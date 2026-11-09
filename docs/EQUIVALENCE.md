@@ -584,6 +584,37 @@ Beyond what this PoC demonstrates:
    `tests/fixtures/README.md` already establish that 15 of 153 fixture×version
    combinations do not compile at all.
 
+### Round-trip fidelity on a second app (HBC v98, 98,680 functions)
+
+Measured 2026-11-09 with `roundtrip-corpus.ts --only expensify-app-0.86.0 --passes on`
+(12451/12451 modules, 11 RECOMPILE-ERROR, 0 DECOMPILE-STUB). IDENTICAL went
+from **40.97%** (40,427 of 98,680; main `926176b`, the morning) to **46.07%**
+(45,460; main `6e6a2ff`), so the day's decompiler gains generalise beyond
+react-navigation (50.99% on the same main). Top-15 DIFFERENT buckets on `6e6a2ff`:
+
+| # | bucket | functions | in react-navigation top-15? |
+|---|---|---|---|
+| 1 | `StoreToEnvironment/LoadParam` | 6229 | yes (#12) |
+| 2 | `PutOwnBySlotIdx/PutByIdLoose` | 2498 | yes (#13) |
+| 3 | `GetById(reg)` | 2354 | yes (#7) |
+| 4 | `TryGetById(reg)` | 2354 | yes (#3) |
+| 5 | `LoadConst/GetGlobalObject` | 1832 | yes (#8) |
+| 6 | `LoadFromEnvironment(reg)` | 1667 | yes (#14) |
+| 7 | `JmpFalse(label)` | 1591 | new |
+| 8 | `GetById/LoadFromEnvironment` | 1577 | new |
+| 9 | `TryGetById(string)` | 1483 | new |
+| 10 | `CreateFunctionEnvironment(imm)` | 1445 | yes (#9) |
+| 11 | `LoadParam/LoadConst` | 1392 | yes (#5) |
+| 12 | `LoadFromEnvironment(imm)` | 1326 | yes (#4) |
+| 13 | `JmpTrue(label)` | 1169 | new |
+| 14 | `GetByIndex(reg)` | 1068 | new |
+| 15 | `GetById/CreateClosure` | 986 | new |
+
+Nine of fifteen buckets overlap; the new ones are branch-polarity
+(`JmpFalse`/`JmpTrue`), string-keyed `TryGetById`, `GetByIndex` and two
+`GetById`-vs-other-op shapes. react-navigation's `NewObjectWithBuffer`
+buckets (#1, #2) do not appear in Expensify's top 15.
+
 ## 10. CLI shape
 
 ```
