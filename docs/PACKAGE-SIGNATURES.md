@@ -923,3 +923,17 @@ each new job first sweeps `sigpaths-<pid>-*` dirs whose pid is dead; live
 pids' dirs and legacy unnumbered `sigpaths-XXXXXX` dirs are never touched
 (a live rebuild once leaked 6,977 dirs / 20 GB this way). Test:
 `tests/gate/deps/bugs-2026-11-09-sigpaths-tmp-leak.test.ts`.
+
+## 8. Population widening by dependency closure
+
+The bulk population (`candidates.mjs --registry`: `keywords:react-native`,
+`keywords:expo`, `react-native-` name prefix, ranked by downloads) misses
+the plain JS that RN libraries pull in. `tools/pkgsig/bulk/population-closure.mjs`
+adds the 2-hop registry dependency closure of the DB's own hbc98 names,
+plus scoped name strings from non-holdout corpus bundles
+(`population-corpus.mjs`). It picks one version per new name (the one most
+parent ranges resolve to), skips types/toolchain names, and ranks by dependent
+families. It writes `worker.sh` jobs, so `build-one.mjs` and `dep-subtract.mjs`
+are unchanged. Planner logic has an offline test against a canned registry:
+`tests/gate/deps/deps-population-widen.test.ts`. Results: docs/DEPS.md
+"Population widening".
