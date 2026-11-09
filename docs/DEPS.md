@@ -2969,3 +2969,56 @@ Adding the population-retry overlay (`db-overlay-pop2`, 1,251 path-bearing files
 | MetaMask | 186 / 148 / 38 | same | 192 / 153 / 39 | same | 188 / 149 / 39 | same |
 
 The pathless base DB scores exactly as before. On Expensify, +pop loses sax, encoding, typeorm and octokit as FPs and gains source-map-js as one. +pop2 restores react-is and drops 16 FPs, mostly buffer carriers. Expensify +pop2 now matches +pop on TPs (126) with fewer FPs (29 vs 34). Not yet met: bluesky +pop2 loses lodash.debounce and react-native-svg against main (+FP web-streams-polyfill), not traced. The ambiguity-cutoff mechanism (MetaMask's four ljharb TPs, bluesky's color and react-native-gesture-handler) is untouched. Every claimant there is a pathless file, so it needs a claimant-independent rule. Candidates for that rule: count only claimants whose recorded dependency closure does not contain another claimant, or a DB-wide rather than candidate-relative count. js-base64's proposal loss is also still open.
+
+### Transitive dependency subtraction (deps-transitive-subtract, 2026-11-10)
+
+`dep-subtract` removes from a package only the own code of its DIRECT
+dependencies that were in the DB at a satisfying version when the file was
+built, so a pathless signature keeps every grand-dependency and every
+dependency the DB lacked: `is-array-buffer@3.0.5` records
+`subtractedDependencies: []` and still holds call-bind, call-bound and
+get-intrinsic. `tools/pkgsig/bulk/dep-closure.mjs` turns the declared
+dependencies `dep-subtract` already cached (dependencies, peer, optional)
+into each release's transitive closure of names, offline, written as a
+layer's `dependency-closure.json` (or a file's `dependencyClosure`), so no
+signature is rebuilt. A step descends only through the in-DB version that
+satisfies the declared range; with any version's edges, old
+which-typed-array (which depended on is-typed-array) made the two each
+other's dependency and removed both. At match time a target hash that a
+loaded signature of a closure member holds as own code is that member's,
+handled like the DB-growth copies (not a hit, not in the denominators, no
+owner). It is all or nothing per package: the closure's code is set aside
+only when no hit is left outside it. Subtracting it always cost
+define-properties and typed-array-buffer on MetaMask, true packages whose own
+code is a few functions. A cycle (the member's closure names the package)
+takes nothing. Test: `tests/gate/deps/corpus-transitive-subtract.test.ts`.
+
+Measured offline on deb (`meas2.mjs`, full v4 farm `deps-rm/f-v4`, closure
+sidecar from the four bulk `dep-cache` dirs: 18,092 closures), confirmed /
+TP / FP, precision, recall. The first cut, which always subtracted, removed
+is-array-buffer, fast-json-patch and typeorm (MetaMask) and typeorm (rainbow),
+but lost define-properties and typed-array-buffer (MetaMask) and one bluesky
+TP. All-or-nothing:
+
+| app | before | after |
+|---|---|---|
+| metamask | 174 / 161 / 13, 92.5%, 21.5% | 173 / 161 / 12, 93.1%, 21.5% |
+| rainbow | 114 / 108 / 6, 94.7%, 20.8% | unchanged |
+| Expensify J3 | 105 / 102 / 3, 97.1%, 35.4% | unchanged |
+| bluesky | 44 / 43 / 1, 97.7%, 21.7% | unchanged |
+| react-navigation | 21 / 21 / 0, 100%, 27.6% | unchanged |
+
+Only is-array-buffer goes. The other seven survive because the dependency
+holding their hits has no signature to match against. call-bind,
+function-bind, pako and @xmldom/xmldom have no file in the farm at all, so
+the es-shim code is held only by other contaminated packages (is-regex,
+fast-json-patch, jszip, mammoth). wagmi, rpc-websockets and
+reactotron-react-native lose their viem, eventemitter3 and query-string hits
+but keep hits outside the closure (@wagmi/core and @babel/runtime are not
+loaded). The next lever is in the DB, not the matcher: build signatures for
+the missing dependencies (call-bind, function-bind, get-intrinsic, pako,
+@xmldom/xmldom, @wagmi/core, @babel/runtime), after which this rule removes
+the hits with no matcher change. The other option is to treat code shared by
+two packages that declare a common dependency (and no edge between them) as
+that dependency's. It was not built: without the dependency's own signature
+it is the rejected shared-hits rule plus a name match.
