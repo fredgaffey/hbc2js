@@ -467,6 +467,42 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
         out.push({ ...s, body: inner.stmts });
         continue;
       }
+      // A loop (spec 24 section 1.7, "loops"). Its body runs with the aliases
+      // that hold on EVERY entry to it: the first one (the aliases here) and
+      // every back edge. Rather than iterate to a fixed point, two
+      // conservative rules make the entry set exact. (i) An alias held here
+      // that the loop writes anywhere refuses the name: on a later iteration
+      // the register may hold the other value. (ii) Every copy of an alias the
+      // loop makes is confined (`confined` below, checked at the copy): the
+      // copy is killed by a plain store in the same straight-line stretch,
+      // with no jump in between, so no copy's value reaches the back edge,
+      // a `continue`, a `break` or the code after the loop. So every
+      // iteration starts with exactly the aliases held here, and they are
+      // also what holds after the loop.
+      if (s.k === "while" || s.k === "do-while" || s.k === "for") {
+        if (bodyHasTry || [...aliases].some((n) => identUses([s], n).writes > 0) || (s.k === "for" && s.init !== null)) { escaped = true; out.push(s); continue; }
+        // Register values (`list = this`) the loop rewrites hold only on the
+        // first iteration; an install inside a loop runs zero or many times,
+        // never once like a field declaration, so it refuses the name.
+        const loopRegs = new Map([...regs].filter(([n]) => identUses([s], n).writes === 0));
+        const installsBefore = installs;
+        loopDepth++;
+        const inner = fold(s.body, aliases, loopRegs);
+        loopDepth--;
+        if (installs !== installsBefore) escaped = true;
+        const test = s.test === undefined ? undefined : processExpr(s.test, aliases, loopRegs, null);
+        const update = s.k === "for" && s.update !== null ? processExpr(s.update, aliases, loopRegs, null) : null;
+        if (s.k === "for") out.push({ ...s, test: test!, update, body: inner.stmts });
+        else if (s.k === "do-while") out.push({ ...s, test: test!, body: inner.stmts });
+        else out.push(test === undefined ? { ...s, body: inner.stmts } : { ...s, test, body: inner.stmts });
+        // Registers the loop wrote no longer hold what `regs` says.
+        regs = loopRegs;
+        continue;
+      }
+      if (loopDepth > 0) {
+        const cp = simpleStore(s);
+        if (cp !== null && isIdent(cp.value) && aliases.has(cp.value.name) && !confined(stmts, i, cp.name)) { escaped = true; out.push(s); continue; }
+      }
       if (s.k === "if") {
         const test = processExpr(s.test, aliases, regs, null);
         const thenOut = fold(s.then, aliases, regs);
@@ -546,6 +582,26 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
     return false;
   }
 
+  /** Rule (ii) above: the copy into `reg` at `stmts[at]` is overwritten by a
+   *  plain store later in the same list, and everything in between is a plain
+   *  statement (no `if`, loop, label or jump, which could leave the stretch
+   *  with the symbol still in `reg`). The kill may read `reg` (`r = this[r]`):
+   *  its operand is evaluated, as an alias read, before the write. */
+  function confined(stmts: readonly Stmt[], at: number, reg: string): boolean {
+    for (let j = at + 1; j < stmts.length; j++) {
+      const t = stmts[j]!;
+      if (t.k !== "expr" && t.k !== "init" && t.k !== "decl" && t.k !== "comment") return false;
+      const st = simpleStore(t);
+      if (st !== null && st.name === reg) return true;
+      if (identUses([t], reg).writes > 0) return false; // a nested write: not a plain kill
+    }
+    return false;
+  }
+
+  let loopDepth = 0;
+  // A `catch` in this frame could observe a register an exception leaves
+  // mid-stretch; loops are only reasoned about without one.
+  const bodyHasTry = (() => { let t = false; walk(body, { stmt: (x) => { if (x.k === "try") t = true; } }); return t; })();
   const result = fold(body, new Set([envName]), new Map());
   if (escaped || installs > 1) return null;
   const folded = claimedSources.size === 0 ? result.stmts : result.stmts.filter((s) => !claimedSources.has(s));
