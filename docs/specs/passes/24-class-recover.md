@@ -373,7 +373,7 @@ own register `r3` read as newly free. A name now passes when the function body
 declares it at top level and no mention of it is left inside a nested function
 or class.
 
-### 1.7.1 Private methods (2026-11-09, spec only -- not yet folded)
+### 1.7.1 Private methods (2026-11-09, folded)
 
 **Problem.** The 46 react-navigation `defining-body-escape` refusals that
 section 9.5 (f) and the BUGS row put down to "a function hermesc hoisted into
@@ -478,6 +478,43 @@ the conservative rule needs no join. Fixture 112-private-field-loop-copy
 `tests/gate/passes/private-fields-loop.test.ts` adds hand-built refusals
 (back-edge carried, carried out of the loop, `continue` before the kill,
 entry alias overwritten).
+
+**As implemented (`src/passes/private-fields/methods.ts`, run first inside
+`foldAll`).** The method slot store may go through one register
+(`r3 = _fnK; ...; M = r3;`, the register read nowhere else), the same one-hop
+rule as a symbol. Dominance is a forward scan per frame (each member body and
+each function nested in one, which has its own registers): a brand-check
+block (`L: { ...; t = hasOwn(recv, B); if (t) { break L; } (literal stores)*;
+[x =] throwTypeError(...); break L; }`, no other exit from `L` before the
+check, B direct or through a register the block's prefix proves holds it)
+adds `recv` to the proven set once the block completes; after an `if` or a
+labelled block the state is the meet of every way out (arm ends and every
+`break` to the label); a loop, `try` or `switch` is entered with every fact it
+might kill already killed. A register that held a method through a dropped
+store on some but not all paths is "maybe", and any read of it refuses. The
+brand is folded by `foldOne` itself (candidate flag `brand`), so it gets the
+field fold's own install/guard handling and R-PF1; the field declaration that
+produces is discarded, and the fold must not add any `.#m` member (B is never
+a property key). The **hosted shape** (class and slot stores inside a labelled
+block placed directly in the function body, method functions at the body's
+top level) is matched on the whole-body visit (`foldHosted`), which then runs
+the field fold on the new block and requires no mention of a method slot,
+the brand or a folded field slot anywhere else in the frame. Refusal codes
+(all-or-nothing per class; `tools/passes/private-fields-refusals.ts` lists
+them as `pm-*` rows): `pm-no-class`, `pm-no-constructor`, `pm-no-brand`,
+`pm-method-escape` (a `#` function not stored once into a slot beside the
+class, or its hop register read again), `pm-slot-rewritten`, `pm-inner-name`,
+`pm-undominated-call`, `pm-slot-escape`, `pm-brand-escape`. Observed and NOT
+folded: a static private method -- hermesc checks the brand on the class but
+passes `0` as the `Reflect.apply` receiver (the body never reads `this`), so
+no check dominates the call (`pm-undominated-call`); a private getter was
+inlined by hermesc in every probe. Fixture `103-private-method-escape` (the
+method also read as a value through a getter) stays refused and runs.
+Measured on react-navigation-example-0.85.3 (before = 022e26b, clean
+worktrees; `private-fields-refusals.ts --inline-new`): candidates 142 -> 132
+(method-frame rows now classify after the fold), `folded` 36 -> 51,
+`defining-body-escape` 64 -> 34, new rows `pm-folded` 2 (frames), `pm-slot-escape`
+3; `roundtrip-corpus --passes on` IDENTICAL 6272 -> 6272 of 14437 (43.44 percent; no function flips to IDENTICAL yet: the folded classes' other differences remain), DIFFERENT 8165, bucket `diff:GetOwnPrivateBySym/GetByVal` 140 -> 130.
 
 ### 1.8 Corpus reach
 
