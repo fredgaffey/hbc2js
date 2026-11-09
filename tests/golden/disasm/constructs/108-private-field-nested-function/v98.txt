@@ -1,4 +1,4 @@
-; hbc2js disassembly of 100-private-field-nested-function/v98.hbc
+; hbc2js disassembly of 108-private-field-nested-function/v98.hbc
 ; version=98 layout=E opcodeTable=hbc98-late functions=8 strings=17 globalCodeIndex=0
 function #0 "global"  params=1 frame=23 env=0 flags=dbg,overflowed  @0x000001b0 size=261
   0000  CreateFunctionEnvironment r4, 1

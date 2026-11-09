@@ -360,7 +360,7 @@ It refuses the name when it names any other live alias of the member (an env
 slot copy the fold would delete) or is a `sameFrame` closure. A function that
 captures nothing is hoisted by hermesc into the *defining* frame, outside the
 class body, where `#x` is not valid syntax; it keeps its mention and R-PF1
-still refuses (fixture 101-private-field-hoisted-function). Two smaller
+still refuses (fixture 109-private-field-hoisted-function). Two smaller
 changes were needed to fold fixture 100. (1) When the matched list is a
 labelled block placed directly in the function body, the register scan no
 longer refuses for any mention outside the list. That block runs once per
@@ -946,7 +946,7 @@ needs a class with no `extends`, derived H-D one with `extends`.
 
 H-B also accepts a receiver register different from the prototype's
 (`P = C.prototype; X = Object.create(P === null ? ...)`, fixture
-100-private-field-nested-function's second `new`). P is then one more
+108-private-field-nested-function's second `new`). P is then one more
 register the region wrote: it holds `C.prototype`, which nothing in
 `X = new C(args)` stores, so section 9.2 (5) must prove it dead after the
 region or re-store it from a name that still holds the value, exactly as for
