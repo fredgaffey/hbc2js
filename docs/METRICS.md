@@ -182,6 +182,8 @@ Own build scored against the package lockfile truth. Offline and `--confirm` giv
 | bluesky own build (hash-index candidates, offline) | see DEPS.md | partial 29 / 100% / 14.6%; clean 42 / 81.0% / 17.2% | unchanged (corpus-recall-candidates) | not run | n/a |
 | rainbow own build (hash-index candidates, offline, either DB) | see DEPS.md | 104 / 78.8% / 15.8% (direct 20.4%) | 127 / 81.9% / 20.1% (direct 26.5%; corpus-recall-candidates, +22 TP, +1 FP `digest-fetch`) | not run | n/a |
 | metamask own build (hash-index candidates, offline, either DB) | see DEPS.md | 169 / 78.1% / 17.6% (direct 20.3%) | 178 / 79.2% / 18.8% (direct 20.3%; corpus-recall-candidates, +10 TP, `bs58` lost, FP `react-base16-styling` in, `eventid` out) | not run | n/a |
+| five truth apps (hop-two expansion with own string sets, db-v3-clean + hash index, offline) | see DEPS.md | Expensify 130 / 70.0%; nav 14 / 100%; bluesky 42 / 81.0%; rainbow 127 / 81.9%; metamask 178 / 79.2% / 18.8% | unchanged except metamask 181 / 79.0% / 19.1% (+`bare-events` `rfdc`, +1 FP `jszip`; corpus-recall-hop-two) | not run | n/a |
+| five truth apps (hop-two expansion with own string sets, db-v4-paths-partial + hash index, offline) | see DEPS.md | Expensify 92 / 96.7% / 30.9%; nav 10 / 100% / 13.2%; bluesky 29 / 100% / 14.6%; rainbow 127 / 81.9%; metamask 178 / 79.2% | Expensify 95 / 96.8% / 31.9%; nav 18 / 100% / 23.7% (0 FP); bluesky 39 / 100% / 19.7%; rainbow unchanged; metamask 181 / 79.0% / 19.1% (+23 TP, +1 FP `jszip`; corpus-recall-hop-two) | not run | n/a |
 Store-bundle scoring was not repeated in this measurement.
 
 ## `--confirm` on three apps without ground truth

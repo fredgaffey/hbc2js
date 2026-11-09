@@ -24,7 +24,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ModuleInventory } from "./inventory.ts";
 import type { SigDbFile } from "./sigdb-types.ts";
-import { proposeFromHashIndex } from "./hash-index.ts";
+import { packagesWithOwnStringSets, proposeFromHashIndex } from "./hash-index.ts";
 
 /** `<safeName>@<version>__hbc<N>.json` -> canonical package name (reverses
  *  `writeSignature`'s `db.package.replace(/\//g, "__")`, `db.ts`). Returns
@@ -221,6 +221,7 @@ export function deriveCandidatePackages(layers: readonly DbLayer[], inventory: M
   const universe = listCandidatePackageNamesForLayers(layers);
   const text = evidenceTextFromInventory(inventory);
   const found = new Set(findCandidatesInText(universe, text));
+  const direct = new Set(found);
 
   // Dependency expansion (candidate-derivation dependency expansion,
   // docs/DEPS.md "Where dependency recall is actually lost", measured
@@ -281,6 +282,21 @@ export function deriveCandidatePackages(layers: readonly DbLayer[], inventory: M
   for (const scope of matchedScopes) {
     for (const name of scopeToNames.get(scope) ?? []) found.add(name);
   }
+
+  // Hop-two expansion (corpus-recall-hop-two, docs/DEPS.md "Hop-two
+  // candidate expansion"): a recorded dependency of a candidate that is NOT
+  // itself directly evidenced (dependency-, hash- or scope-proposed) is
+  // admitted only on its OWN string evidence, per the 2026-09-29 owner
+  // ruling — one of its own functions' distinctive string sets (>= 2
+  // strings, no other package has it) is present in the target. The edge
+  // alone is never enough, and admitted packages' dependencies are not
+  // expanded further.
+  const hopTwo = new Set<string>();
+  for (const pkg of found) {
+    if (direct.has(pkg)) continue;
+    for (const dep of recordedDependencyPackageNames(layers, pkg, depIndex)) if (!found.has(dep)) hopTwo.add(dep);
+  }
+  for (const pkg of packagesWithOwnStringSets(layers, inventory, hopTwo)) found.add(pkg);
 
   return found;
 }

@@ -98,11 +98,107 @@ export function buildCandidateHashIndex(dir: string, hbcVersion: number, opts: B
   return `${HASH_INDEX_MAGIC}${JSON.stringify(header)}\n${lines.join("\n")}${lines.length > 0 ? "\n" : ""}`;
 }
 
-/** Builds and writes `<outDir>/candidate-hash-index__hbc<N>.tsv`; returns its path. */
+/** Builds and writes `<outDir>/candidate-hash-index__hbc<N>.tsv` and, beside
+ *  it, the hop-two string-set index (`buildCandidateStringSetIndex`); returns
+ *  the hash index's path. */
 export function writeCandidateHashIndex(sigDir: string, outDir: string, hbcVersion: number, opts: BuildHashIndexOptions = {}): string {
   const path = join(outDir, hashIndexFileName(hbcVersion));
   writeFileSync(path, buildCandidateHashIndex(sigDir, hbcVersion, opts));
+  writeFileSync(join(outDir, stringSetIndexFileName(hbcVersion)), buildCandidateStringSetIndex(sigDir, hbcVersion, opts));
   return path;
+}
+
+// ---------------------------------------------------------------------------
+// Hop-two string-set index (corpus-recall-hop-two, docs/DEPS.md "Hop-two
+// candidate expansion"). The owner ruling (2026-09-29) admits a dependency of
+// a non-string-evidenced candidate only on its OWN string evidence. Signature
+// files carry no string literals, only each function's string-set hash (the
+// hash of the set of string constants it uses) and their count; a target
+// function with the same string-set hash uses exactly the same strings. The
+// index keeps the sets that are distinctive: >= MIN strings, from a function
+// the file's own package owns, and present in exactly one package's files at
+// that HBC version (toolchain baselines count as an owner, so a set the RN
+// baseline has is never anyone's own evidence).
+
+export const STRINGSET_INDEX_MAGIC = "#hbc2js-candidate-stringset-index 1 ";
+export const DEFAULT_STRINGSET_MIN_STRINGS = 2;
+
+export function stringSetIndexFileName(hbcVersion: number): string {
+  return `candidate-stringset-index__hbc${hbcVersion}.tsv`;
+}
+
+export function buildCandidateStringSetIndex(dir: string, hbcVersion: number, opts: BuildHashIndexOptions & { readonly minStrings?: number } = {}): string {
+  const minStrings = opts.minStrings ?? DEFAULT_STRINGSET_MIN_STRINGS;
+  const readFile = opts.readFile ?? ((p: string) => readFileSync(p, "utf8"));
+  const suffix = `__hbc${hbcVersion}.json`;
+  const packages: string[] = [];
+  const ids = new Map<string, number>();
+  // string-set hash -> owning package id; -1 once a second package has it.
+  const owner = new Map<string, number>();
+  for (const name of readdirSync(dir).sort()) {
+    if (!name.endsWith(suffix)) continue;
+    let file: SigDbFile;
+    try {
+      file = JSON.parse(readFile(join(dir, name))) as SigDbFile;
+    } catch {
+      continue;
+    }
+    if (file.hbcVersion !== hbcVersion) continue;
+    let id = ids.get(file.package);
+    if (id === undefined) {
+      id = packages.length;
+      packages.push(file.package);
+      ids.set(file.package, id);
+    }
+    // A baseline file blocks every set it has but is never itself proposed.
+    const ownerId = file.toolchainBaseline ? -2 : id;
+    for (const fn of file.functions) {
+      if (fn.stringCount < minStrings) continue;
+      if (fn.owner !== undefined && fn.owner !== null && fn.owner !== file.package) continue;
+      const cur = owner.get(fn.stringSetHash);
+      if (cur === undefined) owner.set(fn.stringSetHash, ownerId);
+      else if (cur !== ownerId) owner.set(fn.stringSetHash, -1);
+    }
+  }
+  const header = { hbcVersion, minStrings, packages };
+  const lines: string[] = [];
+  for (const [hash, id] of owner) if (id >= 0) lines.push(`${hash}\t${id}`);
+  lines.sort();
+  return `${STRINGSET_INDEX_MAGIC}${JSON.stringify(header)}\n${lines.join("\n")}${lines.length > 0 ? "\n" : ""}`;
+}
+
+/** Of `wanted`, the packages that have at least one indexed (distinctive,
+ *  own) string set among the target's function string-set hashes, per
+ *  layer carrying a string-set index for the target's HBC version. */
+export function packagesWithOwnStringSets(layers: readonly DbLayer[], inventory: ModuleInventory, wanted: ReadonlySet<string>): ReadonlySet<string> {
+  const out = new Set<string>();
+  if (wanted.size === 0) return out;
+  const target = new Set<string>();
+  for (const fn of inventory.functions) target.add(fn.stringSetHash);
+  for (const layer of layers) {
+    const path = join(hashIndexDir(layer), stringSetIndexFileName(inventory.hbcVersion));
+    if (!existsSync(path)) continue;
+    const text = readFileSync(path, "utf8");
+    const nl = text.indexOf("\n");
+    if (nl < 0 || !text.startsWith(STRINGSET_INDEX_MAGIC)) continue;
+    const header = JSON.parse(text.slice(STRINGSET_INDEX_MAGIC.length, nl)) as { hbcVersion: number; packages: string[] };
+    if (header.hbcVersion !== inventory.hbcVersion) continue;
+    const wantedIds = new Set<number>();
+    header.packages.forEach((p, i) => { if (wanted.has(p)) wantedIds.add(i); });
+    if (wantedIds.size === 0) continue;
+    let start = nl + 1;
+    while (start < text.length) {
+      let end = text.indexOf("\n", start);
+      if (end < 0) end = text.length;
+      const tab = text.indexOf("\t", start);
+      if (tab > start && tab < end) {
+        const id = Number(text.slice(tab + 1, end));
+        if (wantedIds.has(id) && target.has(text.slice(start, tab))) out.add(header.packages[id]!);
+      }
+      start = end + 1;
+    }
+  }
+  return out;
 }
 
 /** Directory that holds a layer's index files. A sqlite DB keeps the index as a
