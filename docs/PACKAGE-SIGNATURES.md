@@ -1145,3 +1145,66 @@ families. It writes `worker.sh` jobs, so `build-one.mjs` and `dep-subtract.mjs`
 are unchanged. Planner logic has an offline test against a canned registry:
 `tests/gate/deps/deps-population-widen.test.ts`. Results: docs/DEPS.md
 "Population widening".
+
+## 9. App-blind population (sigdb-honest-population)
+
+**Problem.** Recall is 21–35% and 1,235 of the 1,393 misses in the
+2026-11-10 triage (docs/deps-triage-1110.md) are DB coverage. The triage's
+wishlist is read off the five apps' truth files, so building it would
+measure the rule "build what the test apps contain". Recall is only honest
+if the population is chosen without the measured apps.
+
+**Rule** (`tools/pkgsig/bulk/population-honest.mjs`, offline test
+`tests/gate/deps/deps-population-honest.test.ts`). Three pinned, public
+sources, nothing else:
+
+1. *declared*: what the SDKs say an app ships with. `bundledNativeModules.json`
+   plus `dependencies` of `expo` at `dist-tags.latest` and the two highest
+   `sdk-N` tags below it (2026-11-10: 58.0.23, 57.0.32, 56.0.24), and
+   `template/package.json` `dependencies` of `@react-native-community/template`
+   at `latest` and the two highest `N-stable` tags below it (0.88.1, 0.86.3,
+   0.83.10). 143 names.
+2. *top*: the first `--top` names of `npm-high-impact@1.13.0`'s `topDownload`
+   list (npm packages ranked by weekly downloads; a published npm package, so
+   the list is reproducible). Not filtered for "RN relevance" beyond
+   `skipName()`: any such filter we could write (keyword, peer dep) drops
+   `semver`/`buffer`-style plain JS, which is what apps bundle; node-only
+   packages cost a failed build, not a false match.
+3. `skipName()` (shared with `population-closure.mjs`): `@types/*`, react,
+   react-native, build toolchain.
+
+Versions: a declared name builds every stable version an SDK range resolves
+to; a top name builds `dist-tags.latest` plus the newest release of each of
+`--prior-majors` (1) majors below it. Jobs are (name, version, hbc) for
+hbc 96 and 98 (the measured apps' versions, also the two current scaffold
+families), skipped when the exact file exists in `--exclude-db` (the v4
+farm `deps-rm/f-v4` and the earlier honest overlays `db-overlay-pop{,2}`).
+Order: phase 1 = the primary version of names with no file at that hbc,
+phase 2 = everything else; declared before top; by download rank inside
+each. A batch is a prefix of that order, so the cut is set by build cost
+only. The full plan at `--top 5000` is 12,841 jobs (4,079 names); phase 1
+is 5,746.
+
+**Rejected:** ranking by "dependents of react-native/expo" (the registry
+has no dependents query; the keyword search of round 2b already covers RN
+libraries), and any tuning of `--top`/order against the triage misses.
+
+**Overlap with the triage's 1,235 coverage misses** (read after the rule
+was fixed; it measures the rule, it chose nothing). A miss counts as
+covered when the plan has the name at the app's hbc (for `version-missing`:
+the exact version):
+
+| population | jobs | covered of 1,235 | exact version |
+|---|---|---|---|
+| `db-overlay-pop{,2}` (built, hbc98 only, not in f-v4) | 2,152 files | 148 | 41 |
+| declared only | 643 | 87 | 5 |
+| phase 1, top 500 / 1,000 / 2,000 / 5,000 | 514 / 905 / 1,865 / 5,746 | 121 / 132 / 179 / 318 | 33 / 36 / 48 / 101 |
+| both phases, top 500 / 2,000 / 5,000 | 1,728 / 4,992 / 12,841 | 182 / 263 / 429 | 60 / 92 / 168 |
+| full plan + pop overlays | | 499 | 209 |
+| batch 1 (first 480 jobs, 345 package-versions) | 480 | 119 | |
+
+So an app-blind population reaches at most about 40% of the misses: the
+rest is each app's long tail (wallet SDKs, `@metamask/*`, app-specific
+forks), which no download- or SDK-ranked list reaches. The truth-chosen
+wishlist would cover all 1,235 by construction; that number would say
+nothing about a new app.
