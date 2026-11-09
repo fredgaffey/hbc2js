@@ -24,12 +24,23 @@ params, body, generator/async flags) when all of these hold:
 2. no loop statement (`while`/`do-while`/`for`/`for-in`/`for-of`, test and
    body alike) contains the read, so the read runs at most once per
    activation;
-3. the read is not the whole stored value of `x = N` / `let x = N` with `x`
-   a non-register target (member, env slot, named binding). That is how a
-   source *declaration* surfaces (`r1.m = m`, `_e14_3 = _fn5`). Hermes
-   already created that closure at entry, where the store sits, so moving it
-   would change no bytecode and would cost the declaration form;
-4. no nested block, `catch` parameter or loop binding of the host declares a
+3. the read is not the whole stored value of a plain store, `x = N` or
+   `let x = N`, whatever `x` is. That is how a source declaration surfaces
+   (`r1.m = m`, `_e14_3 = _fn5`). It is also how the emitter spells a bare
+   `CreateClosure` into a register (`r3 = _fn1`), which later rungs and
+   readers key on: class-recover's constructor binding and array-literal's
+   reference copy. A store already sits where Hermes created the closure, so moving it would gain nothing;
+4. the read is not a direct argument of a runtime helper
+   (`__hbc_makeGenerator(_fn4)`, the async spawn driver). The PARENT's
+   generator/async rungs (spec 25/29) run later, in the parent's pipeline,
+   and read this body's hoisted factory declarations as their evidence;
+5. the bytecode does not create the closure in the function's prologue,
+   i.e. before the first instruction outside environment/parameter/constant
+   set-up and other closure creations. Such a closure is a source declaration,
+   or is used by the opening statement, so hoisting is already the faithful
+   order. The function index comes from the body's `// fn#N` line and is
+   matched against `CreateClosure` operands in `ctx.cfg`;
+6. no nested block, `catch` parameter or loop binding of the host declares a
    name `F` mentions (no shadowing at the new position).
 
 Registered after every structure rung that looks for hoisted declarations
@@ -47,9 +58,24 @@ observe it before that read (condition 1). Under condition 2 the read runs
 at most once per activation. A hoisted declaration also makes one closure per
 activation, so the number of distinct closures and their identities are
 unchanged. It captures the same bindings: env slots are function-top `let`s
-or enclosing-scope names, and condition 4 rules out shadowing. A register
+or enclosing-scope names, and condition 6 rules out shadowing. A register
 copy (`rX = function get() {...}`) that is read twice later still holds the
 one closure, so fixture 230's `twice` still prints `true`.
+
+**Analysis cost.** All of a body's declarations are decided in a constant
+number of walks (`identUsesMany` over the body and over its outermost loops).
+`rewrite` moves every accepted one at once. A first version walked once per
+declaration and re-matched once per move, and it did not finish the
+react-navigation split in 14 minutes; the whole run normally takes about
+3.5 minutes.
+
+**Printer side fix.** A function expression in callee position
+(`_fn3(a, b)` -> `(function _fn3() {...})(a, b)`) printed as
+`function _fn3() {...}(a, b);`. That parses as a declaration followed by a
+parenthesised expression, so the call silently never ran. It showed up as
+DIVERGENT on the `.obf` fixtures 02/03/04 at v98/v99. `printStmt` now
+parenthesises any expression statement whose text starts with `function` or
+`{`. The regression test is in `closure-inline.test.ts`.
 
 ## 3. Rejected alternative
 
