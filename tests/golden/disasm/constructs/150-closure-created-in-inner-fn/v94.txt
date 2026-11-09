@@ -1,0 +1,96 @@
+; hbc2js disassembly of 150-closure-created-in-inner-fn/v94.hbc
+; version=94 layout=C opcodeTable=hbc94 functions=5 strings=21 globalCodeIndex=0
+function #0 "global"  params=1 frame=15 env=0 flags=dbg  @0x000001b4 size=158
+  0000  DeclareGlobalVar     s11 "p"
+  0005  DeclareGlobalVar     s15 "makeParser"
+  000a  CreateEnvironment    r0
+  000c  CreateClosure        r1, r0, f1 "makeParser"
+  0011  GetGlobalObject      r0
+  0013  PutById              r0, r1, #c1, s15 "makeParser"
+  0019  GetByIdShort         r3, r0, #c1, s15 "makeParser"
+  001e  LoadConstUndefined   r2
+  0020  LoadConstString      r1, s3 "#"
+  0024  Call2                r1, r3, r2, r1
+  0029  PutById              r0, r1, #c2, s11 "p"
+  002f  TryGetById           r3, r0, #c2, s17 "print"
+  0035  GetByIdShort         r5, r0, #c3, s11 "p"
+  003a  GetByIdShort         r4, r5, #c4, s12 "parse"
+  003f  LoadConstString      r1, s2 "#a\nb\n#c"
+  0043  Call2                r4, r4, r5, r1
+  0048  GetByIdShort         r1, r4, #c5, s14 "join"
+  004d  LoadConstString      r5, s6 ","
+  0051  Call2                r1, r1, r4, r5
+  0056  Call2                r1, r3, r2, r1
+  005b  TryGetById           r3, r0, #c2, s17 "print"
+  0061  GetByIdShort         r6, r0, #c3, s11 "p"
+  0066  GetByIdShort         r4, r6, #c4, s12 "parse"
+  006b  LoadConstString      r1, s4 "#d"
+  006f  Call2                r4, r4, r6, r1
+  0074  GetByIdShort         r1, r4, #c5, s14 "join"
+  0079  Call2                r1, r1, r4, r5
+  007e  Call2                r1, r3, r2, r1
+  0083  TryGetById           r1, r0, #c2, s17 "print"
+  0089  GetByIdShort         r3, r0, #c3, s11 "p"
+  008e  GetByIdShort         r0, r3, #c6, s9 "count"
+  0093  Call1                r0, r0, r3
+  0097  Call2                r0, r1, r2, r0
+  009c  Ret                  r0
+
+function #1 "makeParser"  params=2 frame=13 env=2 flags=strict,dbg  @0x00000252 size=81
+  0000  CreateEnvironment    r1
+  0002  GetGlobalObject      r0
+  0004  TryGetById           r3, r0, #c1, s10 "RegExp"
+  000a  LoadConstString      r2, s7 "^"
+  000e  LoadParam            r0, 1
+  0011  Add                  r4, r2, r0
+  0015  GetByIdShort         r0, r3, #c2, s18 "prototype"
+  001a  CreateThis           r2, r0, r3
+  001e  LoadConstString      r0, s5 "(\\w+)"
+  0022  Add                  r5, r4, r0
+  0026  Mov                  r6, r2
+  0029  Construct            r0, r3, 2
+  002d  SelectObject         r0, r2, r0
+  0031  StoreToEnvironment   r1, 0, r0
+  0035  LoadConstZero        r0
+  0037  StoreNPToEnvironment r1, 1, r0
+  003b  NewObject            r0
+  003d  CreateClosure        r2, r1, f2 "parse"
+  0042  PutNewOwnByIdShort   r0, r2, s12 "parse"
+  0046  CreateClosure        r1, r1, f4 "count"
+  004b  PutNewOwnByIdShort   r0, r1, s9 "count"
+  004f  Ret                  r0
+
+function #2 "parse"  params=2 frame=13 env=0 flags=strict,dbg  @0x000002a3 size=41
+  0000  LoadParam            r2, 1
+  0003  GetByIdShort         r1, r2, #c1, s20 "split"
+  0008  LoadConstString      r0, s1 "\n"
+  000c  Call2                r3, r1, r2, r0
+  0011  GetByIdShort         r2, r3, #c2, s16 "reduce"
+  0016  CreateEnvironment    r0
+  0018  CreateClosure        r1, r0, f3 ""
+  001d  NewArray             r0, 0
+  0021  Call3                r0, r2, r3, r1, r0
+  0027  Ret                  r0
+
+function #3 ""  params=3 frame=13 env=0 flags=strict,dbg  @0x000002cc size=56
+  0000  LoadParam            r0, 1
+  0003  GetEnvironment       r2, 1
+  0006  LoadFromEnvironment  r4, r2, 0
+  000a  GetByIdShort         r3, r4, #c1, s13 "exec"
+  000f  LoadParam            r1, 2
+  0012  Call2                r4, r3, r4, r1
+  0017  JmpFalse             L1, r4
+  001a  GetByIdShort         r3, r0, #c2, s19 "push"
+  001f  LoadConstUInt8       r1, 1
+  0022  GetByVal             r1, r4, r1
+  0026  Call2                r1, r3, r0, r1
+L1:
+  002b  LoadFromEnvironment  r1, r2, 1
+  002f  Inc                  r1, r1
+  0032  StoreToEnvironment   r2, 1, r1
+  0036  Ret                  r0
+
+function #4 "count"  params=1 frame=1 env=0 flags=strict  @0x00000304 size=9
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r0, r0, 1
+  0007  Ret                  r0

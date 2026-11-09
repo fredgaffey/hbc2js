@@ -32,7 +32,7 @@ const DIR = join(repoRoot(), "tests", "fixtures", "constructs");
 const VERSIONS = ["v84", "v94", "v96", "v98", "v99"] as const;
 // Fixture 96 at v99: fn 3 (`setup`) gives r1 to three unrelated values:
 // `load("styles")` (web 1, `r1`), the `makeSheet(...)` result (web 2, `r1_2`,
-// which var-naming renders `apply`) and `sheet.width + sheet.height` (web 3,
+// `r1_2`) and `sheet.width + sheet.height` (web 3,
 // `r1_3`). Under the whole-register identity all three had to share a name.
 const F96 = join(DIR, "96-reg-reuse-straight", "v99.hbc");
 const SETUP = 3;
@@ -66,16 +66,17 @@ test("web identity: nameable bindings list each bound web of a split register, n
   assert.ok(keys.includes("reg:3:1:1"), keys.join(" "));
   assert.ok(keys.includes("reg:3:1:3"), keys.join(" "));
   assert.ok(!keys.includes("reg:3:1"), "a split register is asked about per web");
-  // r1_2 is printed as `apply` (var-naming): not a literal identifier of the
-  // body the model sees, so it is not requested (readability-id-match).
-  assert.ok(!keys.includes("reg:3:1:2"), keys.join(" "));
+  // r1_2 used to print as `apply` (the Reflect.apply residue) and was not
+  // requested; with call-shape R3f the call is `(0, r2.makeSheet)(..)`, the
+  // web is a literal identifier of the body, so it is a binding now.
+  assert.ok(keys.includes("reg:3:1:2"), keys.join(" "));
   assert.ok(!keys.includes("reg:3:1:4"), "a web that does not exist is not a binding");
   assert.ok(idx.of(SETUP).includes(1), "of() still lists registers");
 });
 
 test("web identity: a web-keyed name renames only that live range", () => {
   const code = renderSetup(new Map([["r1_3", { name: "total" }]]));
-  assert.match(code, /let total = apply\.width \+ apply\.height;/);
+  assert.match(code, /let total = r1_2\.width \+ r1_2\.height;/);
   assert.match(code, /return total;/);
   assert.match(code, /let r1 = a1\("styles"\);/, "web 1 keeps its own (unnamed) binding");
   assert.doesNotMatch(code, /r1_3/);

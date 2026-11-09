@@ -58,19 +58,17 @@
 #   98-early -> c00cc57595b3ef504a323360ba77e7b2e0ac26ce  (third_party/hermes/hbc98-2024)
 #         v97-shaped class-D layout; no known public producer. Output dir
 #         tools/hermes-vm/v98-early (src-98-early, build-98-early).
-#   99 -> 913d31acd10aff31e0856657c9c566c3e72bd24a
-#         "static_h" (Static Hermes) lineage. This is "Revert bytecode version
-#         to 99" (2026-03-05), the commit that inserts NewTypedObjectWithBuffer
-#         at opcode index 4, producing the 220-opcode table that both
-#         v99.hbc and v99-public.hbc decode against (docs/HBC-FORMAT.md sec 0
-#         and sec 11.2). hermes-compiler@260318099.0.x's npm tarball carries no
-#         embedded commit hash (checked: package.json has no gitHead, binary
-#         strings have none either) and its output is confirmed NOT
-#         byte-identical to either v99 fixture (docs/TOOLCHAIN.md) — different
-#         builtin table and dead-code emission — so there is no way to pin the
-#         *exact* commit any more precisely than "on the 220-opcode side of
-#         913d31acd10a"; this is the earliest such commit, which is the most
-#         specific defensible choice.
+#   99 -> 93d758c8a3e5c378bd5b50cde57935731e51235d
+#         "static_h", 2026-03-07, "Computed function names". The first commit after
+#         68040db82 ("Add HermesBuiltin for setting function name") whose hermesc
+#         lowers computed method/class names to `CallBuiltin
+#         HermesBuiltin.setFunctionName`, exactly as the public
+#         hermes-compiler@260318099.0.1 does. Chosen by experiment: with this pin
+#         the built hermesc compiles every tests/fixtures/constructs/*/source.js
+#         byte-identically to tools/hermesc/v99 (public), and the VM runs the
+#         public bytecode. The earlier pin 913d31acd10a ("Revert bytecode version
+#         to 99", 2026-03-05, same 220-opcode table) predates the builtin and
+#         fails public v99 files with "Can't apply() to non-callable".
 #
 # Build scope: only the `hermes` (VM+CLI, executes .hbc, also compiles), and
 # `hermesc` + `hbcdump` (both cheap once `hermes`'s object files exist, since
@@ -87,7 +85,7 @@ version_94_sha="3815fec63d1a6667ca3195160d6e12fee6a0d8d5"
 version_96_sha="644c8be78af1eae7c138fa4093fb87f0f4f8db85"
 version_98_sha="09373fc61ba3f8735a40a15065f9fb55b1223df8"
 version_98_early_sha="c00cc57595b3ef504a323360ba77e7b2e0ac26ce"
-version_99_sha="913d31acd10aff31e0856657c9c566c3e72bd24a"
+version_99_sha="93d758c8a3e5c378bd5b50cde57935731e51235d"
 
 usage() {
   echo "Usage: $0 [--clean] <94|96|98|98-early|99>" >&2

@@ -65,11 +65,12 @@ test("sizeDiff: irreducible-loop-window round trip — ratio and histogram sum t
   const sum =
     result.histogram["reflect-apply"] + result.histogram["labelled-break"] + result.histogram["state-machine-switch"] + result.histogram.other;
   assert.equal(sum, result.functionCount);
-  // This construct's `expandWindow`/`checkLo`/`checkHi` bodies call through
-  // `Reflect.apply` (decompile()'s standard rendering of the computed
-  // `globalThis.checkLo`/`checkHi` call targets, see the module doc comment)
-  // -- known from having decompiled this fixture while writing the tool.
-  assert.ok(result.histogram["reflect-apply"] >= 1, "expected at least one reflect-apply function");
+  // This construct's `expandWindow`/`checkLo`/`checkHi` bodies used to call
+  // through `Reflect.apply` (the computed `globalThis.checkLo`/`checkHi` call
+  // targets with an undefined receiver). Since call-shape R3f (spec 04,
+  // round-trip review passes-roundtrip-global) those print as
+  // `(0, r.checkLo)(...)`, so no function is classified reflect-apply.
+  assert.equal(result.histogram["reflect-apply"], 0, "R3f should leave no reflect-apply function");
 });
 
 test("sizeDiff: nested-closures-counters round trip — ratio and histogram sum to function count", async (t) => {

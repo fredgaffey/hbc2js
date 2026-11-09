@@ -224,11 +224,12 @@ test("impure-callee: a construct callee containing `new` is refused", () => {
   assert.deepEqual(classifyNode(node, []), { ok: false, reason: "impure-callee" });
 });
 
-test("member-callee-with-undefined-this: a member callee whose receiver is provably undefined is not folded into a method call", () => {
+test("member callee with a provably undefined receiver is not folded into a method call (R3f keeps `this` undefined)", () => {
   const node = reflectApply(member(id("o"), "m"), UNDEF, []);
-  assert.deepEqual(classifyNode(node, []), { ok: false, reason: "member-callee-with-undefined-this" });
-  const before: readonly Stmt[] = [exprStmt(node)];
-  assert.equal(match(before, ctxFor(before)), null);
+  const v = classifyNode(node, []);
+  assert.ok(v.ok);
+  assert.equal(v.rule, "R3f");
+  assert.deepEqual(v.replacement, call({ k: "seq", exprs: [lit("0"), member(id("o"), "m")] }, []));
 });
 
 test("unproven-this: a non-member callee whose `this` is neither literal undefined nor a proven-undefined register", () => {

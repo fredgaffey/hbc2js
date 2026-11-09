@@ -372,3 +372,105 @@ functions whose FIRST difference moved later, not regressions:
 difference from the `Reflect.apply` call shape), `diff:GetGlobalObject/
 CreateFunctionEnvironment` 1 -> 200 (the factory, now differing at where the
 inlined environment is created), `diff:GetById/NewObjectWithBuffer` 665 -> 702.
+
+## 11. A closure belongs to the function that creates it
+
+**Problem.** Bucket `tree:unmatched-closure(orig 1 vs recompiled 0)`
+(react-navigation-example, 453 functions under 297 unmatched roots). The
+emitter nests each function inside the OWNER of its closure environment
+(`closureEnvOf`, `src/emit/index.ts` "Function nesting"). When the creating
+function `C` owns no environment of its own (it captures nothing), the closure
+environment is an ancestor `H`'s, so the function was emitted beside `C` in
+`H`: module 91's `parse(text) { return text.split("\n").reduce(function (acc,
+line) {...}, []) }` came out with the callback as a sibling declaration of
+`parse`. The recompiled `parse` then creates no closure, `H` creates one too
+many, and the closure is one instance per `H` call where the original makes
+one per `C` call (a real identity divergence, not just a shape one). This
+happens at v98/v99 only: at v84-v96 `C` reaches the closure environment
+through its own scope, and the graph already put it at `C`.
+
+**Choice.** After the joined/LCA moves, a function whose creation sites are
+all in ONE function `C`, over one environment, with `C` strictly below its
+home `H` (by the final `parentOf`), is re-parented to `C`. Sound because every
+environment the body names is declared at `H` or above, all ancestors of `C`,
+and `C` and the functions between declare only their own `_e<id>_<slot>`
+names, so nothing is shadowed; the declaration is hoisted to the top of `C`,
+so it is visible at every site. Running after the LCA rule means a creator
+that was moved ABOVE `H` fails the `isAncestor(H, C)` check and keeps the
+leftover-7 placement.
+
+**Rejected.** Re-parenting whenever the sites lie in a subtree of `H` (to the
+LCA of several creators): that is the "reparent inwards" variant the LCA rule
+already measured worse, and a function created in two functions (hermesc
+inlined its creator into both) has no single host.
+
+**Tests.** `tests/gate/emit/closure-creator-host.test.ts`: fixture
+`150-closure-created-in-inner-fn` (the round trip reproduces the closure tree
+under `makeParser`; failed at v98/v99 before this section with
+`actual: '(()()())' expected: '((())())'`) and its negative twin
+`151-closure-created-in-two-fns` (the callback stays beside `left`/`right`).
+T2 under the real Hermes VMs: both fixtures' decompiled output matches
+`expected.txt` at v84, v94, v96, v98 and v99.
+
+**Measured** (`node tools/e2e/roundtrip-corpus.ts --only
+react-navigation-example-0.85.3 --passes on`, `1baaa7c` -> this section, same
+machine): IDENTICAL 6590 (45.65%) -> 7107 (49.23%) of 14437; 520 newly
+IDENTICAL, 3 newly DIFFERENT (module 821 / fn#14044, module 1537 / fn#13008,
+fn#13010: `diff:LoadFromEnvironment(imm)`, the parent's environment slots
+numbered in a different order). `tree:unmatched-closure(orig 1 vs recompiled
+0)` 453 -> 63, all `tree:unmatched-closure(...)` buckets together 924 -> 185;
+`diff:CreateFunctionEnvironment(imm)` 341 -> 183. Split diagnostics 4298 ->
+4278. Buckets that grew (`diff:GetParentEnvironment/LoadConst` 68 -> 114,
+`diff:GetParentEnvironment/GetGlobalObject` 227 -> 267,
+`diff:CreateGenerator/GetGlobalObject` 4 -> 32, `diff:GetById/
+NewObjectWithBuffer` 702 -> 740, and a few +25s) are functions that are now
+paired with their recompiled twin and differ later, not regressions.
+
+## 12. A closure created more than once per activation is an expression
+
+**Problem.** review-1109-1 (fixture `200-closure-in-loop-identity`, every
+version v84-v99, both `--passes` modes). Every nested function was emitted as
+a declaration hoisted to the top of its host, and each `CreateClosure` site
+read that one binding. A declaration makes ONE function object per activation
+of the host; a `CreateClosure` makes a new one every time it executes. In
+`for (...) fs.push(function () { return hv; })` the VM prints
+`fs[0] !== fs[1]` true, the decompiled source printed false. Section 11
+restored per-call identity (the right host); this restores per-execution
+identity inside the host.
+
+**Choice.** A function `g` is emitted as a function expression at each of its
+creation sites (the `inlineFunctions` route the loop-local environments of
+section 6 already use: `r7 = function _fn3() {...}`) when all of the
+following hold: every creation site of `g` in the module is in its host `h`
+(by the final `parentOf`); every site is a `CreateClosure` /
+`CreateGeneratorClosure` / `CreateAsyncClosure` (a pre-v97 `CreateGenerator`
+reads the inner function by name and keeps the declaration); `g` has no
+creation-context copies (section "closure copies" owns those); and some site
+CAN EXECUTE TWICE in one activation: it lies on a cycle of `h`'s normal CFG,
+or one site reaches another (same block, later offset, or a CFG path). The
+function expression keeps its own `this`, `arguments` and `new.target`, so it
+is the same closure kind as the declaration; it is never an arrow. The name
+stays `_fn<n>`, so a named expression still binds itself inside its body.
+
+**Soundness of the hoisted form that remains.** If no site can execute twice,
+each activation of `h` creates at most one object for `g`, and the declaration
+creates exactly one. The two differ only in WHEN the object exists (activation
+entry vs the site) and in a site that never runs. Neither is observable:
+creating a closure runs no user code, and the synthetic name `_fn<n>` is read
+only at `g`'s creation sites (each lowered to `rX = _fn<n>`), so no code
+before a site can reach the object, and an unreached site exposes nothing. A
+function whose sites lie in another function than its host (orphans, several
+creators) is outside this rule and keeps the declaration; for several
+creators the function is shared across them, which section 11's rejected
+alternative already records.
+
+**Rejected.** Inlining every nested function at its site. That is sound too
+but turns every function-top declaration into a statement-position expression
+(a readability loss for the common once-per-activation case) and duplicates
+the body when hermesc duplicated a site on exclusive paths (a `finally` copied
+into the normal and the exceptional exit), where at most one runs.
+
+**Tests.** `tests/gate/emit/review-1109.test.ts` review-1109-1 cases (fixture
+200 at v84, v94, v96, v98, v99 x `--passes none|on`; failed before with
+`distinct: false`). T2 under the real Hermes VMs
+(`tests/gate/decompile/equivalence.test.ts`) passes for fixture 200.

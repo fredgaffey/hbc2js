@@ -1,0 +1,79 @@
+; hbc2js disassembly of 151-closure-created-in-two-fns/v94.hbc
+; version=94 layout=C opcodeTable=hbc94 functions=6 strings=17 globalCodeIndex=0
+function #0 "global"  params=1 frame=14 env=0 flags=dbg  @0x00000174 size=120
+  0000  DeclareGlobalVar     s12 "lr"
+  0005  DeclareGlobalVar     s15 "makeTwo"
+  000a  CreateEnvironment    r0
+  000c  CreateClosure        r1, r0, f1 "makeTwo"
+  0011  GetGlobalObject      r0
+  0013  PutById              r0, r1, #c1, s15 "makeTwo"
+  0019  GetByIdShort         r3, r0, #c1, s15 "makeTwo"
+  001e  LoadConstUndefined   r2
+  0020  LoadConstString      r1, s3 "@"
+  0024  Call2                r1, r3, r2, r1
+  0029  PutById              r0, r1, #c2, s12 "lr"
+  002f  TryGetById           r3, r0, #c2, s13 "print"
+  0035  GetByIdShort         r5, r0, #c3, s12 "lr"
+  003a  LoadConstZero        r1
+  003c  GetByVal             r4, r5, r1
+  0040  NewArrayWithBuffer   r1, 2, 2, lit@0x0000
+  0048  Call2                r1, r4, r5, r1
+  004d  Call2                r1, r3, r2, r1
+  0052  TryGetById           r1, r0, #c2, s13 "print"
+  0058  GetByIdShort         r4, r0, #c3, s12 "lr"
+  005d  LoadConstUInt8       r0, 1
+  0060  GetByVal             r3, r4, r0
+  0064  NewArrayWithBuffer   r0, 2, 2, lit@0x0003
+  006c  Call2                r0, r3, r4, r0
+  0071  Call2                r0, r1, r2, r0
+  0076  Ret                  r0
+
+function #1 "makeTwo"  params=2 frame=3 env=2 flags=strict,dbg  @0x000001ec size=42
+  0000  CreateEnvironment    r1
+  0002  LoadParam            r0, 1
+  0005  StoreToEnvironment   r1, 0, r0
+  0009  CreateClosure        r0, r1, f2 "wrap"
+  000e  StoreToEnvironment   r1, 1, r0
+  0012  NewArray             r0, 2
+  0016  CreateClosure        r2, r1, f4 "left"
+  001b  PutOwnByIndex        r0, r2, 0
+  001f  CreateClosure        r1, r1, f5 "right"
+  0024  PutOwnByIndex        r0, r1, 1
+  0028  Ret                  r0
+
+function #2 "wrap"  params=2 frame=11 env=0 flags=strict,dbg  @0x00000216 size=22
+  0000  LoadParam            r2, 1
+  0003  GetByIdShort         r1, r2, #c1, s16 "map"
+  0008  CreateEnvironment    r0
+  000a  CreateClosure        r0, r0, f3 ""
+  000f  Call2                r0, r1, r2, r0
+  0014  Ret                  r0
+
+function #3 ""  params=2 frame=2 env=0 flags=strict,dbg  @0x0000022c size=16
+  0000  GetEnvironment       r0, 1
+  0003  LoadFromEnvironment  r1, r0, 0
+  0007  LoadParam            r0, 1
+  000a  Add                  r0, r1, r0
+  000e  Ret                  r0
+
+function #4 "left"  params=2 frame=11 env=0 flags=strict,dbg  @0x0000023c size=33
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r2, r0, 1
+  0007  LoadConstUndefined   r1
+  0009  LoadParam            r0, 1
+  000c  Call2                r2, r2, r1, r0
+  0011  GetByIdShort         r1, r2, #c1, s14 "join"
+  0016  LoadConstString      r0, s1 "<"
+  001a  Call2                r0, r1, r2, r0
+  001f  Ret                  r0
+
+function #5 "right"  params=2 frame=11 env=0 flags=strict,dbg  @0x0000025d size=33
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r2, r0, 1
+  0007  LoadConstUndefined   r1
+  0009  LoadParam            r0, 1
+  000c  Call2                r2, r2, r1, r0
+  0011  GetByIdShort         r1, r2, #c1, s14 "join"
+  0016  LoadConstString      r0, s2 ">"
+  001a  Call2                r0, r1, r2, r0
+  001f  Ret                  r0

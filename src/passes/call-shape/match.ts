@@ -18,7 +18,7 @@ import { identUses, isHelperCall, isRegisterName } from "../ast.ts";
 import { applyReplacement } from "./rewrite.ts";
 import type { Match, PassContext } from "../types.ts";
 
-export type CallShapeRule = "R3a" | "R3b" | "R3c" | "R3d" | "R3e";
+export type CallShapeRule = "R3a" | "R3b" | "R3c" | "R3d" | "R3e" | "R3f";
 
 export type RefuseReason = "dynamic-args" | "impure-callee" | "unproven-this" | "member-callee-with-undefined-this" | "explicit-new-target" | "duplicated-construct-callee" | "helper-arity" | "not-a-call-shape-site";
 
@@ -164,7 +164,11 @@ function classifyReflectApply(node: Expr & { readonly k: "call" }, fnBody: reado
     const O = F.obj;
     const sameIdent = O.k === "ident" && T.k === "ident" && T.name === O.name;
     if (sameIdent) return { ok: true, rule: "R3b", replacement: { k: "call", callee: F, args } };
-    if (isProvenUndefinedThis(T, fnBody)) return { ok: false, reason: "member-callee-with-undefined-this" };
+    // R3f (spec 04 section 4): a member callee called with a proven-undefined
+    // receiver is Babel's interop call `(0, O.p)(a...)`. The sequence makes
+    // the callee a plain value, so `this` stays undefined; `O.p` is still the
+    // first effect, exactly as in `Reflect.apply`'s argument order.
+    if (isProvenUndefinedThis(T, fnBody)) return { ok: true, rule: "R3f", replacement: { k: "call", callee: { k: "seq", exprs: [{ k: "lit", text: "0" }, F] }, args } };
     return { ok: false, reason: "unproven-this" };
   }
 
@@ -425,6 +429,17 @@ function readOf(s: Stmt, f: string, r: string): (Expr & { readonly k: "member" }
   return isMemberOf(s.expr.value, r) ? s.expr.value : null;
 }
 
+/** `rN = _eX_Y` (a closure-env slot load into a register), else null. */
+function symbolSlotLoad(e: Expr): string | null {
+  return e.k === "assign" && e.target.k === "ident" && e.value.k === "ident" && /^_e\d+_\d+$/.test(e.value.name) ? e.target.name : null;
+}
+
+/** `x = O[rN]` or `O[rN]` for the register `rN`. */
+function symbolKeyRead(e: Expr | undefined, reg: string): boolean {
+  const v = e !== undefined && e.k === "assign" ? e.value : e;
+  return v !== undefined && v.k === "member" && v.computed && v.prop.k === "ident" && v.prop.name === reg;
+}
+
 export function matchCondArg(list: readonly Stmt[], fnBody: readonly Stmt[]): CallShapeSite | null {
   for (let j = 1; j < list.length; j++) {
     const assigned: string[] = [];
@@ -432,6 +447,9 @@ export function matchCondArg(list: readonly Stmt[], fnBody: readonly Stmt[]): Ca
     if (call === null || call.args.length !== 3) continue;
     const [F, R, arr] = call.args;
     if (F!.k !== "ident" || R!.k !== "ident" || !isRegisterName(F!.name) || !isRegisterName(R!.name) || F!.name === R!.name) continue;
+    // Order with R3f: a provably-undefined receiver is R3f's (`(0, O.p)` keeps
+    // `this` undefined); R3e applies only when R is the real receiver.
+    if (isProvenUndefinedThis(R!, fnBody)) continue;
     const args = extractArgsArray(arr!);
     if (args === null || args.length === 0) continue;
     const f = F!.name;
@@ -476,6 +494,10 @@ export function matchCondArg(list: readonly Stmt[], fnBody: readonly Stmt[]): Ca
       else seq.push(...e);
     }
     if (!ok || read === null) continue;
+    // An argument that loads a closure-env slot (a private-name symbol, say) stays
+    // in statement form: private-fields folds `this[symbolSlot]` only there
+    // (review "passes-roundtrip-integrate", fixture 112).
+    if (seq.some((e, i) => symbolSlotLoad(e) !== null && symbolKeyRead(seq[i + 1], symbolSlotLoad(e)!))) continue;
     // `this` must be the value R held when P was read: no write to R between.
     if (seq.length > 0) {
       const mid: Stmt[] = [{ k: "expr", expr: { k: "seq", exprs: seq } }];
