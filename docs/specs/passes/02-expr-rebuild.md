@@ -112,6 +112,19 @@ Class: **expression-only** (ladder §4.3). `check` calls
    and `.writes` is one fewer;
 5. `nested === 0` for `rX` in `before`.
 
+**Loop bodies (amendment 2026-11-10, passes-roundtrip-getbyidreg).** When
+`before` is a loop's own `body` list (`while`/`do-while`/`for`/`for-in`/`for-of`,
+by identity in `fnBody`), "read before its def" is relative: a loop-carried
+register (`i` in `s[i](); i = i + 1`) is read before its first def in the body
+already, its value coming from the previous iteration or from before the loop.
+There a name fails only if the rewrite *grew* its count of reads preceding its
+first def (or it newly has one) — deleting or postponing a def still fails;
+leaving the loop-carried read where it was does not. Before this one such name
+refused every fold in the body (the `s[i]()` call stayed `Reflect.apply`, whose
+global read shifted every later register: round-trip `diff:GetById(reg)`).
+Every other list keeps the absolute rule. Fixture 340 (with a getter-ordered
+twin); `tests/gate/passes/expr-rebuild-loop-carried.test.ts`.
+
 The driver adds `parses(fnBody)` once per function (01 F1) and `checkBindings`
 (EM-01) runs afterwards over the whole program.
 
