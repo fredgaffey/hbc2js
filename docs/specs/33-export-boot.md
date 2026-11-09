@@ -151,3 +151,26 @@ path on *both* sides, which is fine because only the difference is compared.
 Expected first finding: export's `index.js` (spec 29 §4.1) requires only the
 entry module. The original ends with `__r(<InitializeCore>); __r(0)`, so B1
 should diverge at the first `enter` until run-before-main is carried over.
+
+**L1 findings (2026-11-10).** The prediction was half right. The export's
+`index.js` required the entry module's *file* only, which registers it
+(`__hbc.define`) and runs no factory at all, so the exported tree booted
+nothing; it now registers and runs the original's whole top-level `__r`
+sequence (`__hbc.r(48); __hbc.r(0)` on rn-template). Two more export bugs
+surfaced behind it: 136 of 435 readable modules registered a hoisted
+`__hbc_*` runtime helper as their factory (`wrapReadableModule` took the
+first function declaration), and the offline check bundled a pre-0.73 tree
+with bare `metro-config` defaults, which carry no RN polyfills, so
+`global.ErrorUtils` was missing (the RN CLI always adds them; the check now
+does too). The stub host needed one addition, on both sides:
+`getConstants()` returns an object (DeviceInfo gets fixed `Dimensions`), not
+undefined. The original now boots cleanly (107 factories, key
+`HelloHermes072`); its own factory throw is treated as INCONCLUSIVE, like a
+top-level throw. One divergence remains, and it is a decompile gap, not an
+export one: the zero-yield `function* () {}` that RN's module 87 probes with
+`hasNativeConstructor` is not recovered to `function*`, so the export
+polyfills `regeneratorRuntime` and enters module 82 (docs/BUGS.md). With
+that function hand-patched, B1 is EQUIVALENT, so test 1 stays `todo` on that
+row and tests 2 to 6 are real. Source mode uses one VM for both sides, the
+one matching the bundle's HBC version: the default oldest VM (v84) cannot
+parse the BigInt literals decompiled code may contain.

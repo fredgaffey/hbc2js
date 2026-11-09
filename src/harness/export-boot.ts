@@ -118,6 +118,9 @@ export interface ExportBootDivergence {
   readonly index: number;
   readonly a: string | null;
   readonly b: string | null;
+  /** The export's first factory throw (`throw <id>: <error>`) or top-level
+   *  boot error, if any, even when the first mismatch came earlier. */
+  readonly exportThrow?: string | null;
 }
 
 export interface ExportBootResult {
@@ -223,15 +226,19 @@ export async function exportBootProof(original: string, exportDir: string, opts:
   const common = { ...base, appKeys: { a: keys(pa), b: keys(pb) }, factories: { a: enters(pa), b: enters(pb) }, masked: maskedCount };
   if (!b.ran) return inconclusive(`the export side produced no boot trace: ${errText(b)}`, pb);
 
+  const bThrowRec = b.trace.records.find((r) => r.k === "call" && r.fn === PROBE_FN && r.args[0] === "throw");
+  const exportThrow = bThrowRec !== undefined && bThrowRec.k === "call"
+    ? `throw ${String(bThrowRec.args[1])}: ${String(bThrowRec.throws ?? "")}`
+    : b.reachedEnd ? null : `threw ${errText(b)}`;
   let i = 0;
   while (i < pa.length && i < pb.length && pa[i] === pb[i]) i++;
   if (i < pa.length || i < pb.length) {
-    const divergence = { index: i, a: pa[i] ?? null, b: pb[i] ?? null };
+    const divergence = { index: i, a: pa[i] ?? null, b: pb[i] ?? null, exportThrow };
     return { ...common, verdict: "DIVERGENT", divergence, reason: `first boot-projection mismatch at entry ${i}: original ${divergence.a ?? "<end>"}, export ${divergence.b ?? "<end>"}${b.reachedEnd ? "" : ` (export threw: ${errText(b)})`}` };
   }
   if (!b.reachedEnd) {
     // The original booted under this host, so an export throw is real (§3).
-    return { ...common, verdict: "DIVERGENT", divergence: { index: i, a: "end", b: `threw ${errText(b)}` }, reason: `the export threw where the original did not: ${errText(b)}` };
+    return { ...common, verdict: "DIVERGENT", divergence: { index: i, a: "end", b: `threw ${errText(b)}`, exportThrow }, reason: `the export threw where the original did not: ${errText(b)}` };
   }
   return { ...common, verdict: "EQUIVALENT", divergence: null, reason: null };
 }
