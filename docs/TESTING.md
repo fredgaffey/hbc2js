@@ -484,3 +484,14 @@ caches are keyed by inputs so a stale hit needs both an input change and an
 identical key. Never cache a result that depends on the output path or cwd
 without tokenising it. Timings on a shared box are only comparable at similar
 `uptime` load averages.
+
+## Concurrent e2e runs (Playwright)
+`cd ui && npm run e2e` is isolated per run: `ui/e2e/run.mjs` picks two free
+loopback ports (`ui/e2e/select.mjs`, bind port 0) and a unique `mkdtemp`
+fixture root, passes them to `prepare-fixture.mjs` and the Playwright config,
+and deletes the root afterwards. Several worktrees can gate at once. Overrides
+still work: `HBC2JS_E2E_PORT_BASE` (API port; preview = base+1; refused if
+busy, a stranger's server is never reused) and `HBC2JS_E2E_ROOT` (kept, not
+deleted). Under heavy concurrent load a spec can still time out on CPU
+starvation; that is a timing flake, not a collision. Gate test:
+`tests/gate/ui/e2e-select.test.ts`.

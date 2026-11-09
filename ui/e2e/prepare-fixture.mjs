@@ -6,6 +6,9 @@
 // (:4173) serves.
 // Run before `playwright test`; `npm run e2e` does both.
 //
+// `npm run e2e` (run.mjs) normally picks free ports + a mkdtemp root per run
+// (select.mjs) and exports them via these vars, so concurrent runs are
+// isolated by default. The vars below remain manual overrides.
 // Two env vars let two agents run the suite concurrently on one box:
 //   HBC2JS_E2E_PORT_BASE  API port (default 7341); preview is base + 1.
 //   HBC2JS_E2E_ROOT       throwaway project/dist root (default
@@ -26,7 +29,7 @@ const repoRoot = join(uiDir, "..");
 
 const DEFAULT_PORT_BASE = 7341;
 export const API_PORT = Number(process.env["HBC2JS_E2E_PORT_BASE"] ?? DEFAULT_PORT_BASE);
-export const PREVIEW_PORT = API_PORT + 1;
+export const PREVIEW_PORT = Number(process.env["HBC2JS_E2E_PREVIEW_PORT"] ?? API_PORT + 1);
 
 const defaultRoot = join(tmpdir(), API_PORT === DEFAULT_PORT_BASE ? "hbc2js-ui-e2e" : `hbc2js-ui-e2e-${API_PORT}`);
 export const FIXTURE_ROOT = process.env["HBC2JS_E2E_ROOT"] ?? defaultRoot;
