@@ -336,7 +336,10 @@ function scorePackage(entry: LoadedSig, target: ModuleInventory, targetExact: Se
     if (targetExact.has(exactKey)) {
       if (!isUnambiguous(exactKey)) continue; // shared with >=1 other distinct package — not this package's own evidence
       hitKeys.add(exactKey);
-      if (uniqueHashOwners?.get(exactKey) === pkg.package) dbUniqueHits.add(exactKey);
+      // review-1110: the index covers indexed layers only; a loaded
+      // candidate of another name holding the hash (a layer without an
+      // index) makes it not unique.
+      if (uniqueHashOwners?.get(exactKey) === pkg.package && (hashOwnerNames.get(exactKey)?.size ?? 1) <= 1) dbUniqueHits.add(exactKey);
       exactHits++;
       exactHitInstrSum += fn.instrCount;
       continue;
@@ -562,14 +565,17 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
     for (const k of a) if (b.has(k)) n++;
     return n;
   };
+  // review-1110: hosts are the packages high when this rule starts, not
+  // live tiers, so a host demoted earlier in this loop (B embedded in C)
+  // still explains A, and the verdict does not depend on DB order.
   const hosts = high();
   for (const s of hosts) {
-    const host = hosts.find((q) => q !== s && q.score.tier === "high" && q.score.package !== s.score.package && (q.entry.file.modulePaths ?? 0) >= 1 && q.hitKeys.size >= EMBEDDED_HOST_SIZE_RATIO * s.hitKeys.size && shared(s.hitKeys, q.hitKeys) >= EXPLAINED_EVIDENCE_SHARE * s.hitKeys.size);
+    const host = hosts.find((q) => q !== s && q.score.package !== s.score.package && (q.entry.file.modulePaths ?? 0) >= 1 && q.hitKeys.size >= EMBEDDED_HOST_SIZE_RATIO * s.hitKeys.size && shared(s.hitKeys, q.hitKeys) >= EXPLAINED_EVIDENCE_SHARE * s.hitKeys.size);
     if (host !== undefined) demote(s, "embedded", host.score.package);
   }
   const twins = high();
   const dependedOn = new Set<string>();
-  for (const s of twins) for (const d of s.entry.file.subtractedDependencies ?? []) dependedOn.add(d.slice(0, d.lastIndexOf("@") > 0 ? d.lastIndexOf("@") : d.length));
+  for (const s of twins) for (const d of s.entry.file.subtractedDependencies ?? []) dependedOn.add(dependencyName(d));
   const pathBearing = (s: ScoredEntry): boolean => (s.entry.file.modulePaths ?? 0) >= 1;
   const rank = (s: ScoredEntry): readonly number[] => [pathBearing(s) ? 1 : 0, dependedOn.has(s.score.package) ? 1 : 0, s.hitKeys.size];
   const better = (a: ScoredEntry, b: ScoredEntry): boolean => {
@@ -625,6 +631,16 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
     if (oversized >= EXPLAINED_EVIDENCE_SHARE * s.hitKeys.size) demote(s, "bundled-dist");
   }
   return scored;
+}
+
+/** `subtractedDependencies` entries are sibling signature file names,
+ *  `<name with / as __>@<version>__hbc<N>.json` (candidates.ts
+ *  `packageNameFromSigFilename`); review-1110: slicing at the last `@` left
+ *  scoped names as `@s__p`, so the twin rule never saw a scoped dependency. */
+export function dependencyName(d: string): string {
+  const m = /^(.*)@[^@]+__hbc\d+\.json$/.exec(d);
+  if (m !== null) return m[1]!.replace(/__/g, "/");
+  return d.slice(0, d.lastIndexOf("@") > 0 ? d.lastIndexOf("@") : d.length);
 }
 
 /** Package directory of a node_modules-relative path (`@s/p/x.js` -> `@s/p`,
@@ -694,6 +710,20 @@ function promoteViaDependency(scored: readonly ScoredEntry[], inventory: ModuleI
       s.add(m);
     }
   }
+  // review-1110: an app module that another high package holds as its own
+  // (its factory, or at least half its eligible functions, among that
+  // package's hit hashes) is that package's evidence; crediting it to a
+  // second package through an edge counts it twice and skips the twin rule.
+  const highOthers = scored.filter((q) => q.score.tier === "high" && !q.score.isBaseline);
+  const ownedByOther = (t: ModuleInventory["modules"][number], pkg: string): boolean => {
+    const own = (t.functionIndices ?? []).map((i) => inventory.functions[i]).filter((f): f is ModuleInventory["functions"][number] => f !== undefined && f.instrCount >= minInstr);
+    return highOthers.some((q) => {
+      if (q.score.package === pkg) return false;
+      if (t.exactHash !== null && q.hitKeys.has(t.exactHash)) return true;
+      const n = own.filter((f) => q.hitKeys.has(f.exactHash)).length;
+      return own.length > 0 && n >= 0.5 * own.length;
+    });
+  };
   const depsOf = (m: ModuleInventory["modules"][number]): ModuleInventory["modules"][number][] =>
     (m.depIds ?? []).map((d) => tById.get(d)).filter((x): x is ModuleInventory["modules"][number] => x !== undefined);
   const holdsHits = (m: ModuleInventory["modules"][number], hits: readonly ScoredEntry[]): boolean =>
@@ -728,6 +758,7 @@ function promoteViaDependency(scored: readonly ScoredEntry[], inventory: ModuleI
       const depMods = graph.depsOf(own);
       if (complete && own.factoryExactHash !== null) {
         for (const t of tByFactory.get(own.factoryExactHash) ?? []) {
+          if (ownedByOther(t, file.package)) continue;
           const tDeps = depsOf(t);
           const d = depMods.find((sd) => sd.factoryExactHash !== null && (targetCopies.get(sd.factoryExactHash) ?? 0) < TARGET_GENERIC_COPIES && tDeps.some((td) => td.exactHash === sd.factoryExactHash));
           if (d !== undefined) {
@@ -748,7 +779,7 @@ function promoteViaDependency(scored: readonly ScoredEntry[], inventory: ModuleI
       const counts = new Map<ModuleInventory["modules"][number], number>();
       for (const h of ownFuzzy) for (const t of fuzzyIndex.get(h) ?? []) counts.set(t, (counts.get(t) ?? 0) + 1);
       for (const [t, n] of counts) {
-        if (n < MIN_DISTINCT_EVIDENCE_HASHES || n < 0.5 * total || n < 0.5 * (tFuzzy.get(t)?.size ?? 0)) continue;
+        if (n < MIN_DISTINCT_EVIDENCE_HASHES || n < 0.5 * total || n < 0.5 * (tFuzzy.get(t)?.size ?? 0) || ownedByOther(t, file.package)) continue;
         const tDeps = depsOf(t);
         const by = confirmedDeps.find((p) => tDeps.some((td) => holdsHits(td, highByName.get(p)!)));
         if (by !== undefined) {
