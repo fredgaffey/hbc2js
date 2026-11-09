@@ -514,6 +514,16 @@ its `Reflect.apply` sit in different blocks. Folding either needs a new
 argument (a slot that holds `this` is stable, or dominance through the
 dispatch loop), so both stay refused.
 
+Spec 27 §11 (closure creator placement) later emitted a closure created in
+one member inside that member, so the original fixture-180 `pick` (declared
+in `sum`) stopped escaping and the fold there became sound. The test no
+longer had anything to catch. Fixture 180 now creates `pick` in the `sum`
+computed key (`[(pickRef = function pick(o) { return o.#v; }, "sum")]`). Its
+only creation site is the global frame, which is the slot's home, so §11
+never moves it and it stays at the body's top level. `static peek` (and
+its `inner`) is emitted there too. With `mentionedOutsideList` disabled the
+fixture prints `peek: NaN` / `sum: NaN` (trace DIVERGENT) at v98 and v99.
+
 **As implemented (`src/passes/private-fields/methods.ts`, run first inside
 `foldAll`).** The method slot store may go through one register
 (`r3 = _fnK; ...; M = r3;`, the register read nowhere else), the same one-hop
