@@ -51,3 +51,19 @@ test("method-read: a register still live after the call stays an assignment in t
 test("method-read: a write to the receiver in between refuses the fusion", () => {
   assert.equal(run([set("r3", mem(id("r0"), "m")), set("r0", mem(id("a"), "b")), set("r2", apply("r3", "r0", [id("r0")]))]), null);
 });
+
+test("method-read: an inline-require argument chain folds back in evaluation order (export registerComponent shape)", () => {
+  // r3 = R.registerComponent; r2 = 3; r4 = list[r2]; r6 = r5(r4); r7 = r6.name; r1 = f;
+  // Reflect.apply(r3, R, [r7, r1])  ->  R.registerComponent(r5(list[3]).name, f)
+  const call: Expr = { k: "call", callee: id("r5"), args: [id("r4")] };
+  const out = run([
+    set("r3", mem(id("r0"), "registerComponent")),
+    set("r2", lit("3")),
+    set("r4", { k: "member", obj: id("list"), prop: id("r2"), computed: true }),
+    set("r6", call),
+    set("r7", mem(id("r6"), "name")),
+    set("r1", id("f")),
+    set("r8", apply("r3", "r0", [id("r7"), id("r1")])),
+  ]);
+  assert.equal(out, "r8 = r0.registerComponent(r5(list[3]).name, f)");
+});

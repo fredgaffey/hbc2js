@@ -48,22 +48,25 @@ function withValue(s: Stmt, v: Expr): Stmt {
 
 const asStmts = (es: readonly Expr[]): Stmt[] => es.map((e) => ({ k: "expr", expr: e }) as Stmt);
 /** `reg` holds no value read after statement `j`: the statement overwrites it,
- *  the function reads it nowhere else, or it is overwritten later in `list`
+ *  the function reads it nowhere outside `list[k+1..j]`, or it is overwritten later in `list`
  *  before any read (straight-line statements only). */
-function deadAfter(list: readonly Stmt[], fnBody: readonly Stmt[], j: number, reg: string, assigned: string | null): boolean {
+function deadAfter(list: readonly Stmt[], fnBody: readonly Stmt[], k: number, j: number, reg: string, assigned: string | null): boolean {
   if (assigned === reg) return true;
   const fu = identUses(fnBody, reg);
   if (fu.nested !== 0) return false;
-  if (fu.reads === identUses([list[j]!], reg).reads) return true;
+  // every read in the function is inside the statements being fused
+  if (fu.reads === identUses(list.slice(k + 1, j + 1), reg).reads) return true;
   for (let k = j + 1; k < list.length; k++) {
     const s = list[k]!;
     if (s.k === "comment" || s.k === "decl") continue;
+    if (s.k === "return") return identUses([s], reg).reads === 0;
     if (s.k !== "expr" && s.k !== "init") return false;
     if (s.k === "expr" && s.expr.k === "assign" && s.expr.target.k === "ident" && s.expr.target.name === reg) return identUses([{ k: "expr", expr: s.expr.value }], reg).reads === 0;
     const u = identUses([s], reg);
     if (u.reads + u.writes + u.nested > 0) return false;
   }
-  return false;
+  // Falling off the end of the function body itself: nothing reads it again.
+  return list === fnBody;
 }
 
 /** Where evaluating `e` first meets `reg`: `"found"` when every evaluation
@@ -80,12 +83,21 @@ function leadingRead(e: Expr, reg: string, names: string[]): "found" | "pure" | 
       names.push(e.name);
       return "pure";
     case "member": {
-      if (e.computed) return "impure";
       const r = leadingRead(e.obj, reg, names);
-      return r === "found" ? "found" : "impure"; // the property get itself may run a getter
+      if (r !== "pure" || !e.computed) return r === "found" ? "found" : "impure";
+      // the property get itself may run a getter
+      return leadingRead(e.prop, reg, names) === "found" ? "found" : "impure";
     }
-    case "call":
-      return leadingRead(e.callee, reg, names) === "found" ? "found" : "impure";
+    case "call": {
+      // callee, then the arguments in order, then the call itself
+      const r = leadingRead(e.callee, reg, names);
+      if (r !== "pure") return r;
+      for (const a of e.args) {
+        const ra = leadingRead(a, reg, names);
+        if (ra !== "pure") return ra;
+      }
+      return "impure";
+    }
     case "array":
     case "object": {
       const parts = e.k === "array" ? e.elements : e.props.map((p) => ("k" in p || p.computed || p.key === "__proto__" ? null : p.value));
@@ -107,9 +119,12 @@ function replaceLeading(e: Expr, reg: string, v: Expr): Expr {
     case "ident":
       return e.name === reg ? v : e;
     case "member":
-      return { ...e, obj: replaceLeading(e.obj, reg, v) };
-    case "call":
-      return { ...e, callee: replaceLeading(e.callee, reg, v) };
+      return leadingRead(e.obj, reg, []) === "found" ? { ...e, obj: replaceLeading(e.obj, reg, v) } : { ...e, prop: replaceLeading(e.prop, reg, v) };
+    case "call": {
+      if (leadingRead(e.callee, reg, []) === "found") return { ...e, callee: replaceLeading(e.callee, reg, v) };
+      const i = e.args.findIndex((x) => leadingRead(x, reg, []) === "found");
+      return { ...e, args: e.args.map((x, j) => (j === i ? replaceLeading(x, reg, v) : x)) };
+    }
     case "array": {
       const i = e.elements.findIndex((x) => leadingRead(x, reg, []) === "found");
       return { ...e, elements: e.elements.map((x, j) => (j === i ? replaceLeading(x, reg, v) : x)) };
@@ -134,9 +149,10 @@ export function foldSeqIntoArgs(seq: Expr[], args: readonly Expr[], dead: (reg: 
     if (last === undefined || last.k !== "assign" || last.target.k !== "ident" || !isRegisterName(last.target.name)) break;
     const reg = last.target.name;
     const value = last.value;
-    const all = identUses(asStmts([...seq.slice(0, -1), ...out]), reg);
+    // Reads of `reg` earlier in the sequence see older values; only the
+    // arguments' reads matter.
     const inArgs = identUses(asStmts(out), reg);
-    if (all.reads !== 1 || all.nested !== 0 || inArgs.reads !== 1 || inArgs.writes !== 0) break;
+    if (inArgs.reads !== 1 || inArgs.nested !== 0 || inArgs.writes !== 0) break;
     const names: string[] = [];
     let q = -1;
     for (let i = 0; i < out.length && q < 0; i++) {
@@ -213,7 +229,7 @@ export function matchSite(list: readonly Stmt[], fnBody: readonly Stmt[]): Metho
     const mid = asStmts(seq);
     const fu = identUses(mid, f);
     if (identUses(mid, r).writes !== 0 || fu.reads !== 0 || fu.writes !== 0) continue;
-    const args = foldSeqIntoArgs(seq, arr!.elements, (reg) => deadAfter(list, fnBody, j, reg, top.assigned));
+    const args = foldSeqIntoArgs(seq, arr!.elements, (reg) => deadAfter(list, fnBody, k, j, reg, top.assigned));
     if (seq.length > 0 && args.length === 0) continue;
     // Work that still holds a call stays in statement form, unfused: a nested
     // call site (an inline require, a child element) is evidence later rungs
