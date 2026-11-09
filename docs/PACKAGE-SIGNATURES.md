@@ -934,15 +934,29 @@ path-bearing files are mostly copies: 86% of modules and 37% of functions
 by module, hoisted copies 87%, `@babel/runtime` helpers 11%, nested
 `node_modules` copies 1.4% (hbc98). 14,326 of the 17,151 hbc98 files carry at
 least one foreign module. **Choice (B): keep the files, filter in the
-builders.** Both index builders skip `foreignSets(file).functions` (the same
-set scoring uses, `src/deps/module-paths.ts`); a pathless file gives the empty
-set and is indexed exactly as before, so an index over `db-v3-clean` is
-byte-for-byte unchanged and needs no rebuild. No stored field, hash scheme or
-`modulePaths` version changes. Index effect on the farm: hbc98 unique hashes
-530,413 -> 476,745 (10,854 became unique, 64,522 stopped being unique: hashes
-that only a copy held, which now claim nothing), string sets 165,239 ->
-156,121 (+6,401 / -15,519); hbc96 304,882 -> 296,976 and 153,328 -> 149,119.
-The hbc98 index file shrinks 15.3 -> 13.8 MB; build time and RSS unchanged.
+builders.** In both index builders a function in a foreign module of a
+path-bearing file (`foreignSets`, the set scoring uses) counts as an
+occurrence of the package its path names (`packageOfPath`: the name after the
+last `node_modules/`; `foreignFunctionPackages` in `src/deps/module-paths.ts`),
+never the carrier's. A hash held only by owner-lib's own file and by copies of
+owner-lib becomes unique to owner-lib; a hash held only by copies of a package
+with no signature file is indexed for nobody (the index header names only
+packages with a file). Simply dropping foreign functions was the first cut and
+measurably wrong in a mixed DB: a PATHLESS file's copy (react-native-root-toast's
+`deprecated-react-native-prop-types`, enzyme-shallow-equal's `object-is`) was
+blocked by a path-bearing copy elsewhere, and once that copy was dropped the
+pathless carrier became the sole owner (two new metamask/rainbow FPs).
+Attribution keeps the copy as evidence of whose code it is. A pathless file
+gives no foreign functions and is indexed exactly as before, so an index over
+`db-v3-clean` is byte-for-byte unchanged and needs no rebuild. No stored field, hash scheme or
+`modulePaths` version changes. Index effect on the farm (final rule): hbc98
+hash index 15.3 -> 13.9 MB, string-set index 4.9 -> 4.4 MB; hbc96 8.9 -> 8.4 and
+4.5 -> 4.2 MB; build time and RSS unchanged. Under the first cut (drop), hbc98
+unique hashes went 530,413 -> 476,745: 10,854 became unique and 64,522 stopped
+being unique (hashes only a copy held). The hop-two TPs named in docs/DEPS.md
+(`is-regex`, `is-date-object`, `has-property-descriptors`, `lodash.debounce`)
+already have unique hashes on this farm (3-22 each) and their counts do not
+change; on metamask `is-regex` and `is-date-object` are FPs either way.
 **Rejected (A): strip foreign modules from the files at finalize time** (a
 derived DB with a `strippedForeign` count and a version marker). It would save
 disk and load memory (37-46% of functions), but the scoring paths already read
@@ -956,7 +970,8 @@ match time. Measured on five truth apps in docs/DEPS.md "Foreign modules in
 the candidate indexes". Test: `tests/gate/deps/sigdb-strip-embedded.test.ts`
 (hash and string-set index ignore a hoisted and a nested copy; a pathless
 file's copies still count; a package blocked only by a copy is proposed, the
-carrier is not).
+carrier is not; mixed DB: a path-bearing copy still blocks a pathless file's
+copy of the same package).
 
 **sqlite layer.** A sigdb v3 `.sqlite` stores module paths too (schema
 revision 2, additive inside `hbc2js-sigdb/3`): `modules.path`,

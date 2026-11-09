@@ -2452,6 +2452,42 @@ Corpus scale: `com.brex.mobile` (hbc98, `hbc2js deps --offline`, default heap) c
 
 **No cascade (deps-hop-two-cascade).** We first read the react-navigation-example gain as admitting `react-native-pager-view` and `standard-navigation` also making `@react-navigation/native`, `react-native-screens`, `react-native-safe-area-context`, `react-native-gesture-handler` and others confirm. It traced to the stale baseline above. With the current matcher on the same farm and those two packages removed from the candidate set, the app confirms 17. Each of those packages reaches high through `promoteViaDependency`'s fuzzy form with `by: react-native` (`abort-controller` through `event-target-shim`), not through the admitted packages. Admitting them adds `react-native-pager-view` only (also `viaDependency` by `react-native`). `standard-navigation` does not reach high. So hop-two's real gain on react-navigation-example is +1 TP (17 -> 18), and the rest of 10 -> 18 is path recall. On Expensify the same A/B (current code, admitted packages removed vs kept) gives 92 -> 95: exactly the three admitted packages (`abort-controller` via `event-target-shim`, `define-properties` via `has-property-descriptors`, `htmlparser2` via `domhandler`), nothing else moves. Bluesky confirms 39 under the current code. Its 29 "before" is the stale baseline too, and the hop-two share of the gap was not split out. That is principled. A candidate added to the set changes another package's score only through shared evidence: hash ambiguity (`hashOwnerNames`), demotion by a better-explaining package, or a fuzzy-form edge where the new package is the confirmed dependency D. A package that shares no hash with the other candidates moves nothing. `tests/gate/deps/corpus-recall-hop-two.test.ts` (`deps-hop-two-cascade`) pins that invariance. Corpus scale: `com.brex.mobile` (`--offline`, default heap) completes, with the same confirmed set as before, 16 min 24 s wall and 3.56 GB peak RSS (3.37 GB before, on a deb at load 50-70).
 
+### Foreign modules in the candidate indexes (sigdb-strip-embedded, 2026-11-09)
+
+The candidate hash index and the hop-two string-set index attribute a
+path-bearing file's copies of other packages to the package each copy's path
+names (docs/PACKAGE-SIGNATURES.md §7 "Foreign modules in the DB-wide
+indexes"). **Measured** (deb, offline `scoreAgainstTruth`, sha pins matched;
+v4-layered farm = the 23,678 hbc96/98 db-v4-paths files the running rebuild had
+logged ok, else db-v3-clean; main d19fef1 + integrate-1109h before, this
+branch after, each with its own index):
+
+| bundle | before conf / TP / FP | after | change |
+|---|---|---|---|
+| Expensify | 100 / 93 / 7 | 100 / 93 / 7 | none |
+| react-navigation | 19 / 19 / 0 | 19 / 19 / 0 | none |
+| bluesky | 42 / 41 / 1 | 42 / 41 / 1 | none |
+| rainbow | 121 / 105 / 16 (prec 0.868, recall 20.3%) | 119 / 104 / 15 (0.874, 20.1%) | -`digest-fetch` FP, -`browserify-rsa` TP |
+| MetaMask | 178 / 147 / 31 (0.826, 19.6%) | 176 / 146 / 30 (0.830, 19.5%) | -`react-base16-styling` FP, -`browserify-rsa` TP |
+
+No FP added. `digest-fetch` and `react-base16-styling` were the two FPs the
+hash-index proposal let in through a copy (coverage 0.66 / 0.45, "Hash-index
+candidate proposal"). `browserify-rsa` lost 89 of its 188 unique hbc96 hashes:
+178 functions of its signature are `bn.js/lib/bn.js`, which is bn.js's code,
+and with the copy attributed it no longer reaches the proposal's coverage bar.
+It is a true package proposed on another package's code, the same evidence the
+own-file rule refuses at score time, so the loss is the rule working.
+`db-v3-clean` (pathless): the index rebuilt with this code is byte-identical
+to the old one for both versions and both kinds, so its scores are unchanged
+(this code, `idx-v3` farm: Expensify 130 / 91 / 39, react-navigation 14 / 14 / 0,
+bluesky 42 / 34 / 8, rainbow 127 / 104 / 23, MetaMask 181 / 143 / 38). The
+first cut, which dropped foreign functions instead of attributing them, added
+two FPs (`react-native-root-toast`, `enzyme-shallow-equal`: pathless files
+whose copies became sole owner) and three TPs (`bignumber.js`,
+`process-nextick-args`, `fast-json-stable-stringify`), and was not kept. The
+wider recall question (is-regex and others) is not an index-uniqueness problem
+on this farm: they already have unique hashes.
+
 ### Population widening (deps-population-widen, 2026-11-09)
 
 The never-queued bucket above is a population choice, so this widens the
