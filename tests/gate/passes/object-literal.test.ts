@@ -380,7 +380,9 @@ for (const version of ["v84", "v94", "v96", "v98", "v99"]) {
     assert.doesNotMatch(on, /\.tag = /);
     assert.match(on, /\{x: [^\n]+, y: [^\n]+, tag: [^\n]+\}/);
     // Rung-owned property 2: the closure-valued literal is one statement.
-    assert.match(on, /\{name: "counter", inc: \w+, read: \w+\}/);
+    // (closure-inline, spec 32, may put the closure itself in the literal)
+    assert.match(on, /\{name: "counter", inc: (?:\w+, read: \w+\}|function \w+\()/);
+    assert.match(on, /read: (?:\w+\}|function \w+\()/);
     assert.doesNotMatch(on, /\.inc = \w+;/);
     // Rung-owned property 3: strictly fewer own-property store statements and
     // strictly fewer lines than with the rung skipped. (A count, not a
@@ -406,7 +408,9 @@ for (const version of ["v84", "v94", "v96", "v98", "v99"]) {
     // whose first def is this plain a top-level statement) — either form is
     // fine, the property under test is only that `.after` is still a
     // separate statement.
-    assert.match(on, /Object\.defineProperty\([^\n]*\n\s*((?:let |const |var )?\w+ = [^\n]*;\n\s*)?\w+\.after = /);
+    // (since closure-inline, spec 32, the getter may be an inline function
+    // expression, so the call can span lines)
+    assert.match(on, /Object\.defineProperty\([\s\S]*?\);\n\s*((?:let |const |var )?\w+ = [^\n]*;\n\s*)?\w+\.after = /);
     // F: the object escapes mid-run, so `second` is never folded in.
     assert.match(on, /\.second = /);
   });

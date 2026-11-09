@@ -15,6 +15,7 @@ import { destructure } from "./destructure/index.ts";
 import { spreadRest } from "./spread-rest/index.ts";
 import { optionalChain } from "./optional-chain/index.ts";
 import { objectLiteral } from "./object-literal/index.ts";
+import { objectLiteralArg } from "./object-literal-arg/index.ts";
 import { privateFields } from "./private-fields/index.ts";
 import { inlineNew } from "./inline-new/index.ts";
 import { exprRebuild } from "./expr-rebuild/index.ts";
@@ -172,6 +173,10 @@ export const REGISTRY: readonly Pass[] = [
   // identity, so it sits immediately after it and before every renaming rung.
   privateFields as Pass,
   jsxRecover as Pass,
+  // docs/specs/passes/20-object-literal.md section 9: an inert literal (and
+  // then the callee base) inlined into the adjacent call, after every rung
+  // that reads a `rN = {...}` props/descriptor statement as evidence.
+  objectLiteralArg as Pass,
   fnNaming as Pass,
   // R17 (docs/specs/passes/32-closure-inline.md): after every rung that may
   // still look for a hoisted declaration and after `fn-naming` (the moved
