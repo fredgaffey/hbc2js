@@ -205,7 +205,34 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
   // table up front; the UIManager stub now does too (no records: the
   // methods are only materialised, not called).
   var UI_MANAGER_METHODS = ["getConstants", "createView", "updateView", "setChildren", "manageChildren", "removeSubviewsFromContainerWithID", "replaceExistingNonRootView", "measure", "measureInWindow", "measureLayout", "measureLayoutRelativeToParent", "findSubviewIn", "dispatchViewManagerCommand", "setJSResponder", "clearJSResponder", "configureNextLayoutAnimation", "blur", "focus", "getConstantsForViewManager", "getDefaultEventTypes", "lazilyLoadView", "setLayoutAnimationEnabledExperimental", "sendAccessibilityEvent", "showPopupMenu", "dismissPopupMenu"];
-  function hostStub(name) {
+  // \`jsi\`: a JSI host object (installed by installTurboModule below); its
+  // methods return further opaque host objects (serializables, runtime
+  // holders), never undefined, as the native side does.
+  function expoStub() {
+    var classes = Object.create(null);
+    var others = Object.create(null);
+    return new Proxy(Object.create(null), {
+      get: function (t, p) {
+        if (typeof p === "symbol" || p === "then") return undefined;
+        if (/^[A-Z]/.test(p)) {
+          if (!(p in classes)) {
+            var C = function () {};
+            C.prototype.addListener = function () { return { remove: function () {} }; };
+            C.prototype.removeListener = function () {};
+            C.prototype.removeAllListeners = function () {};
+            C.prototype.emit = function () {};
+            C.prototype.listenerCount = function () { return 0; };
+            classes[p] = C;
+          }
+          return classes[p];
+        }
+        if (!(p in others)) others[p] = hostStub("expo." + p, true);
+        return others[p];
+      },
+      has: function () { return true; },
+    });
+  }
+  function hostStub(name, jsi) {
     var backing = Object.create(null);
     var proxy = new Proxy(backing, {
       get: function (t, p) {
@@ -223,6 +250,23 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
           // Spec 33 L1 stub-host addition (spec 31 §4.2): getConstants()
           // returns an object (see hostConstants), not undefined.
           if (p === "getConstants") return hostConstants(name);
+          // Spec 33 stub-host addition (spec 31 §4.2): a JSI library's
+          // \`<X>TurboModule.installTurboModule()\` (worklets, reanimated)
+          // natively installs \`globalThis.__<x>ModuleProxy\`, which the
+          // library reads next; stand in a recording stub for it.
+          if (p === "installTurboModule") {
+            var m = /\.([A-Za-z]+?)(?:TurboModule|Module)$/.exec(name);
+            if (m !== null) {
+              var g = "__" + m[1].charAt(0).toLowerCase() + m[1].slice(1) + "ModuleProxy";
+              if (globalThis[g] === undefined) globalThis[g] = hostStub(g, true);
+            }
+          }
+          // Likewise expo-modules-core's \`ExpoModulesCore.installModules()\`
+          // installs the JSI \`globalThis.expo\`: capitalised members are
+          // extendable base classes (EventEmitter, NativeModule, SharedObject,
+          // ...) with no-op listener methods; the rest are JSI host stubs.
+          if (p === "installModules" && /ExpoModulesCore$/.test(name) && globalThis.expo === undefined) globalThis.expo = expoStub();
+          if (jsi === true) return hostStub(name + "." + String(p) + "()", true);
           return undefined;
         };
         t[p] = child;

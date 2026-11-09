@@ -213,3 +213,18 @@ One stub gap, fixed on both sides: 0.72's PaperUIManager spreads
 read so far, so render found no `setChildren`; the UIManager stub now has its
 whole method table up front. rn-template B2 is EQUIVALENT (bytecode export:
 key `HelloHermes072`, 99 views, 1 commit, 246 factories each side).
+
+**react-navigation-example by hand (2026-11-10, after L3).** B1 is
+INCONCLUSIVE: the original stops on stub-host gaps before it registers its app
+key, so nothing about the export is concluded yet. Two gaps are closed on both
+sides: a JSI library's `<X>TurboModule.installTurboModule()` now installs a
+recording `globalThis.__<x>ModuleProxy` whose methods return opaque host
+objects (react-native-worklets), and `ExpoModulesCore.installModules()`
+installs a `globalThis.expo` with extendable base classes. With those the
+original runs 839 factories (from 485). The next gap (factory 1059, expo
+constants) is structural: `nativeModuleProxy` answers every name with a
+module, so *optional* native modules (`requireOptionalNativeModule
+('ExpoUpdates')`, `NativeModules.EXDevLauncher`) look present and their
+constants are functions, and `JSON.parse` of one throws. The fix is a
+present/absent native-module list in the stub host (L4, spec 31 §4.2), not a
+per-module patch. Test 10 stays `todo`.
