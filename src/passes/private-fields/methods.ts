@@ -166,7 +166,12 @@ export function foldMethods(before: readonly Stmt[], scope?: FoldScope, outerFns
   // (3) the brand, through the field fold's own machinery.
   const display = methods[0]!.display;
   const before3 = countPrivateMembers(tree2, display);
-  const folded = foldOne(tree2, { envName: brand.envName, displayName: display, regName: brand.regName, brand: true }, scope);
+  // Hosted shape: the method functions sit at the function body's top level
+  // and move into the class, so the frame the brand's R-PF1 scans is the body
+  // without them (the labelled block itself stays, by identity).
+  const brandScope = outerFns !== undefined && scope?.fnBody !== undefined
+    ? { ...scope, fnBody: scope.fnBody.filter((s) => !(s.k === "func" && fnNames.has(s.name))) } : scope;
+  const folded = foldOne(tree2, { envName: brand.envName, displayName: display, regName: brand.regName, brand: true }, brandScope);
   if (folded === null || countPrivateMembers(folded, display) !== before3) return refuse(PM_REFUSAL.brandEscape, `brand ${brand.envName} has a use the brand fold does not place`);
   const cls3 = findClass(folded)!;
   const cls4: ClassExpr = { ...cls3, members: cls3.members.filter((m) => !(m.kind === "field" && m.key.k === "lit" && m.key.text === display)) };

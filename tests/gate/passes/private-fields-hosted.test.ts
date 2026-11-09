@@ -18,7 +18,7 @@ import { runTier, hbc2jsDecompiler } from "../../../src/harness/tiers.ts";
 import { VERDICT } from "../../../src/harness/ladder.ts";
 import { repoRoot } from "../../support/paths.ts";
 
-const FIXTURES = ["180-private-field-hosted-hoisted-escape"];
+const FIXTURES = ["180-private-field-hosted-hoisted-escape", "181-private-method-hosted", "182-private-method-register-hop"];
 const dirOf = (f: string): string => join(repoRoot(), "tests", "fixtures", "constructs", f);
 const js = (fixture: string, version: "v98" | "v99", mode: "on" | "none"): string =>
   decompile(new Uint8Array(readFileSync(join(dirOf(fixture), `${version}.hbc`))), { resolveV98Ambiguity: true, passes: mode === "none" ? { none: true } : {} }).code;
@@ -47,4 +47,19 @@ for (const version of ["v98", "v99"] as const) {
     assert.match(on, /Symbol\("#v"\)/);
     assert.doesNotMatch(on, /\.#v\b/);
   });
+
+  test(`private-fields hosted: 181-private-method-hosted ${version} -- the hosted #bump moves into the class and #n folds`, () => {
+    const on = js("181-private-method-hosted", version, "on");
+    assert.match(on, /\n\s+#bump\(a1\) \{/);
+    assert.match(on, /\.#bump\(/);
+    assert.doesNotMatch(on, /Symbol\("#n"\)/);
+    assert.doesNotMatch(on, /Symbol\("Counter"\)/);
+  });
 }
+
+test("private-fields hosted: 182-private-method-register-hop v99 -- #step folds through the recycled hop register", () => {
+  const on = js("182-private-method-register-hop", "v99", "on");
+  assert.match(on, /\n\s+#step\(a1\) \{/);
+  assert.match(on, /\.#step\(/);
+  assert.doesNotMatch(on, /Symbol\("#v"\)/);
+});
