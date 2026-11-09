@@ -691,7 +691,7 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
         return;
       }
       case "if": {
-        // spec 04 section 8 (R3g): `fcall-diamond` proved the other arm is the
+        // spec 04 section 10 (R3g): `fcall-diamond` proved the other arm is the
         // same call, so only this one prints, and the test with it.
         if (node.keepOnly !== undefined) {
           lowerTree(node[node.keepOnly], out);

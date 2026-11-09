@@ -1,5 +1,5 @@
 // fcall-diamond: the arm-equivalence proof — docs/specs/passes/04-call-shape.md
-// section 8 (R3g). Pure over instruction lists so the unit tests can drive it
+// section 10 (R3g). Pure over instruction lists so the unit tests can drive it
 // with hand-built arms; `match.ts` adds the CFG and liveness obligations.
 //
 // Each arm is evaluated symbolically: a register the arm has not written

@@ -106,7 +106,7 @@ export const REGISTRY: readonly Pass[] = [
   // -- fixture 16's duplicated finalizer sits inside a loop whose tail guard
   // `loop-cond` would otherwise claim first.
   finallyDedup as Pass,
-  // spec 04 section 8 (R3g): collapses the v98+ `f.call` diamond before any
+  // spec 04 section 10 (R3g): collapses the v98+ `f.call` diamond before any
   // structure rung sees its `if`.
   fcallDiamond as Pass,
   loopCond as Pass,

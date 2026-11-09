@@ -1,4 +1,4 @@
-// fcall-diamond checker — docs/specs/passes/04-call-shape.md section 8 (R3g).
+// fcall-diamond checker — docs/specs/passes/04-call-shape.md section 10 (R3g).
 // Re-derives the whole proof from `before` (never trusts match data) and
 // asserts the rewrite is the annotation alone, naming the non-fast arm.
 import type { Stmt } from "../../structure/ir.ts";

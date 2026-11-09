@@ -1,4 +1,4 @@
-// fcall-diamond matcher — docs/specs/passes/04-call-shape.md section 8 (R3g).
+// fcall-diamond matcher — docs/specs/passes/04-call-shape.md section 10 (R3g).
 //
 // From v98, hermesc lowers `F.call(T, a...)` to a diamond:
 //

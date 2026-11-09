@@ -1,4 +1,4 @@
-// fcall-diamond writer — docs/specs/passes/04-call-shape.md section 8 (R3g):
+// fcall-diamond writer — docs/specs/passes/04-call-shape.md section 10 (R3g):
 // annotation only. The `if` keeps both arms (stage A must stay CFG-isomorphic,
 // docs/specs/07-pass-ladder.md section 2.1) and gets `keepOnly` = the arm that
 // does not hold the fast path; the emitter prints that arm alone.

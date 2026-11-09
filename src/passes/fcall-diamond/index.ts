@@ -5,7 +5,7 @@ import { match } from "./match.ts";
 import type { FcallSite } from "./match.ts";
 import { rewrite } from "./rewrite.ts";
 
-/** Catalogue row R3, rule R3g (docs/specs/passes/04-call-shape.md section 8):
+/** Catalogue row R3, rule R3g (docs/specs/passes/04-call-shape.md section 10):
  *  collapses hermesc's v98+ `JmpBuiltinIs functionPrototypeCall` diamond for
  *  `F.call(T, a...)` to its generic arm, once both arms are proven to be the
  *  same call. `call-shape` R3b then prints the generic arm as `F.call(...)`. */

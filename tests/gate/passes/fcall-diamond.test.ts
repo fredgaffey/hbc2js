@@ -1,4 +1,4 @@
-// fcall-diamond (docs/specs/passes/04-call-shape.md section 8, rule R3g):
+// fcall-diamond (docs/specs/passes/04-call-shape.md section 10, rule R3g):
 // roundtrip review `diff:TryGetById(reg)` bucket, 2026-11-09 — v98's
 // `JmpBuiltinIs functionPrototypeCall` diamond for `f.call(t, ...)` printed as
 // `if (c === __hbc_b_functionPrototypeCall) {...}` instead of `f.call(t, ...)`.
