@@ -33,7 +33,7 @@ const VERSIONS: readonly HbcVersion[] = [84, 94, 96, 98, 99];
 const CONSTRUCTS = join(repoRoot(), "tests", "fixtures", "constructs");
 const POSITIVE = join(CONSTRUCTS, "140-define-property-getter");
 const NEGATIVE = join(CONSTRUCTS, "141-define-property-observable-literal");
-const EMIT_BUG = join(CONSTRUCTS, "142-method-read-before-getter-arg");
+const EMIT_BUG = join(repoRoot(), "tests", "fixtures", "adversarial", "49-method-read-before-getter-arg");
 
 function decompiled(bytes: Uint8Array): string {
   try {
@@ -108,7 +108,7 @@ for (const version of VERSIONS) {
 
   // docs/BUGS.md 2026-11-09 "method read moved past an intervening getter":
   // the emitter's method-call fusion, not this rung. Open.
-  test(`142-method-read-before-getter-arg v${version}: the method is read before the argument's getter`, { todo: "docs/BUGS.md 2026-11-09 method-read fusion" }, (t) => {
+  test(`adversarial/49-method-read-before-getter-arg v${version}: the method is read before the argument's getter`, { todo: "docs/BUGS.md 2026-11-09 method-read fusion" }, (t) => {
     vmRun(EMIT_BUG, version, t);
   });
 }

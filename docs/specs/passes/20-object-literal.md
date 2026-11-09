@@ -268,3 +268,58 @@ hazard). All five HBC versions.
 
 **Metrics.** rn-template `diff:PutNewOwnById/PutById`
 bucket counts, before/after — reported in the landing report.
+
+## 9. Amendment 2026-11-09 — `object-literal-arg` (round-trip bucket `diff:GetById/NewObjectWithBuffer`)
+
+**Problem.** The re-export header `Object.defineProperty(exports, "x",
+{enumerable: true, get: function () {...}})` (the largest-but-one DIFFERENT
+bucket on react-navigation, 702 functions) decompiled to `r7 = Object; obj =
+{enumerable: true, get: _fn2}; r7.defineProperty(r6, "x", obj)`: the
+emitter's method-call fusion (spec 07 §7.4) re-emits the `defineProperty`
+read at the call, and `object-literal` folds the descriptor in its own
+statement after `expr-rebuild` has already run, so nothing put the literal
+back in its argument slot. The recompile allocates the descriptor before
+reading `defineProperty`; hermesc reads it first.
+
+**Choice.** A separate rung, `src/passes/object-literal-arg`, registered after
+`jsx-recover` (it, `class-recover` and `private-fields` read a props or
+descriptor object out of its own `rN = {...}` statement) and before every
+renaming rung. Two site kinds, both inside one straight-line list:
+
+* **A — literal into argument.** `rO = <inert literal>` (fresh-object origin
+  opcode), immediately followed by a call statement with `rO` as one direct
+  argument; `rO` single-use (expr-rebuild D-b) or overwritten before any
+  further mention (D-a). *Inert*: every value is a literal, `this`, a register,
+  the name of a never-reassigned function declaration of this function, or a
+  nested inert array/object; no spread, computed or `__proto__` key. Moving
+  such an allocation later is unobservable: it runs no user code and cannot
+  throw; nothing evaluated before the slot can reach the object (its one
+  reference is the slot); and its inputs cannot change in between, because a
+  register is frame-local (no getter can write it) and the callee/earlier
+  arguments are checked to assign none of the literal's inputs. A global
+  identifier value (`{value: g}`) or a property read (`{value: src.v}`) is
+  *not* inert — a getter can observe the order — and refuses `not-inert`
+  (fixture `141-define-property-observable-literal`).
+* **B — callee base.** `rC = E` with `E` a global identifier or a
+  non-computed member chain over one (it reads no register), then only
+  `isPureStmt` statements that never mention `rC`, then a call whose callee is
+  `rC.m`, `rC` dead after it. The callee's base is the first thing the call
+  evaluates, so `E` runs at the same point of the effect sequence; this is
+  expr-rebuild's R1a, which could not fire while kind A's literal still stood
+  between the two.
+
+Result on fixture `140-define-property-getter`: `Object.defineProperty(a1,
+r5, {enumerable: true, get: get})`, round-trip IDENTICAL at v94/v96/v98/v99
+(v84 differs earlier on an unrelated TDZ `ThrowIfEmpty`).
+
+**Rejected.** Re-running `expr-rebuild` a second time after `object-literal`:
+it would inline every adjacent impure definition everywhere (R1a allows an
+impure value into the next statement), not just these, with no inertness
+proof for the literal's move across the callee read.
+
+**Found on the way, not fixed here.** The fusion itself moves the method read
+past intervening statements that *can* observe it (`api.m(t, "c", {value:
+src.v})` logs `v,m` after decompilation, `m,v` originally) — docs/BUGS.md
+2026-11-09 "method read moved past an intervening getter", reproducer
+`tests/fixtures/adversarial/49-method-read-before-getter-arg` (a `todo` test in
+`tests/gate/passes/object-literal-arg.test.ts`).

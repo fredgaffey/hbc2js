@@ -134,6 +134,7 @@ Computed properties, for-in, optional chaining, nullish coalescing.
 | 39 | getter-callee-position | Getter in function call callee position | PASS | v94, v96, v99 |
 | 41 | nullish-coalescing-edge | Nullish coalescing ?? edge cases | PASS | v94, v96, v99 |
 | 42 | destructuring-params-defaults | Destructuring in function params with defaults | PASS | v94, v96, v99 |
+| 49 | method-read-before-getter-arg | Method read vs a getter read inside its own argument literal | **DIVERGE** (all versions) | **confirmed real bug, `src/emit/lower.ts` method-call fusion** (2026-11-09, passes-roundtrip-objlit): `api.m` is read after `src.v` in the decompiled output (`v,m` vs the VM's `m,v`). docs/BUGS.md 2026-11-09 "method read moved past an intervening getter"; `todo` test in `tests/gate/passes/object-literal-arg.test.ts` |
 
 ## Regression test status
 

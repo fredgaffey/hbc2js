@@ -1,4 +1,4 @@
-// object-literal-arg — docs/specs/passes/20-object-literal.md §9.
+// object-literal-arg matcher — docs/specs/passes/20-object-literal.md §9.
 //
 // `r7 = Object; obj = {enumerable: true, get: _fn2}; r7.defineProperty(r6, "x", obj)`
 // back into `Object.defineProperty(r6, "x", {enumerable: true, get: _fn2})`.
@@ -27,7 +27,7 @@
 //    because kind A's literal still stood between the two statements.
 import { identUses, isPureStmt, isRegisterName, opcodeAt, originOf, registerUses } from "../ast.ts";
 import type { Expr, Stmt } from "../ast.ts";
-import type { CheckResult, Match, Pass, PassContext } from "../types.ts";
+import type { Match, PassContext } from "../types.ts";
 
 const FRESH_OBJECT: ReadonlySet<string> = new Set(["NewObject", "NewObjectWithBuffer", "NewObjectWithBufferLong"]);
 
@@ -49,7 +49,7 @@ function defOf(s: Stmt): { readonly reg: string; readonly value: Expr } | null {
 /** The call a statement evaluates as its whole top-level work: `call(...)`,
  *  `rZ = call(...)` (ident target: evaluates nothing before the call),
  *  `return call(...)`, `let x = call(...)`. */
-function callOf(s: Stmt): Extract<Expr, { k: "call" }> | null {
+export function callOf(s: Stmt): Extract<Expr, { k: "call" }> | null {
   let e: Expr | null = null;
   if (s.k === "expr") e = s.expr.k === "assign" && s.expr.target.k === "ident" ? s.expr.value : s.expr;
   else if (s.k === "return") e = s.arg;
@@ -57,7 +57,7 @@ function callOf(s: Stmt): Extract<Expr, { k: "call" }> | null {
   return e !== null && e.k === "call" ? e : null;
 }
 
-function withCall(s: Stmt, call: Expr): Stmt {
+export function withCall(s: Stmt, call: Expr): Stmt {
   if (s.k === "expr") return s.expr.k === "assign" && s.expr.target.k === "ident" && s.expr.value.k === "call" ? { ...s, expr: { ...s.expr, value: call } } : { ...s, expr: call };
   if (s.k === "return") return { ...s, arg: call };
   if (s.k === "init") return { ...s, value: call };
@@ -192,47 +192,3 @@ function calleeBase(list: readonly Stmt[], fnBody: readonly Stmt[], ctx: PassCon
   }
   return null;
 }
-
-export function rewrite(m: ArgInlineMatch): readonly Stmt[] {
-  const { root: list, data: site } = m;
-  const use = list[site.useIndex]!;
-  const call = callOf(use)!;
-  const isReg = (e: Expr): boolean => e.k === "ident" && e.name === site.reg;
-  const next: Expr =
-    site.kind === "literal-arg"
-      ? { ...call, args: call.args.map((a) => (isReg(a) ? site.value : a)) }
-      : { ...call, callee: { ...(call.callee as Extract<Expr, { k: "member" }>), obj: site.value } };
-  return [...list.slice(0, site.defIndex), ...list.slice(site.defIndex + 1, site.useIndex), withCall(use, next), ...list.slice(site.useIndex + 1)];
-}
-
-export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: PassContext): CheckResult {
-  const again = match(before, ctx);
-  if (again === null) return { ok: false, reason: "no object-literal-arg site recomputed from before" };
-  const want = rewrite(again);
-  if (want.length !== after.length || after.length !== before.length - 1) return { ok: false, reason: "object-literal-arg did not remove exactly the definition" };
-  for (let i = 0; i < want.length; i++) {
-    if (want[i] !== after[i] && JSON.stringify(want[i]) !== JSON.stringify(after[i])) return { ok: false, reason: "object-literal-arg changed a statement other than the use" };
-  }
-  const ub = identUses(before, again.data.reg);
-  const ua = identUses(after, again.data.reg);
-  if (ua.reads !== ub.reads - 1 || ua.writes !== ub.writes - 1) return { ok: false, reason: "object-literal-arg did not remove exactly one write and one read of the inlined register" };
-  return { ok: true };
-}
-
-/**
- * Registered straight after `private-fields` (the last rung that reads
- * `Object.defineProperty(...)` installs as class/private-name evidence, so it
- * must see the descriptor exactly as the emitter and `object-literal` left
- * it) and before every renaming rung.
- */
-export const objectLiteralArg: Pass<readonly Stmt[], ArgInlineSite> = {
-  name: "object-literal-arg",
-  stage: "B",
-  targets: ["140-define-property-getter"],
-  catalogue: [28],
-  after: ["object-literal", "array-literal", "private-fields"],
-  before: ["fn-naming", "reg-split", "var-naming"],
-  match,
-  rewrite,
-  check,
-};
