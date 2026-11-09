@@ -1954,9 +1954,10 @@ confirmed package matches the same hashes:
 | fork whose original is not a candidate | Expensify 2, metamask 2 | `source-map-js` (`source-map`), `whatwg-url` (`whatwg-url-without-unicode`) | open: the originals (`source-map`@0.6.1, `whatwg-url-without-unicode`@8.0.0-3) are in none of `db-v3-clean`, `db-v4-paths-partial`, `db-v4-paths`, so no index derived from the DB can name them; with the exact-version overlay `source-map-js` is demoted by the one-sided `twin` (corpus-twin-sourcemap) and `whatwg-url` by `embedded` on db-v4-paths-partial |
 | part generic, part another package's single file | Expensify 1 | `lodash-es` (41 of 93 hashes in `lodash/lodash.js`, the rest generic factories) | open: the 41 no longer anchor (`scattered`), but tiny-module shapes the package repeats over its 450 files still match whole 2-function app modules |
 | small helper functions spread over many app modules | Expensify 4 | `ai`, `ky`, `culori`, `swiper` (3-8 distinct hashes) | fixed (`scattered`) |
+| a giant pre-built dist file that inlines other libraries (the package is the larger side, so `container` cannot fire) | Expensify 1 (with the population overlay) | `@babel/standalone` (one 6,176-function `babel.js`; its 71 hits are yallist, semver, buffer copies) | fixed (`bundled-dist`) |
 | pathless signature holding its dependencies' code (the es-shim chain, `victory*`, `wagmi`, `typeorm`...) | rainbow ~20, metamask ~30 | `reflect.getprototypeof`, `is-regex`, `globalthis`, `define-properties` | open: needs path-bearing signatures (the full `db-v4-paths`) |
 
-Four rules (five with `scattered`, below) now lower a would-be "high" package to "medium", recorded as
+Four rules (five with `scattered`, six with `bundled-dist`, below) now lower a would-be "high" package to "medium", recorded as
 `PackageScore.demotion` (`src/deps/match.ts`):
 
 - `few-distinct`: its counted hits must be at least
@@ -2054,6 +2055,54 @@ offline, before = corpus-precision-forks):
 Recall is unchanged everywhere. Still open on Expensify's partial DB:
 `source-map-js`, `whatwg-url` (originals not in any DB, see the table
 above) and `lodash-es`. Test: `tests/gate/deps/corpus-precision-residual.test.ts`.
+
+**Bundled dist files (corpus-precision-bundled-dist, 2026-11-09).** The
+population-widening overlay (`db-overlay-pop` over `db-v3-clean`) made
+`@babel/standalone`@7.29.13 a false positive on Expensify. Its signature is
+one path-bearing file, `@babel/standalone/babel.js`, of 6,176 functions: a
+UMD build that inlines its own yallist, lru-cache, semver and buffer. Traced
+against the source map, its 71 distinct hit hashes sit in yallist's
+25-function module (22 of them), buffer's (8 of 75), semver's modules and
+react-devtools-core's 886-function `backend.js` (which inlines the same
+libraries). No rule fired: `container` asks for target modules much larger
+than the package, but here the package is the larger side; `scattered`
+anchors on yallist's dense module; `embedded` and `twin` need a high host
+holding 90% of its hits, and only 21 of 71 are hits of any high package
+(yallist and react-devtools-core are not confirmed). On react-navigation and
+bluesky main already demotes it (`scattered`); the FP seen there came from
+older code. A sixth rule, `bundled-dist`, runs last (so it changes no other
+rule's input), on path-bearing signatures only: a hit hash is oversized when
+its own file has at least `BUNDLED_DIST_MIN_FUNCTIONS` (200) functions and
+every target module holding it is under 1/`CONTAINER_SIZE_RATIO` (4) of that
+file; 90% oversized demotes. One source file is one Metro module, so a real
+copy of a single-file package is a target module about that file's size
+(lodash on Expensify: 144 hits, `lodash.js` 579 functions, target module
+524, stays high). Pathless signatures are skipped: their "file" is the
+whole package lumped together, so small target modules are normal. Slimmed
+signature records (deps-slim-sigs) drop the functions the app lacks, so
+they now carry `slim.fileSizes` (own file sizes by moduleId); without it the
+rule saw `babel.js` as a 71-function file and never fired on the CLI path.
+Rejected: also requiring 90% of the hits to be hits of other high packages
+(the `embedded` shape with a pathless host allowed): 21 of 71 for
+`@babel/standalone`, because the libraries it inlines are often not
+confirmed themselves. Gotcha: on `db-v4-paths-partial` the rule also demotes
+one `d3-shape` version (10 of 10 hits oversized; that version's signature is
+its UMD `dist/d3-shape.js`, while the app compiled the `src/` modules of
+another version). `d3-shape` stays a TP through its other versions, but a
+package whose only signature version is a UMD bundle while the app uses its
+module build would be lost the same way. Measured on deb (offline,
+`babel-sa/run.sh`, before = main 8c3cc77):
+
+| holdout | db-v3-clean | db-v3-clean + pop overlay | db-v4-paths-partial | TP lost |
+|---|---|---|---|---|
+| Expensify J3 | 128 / 89 / 39, unchanged | 154 / 116 / 38 -> 153 / 116 / 37 (`@babel/standalone`) | 93 / 90 / 3, unchanged | 0 |
+| react-navigation-example | 14 / 14 / 0, unchanged | 17 / 17 / 0, unchanged | 17 / 17 / 0, unchanged | 0 |
+| bluesky own build | 42 / 34 / 8, unchanged | 49 / 41 / 8, unchanged | 39 / 39 / 0, unchanged | 0 |
+| rainbow own build | 104 / 82 / 22, unchanged | 106 / 84 / 22, unchanged | 104 / 82 / 22, unchanged | 0 |
+| metamask own build | 169 / 132 / 37, unchanged | 175 / 138 / 37, unchanged | 169 / 132 / 37, unchanged | 0 |
+
+(confirmed / TP / FP.) Recall is unchanged everywhere. Test:
+`tests/gate/deps/corpus-precision-bundled-dist.test.ts`.
 
 **Path recall (corpus-path-recall, 2026-11-09).** Layering the
 path-bearing `db-v4-paths` over `db-v3-clean` lost true packages that were

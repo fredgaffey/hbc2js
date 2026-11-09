@@ -117,6 +117,9 @@ export interface SigDbFile {
      *  functions slimming drops. */
     readonly ownPathDistinct?: number;
     readonly ownFuzzy?: Readonly<Record<number, number>>;
+    /** corpus-precision-bundled-dist: function count of each own file
+     *  (by moduleId) that a kept function belongs to (path-bearing files). */
+    readonly fileSizes?: Readonly<Record<number, number>>;
   };
 }
 
