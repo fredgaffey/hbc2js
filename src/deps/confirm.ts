@@ -28,11 +28,14 @@ import type { PackageScore } from "./match.ts";
 import { userCacheDbDir, writeSignature } from "./db.ts";
 import type { SigDbFile, SigFunction, SigModule } from "./sigdb-types.ts";
 import { isHintEligibleEvidence } from "./guess.ts";
+import { BUILDER_METRO_CONFIG_NAME, builderConfigArgs, builderMetroConfigJs, bundleEnv, missingPeers, peerInstallArgv } from "./builder-support.ts";
 import { attachModulePaths, MODULE_PATHS_VERSION, modulePathsFromSourceMap } from "./module-paths.ts";
 import type { SourceMapLike } from "./module-paths.ts";
 import type { HbcModule } from "../parse/types.ts";
 
-const execFileAsync = promisify(execFile);
+const execFileAsync0 = promisify(execFile);
+/** BUILDFAIL1(d): default maxBuffer (1 MiB) gives ENOBUFS on chatty metro/hermesc output. */
+const execFileAsync = (file: string, args: readonly string[], opts: Record<string, unknown> = {}) => execFileAsync0(file, args, { maxBuffer: 1 << 30, ...opts });
 
 /** Default `--confirm-jobs`: min(4, cpus/2), at least 1. */
 export function defaultConfirmJobs(): number { return Math.max(1, Math.min(4, Math.floor(cpus().length / 2))); }
@@ -547,6 +550,15 @@ async function installCandidate(candidate: ResolvedCandidate, scratchProjectDir:
   } catch {
     await execFileAsync("npm", ["install", "--ignore-scripts", "--no-save", "--legacy-peer-deps", spec], { cwd: scratchProjectDir, env });
   }
+  // BUILDFAIL1(a): the legacy fallback installs no peers; install the
+  // non-optional ones that are still absent so Metro can resolve them.
+  try {
+    const pj = JSON.parse(readFileSync(join(scratchProjectDir, "node_modules", ...candidate.package.split("/"), "package.json"), "utf8"));
+    const peers = missingPeers(pj, (n) => existsSync(join(scratchProjectDir, "node_modules", ...n.split("/"), "package.json")));
+    if (peers.length > 0) await execFileAsync("npm", peerInstallArgv(peers), { cwd: scratchProjectDir, env });
+  } catch {
+    // Best effort: an uninstallable peer just leaves the bundle to fail as before.
+  }
 }
 
 async function bundleAndCompile(pkg: string, scratchProjectDir: string, hermescPath: string, workDir: string, env: NodeJS.ProcessEnv): Promise<{ hbcPath: string; bundlePath: string; mapPath: string }> {
@@ -557,10 +569,11 @@ async function bundleAndCompile(pkg: string, scratchProjectDir: string, hermescP
   const mapPath = join(workDir, "out.bundle.map");
   const assetsDir = join(workDir, "assets");
   mkdirSync(assetsDir, { recursive: true });
+  writeFileSync(join(scratchProjectDir, BUILDER_METRO_CONFIG_NAME), builderMetroConfigJs());
   await execFileAsync(
     "npx",
-    ["react-native", "bundle", "--platform", "android", "--dev", "false", "--minify", "true", "--entry-file", entryFile, "--bundle-output", bundlePath, "--sourcemap-output", mapPath, "--assets-dest", assetsDir],
-    { cwd: scratchProjectDir, env },
+    ["react-native", "bundle", ...builderConfigArgs(scratchProjectDir), "--platform", "android", "--dev", "false", "--minify", "true", "--entry-file", entryFile, "--bundle-output", bundlePath, "--sourcemap-output", mapPath, "--assets-dest", assetsDir],
+    { cwd: scratchProjectDir, env: bundleEnv(env) },
   );
   const hbcPath = join(workDir, "out.hbc");
   await execFileAsync(hermescPath, ["-O", "-emit-binary", `-out=${hbcPath}`, bundlePath]);
