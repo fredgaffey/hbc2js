@@ -372,3 +372,56 @@ functions whose FIRST difference moved later, not regressions:
 difference from the `Reflect.apply` call shape), `diff:GetGlobalObject/
 CreateFunctionEnvironment` 1 -> 200 (the factory, now differing at where the
 inlined environment is created), `diff:GetById/NewObjectWithBuffer` 665 -> 702.
+
+## 11. A closure belongs to the function that creates it
+
+**Problem.** Bucket `tree:unmatched-closure(orig 1 vs recompiled 0)`
+(react-navigation-example, 453 functions under 297 unmatched roots). The
+emitter nests each function inside the OWNER of its closure environment
+(`closureEnvOf`, `src/emit/index.ts` "Function nesting"). When the creating
+function `C` owns no environment of its own (it captures nothing), the closure
+environment is an ancestor `H`'s, so the function was emitted beside `C` in
+`H`: module 91's `parse(text) { return text.split("\n").reduce(function (acc,
+line) {...}, []) }` came out with the callback as a sibling declaration of
+`parse`. The recompiled `parse` then creates no closure, `H` creates one too
+many, and the closure is one instance per `H` call where the original makes
+one per `C` call (a real identity divergence, not just a shape one). This
+happens at v98/v99 only: at v84-v96 `C` reaches the closure environment
+through its own scope, and the graph already put it at `C`.
+
+**Choice.** After the joined/LCA moves, a function whose creation sites are
+all in ONE function `C`, over one environment, with `C` strictly below its
+home `H` (by the final `parentOf`), is re-parented to `C`. Sound because every
+environment the body names is declared at `H` or above, all ancestors of `C`,
+and `C` and the functions between declare only their own `_e<id>_<slot>`
+names, so nothing is shadowed; the declaration is hoisted to the top of `C`,
+so it is visible at every site. Running after the LCA rule means a creator
+that was moved ABOVE `H` fails the `isAncestor(H, C)` check and keeps the
+leftover-7 placement.
+
+**Rejected.** Re-parenting whenever the sites lie in a subtree of `H` (to the
+LCA of several creators): that is the "reparent inwards" variant the LCA rule
+already measured worse, and a function created in two functions (hermesc
+inlined its creator into both) has no single host.
+
+**Tests.** `tests/gate/emit/closure-creator-host.test.ts`: fixture
+`150-closure-created-in-inner-fn` (the round trip reproduces the closure tree
+under `makeParser`; failed at v98/v99 before this section with
+`actual: '(()()())' expected: '((())())'`) and its negative twin
+`151-closure-created-in-two-fns` (the callback stays beside `left`/`right`).
+T2 under the real Hermes VMs: both fixtures' decompiled output matches
+`expected.txt` at v84, v94, v96, v98 and v99.
+
+**Measured** (`node tools/e2e/roundtrip-corpus.ts --only
+react-navigation-example-0.85.3 --passes on`, `1baaa7c` -> this section, same
+machine): IDENTICAL 6590 (45.65%) -> 7107 (49.23%) of 14437; 520 newly
+IDENTICAL, 3 newly DIFFERENT (module 821 / fn#14044, module 1537 / fn#13008,
+fn#13010: `diff:LoadFromEnvironment(imm)`, the parent's environment slots
+numbered in a different order). `tree:unmatched-closure(orig 1 vs recompiled
+0)` 453 -> 63, all `tree:unmatched-closure(...)` buckets together 924 -> 185;
+`diff:CreateFunctionEnvironment(imm)` 341 -> 183. Split diagnostics 4298 ->
+4278. Buckets that grew (`diff:GetParentEnvironment/LoadConst` 68 -> 114,
+`diff:GetParentEnvironment/GetGlobalObject` 227 -> 267,
+`diff:CreateGenerator/GetGlobalObject` 4 -> 32, `diff:GetById/
+NewObjectWithBuffer` 702 -> 740, and a few +25s) are functions that are now
+paired with their recompiled twin and differ later, not regressions.
