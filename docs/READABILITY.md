@@ -595,3 +595,23 @@ Over the whole 192-entry haiku recording: high 2/5 exact, 4/5 lenient; all 9/33 
 | wall | (loaded machine) | 600 s of model time, 14 min total |
 
 Coverage is unchanged (the abstentions are skill/prompt-bound, not model-bound); accuracy is higher, high-confidence volume is more than doubled (18 vs 8 graded names) and tokens per name are 31% lower, mostly because Sonnet's replies are about a fifth the size. `quality.test.ts` now grades the sonnet id-match recording by default (floors: lenient all-confidence >= 50% with n >= 30, coverage >= 0.25, high-confidence exact >= 0.25 with n >= 5).
+
+**Skill v6: answer every target (2026-11-09).** Under v5 the model silently omitted most targets it judged unnameable (65% of the 850 requested bindings). The omissions by binding category were: constant/init temporaries 35%, copies 22%, property reads 20%, other 9%, call results 4%, parameter aliases 4%, expressions 2%. `skills/hbc-name.md` v6 requires an answer for every target and gives role-based `low`-confidence names (e.g. `lengthConst`, `propValue`) where there is no semantic name. `src/readability/binding-hints.ts` adds per-binding def/use/flow hints (defining expression kind, use sites, copy sources) to the naming context so those role names have something to stand on. Re-recorded with the same 60-function id-match recipe (`<app>.recording.idmatch.v6.json`, same nameable denominator):
+
+| id-match, 60 fns, 850 bindings | v5 (sonnet) | v6 (sonnet) |
+| --- | --- | --- |
+| coverage | 35.1% (298) | 86.8% (738) |
+| confidence mix high / med / low | 113 / 149 / 36 | 171 / 260 / 309 |
+| lenient, all confidence | 29/45 (64%) | 35/75 (47%) |
+| exact, all confidence | 18/45 | 30/75 |
+| lenient, high confidence | 15/18 | 15/17 |
+| exact, high confidence | 11/18 | 12/17 |
+| lenient / exact, low confidence | 1/4, 1/4 | 5/24, 4/24 |
+| tokens in / out | 595k / 57k | 645k / 83k |
+| tokens per named binding | 2,190 | 986 |
+
+Coverage rises 2.5x and tokens per name fall 55%, with high-confidence accuracy unchanged. All-confidence accuracy drops because the extra names are mostly `low`: low-confidence names are lower-accuracy by design (about 20% lenient), so a consumer or UI must show the confidence tier and not present `low` names as equal to `high` ones. `quality.test.ts` now grades the v6 recording (floors: coverage >= 0.8, lenient all-confidence >= 40% with n >= 30, high-confidence exact >= 0.6 with n >= 5).
+
+## Render cost (2026-11-09)
+
+Profile on the held-out app (box at load ~15): `prepareModule` 0.3 s, the first whole-module raw emit (`rawFrames`, what the reuse gate used to build on the first `setName`) ~19 s, `NameService.render({fn})` 77-96 s each (it re-emitted all 15,551 functions through stage A + B and sliced one out; the hooks' whole-module views were rebuilt every call), whole-module `render()` ~66 s. Nothing was cached between calls except the analysis. Fix: scoped emit (`emitModule`'s `onlyFunction`) in `render({fn})`, hooks built once per `NameService`, per-function raw frames for the gate, and a touched-functions backstop in `runNamePass` (docs/RENAME.md "Rendering"). The sweep fidelity test now compares scoped renders of its touched functions instead of two whole-module renders. Measured after (same app, same load): `render({fn})` 1.1 s for the first call (hook build) then ~50-300 ms per call (was 77-96 s); `runNamePass` on one target 0.2 s (was two whole-module renders, ~130 s, plus ~19 s for the gate's first whole-module raw emit); scoped output is byte-identical to the whole-module slice on the held-out app (fns 2079 and 2080, plus 40 construct fixtures x 12 fns, with and without names). The ~21 min sweep test was not re-run in this pass.

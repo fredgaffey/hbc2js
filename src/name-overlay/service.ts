@@ -7,7 +7,7 @@
 import type { ModuleAnalysis } from "../cfg/types.ts";
 import type { Stmt } from "../emit/ast.ts";
 import type { PassPipelineOptions } from "../passes/index.ts";
-import { rawFrameBodies, rawFrames } from "./frames.ts";
+import { rawFramesFor } from "./frames.ts";
 import type { RawFrame } from "./frames.ts";
 import { astPassHook } from "../passes/index.ts";
 import type { AstPassHook } from "../passes/index.ts";
@@ -16,8 +16,8 @@ import type { GateRefusal } from "./gate.ts";
 import type { BindingId } from "./id.ts";
 import { OverlayStore } from "./store.ts";
 import type { Confidence, NameRecord, NameQuery, SetResult, Source } from "./store.ts";
-import { render } from "./render.ts";
-import type { RenderOptions, RenderResult } from "./render.ts";
+import { buildRenderHooks, render } from "./render.ts";
+import type { RenderHooks, RenderOptions, RenderResult } from "./render.ts";
 
 export interface SetNameInput {
   readonly confidence: Confidence;
@@ -38,9 +38,12 @@ export class NameService {
   private readonly analysis: ModuleAnalysis;
   private readonly passes: PassPipelineOptions | undefined;
   private readonly strictEnv: boolean;
-  private frames: Map<number, readonly Stmt[]> | null = null;
-  private frameNodes: Map<number, RawFrame> | null = null;
+  /** Raw frames by function, filled one subtree at a time (`rawFramesFor`):
+   *  gating a name in fn N costs fn N's subtree, not the module. */
+  private readonly frameNodes = new Map<number, RawFrame>();
+  private readonly frameTried = new Set<number>();
   private hook: AstPassHook | null = null;
+  private renderHooks: RenderHooks | null = null;
   private readonly splitBodies = new Map<number, readonly Stmt[]>();
 
   constructor(analysis: ModuleAnalysis, store: OverlayStore, opts: { readonly passes?: PassPipelineOptions; readonly strictEnv?: boolean } = {}) {
@@ -50,10 +53,16 @@ export class NameService {
     this.strictEnv = opts.strictEnv ?? true;
   }
 
-  /** Raw `rN` frame bodies, built once and kept warm (spec §5 resident mode). */
-  private rawFrames(): Map<number, readonly Stmt[]> {
-    if (this.frames === null) this.frames = rawFrameBodies(this.analysis, { ...(this.passes !== undefined ? { passes: this.passes } : {}), strictEnv: this.strictEnv });
-    return this.frames;
+  /** Raw frame of `fn`, built on demand and kept warm (spec §5 resident mode). */
+  private rawFrame(fn: number): RawFrame | undefined {
+    if (!this.frameNodes.has(fn) && !this.frameTried.has(fn)) {
+      this.frameTried.add(fn);
+      // Only the requested function's own frame is authoritative; nested
+      // closures may be captured as another copy there.
+      const own = rawFramesFor(this.analysis, fn, { ...(this.passes !== undefined ? { passes: this.passes } : {}), strictEnv: this.strictEnv }).get(fn);
+      if (own !== undefined) this.frameNodes.set(fn, own);
+    }
+    return this.frameNodes.get(fn);
   }
 
   /** `fn`'s body right after reg-split (the `beforeVarNaming` point), built
@@ -61,8 +70,7 @@ export class NameService {
   private splitFrame(fn: number): readonly Stmt[] | undefined {
     const hit = this.splitBodies.get(fn);
     if (hit !== undefined) return hit;
-    if (this.frameNodes === null) this.frameNodes = rawFrames(this.analysis, { ...(this.passes !== undefined ? { passes: this.passes } : {}), strictEnv: this.strictEnv });
-    const frame = this.frameNodes.get(fn);
+    const frame = this.rawFrame(fn);
     if (frame === undefined) return undefined;
     if (this.hook === null) this.hook = astPassHook(this.analysis, this.passes);
     let split: readonly Stmt[] | undefined;
@@ -76,7 +84,7 @@ export class NameService {
   setName(id: BindingId, name: string, input: SetNameInput): SetOutcome {
     // A live-range id is gated against the post-reg-split body, where its
     // web is a binding of its own (docs/RENAME.md).
-    const body = id.kind === "reg" ? (id.web !== undefined ? this.splitFrame(id.fn) : this.rawFrames().get(id.fn)) : undefined;
+    const body = id.kind === "reg" ? (id.web !== undefined ? this.splitFrame(id.fn) : this.rawFrame(id.fn)?.node.k === "func" ? (this.rawFrame(id.fn)!.node as { body: readonly Stmt[] }).body : undefined) : undefined;
     const verdict = gateForFrame(body, id, name, input.override === true);
     if (!verdict.ok) return { ok: false, reason: verdict.reason, overridable: verdict.overridable };
     const overridden = verdict.gate === "overridden";
@@ -107,6 +115,8 @@ export class NameService {
   }
 
   render(opts: RenderOptions = {}): RenderResult {
-    return render(this.analysis, this.store, { ...(this.passes !== undefined ? { passes: this.passes } : {}), strictEnv: this.strictEnv, ...opts });
+    // Hooks (each builds a whole-module view) are built once and kept warm.
+    if (this.renderHooks === null) this.renderHooks = buildRenderHooks(this.analysis, this.passes);
+    return render(this.analysis, this.store, { ...(this.passes !== undefined ? { passes: this.passes } : {}), strictEnv: this.strictEnv, hooks: this.renderHooks, ...opts });
   }
 }

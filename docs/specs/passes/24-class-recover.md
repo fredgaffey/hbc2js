@@ -360,7 +360,7 @@ It refuses the name when it names any other live alias of the member (an env
 slot copy the fold would delete) or is a `sameFrame` closure. A function that
 captures nothing is hoisted by hermesc into the *defining* frame, outside the
 class body, where `#x` is not valid syntax; it keeps its mention and R-PF1
-still refuses (fixture 101-private-field-hoisted-function). Two smaller
+still refuses (fixture 109-private-field-hoisted-function). Two smaller
 changes were needed to fold fixture 100. (1) When the matched list is a
 labelled block placed directly in the function body, the register scan no
 longer refuses for any mention outside the list. That block runs once per
@@ -372,6 +372,112 @@ was the only "declaration" of `r3` inside the matched list, so the frame's
 own register `r3` read as newly free. A name now passes when the function body
 declares it at top level and no mention of it is left inside a nested function
 or class.
+
+### 1.7.1 Private methods (2026-11-09, spec only -- not yet folded)
+
+**Problem.** The 46 react-navigation `defining-body-escape` refusals that
+section 9.5 (f) and the BUGS row put down to "a function hermesc hoisted into
+the defining frame" are not ordinary member functions. Every one sits in one of
+four frames (fn#1564 14, fn#1566 12, fn#1572 4, fn#1574 16) whose class has
+PRIVATE METHODS. hermesc lowers `#m(...) {...}` to: a brand symbol
+`_eD_B = Symbol("<ClassName>")` (no `#`), installed by the constructor like a
+field (`defineProperty(this, B, {value: undefined, ...})` behind the
+double-init guard, ahead of every field); a function `function _fnK(...)`
+(original name `"#m"`) created once in the defining frame and stored after the
+class in a slot `_eD_M = _fnK`; and at each `recv.#m(args)` a brand check
+`L: { t = hasOwnProperty.call(recv, B); if (t) break L; t =
+throwTypeError("Private element not found"); break L; }` followed, possibly
+several statements later, by `Reflect.apply(_eD_M, recv, [args])` (one check
+can cover two calls). The method body reads the class's private fields
+(`r3[_e1952_13] = r5.state`) from outside the class body, so every field it
+touches keeps a surviving slot mention and R-PF1 refuses it. hermesc inlines a
+private method it can (fixture 102's first draft, a non-recursive `#bump`,
+left only the brand checks behind), so the corpus shape is a method too big or
+recursive to inline. Fixture `102-private-method` (a recursive `#bump`) is the
+shape; `tests/gate/passes/private-methods.test.ts` pins it as refused and
+correct today.
+
+**Choice.** A private-methods step in `private-fields`, ahead of the field
+fold, for a class whose brand B and every method slot M meet all of: B's only
+writes are its creation and the constructor install; every M is written once,
+by `M = _fnK` in the matched list after the class, with `_fnK` a function
+declaration in that list whose recorded name starts with `#`; every read of B
+is the first argument of a brand check's `hasOwnProperty.call(x, B)`; every
+read of M is (directly or through one register hop) the callee of
+`Reflect.apply(M, recv, args)` with `args` an array literal. Then: (1) the
+function moves into the class as `#m(params) { body }` (its body becomes a
+member body, so the field fold reaches it like any other member); (2) the
+install of B and its guard are deleted from the constructor; (3) each
+`hasOwnProperty.call(x, B)` becomes `#m in x` for any method `#m` of the class
+(the brand test stays where it was, so its throw keeps its position relative
+to every other effect; the native class installs the brand at the same point
+in construction, before the fields); (4) each `Reflect.apply(M, recv, [a...])`
+becomes `recv.#m(a...)`, only when a brand check on the same `recv` register
+dominates it with no write to that register in between; (5) B's creation, the
+slot stores and the slots' `let`s go. Anything else refuses the whole class's
+methods, and then the fields those bodies touch stay refused as now.
+
+**Soundness.** Identity: a native private method is one function object per
+class evaluation, shared by every instance -- exactly the lowered form's one
+`_fnK` closure per defining-frame run, so (1) changes no observable identity
+(this is why the ordinary-function "move it back into the member" rule
+considered first is NOT needed and would be unsound for an escaping function:
+that one would become a fresh closure per call). Scope: `_fnK`'s free names
+resolve in the defining frame; inside the class body they resolve the same
+unless a name is the class's own inner binding, which refuses. `this`: the
+lowered call passes `recv` as `this`, as `recv.#m()` does. Brand: B is written
+only by the constructor install, so `hasOwnProperty(x, B)` is true exactly
+when x was constructed by this class, which is `#m in x` (proxy and
+`Object.create` objects are false in both). (4) needs the dominating check
+because `recv.#m` re-checks the brand and would throw where the lowered call
+would run the body with a foreign `this`; given a dominating successful check
+on the same unmodified receiver, the re-check cannot fail (a brand is never
+removed), and the argument expressions are evaluated after it in both forms.
+The thrown message differs only when it never happens.
+
+**Rejected alternative.** Moving an ordinary hoisted member function back
+into its member (the item as first briefed): zero of the 46 frames are that
+shape, hermesc inlines a hoisted function that is only called directly, and
+one that is used as a value (fixture 101) escapes, where the move would
+change identity.
+
+**Acceptance.** Fixture 102 at v98/v99 decompiles with `#bump(a1) {...}` in
+the class, no `Symbol("#n")` and no `Symbol("Counter")`, prints expected.txt
+under the real VMs with `--passes=on`, T2 PASS; a negative twin where the
+brand symbol or method slot is read anywhere else (an inlined construction in
+the defining frame, as fixture 95) stays refused and runs; measured as the
+refusal table plus `roundtrip-corpus --passes on` on react-navigation.
+**Mentions before the creation (2026-11-09).** R-PF1's register scan counted
+any mention of the register ahead of the `Symbol()` store, because the list
+may be a loop body re-entered with the symbol still in it. That holds only
+for a re-entered list. The function body, and a labelled block directly in it,
+run once per call, so statements before the creation have completed and
+cannot observe it; there the earlier mentions no longer count. This was the
+remaining refusal on the six R-IN1 frames once section 9.2 (6) rebuilt their
+construction (hermesc had used the register for `Object` first).
+
+**Loops in a member (2026-11-09).** A member that reads `#x` inside a loop
+copies the symbol from its slot into a register in the loop body (`r12 =
+_eD_S; r12 = list[r12];`). `foldInBody` scanned a loop as one leaf, so the
+slot read survived and R-PF1 refused the name (4 of the react-navigation
+`defining-body-escape` residue). Worse, an alias copied *before* a loop and
+read inside it had its copy dropped while the read stayed `this[r]`. A
+`while`/`do-while`/`for` without an init is now folded with the aliases held
+at its entry, because two rules make that set exact on every iteration
+without a fixed point: (i) an entry alias the loop writes anywhere refuses the
+name; (ii) every alias copy inside the loop must be *confined*, killed by a
+plain store to the same register later in the same list with only plain
+statements between (no `if`, loop, label or jump), so no copy's value reaches
+the back edge, a `continue`, a `break` or the code after the loop. An install
+inside a loop refuses (it runs zero or many times, a field declaration once),
+register values (`list = this`) the loop rewrites are dropped, and a frame
+with a `try` is not reasoned about. Rejected: a fixed-point alias analysis
+over the loop's back edges; the confined shape is all hermesc emits here and
+the conservative rule needs no join. Fixture 112-private-field-loop-copy
+(`for-in` lowered to `while (true)`, and a `do-while`);
+`tests/gate/passes/private-fields-loop.test.ts` adds hand-built refusals
+(back-edge carried, carried out of the loop, `continue` before the kill,
+entry alias overwritten).
 
 ### 1.8 Corpus reach
 
@@ -840,7 +946,7 @@ needs a class with no `extends`, derived H-D one with `extends`.
 
 H-B also accepts a receiver register different from the prototype's
 (`P = C.prototype; X = Object.create(P === null ? ...)`, fixture
-100-private-field-nested-function's second `new`). P is then one more
+108-private-field-nested-function's second `new`). P is then one more
 register the region wrote: it holds `C.prototype`, which nothing in
 `X = new C(args)` stores, so section 9.2 (5) must prove it dead after the
 region or re-store it from a name that still holds the value, exactly as for
@@ -874,6 +980,16 @@ after the `new` from a literal / unwritten name. The constructor that
 so the region and `X = new C(args)` perform the same effects on the same
 receiver. Accepted deviation: an env-slot class binding read before its one
 store throws a TypeError in both forms, with a different message.
+(6) The derived prefix (2026-11-09). super-call leaves the constructor's own
+super-constructor lookup `r = Object.getPrototypeOf(<binding>)` ahead of the
+`super(...)` it rebuilt, a call and so not a silent store; R-IN1 refused every
+such constructor (all 6 R-IN1 sites on react-navigation, fixture 81 too). The
+template prefix now admits it once, when its operand's token is the class
+token and `Object` is not a constructor local. It runs no user code (a class
+constructor is an ordinary function object, `[[GetPrototypeOf]]` is the
+ordinary one) and it is the template's copy of the caller's H-D header store,
+so its register takes the header's token. Real code before `super` (fixture
+111-inlined-new-derived-before-super) still refuses R-IN1.
 
 ### 9.3 Refusal codes (via `ctx.refuse`, counted per site)
 
@@ -906,7 +1022,7 @@ another frame stays (it is sound, and the warning is the lowering's); (b) FIXED 
 fixture 90 `private-fields` refused R-PF1 after the rebuild because the
 symbol's register is reused later in the defining frame; R-PF1 is now def-use
 for the register (section 1.7);
-(c) on 93 `private-fields` refuses `ambiguous-multiple-classes`; (f) 2026-11-09: on react-navigation the `defining-body-escape` residue is mostly private reads in functions, not inlined constructions (docs/BUGS.md row; 6 of 68 are R-IN1); (d) a class
+(c) on 93 `private-fields` refuses `ambiguous-multiple-classes`; (f) 2026-11-09: on react-navigation the `defining-body-escape` residue is mostly private reads in functions, not inlined constructions (docs/BUGS.md row; 6 of 68 were R-IN1, FIXED by section 9.2 (6), fixture 110-inlined-new-derived-residue); (d) a class
 whose only prototype member is installed through `C.prototype` directly
 (fixture 91's `Base`, 92's `Point` with one method) is refused `no-members`
 by class-recover; (e) fixture 89's env-IIFE class is not reached (the class

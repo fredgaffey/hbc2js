@@ -46,6 +46,25 @@ export interface RenderOptions {
   readonly passes?: PassPipelineOptions;
   readonly strictEnv?: boolean;
   readonly indent?: string;
+  /** Instrumentation: called with the function index each time a function is
+   *  emitted + stage-B processed by this render (the render-cost counter). */
+  readonly onEmit?: (fnIndex: number) => void;
+  /** Force the reference path for `fn`: re-emit the WHOLE module and slice the
+   *  function out. Byte-identical to the default scoped path (tested); kept as
+   *  the oracle for it. Ignored when `fn` is unset. */
+  readonly wholeModule?: boolean;
+  /** Prebuilt pass hooks (`passHook` / `astPassHook` each build a whole-module
+   *  view); a resident caller (`NameService`) builds them once. */
+  readonly hooks?: RenderHooks;
+}
+
+export interface RenderHooks {
+  readonly stageA: ReturnType<typeof passHook>;
+  readonly stageB: AstPassHook;
+}
+
+export function buildRenderHooks(analysis: ModuleAnalysis, passes?: PassPipelineOptions): RenderHooks {
+  return { stageA: passHook(analysis, passes), stageB: astPassHook(analysis, passes) };
 }
 
 /** Pick the final in-frame name for `wanted`, disambiguating deterministically
@@ -233,15 +252,20 @@ export function renderedRegisterNames(fnIndex: number, body: readonly Stmt[], na
  *  by the heuristic as usual. */
 export function render(analysis: ModuleAnalysis, store: OverlayStore, opts: RenderOptions = {}): RenderResult {
   const strictEnv = opts.strictEnv ?? true;
-  const realHook = astPassHook(analysis, opts.passes);
+  const hooks = opts.hooks ?? buildRenderHooks(analysis, opts.passes);
+  const realHook = hooks.stageB;
   const bodies = new Map<number, Stmt>();
   const collisions: CollisionFlag[] = [];
   const result = emitModule(analysis, {
     provenanceComments: false,
     strictEnv,
     ...(opts.indent !== undefined ? { indent: opts.indent } : {}),
-    passes: passHook(analysis, opts.passes),
+    passes: hooks.stageA,
+    // Scoped: emit only `fn`'s subtree (emitModule's `onlyFunction` reproduces
+    // the target's slice byte-for-byte), so cost follows the functions touched.
+    ...(opts.fn !== undefined && opts.wholeModule !== true && opts.fn >= 0 && opts.fn < analysis.module.functions.length ? { onlyFunction: opts.fn } : {}),
     astPasses: (fn, cfg) => {
+      opts.onEmit?.(cfg.functionIndex);
       if (fn.k !== "func") return realHook(fn, cfg);
       const applied = applyOverlay(cfg.functionIndex, fn.body, store);
       collisions.push(...applied.collisions);
