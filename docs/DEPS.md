@@ -719,6 +719,8 @@ offline against db-v3:
 | rainbow-me/rainbow | 518 (211) | 136 / 64.7% / 17.0% | 121 / 64.5% / 15.1% | -1.9 pt |
 | MetaMask/metamask-mobile | 749 (306) | 172 / 72.7% / 16.7% | 144 / 70.8% / 13.6% | -3.1 pt |
 
+**Dated baseline (db-v3 era, 2026-09/10).** Later work moved these figures (precision rules, exact-version and population overlays, tiny-package coverage path: e.g. Expensify recall 30.9% offline, 58.0% to 64.2% with an overlay taken from the truth file). `docs/METRICS.md` is the source of truth for current precision/recall; the table and bullets below are the original real-world baseline.
+
 - Real-world recall is 13.6% to 17.0% of true dependencies, far below
   the fixture's. The own-build to store gap is small (1.9 to 3.1 points); the large gap is
   fixture to real app, which is signature coverage: these apps have 198 to 749
