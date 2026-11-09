@@ -3,7 +3,8 @@
 // proposal") for a JSON signature directory. Usage:
 //   node --experimental-strip-types tools/deps/build-candidate-hash-index.mjs <sigdir> [--out <dir>] [--hbc 96,98]
 // Default --out is <sigdir> itself; default --hbc is every version present.
-// One file per HBC version: <out>/candidate-hash-index__hbc<N>.tsv.
+// Two files per HBC version: <out>/candidate-hash-index__hbc<N>.tsv and the
+// hop-two string-set index <out>/candidate-stringset-index__hbc<N>.tsv.
 import { statSync } from "node:fs";
 import { sigHbcVersions, writeCandidateHashIndex } from "../../src/deps/hash-index.ts";
 
