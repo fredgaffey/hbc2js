@@ -2274,6 +2274,16 @@ Expensify guessed tier 14 reported / 3 TP / 11 FP became 8 / 2 TP / 6 FP
 newly surfaced as FP); react-navigation-example 5 / 4 TP / 1 FP became
 4 / 4 TP / 0 FP. Tests: `tests/gate/deps/guess.test.ts` (`corpus-guess-generic`).
 
+### Confirm on truth apps (measured 2026-11-09)
+
+`--confirm` on Expensify, react-navigation, bluesky and rainbow (db-v3-clean and
+db-v4-paths) adds 0-4 true positives per app and one false positive in total
+(`semver-truncate`, a 1-module package with 0 of 1 modules exactly matched, rainbow
+v4); Expensify moves 30.9% to 31.9% recall on v3-clean. Most missing truth
+packages are never candidates, and 44-77% of attempted candidates do not
+build under Metro. Counts and per-app rows are in `docs/METRICS.md` ("Confirm on
+truth apps").
+
 ### Candidate dependency expansion is indexed (corpus-remeasure2-brex-oom)
 
 `deriveCandidatePackages` builds one `DependencyIndex` per run: each signature directory is listed once, each signature file is read at most once, and only its dependency names are kept (never the parsed file). Previously every evidenced package re-listed the whole directory and re-parsed all its versions, which on a bundle evidencing thousands of `@aws-sdk/*` packages exhausted the heap. Expansion stays one hop from directly evidenced packages; results are unchanged.
