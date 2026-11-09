@@ -462,4 +462,18 @@ check redirects Metro's `babelTransformerPath` to a wrapper over the installed
 no `--toolchain` flag exists. Rejected: a second pinned toolchain per RN minor.
 See spec 29 §4.6.
 
+## D36 — "Boots" is proved headless, against the original as control; the emulator is not a rung
+
+An exported tree boots when, under the Hermes VM and spec 31's recording stub
+host with the same seed, it produces the same **boot projection** as the
+original. The projection is the factory enter/exit sequence keyed by original
+module id, the `registerComponent` keys, and the native calls made inside
+factories. Phase B2 also drives `runApplication` and compares the Fabric
+view-name sequence up to a virtual-clock horizon. The export side is compiled
+with `hermesc` after the prelude is prepended. An export throw is DIVERGENT. An
+original throw is INCONCLUSIVE (a stub gap). Rejected: an emulator/adb boot,
+even as an optional rung. No gate node has a device, and a second definition of
+"boots" would go stale. The device tool (spec 30) stays a manual viewer. See
+spec 33.
+
 - **Default readability naming model is Sonnet (2026-11-09).** `DEFAULT_MODEL_ALIAS` in `src/readability/types.ts` is the one source of truth (claude-cli alias, agent driver; HTTP backend uses the matching id). Measured on the held-out app: sonnet 75% vs haiku 53% lenient accuracy and fewer tokens per named binding. Override: `--model`/`HBC2JS_LLM_MODEL=haiku`. See docs/READABILITY.md.
