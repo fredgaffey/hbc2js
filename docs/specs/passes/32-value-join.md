@@ -31,7 +31,13 @@ rewrite, so `!(a < b)` never becomes `a >= b`), then `x ? x : B` is
 `x || B` and `x ? A : x` is `x && A`. Preconditions: the label has exactly the
 two uses, both arms are `expr` runs ending in an assignment to the same
 register, nothing in the block declares a binding (the body is spliced into
-the parent list). Exact: the same expressions run in the same order on both
+the parent list), and the statement after the block is a `break`/`continue`
+— the join feeds straight into another jump, which is exactly when the
+original's join block held nothing but that jump. Elsewhere (a value join
+used as an `if` test, a chained `(a && b) || c`, an arm whose constant was
+hoisted above the test) the statement form already recompiles identically
+and the expression form does not: unrestricted, the rung cost 35 IDENTICAL
+functions on react-navigation for 12 gains; restricted, +10 / -0. Exact: the same expressions run in the same order on both
 paths and `rX` gets the same final value. An arm that needs a comma sequence
 and already contains a join is refused — the inner expression's join block is
 what the round trip needs; folding the outer one too only buys an unreadable
