@@ -4,7 +4,7 @@
 // shape (`CreatePrivateName` -> `Symbol("#x")`, `AddOwnPrivateBySym` ->
 // `Object.defineProperty(obj, sym, {value, writable:true, ...})`,
 // `Get/PutOwnPrivateBySym` -> `obj[sym]`, `PrivateIsIn` ->
-// `Object.prototype.hasOwnProperty.call(obj, sym)`) so the pipeline stays
+// `Reflect.getOwnPropertyDescriptor(obj, sym) !== undefined`) so the pipeline stays
 // behaviour-preserving even where no later rung recognises the shape. This
 // rung runs after `class-recover` has already raised the `CreateBaseClass`/
 // `CreateDerivedClass` group into a `class` node (F24-1) and folds every
@@ -159,15 +159,14 @@ function objectCall(e: Expr, name: string): readonly Expr[] | null {
   return p.k === "lit" && p.text === name ? e.args : null;
 }
 
-/** `Object.prototype.hasOwnProperty.call(obj, key)` -- `hasOwn()` in
- *  `src/emit/lower.ts`, `PrivateIsIn`'s lowering. */
+/** `Reflect.getOwnPropertyDescriptor(obj, key) !== undefined` --
+ *  `privateIsIn()` in `src/emit/lower.ts`, `PrivateIsIn`'s lowering (a
+ *  primitive `obj` throws, as `#x in obj` does; review-1109-2). */
 export function hasOwnCall(e: Expr): readonly Expr[] | null {
-  if (e.k !== "call" || e.callee.k !== "member" || e.callee.computed || e.callee.prop.k !== "lit" || e.callee.prop.text !== "call") return null;
-  const target = e.callee.obj;
-  if (target.k !== "member" || target.computed || target.prop.k !== "lit" || target.prop.text !== "hasOwnProperty") return null;
-  const proto = target.obj;
-  if (proto.k !== "member" || proto.computed || proto.prop.k !== "lit" || proto.prop.text !== "prototype") return null;
-  return proto.obj.k === "ident" && proto.obj.name === "Object" && e.args.length === 2 ? e.args : null;
+  if (e.k !== "bin" || e.op !== "!==" || !((e.right.k === "lit" && e.right.text === "undefined") || (e.right.k === "ident" && e.right.name === "undefined"))) return null;
+  const c = e.left;
+  if (c.k !== "call" || c.callee.k !== "member" || c.callee.computed || c.callee.prop.k !== "lit" || c.callee.prop.text !== "getOwnPropertyDescriptor") return null;
+  return c.callee.obj.k === "ident" && c.callee.obj.name === "Reflect" && c.args.length === 2 ? c.args : null;
 }
 
 /** `AddOwnPrivateBySym`'s exact descriptor (`defineProperty()` in
