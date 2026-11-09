@@ -83,7 +83,20 @@ Not rungs: `29-promise-chaining`, `31-microtask-ordering`, `50-this-binding`
 (no idiom); `30-async-generator` (uncompilable); `21-iife-closures` (module
 wrapper `_fn0.call(globalThis)` is the emitter's, not a lowering).
 
-**Count: 31 rungs** (12 stage A, 19 stage B); 27 merged (jsx-recover opt-in) as of the 2026-09-05 ladder landing; remaining: gen-lowered and the hard/unscheduled rows below.
+**Count (2026-11-10): 37 registered passes** (10 stage A, 27 stage B; `jsx-recover` opt-in), per `src/passes/registry.ts`. The 31-rung table above is the original inventory; passes added since that have no row above: `fcall-diamond` (spec 04 §10), `globalthis-dead-store`, `array-literal` (spec 31), `inline-new` (spec 24 §9), `object-literal-arg` (spec 20 §9). Still unshipped: `gen-lowered`, `string-array-decode`, `closure-naming` (§5 hard rows); the ordering diagram below names them as planned positions only.
+
+### Registered order (authoritative: `src/passes/registry.ts`)
+
+Checked mechanically by `tests/gate/docs/pass-order.test.ts`; update both when a pass is added.
+
+<!-- registry-order:start -->
+```
+finally-dedup fcall-diamond loop-cond for-header for-in for-of switch-raise if-chain try-shape label-clean
+expr-rebuild global-access globalthis-dead-store call-shape default-params destructure spread-rest template-literal optional-chain object-literal array-literal yield-recovery yield-loop async-recovery arguments-form literal-forms try-clean class-recover super-call ctor-this inline-new private-fields jsx-recover object-literal-arg fn-naming reg-split var-naming
+```
+<!-- registry-order:end -->
+
+Note the diagram below predates this order: `fn-naming` is registered after `jsx-recover`/`object-literal-arg` (not directly after `class-recover`), and `try-shape` is stage A, not a child of `finally-dedup` only.
 
 ---
 
