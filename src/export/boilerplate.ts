@@ -11,7 +11,10 @@ export interface AppNameResult {
 }
 
 const REGISTER_COMPONENT_LITERAL_RE = /\.registerComponent\(\s*(['"])([^'"]+)\1\s*,/;
-const REGISTER_COMPONENT_VAR_RE = /\.registerComponent\(\s*\w+\s*,/;
+// Any non-literal first argument: a bare name, or (spec 05 section 7.4: the
+// method read stays before the argument's require) `require(N).name` inline.
+// Also the unfused `rF = rO.registerComponent; ...; Reflect.apply(rF, rO, [arg, ...])`.
+const REGISTER_COMPONENT_VAR_RE = /\.registerComponent\(\s*[^,'"]+,|(\w+) = (\w+)\.registerComponent;[\s\S]*?Reflect\.apply\(\1, \2, \[/;
 const NAME_DISPLAYNAME_RE = /\bname\s*:\s*(['"])([^'"]+)\1\s*,\s*displayName\s*:\s*\1\2\1/;
 
 export interface RecoverAppNameModule {

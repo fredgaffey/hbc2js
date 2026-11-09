@@ -1354,6 +1354,85 @@ export function isPureStmt(s: Stmt): boolean {
   return s.k === "expr" && s.expr.k === "assign" && s.expr.target.k === "ident" && isPure(s.expr.value);
 }
 
+/** Where evaluating `e` (ECMAScript order: member object before key before
+ *  the get; callee before arguments before the call; left before right)
+ *  first meets an unconditional read of `reg`. `"found"` when everything
+ *  evaluated before that read is unobservable — literals, non-global
+ *  binding reads (collected in `names`), closure creation, and the
+ *  operators `isPure` models as pure; `"pure"` when all of `e` is such and
+ *  it never reads `reg`; otherwise `"impure"` (an effect comes first, or the
+ *  read sits under a `&&`/`||`/`?:` branch). The predicate a rung uses
+ *  before moving an impure `rX = E` into the one read of `rX` (spec 05
+ *  section 7.4 evaluation-order rule; fix-jsx-read-order). */
+export function firstReadOrder(e: Expr, reg: string, names: string[]): "found" | "pure" | "impure" {
+  const seq = (parts: readonly Expr[]): "found" | "pure" | "impure" => {
+    for (const p of parts) {
+      const r = firstReadOrder(p, reg, names);
+      if (r !== "pure") return r;
+    }
+    return "pure";
+  };
+  // `parts` evaluated in order, then an observable operation.
+  const thenEffect = (parts: readonly Expr[]): "found" | "impure" => (seq(parts) === "found" ? "found" : "impure");
+  switch (e.k) {
+    case "lit":
+    case "this":
+    case "func":
+      return "pure";
+    case "ident":
+      if (e.name === reg) return "found";
+      if (e.global === true) return "impure";
+      names.push(e.name);
+      return "pure";
+    case "member":
+      return thenEffect(e.computed ? [e.obj, e.prop] : [e.obj]);
+    case "call":
+    case "new":
+      // The emitter's own `Reflect.apply(F, T, [A…])` stands for the call
+      // `F` with `this` `T`: the original evaluates no `Reflect.apply` read.
+      if (e.k === "call" && e.callee.k === "member" && !e.callee.computed && e.callee.obj.k === "ident" && e.callee.obj.name === "Reflect" && e.callee.prop.k === "lit" && e.callee.prop.text === "apply" && e.args.length === 3 && e.args[2]!.k === "array" && !e.args[2]!.elements.some((x) => x.k === "spread")) {
+        return thenEffect([e.args[0]!, e.args[1]!, ...e.args[2]!.elements]);
+      }
+      if (e.args.some((a) => a.k === "spread")) return thenEffect([e.callee]);
+      return thenEffect([e.callee, ...e.args]);
+    case "unary":
+      return e.op === "delete " ? thenEffect([e.arg]) : firstReadOrder(e.arg, reg, names);
+    case "bin": {
+      const r = seq([e.left, e.right]);
+      return r === "pure" && (e.op === "in" || e.op === "instanceof") ? "impure" : r;
+    }
+    case "logical": {
+      const l = firstReadOrder(e.left, reg, names);
+      if (l !== "pure") return l;
+      return firstReadOrder(e.right, reg, names) === "pure" ? "pure" : "impure";
+    }
+    case "cond": {
+      const t = firstReadOrder(e.test, reg, names);
+      if (t !== "pure") return t;
+      return firstReadOrder(e.then, reg, names) === "pure" && firstReadOrder(e.else, reg, names) === "pure" ? "pure" : "impure";
+    }
+    case "seq":
+      return seq(e.exprs);
+    case "array":
+      if (e.elements.some((x) => x.k === "spread")) return "impure";
+      return seq(e.elements);
+    case "object": {
+      const parts: Expr[] = [];
+      for (const p of e.props) {
+        if ("k" in p || p.computed || p.key === "__proto__") return "impure";
+        parts.push(p.value);
+      }
+      return seq(parts);
+    }
+    case "assign":
+      if (e.target.k === "ident" && isRegisterName(e.target.name)) return firstReadOrder(e.value, reg, names);
+      if (e.target.k === "member") return thenEffect(e.target.computed ? [e.target.obj, e.target.prop, e.value] : [e.target.obj, e.value]);
+      return thenEffect([e.value]);
+    default:
+      return "impure";
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helper-call recognition, by name, never by position.
 // ---------------------------------------------------------------------------

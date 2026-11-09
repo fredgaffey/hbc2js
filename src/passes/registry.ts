@@ -16,6 +16,7 @@ import { spreadRest } from "./spread-rest/index.ts";
 import { optionalChain } from "./optional-chain/index.ts";
 import { objectLiteral } from "./object-literal/index.ts";
 import { objectLiteralArg } from "./object-literal-arg/index.ts";
+import { methodRead } from "./method-read/index.ts";
 import { privateFields } from "./private-fields/index.ts";
 import { inlineNew } from "./inline-new/index.ts";
 import { exprRebuild } from "./expr-rebuild/index.ts";
@@ -171,6 +172,9 @@ export const REGISTRY: readonly Pass[] = [
   // needs the `class` node `classRecover` just built, and the same register
   // identity, so it sits immediately after it and before every renaming rung.
   privateFields as Pass,
+  // Spec 05 section 7.4: re-fuses a method call the emitter left unfused for
+  // evaluation order, once the work in between is folded into literals.
+  methodRead as Pass,
   jsxRecover as Pass,
   // docs/specs/passes/20-object-literal.md section 9: an inert literal (and
   // then the callee base) inlined into the adjacent call, after every rung

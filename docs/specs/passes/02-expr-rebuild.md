@@ -79,7 +79,14 @@ or the `disc` of a `switch` (never inside a body, never inside a nested `func`);
 
 * if `isPure(E)`: every statement in `L[i+1..j-1]` is simple, `isPureStmt`,
   does not mention `rX`, and does not write any register `E` reads;
-* else: `j === i + 1` (no intervening statement at all).
+* else: `j === i + 1` (no intervening statement at all), and inside `L[j]`
+  the read of `rX` is the first observable evaluation (`firstReadOrder` in
+  `src/passes/ast.ts`: only literals, non-global binding reads `E` does not
+  write, closures and `isPure` operators come before it, never under a
+  `&&`/`||`/`?:` branch; the emitter's `Reflect.apply(F, T, [A…])` evaluates
+  `F, T, A…`). Without it `rT = X.Text; r1 = r3.createElement(rT, null)`
+  folded to a call that reads `r3.createElement` before `X.Text`
+  (fix-jsx-read-order, construct fixture 360).
 
 **R1b — dead store.** `L[i]` is `rX = E` and `rX` is dead after `i` (use `j =
 i` in the deadness test). Refuse when `E` is `ident rX` (that is R1c).
@@ -144,7 +151,7 @@ one list.
 
 * `nested-capture` — a nested `func` mentions `rX`.
 * `not-dead` — neither (D-a) nor (D-b).
-* `impure-move` — `E` impure and `j > i + 1`.
+* `impure-move` — `E` impure and `j > i + 1`, or something observable in `L[j]` is evaluated before the read.
 * `input-clobbered` — a skipped statement writes a register `E` reads.
 * `env-slot-order` — `E` reads a lexical environment slot (`_e<env>_<slot>`)
   and a skipped statement stores into a slot of the **same** environment.

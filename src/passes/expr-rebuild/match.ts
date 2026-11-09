@@ -8,7 +8,7 @@
 // from `before` alone (it gets no access to this match's `data`) and so unit
 // tests can assert the exact refuse reason without going through the driver.
 import type { Expr, IdentUses, Stmt } from "../ast.ts";
-import { identUses, isPure, isPureStmt, isRegisterName, registerUses, registerUsesIfMemoised } from "../ast.ts";
+import { firstReadOrder, identUses, isPure, isPureStmt, isRegisterName, registerUses, registerUsesIfMemoised } from "../ast.ts";
 import { anyPassThroughBetween, nextRelevant, stmtInterest } from "./stmt-index.ts";
 
 const NO_USES = { reads: 0, writes: 0, nested: 0 } as const;
@@ -763,6 +763,19 @@ export function classifySite(list: readonly Stmt[], fnBody: readonly Stmt[], i: 
       }
     } else if (j !== i + 1) {
       return { ok: false, reason: "impure-move" };
+    } else {
+      // fix-jsx-read-order: adjacency is not enough -- inside `L[j]` the
+      // read of `reg` must be the first observable evaluation, or folding
+      // moves `E` past it (`rT = X.Text; r = R.createElement(rT, …)` read
+      // `R.createElement` before `X.Text`). Bindings read ahead of it must
+      // not be written by `E`.
+      const tl = topLevelExprOf(list[j]!);
+      const names: string[] = [];
+      if (tl === null || firstReadOrder(tl, reg, names) !== "found") return { ok: false, reason: "impure-move" };
+      if (names.length > 0) {
+        const own = [{ k: "expr", expr: value } as Stmt];
+        if (names.some((n) => identUses(own, n).writes !== 0)) return { ok: false, reason: "impure-move" };
+      }
     }
     // If `L[j]` is itself a plain store to `reg` (self-referential, e.g. a
     // second `reg = reg + x` landing right where we are folding a *first*

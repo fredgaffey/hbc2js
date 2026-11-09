@@ -9,7 +9,7 @@
 // function with an `onOcc` that *does* return a name, so occurrence #k in
 // the enumeration pass and occurrence #k in the rewrite pass are — by
 // construction, not by parallel bookkeeping — the same tree position.
-import type { Expr, Pattern, PatternElement, Stmt } from "../ast.ts";
+import type { Expr, JsxFactory, Pattern, PatternElement, Stmt } from "../ast.ts";
 import { isRegisterName, walk } from "../ast.ts";
 import type { Match, PassContext } from "../types.ts";
 
@@ -370,8 +370,28 @@ function walkExpr(e: Expr, onOcc: (reg: string, kind: OccKind, strong: boolean, 
       });
       return changed ? { ...e, superClass, members } : e;
     }
+    case "jsx": {
+      // fix-jsx-read-order: a `jsx` node (opt-in jsx-recover, which runs
+      // before this rung) holds this frame's registers in its factory
+      // callee, tag, attributes and children; leaving them unrenamed made
+      // `{a: r4}` read the pre-split web. Visited in `jsxToCall` order.
+      let changed = false;
+      const sub = (x: Expr): Expr => {
+        const y = walkExpr(x, onOcc, false);
+        if (y !== x) changed = true;
+        return y;
+      };
+      const f = e.factory;
+      const callee = sub(f.callee);
+      const tag = sub(e.tag);
+      const tagDisplay = e.tagDisplay === undefined ? undefined : sub(e.tagDisplay);
+      const attrs = e.attrs.map((a) => ("spread" in a ? { spread: sub(a.spread) } : { name: a.name, value: a.value === null ? null : sub(a.value) }));
+      const children = e.children.map((c) => (c.k === "expr" ? { k: "expr" as const, expr: sub(c.expr) } : c));
+      const factory: JsxFactory = f.runtime === "automatic" ? { ...f, callee, key: f.key === null ? null : sub(f.key), rest: f.rest.map(sub) } : { ...f, callee, nullProps: f.nullProps === null ? null : sub(f.nullProps) };
+      return changed ? { ...e, tag, ...(tagDisplay === undefined ? {} : { tagDisplay }), attrs, children, factory } : e;
+    }
     default:
-      return e; // lit, this, argumentsObject, func (separate frame — never recurse), jsx (not yet present)
+      return e; // lit, this, argumentsObject, func (separate frame — never recurse)
   }
 }
 
