@@ -236,6 +236,18 @@ Validator on the 28,557 files then done: 0 errors, all `hashScheme` 2, hbc98 14,
 
 Rainbow and metamask are unchanged because none of their false-positive owners was rebuilt yet; re-measure after DONE (`ship-meas/meas.sh`-style run with the final DB).
 
+## db-v4-paths retry (2026-11-09, offline, main a1c0b4d + transplant-multi on builder-support)
+
+Layered farms (hard links), each with its own candidate hash/stringset indexes: A = db-v3-clean <- db-v4-paths (the first rebuild as finished: 56,413 files with paths, the other 14,809 pathless), B = A <- db-v4-paths-retry snapshot of 841 files (the retry was still running: 14,809 pathless files being re-run, no failure so far). The ten false-positive-prone versions (30 files) were retried first and all built.
+
+| app | A confirmed | A TP | A FP | B confirmed | B TP | B FP | B precision | B recall |
+|---|---|---|---|---|---|---|---|---|
+| Expensify | 106 | 100 | 6 | 106 | 100 | 6 | 0.943 | 0.347 |
+| react-navigation | 21 | 21 | 0 | 21 | 21 | 0 | 1.000 | 0.276 |
+| bluesky | 45 | 44 | 1 | 45 | 44 | 1 | 0.978 | 0.222 |
+| rainbow | 117 | 108 | 9 | 115 | 109 | 6 | 0.948 | 0.210 |
+| metamask | 176 | 156 | 20 | 169 | 156 | 13 | 0.923 | 0.208 |
+
 ## Confirm on truth apps (2026-11-09)
 
 `deps --confirm --confirm-jobs 3` against the truth apps, with every rule on

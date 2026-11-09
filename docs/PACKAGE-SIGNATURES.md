@@ -1055,6 +1055,23 @@ pids' dirs and legacy unnumbered `sigpaths-XXXXXX` dirs are never touched
 (a live rebuild once leaked 6,977 dirs / 20 GB this way). Test:
 `tests/gate/deps/bugs-2026-11-09-sigpaths-tmp-leak.test.ts`.
 
+**Retrying the pathless remainder (2026-11-09).** `transplant-multi.mjs`
+now uses the shared `src/deps/builder-support.ts` (§6.7: per-job Metro config
+shimming Node built-ins, absent peers installed, unresolved-bare-module retry
+up to 3 rounds, `CI=true`) and a 300 s per-install/bundle timeout; before this
+the first rebuild lost 1,615 files to `react-native bundle` failures, 132 to
+"too many unmatched modules", ~35 to timeouts, and the other ~13,000 of the
+14,809 were simply not attempted (run stopped early). A retry is just the same
+driver over the failed list as `SRC` (hard links of those files from db-v3-clean)
+with `OUT=db-v4-paths-retry`; `OUT` is a separate dir so the first rebuild is
+never modified. Layering for `finalize.sh`: the retry files override the
+pathless originals, i.e. the staged DB is `OUT=db-v4-paths` plus every file of
+`db-v4-paths-retry`, and `LIST` shrinks to `db-v4-paths.failed.txt` minus the
+retry files. All 30 files of the ten false-positive-prone versions (wagmi,
+typeorm, d3-geo, mammoth, jszip, is-regex, fast-json-patch, p-map,
+reactotron-react-native, rpc-websockets) built. Test:
+`tests/gate/deps/builder-failures.test.ts` (transplant-multi wiring).
+
 ### Shipping db-v4-paths
 
 The v4 DB is the db-v3 files with module paths transplanted (above). Nothing
