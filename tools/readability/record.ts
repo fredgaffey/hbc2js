@@ -385,6 +385,9 @@ async function main(): Promise<void> {
         context: canonicaliseContext(context),
       });
       recorded += 1;
+      // HBC2JS_RECORD_DUMP=<dir>: write each function's request context (prompt inspection only; no effect on the recording).
+      const dumpDir = process.env["HBC2JS_RECORD_DUMP"];
+      if (dumpDir !== undefined) writeFileSync(`${dumpDir}/fn${String(fn)}.json`, `${JSON.stringify(context, null, 2)}\n`);
       if (resume && Object.prototype.hasOwnProperty.call(existing, key)) {
         cacheHits += 1;
         const cachedTokens = existing[key]?.cost;

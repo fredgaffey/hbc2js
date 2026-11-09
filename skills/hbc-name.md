@@ -1,7 +1,7 @@
 ---
 id: hbc-name
 kind: suggest-name
-version: 6
+version: 9
 ---
 
 # hbc-name -- naming registers and functions in decompiled Hermes bytecode
@@ -22,7 +22,9 @@ You are given, and may use, only what is in the request:
 - `strings` -- string literals the function loads: endpoint paths, keys,
   action types, error messages. These are the strongest evidence available.
 - `hints` -- OPTIONAL, one entry per requested target: `{id, ident, def,
-  uses, flowsInto}`. `def` is the line that assigns the binding, `uses` up to
+  uses, flowsInto, params}`. `params` lists the function parameters (`aN`,
+  `arguments[N]`) copied into the binding: bare when the copy is its def,
+  `a4 (L51)` when a reused register takes the parameter later. `def` is the line that assigns the binding, `uses` up to
   three lines that read it, `flowsInto` the callees it is passed to; each line
   is prefixed `L<n>:` with its 1-based line in `source`. Start from these --
   they are the evidence for that binding, already extracted.
@@ -83,6 +85,28 @@ You never fetch anything else. If the evidence you need is absent, abstain.
 9. Interior helper plumbing counts too: a binding that holds `globalThis`,
    `Array`, `Reflect`, a bound method or a closure over a named callee is
    named for that thing (`globalScope`, `ArrayCtor`, `reflectApply`).
+
+10. PARAMETERS FIRST. A binding whose hint has a non-empty `params` is that
+   parameter's variable: name it for the PARAMETER, even when the register
+   also holds a temporary before or after the copy (`r5 = arr.length; ...
+   r5 = a4;` is named for `a4`). Name the parameter for what the WHOLE
+   function does with it, not for one property read from it (`r4 = a1;
+   r4.initialRouteName` is `options` or `config`, not `initialRouteName`),
+   and prefer the conventional JavaScript name for its position in the
+   idiom the function implements:
+   - added to a set/list and removed by a returned function (subscribe):
+     `listener`;
+   - read for many keys by a component or hook: `props`; an object read for
+     several unrelated settings: `options` / `config`;
+   - `(state, action)` for a reducer or router; `(event)` for a handler;
+     `(item, index)` for an array callback; `(error)` for a rejection or
+     catch handler; `(a, b)` style pairs for a comparator;
+   - a parameter only tested for truthiness and that gates the rest of the
+     body is a predicate (`isEnabled`, `shouldX`) only when a literal or
+     callee says so; otherwise keep the idiomatic noun.
+   When this is a guess, give the idiomatic name at `low`; do not invent a
+   domain name from a single use. A parameter is never named after the
+   constant or temporary its register held before the copy.
 
 ## Output contract
 

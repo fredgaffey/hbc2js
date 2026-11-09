@@ -13,6 +13,11 @@ export interface BindingHint {
   readonly def: string;
   readonly uses: readonly string[];
   readonly flowsInto: readonly string[];
+  /** Skill v9: every parameter (`aN`, `arguments[N]`) copied into the
+   *  binding. A copy at the def line is bare (`a1`); a later copy into a
+   *  reused register carries its line (`a4 (L51)`). The parameter is the
+   *  value the author named, so the skill names the binding for it. */
+  readonly params: readonly string[];
 }
 
 const MAX_USES = 3;
@@ -71,17 +76,23 @@ export function bindingHints(
     const id = shortForm({ kind: "reg", ...t } as Parameters<typeof shortForm>[0]);
     const word = new RegExp(`(?<![\\w$])${escapeRe(ident)}(?![\\w$])`);
     const assign = new RegExp(`(?<![\\w$])${escapeRe(ident)}\\s*=[^=>]`);
+    const fromParam = new RegExp(`(?<![\\w$.])${escapeRe(ident)}\\s*=\\s*(a\\d+|arguments\\[\\d+\\])\\s*;`);
     let def = "";
     const uses: string[] = [];
     const flows: string[] = [];
+    const params: string[] = [];
     for (const i of own) {
       const l = lines[i]!;
-      if (!word.test(l) || /^\s*let\s/.test(l)) continue;
+      // A bare declaration list (`let r0, r1;`) is skipped; a declaration
+      // with an initialiser (`let r3 = a1;`) is the binding's def.
+      if (!word.test(l) || (/^\s*let\s/.test(l) && !assign.test(l))) continue;
+      const p = fromParam.exec(l);
+      if (p !== null) params.push(def === "" ? p[1]! : `${p[1]!} (L${String(i + 1)})`);
       if (def === "" && assign.test(l)) def = show(i + 1, l);
       else if (uses.length < MAX_USES) uses.push(show(i + 1, l));
       const call = new RegExp(`([A-Za-z_$][\\w$.]*)\\([^()]*(?<![\\w$])${escapeRe(ident)}(?![\\w$])`).exec(l);
       if (call !== null && !flows.includes(call[1]!)) flows.push(call[1]!);
     }
-    return { id, ident, def, uses, flowsInto: flows };
+    return { id, ident, def, uses, flowsInto: flows, params };
   });
 }
