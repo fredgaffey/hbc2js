@@ -521,7 +521,7 @@ shape from the human table.
 | `reactNativeVersion` | `string \| null` | Best-guess RN version, from the highest-confidence matched `react-native`/`react-native-foundation` signature; `null` if none matched at all. |
 | `reactNativeVersionConsistentWithHbc` | `boolean \| null` | F4 (issue #14): `null` when `reactNativeVersion` is `null` (nothing to reconcile) or the parsed `hbcVersion` has no documented RN range; otherwise whether `reactNativeVersion` falls inside the range `docs/TOOLCHAIN.md`'s table documents for this `hbcVersion` (e.g. HBC96 → RN 0.72.x-0.81.x, widened from 0.73.x-0.81.x 2026-09-18 -- see "RN version reconciliation (F4)" below). |
 | `reactNativeVersionExpectedRange` | `string \| null` | Human-readable RN range for this `hbcVersion` (populated whenever one is known, not only on a mismatch), e.g. `"RN 0.72.x-0.81.x"`. |
-| `confirmedDeps` | `ConfirmedDep[]` | `{ package, version, confidence, modulesCovered, moduleTotal, source }` — `package` (not `.name`), High-tier or `--confirm`-verified. Written into `package.json`. |
+| `confirmedDeps` | `ConfirmedDep[]` | `{ package, version, confidence, modulesCovered, moduleTotal, source }` — `package` (not `.name`), High-tier or `--confirm`-verified. Written into `package.json`. Optional `forkOf` / `forkEvidence` (corpus-fork-relabel): `package` is a fork the bundle names, `forkOf` the upstream whose signature matched, `version` that upstream's version. |
 | `guessedDeps` | `GuessedDep[]` | `{ package, version, confidence, modules, evidence }` — evidence-scored leads clearing the precision rules (≥2 independent evidence kinds, confidence ≥0.5). Never written into `package.json`. |
 | `hintedDeps` | `HintedDep[]` | `{ package, version, confidence, evidenceKind, evidence }` — single-evidence-kind leads kept only when that one kind is high-specificity. Reported for visibility only. |
 | `suppressedGuesses` | `SuppressedGuess[]` | `{ package, confidence, evidence, reason }` — what the precision rules weighed and dropped, and why. |
@@ -2763,3 +2763,75 @@ are not told apart). `db-v3-clean` is pathless, so its numbers are
 unchanged by construction. TPs lost: 0 on all five apps.
 
 Test: `tests/gate/deps/corpus-precision-rainbow-mm.test.ts`.
+
+### Fork relabel (corpus-fork-relabel, 2026-11-09)
+
+**Problem.** One kind of false positive comes from an app that ships a fork or
+rename Q of an upstream package P. Q's code is P's code, so P's signature
+matches, but the truth (and the app's `package.json`) names Q. Known cases on
+the full-v4 farm: `@react-native-community/cookies` (Q
+`@react-native-cookies/cookies`), `react-native-webview`
+(`@metamask/react-native-webview`), `superstruct` (`@metamask/superstruct`),
+`react-query` (`@tanstack/react-query`), `whatwg-url`
+(`whatwg-url-without-unicode`), `source-map-js` (`source-map`).
+
+**Where Q's name is.** A dump of every string naming these families on
+metamask, rainbow and Expensify showed that Q is usually named outside P's
+matched code. The places are the app's own bundled `package.json` (metamask
+lists `@metamask/react-native-webview`, `@react-native-cookies/cookies` and
+`@tanstack/react-query`), a dependent's `package.json` (`react-native-url-polyfill`
+lists both `whatwg-url` and `whatwg-url-without-unicode`, and `css-tree`
+lists `source-map`), and error strings in other packages' code (`@metamask/utils`
+names `@metamask/superstruct`). Rainbow's `react-query` has no `@tanstack`
+string at all, so that case stays a false positive.
+
+**Choice** (`src/deps/fork-relabel.ts`, run after `matchInventory` in
+`runDeps`). A string "names" a package when the whole string is the name or
+`name@version`. A confirmed package P is reported as Q (`ConfirmedDep.forkOf: P`,
+`forkEvidence` quoting the strings, tier and version unchanged) when exactly
+one Q that the bundle names fits one of these rules:
+- `scoped-copy`: P is unscoped and Q is `@scope/P`.
+- `own-scope`: P and Q have the same basename, and Q's scope contains it
+  (`@react-native-cookies/cookies`).
+- `affix`: P and Q are in the same scope, and one is the other plus
+  `-word...` at either end. The shorter name must still contain a separator,
+  following the corpus-guess-generic rule. Q must have no signature in the DB.
+  Q must also be named in a `package.json`-shaped module: one function, no
+  requires, and the strings `name`, `version` and a dependency key.
+
+Guards: Q is not confirmed itself (if it is, the twin rules decide). `@types/*`
+never counts as a fork. Every module that names P must also name Q and name at
+most `FORK_CONTEXT_MAX_CONFIRMED` (4) other confirmed packages. In a small
+`package.json` the upstream name is a keyword or description. An app's own
+`package.json`, which lists everything, keeps P.
+
+**Rejected.**
+(1) Looking for Q only in P's matched modules: for 5 of the 6 families the
+name is in a `package.json` or in another package's code, not in P's code.
+(2) Requiring Q to have no signature for every rule: `@tanstack/react-query`
+has 19 signature files, none of which match the app.
+(3) Accepting affix names from code: React's renderer calls itself
+`react-native-renderer`, which made rn-template's `react-native` look like a
+fork. The guard tests in `truth.test.ts` caught it.
+(4) A hand-written list of rename families.
+
+Measured offline on deb (`deps-forks/run.sh` = `deps-rm/run.sh`, `meas2.mjs`
+`scoreAgainstTruth`). Before is this branch's merge base (deps-hub-edge + main),
+after is the relabel. Each cell is confirmed / TP / FP, precision:
+
+| app | db-v3-clean before | after | full v4 before | after |
+|---|---|---|---|---|
+| react-navigation-example | 16 / 16 / 0, 100% | unchanged | 21 / 21 / 0, 100% | unchanged |
+| bluesky | 45 / 37 / 8, 82.2% | unchanged | 46 / 45 / 1, 97.8% | unchanged |
+| rainbow | 129 / 106 / 23, 82.2% | unchanged (`test-renderer` FP relabelled to `react-test-renderer`, still an FP) | 115 / 108 / 7, 93.9% | unchanged |
+| metamask | 186 / 148 / 38, 79.6% | 186 / 151 / 35, 81.2% | 176 / 156 / 20, 88.6% | 176 / 162 / 14, 92.0% |
+| Expensify J3 | 135 / 96 / 39, 71.1% | 135 / 98 / 37, 72.6% | 107 / 100 / 7, 93.5% | 107 / 102 / 5, 95.3% |
+
+Converted FP to TP. On metamask v4: cookies, webview, `react-query`,
+`superstruct`, `source-map-js` and `whatwg-url`. On metamask v3:
+`superstruct`, `source-map-js` and `whatwg-url`. On Expensify, both DBs:
+`source-map-js` and `whatwg-url`. TP lost: 0. Recall rises by the same amount.
+Still open: rainbow's `react-query` (no `@tanstack` string) and rainbow's
+`whatwg-url`, where some guard holds (not traced). Metamask v3's `react-query`
+also stays an FP, also not traced.
+Test: `tests/gate/deps/corpus-fork-relabel.test.ts`.
