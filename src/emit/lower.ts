@@ -131,6 +131,9 @@ export interface BlockPlan {
   readonly selectObjects: ReadonlyMap<number, number>;
   /** Index of a `Call*` -> the method-call fast path it should use. */
   readonly methodCalls: ReadonlyMap<number, { readonly objReg: number; readonly name: string }>;
+  /** Index of a `Call*` whose method read stays a statement because an
+   *  observable instruction sits in between (§7.4 evaluation order). */
+  readonly unfusedReads: ReadonlySet<number>;
   /** The block's own instructions, so a lowering can look back within the
    *  block (`isLiteralUndefinedReg`). */
   readonly instructions: readonly Instruction[];
@@ -143,6 +146,12 @@ const CONSTRUCT = new Set(["Construct", "ConstructLong"]);
 // `Construct` (measured on 33-class-inheritance-super v99, functions #0 and #4).
 const CONSTRUCT_WITH_NEW_TARGET = new Set(["CallWithNewTarget", "CallWithNewTargetLong"]);
 const CALL_N = new Set(["Call1", "Call2", "Call3", "Call4"]);
+// Instructions that neither read nor write state a getter could observe or
+// change: registers, constants, environments being created, fresh allocations.
+const FRAME_LOCAL = /^(Mov|MovLong|LoadConst\w*|LoadParam|LoadParamLong|GetGlobalObject|GetEnvironment|GetParentEnvironment|GetClosureEnvironment|Create(Function|Inner)?Environment\w*|CreateClosure\w*|CreateGeneratorClosure\w*|CreateAsyncClosure\w*|GetNewTarget|GetArgumentsLength|CreateRegExp|GetBuiltinClosure|NewArray|NewArrayWithBuffer\w*|NewFastArray)$/;
+// A fresh object, and own-property definitions on it before it escapes.
+const FRESH_OBJECT = /^(NewObject|NewObjectWithBuffer\w*)$/;
+const FRESH_OBJECT_INIT = /^(PutOwnBySlotIdx\w*|PutNewOwnById\w*|PutNewOwnNEById\w*|PutOwnByIndex\w*)$/;
 
 /**
  * §7.5 — recognise the `new` triple, and §7.4's method-call fast path, before
@@ -155,6 +164,7 @@ export function planBlock(block: BasicBlock, functionInstructions: readonly Inst
   const newSites = new Map<number, NewSite>();
   const selectObjects = new Map<number, number>();
   const methodCalls = new Map<number, { objReg: number; name: string }>();
+  const unfusedReads = new Set<number>();
   const ins = block.instructions;
 
   // The `new` triple is matched over the *whole function*, not one block: in
@@ -240,6 +250,23 @@ export function planBlock(block: BasicBlock, functionInstructions: readonly Inst
       if (c.operands.some((o, k) => o.role === "reg" && o.value === calleeReg && k > 0)) break;
     }
     if (getIdx < 0 || consumed.has(getIdx)) continue;
+    // Evaluation order: the fused `rO.m(…)` reads `.m` at the call, so every
+    // instruction between the read and the call must be unobservable to it
+    // (frame-local). Otherwise the read stays a statement, the call stays
+    // `Reflect.apply(rF, rO, […])`, and expr-rebuild + call-shape R3b re-fuse
+    // it only when the argument expressions inline after the read in order
+    // (docs/BUGS.md 2026-11-09 "method read moved past an intervening getter").
+    let observable = false;
+    const fresh = new Set<number>();
+    for (let j = getIdx + 1; j < i; j++) {
+      const c = ins[j]!;
+      if (FRESH_OBJECT.test(c.name)) fresh.add(V(c, 0));
+      else if (FRESH_OBJECT_INIT.test(c.name) && fresh.has(V(c, 0))) continue;
+      else if (!FRAME_LOCAL.test(c.name)) {
+        observable = true;
+        break;
+      }
+    }
     let readLater = false;
     for (let j = i + 1; j < ins.length; j++) {
       const later = ins[j]!;
@@ -250,6 +277,10 @@ export function planBlock(block: BasicBlock, functionInstructions: readonly Inst
       }
     }
     if (readLater) continue;
+    if (observable) {
+      unfusedReads.add(i);
+      continue;
+    }
     consumed.add(getIdx);
     // The property *name* is a string id; the string table is only available at
     // lowering time, so the id travels through and is resolved there.
@@ -257,7 +288,7 @@ export function planBlock(block: BasicBlock, functionInstructions: readonly Inst
   }
 
   void fnIndexOf;
-  return { consumed, newSites, methodCalls, selectObjects, instructions: ins };
+  return { consumed, newSites, methodCalls, unfusedReads, selectObjects, instructions: ins };
 }
 
 /** Registers holding the arguments of a frame-based call, `arg[0]` = `this`. */
@@ -747,7 +778,8 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
       const method = f.mod.strings.get(Number(fast.name));
       return set(dst, call(prop(R(fast.objReg), method), args.slice(1)));
     }
-    return set(dst, applyCall(RG(insn, 1), args));
+    const general = applyCall(RG(insn, 1), args);
+    return set(dst, plan.unfusedReads.has(index) && general.k === "call" ? { ...general, methodRead: true } : general);
   }
   switch (name) {
     case "Call":

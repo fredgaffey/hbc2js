@@ -369,6 +369,9 @@ function leadingCall(s: Stmt, assigned: string[] = []): (Expr & { readonly k: "c
       e = e.value;
     }
     else if (e.k === "member") e = e.obj;
+    // `x + call(...)`: a register or literal left operand evaluates nothing a
+    // getter could observe, so the call is still the first effect.
+    else if (e.k === "bin" && (e.left.k === "lit" || (e.left.k === "ident" && isRegisterName(e.left.name)))) e = e.right;
     else return null;
   }
   return null;
@@ -451,14 +454,17 @@ export function matchCondArg(list: readonly Stmt[], fnBody: readonly Stmt[]): Ca
     // `this` undefined); R3e applies only when R is the real receiver.
     if (isProvenUndefinedThis(R!, fnBody)) continue;
     const args = extractArgsArray(arr!);
-    if (args === null || args.length === 0) continue;
+    // `methodRead`: lower (spec 05 section 7.4) left this read unfused for
+    // evaluation order and proved `F` dead after the call itself.
+    const proven = call.methodRead === true;
+    if (args === null || (args.length === 0 && !proven)) continue;
     const f = F!.name;
     const r = R!.name;
     // The value `F = R.P` stores must die at this call: F read once in it,
     // and either F used nowhere else or this statement overwrites F.
     const uses = identUses(fnBody, f);
     if (identUses([list[j]!], f).reads !== 1) continue;
-    if (!(uses.reads === 1 && uses.writes === 1) && !assigned.includes(f)) continue;
+    if (!(uses.reads === 1 && uses.writes === 1) && !assigned.includes(f) && !proven) continue;
     // The statement writing F, scanning back from the call.
     let k = j - 1;
     while (k >= 0 && identUses([list[k]!], f).writes === 0) k--;
@@ -504,6 +510,7 @@ export function matchCondArg(list: readonly Stmt[], fnBody: readonly Stmt[]): Ca
       const fu = identUses(mid, f);
       if (identUses(mid, r).writes !== 0 || fu.reads !== 0 || fu.writes !== 0) continue;
     }
+    if (args.length === 0 && seq.length > 0) continue;
     const callArgs = seq.length === 0 ? args : [{ k: "seq", exprs: [...seq, args[0]!] } as Expr, ...args.slice(1)];
     const replacement: Expr = { k: "call", callee: read, args: callArgs };
     const newStmt = applyReplacement(list[j]!, call, replacement);
