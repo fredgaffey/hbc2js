@@ -2,27 +2,79 @@
   "schema": 1,
   "description": "Supplementary signature population (sigdb-supplement): packages that the react-navigation recall analysis (docs/DEPS.md, DB coverage) found missing or only at old versions. `pinned` versions come from the example app's lockfile as recorded in its deps-truth.json (only 8 workspace packages carry a version there); every package additionally gets the latest `latestStable` stable releases from the npm registry (supplement-jobs.mjs). No other app's truth is read.",
   "latestStable": 3,
-  "hbcVersions": [94, 96, 98, 99],
+  "hbcVersions": [
+    94,
+    96,
+    98,
+    99
+  ],
   "packages": {
-    "@react-navigation/bottom-tabs": ["8.0.0-alpha.50"],
-    "@react-navigation/core": ["8.0.0-alpha.34"],
-    "@react-navigation/devtools": ["8.0.0-alpha.35"],
-    "@react-navigation/drawer": ["8.0.0-alpha.51"],
-    "@react-navigation/elements": ["3.0.0-alpha.48"],
-    "@react-navigation/native-stack": ["8.0.0-alpha.52"],
-    "react-native-drawer-layout": ["5.0.0-alpha.18"],
-    "react-native-tab-view": ["5.0.0-alpha.15"],
-    "@babel/runtime": [], "@expo-google-fonts/nunito": [], "@expo-google-fonts/outfit": [],
-    "@expo-google-fonts/roboto-slab": [], "@expo-google-fonts/space-grotesk": [],
-    "@expo/react-native-action-sheet": [], "@react-native-async-storage/async-storage": [],
-    "@react-native-vector-icons/common": [], "@react-native-vector-icons/feather": [],
-    "@react-native-vector-icons/ionicons": [], "@react-native-vector-icons/material-design-icons": [],
-    "@react-native/assets-registry": [], "@react-native/virtualized-lists": [],
-    "@tanstack/query-core": [], "@tanstack/react-query": [], "@ungap/structured-clone": [],
-    "expo": [], "expo-asset": [], "expo-constants": [], "expo-font": [], "expo-linking": [],
-    "expo-modules-core": [], "expo-splash-screen": [], "expo-status-bar": [],
-    "filter-obj": [], "invariant": [], "nanoid": [], "nullthrows": [], "promise": [],
-    "react-freeze": [], "react-native-showtime": [], "semver": [], "split-on-first": [],
-    "stacktrace-parser": [], "use-latest-callback": [], "warn-once": []
+    "@react-navigation/bottom-tabs": [
+      "8.0.0-alpha.50"
+    ],
+    "@react-navigation/core": [
+      "8.0.0-alpha.34"
+    ],
+    "@react-navigation/devtools": [
+      "8.0.0-alpha.35"
+    ],
+    "@react-navigation/drawer": [
+      "8.0.0-alpha.51"
+    ],
+    "@react-navigation/elements": [
+      "3.0.0-alpha.48"
+    ],
+    "@react-navigation/native-stack": [
+      "8.0.0-alpha.52"
+    ],
+    "react-native-drawer-layout": [
+      "5.0.0-alpha.18"
+    ],
+    "react-native-tab-view": [
+      "5.0.0-alpha.15"
+    ],
+    "@babel/runtime": [],
+    "@expo-google-fonts/nunito": [],
+    "@expo-google-fonts/outfit": [],
+    "@expo-google-fonts/roboto-slab": [],
+    "@expo-google-fonts/space-grotesk": [],
+    "@expo/react-native-action-sheet": [],
+    "@react-native-async-storage/async-storage": [],
+    "@react-native-vector-icons/common": [],
+    "@react-native-vector-icons/feather": [],
+    "@react-native-vector-icons/ionicons": [],
+    "@react-native-vector-icons/material-design-icons": [],
+    "@react-native/assets-registry": [],
+    "@react-native/virtualized-lists": [],
+    "@tanstack/query-core": [],
+    "@tanstack/react-query": [],
+    "@ungap/structured-clone": [],
+    "expo": [],
+    "expo-asset": [],
+    "expo-constants": [],
+    "expo-font": [],
+    "expo-linking": [],
+    "expo-modules-core": [],
+    "expo-splash-screen": [],
+    "expo-status-bar": [],
+    "filter-obj": [],
+    "invariant": [],
+    "nanoid": [],
+    "nullthrows": [],
+    "promise": [],
+    "react-freeze": [],
+    "react-native-showtime": [],
+    "semver": [],
+    "split-on-first": [],
+    "stacktrace-parser": [],
+    "use-latest-callback": [],
+    "warn-once": [],
+    "call-bind": [],
+    "call-bound": [],
+    "function-bind": [],
+    "get-intrinsic": [],
+    "pako": [],
+    "@xmldom/xmldom": [],
+    "@wagmi/core": []
   }
 }
