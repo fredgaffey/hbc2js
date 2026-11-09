@@ -328,21 +328,20 @@ helper (R-A3: the object escapes into a call), so that form prints
 `Reflect.apply` at load, so a program overriding `Function.prototype.apply`
 no longer reaches it.
 
-**Long-form `f.call`.** `o.n.call(t, 1, 2, 3)` printed as
-`Reflect.apply(r3, r12, [r11, ...])` not because of the arm shape but because
-`expressionOnlyCheck` refused every fold in a statement list where some
-register was read before its first def (here `r4 = r3.n; r3 = r4.call`: r3 is
-live into the block, then reassigned) -- even when the fold touched other
-registers. The check now refuses only a violation the rewrite introduced: a
-name violating in `before` too is carried when its first def is the same
-statement, in the unchanged prefix or suffix (every read before it is then
-either unchanged or reads the live-in value with no def in between). The
-argument `Mov`s then fold into the call, `C = F.call` becomes adjacent, and
-R3b prints `F.call(T, a1, ..., an)`. expr-rebuild itself is unchanged.
-
 **Known gaps.** `fcall-diamond` labels: the `break L` inside the hidden fast
 arm still counts as a use, so `label-clean` keeps the wrapper (`L0: { ...;
-break L0; }`, compiles identically).
+break L0; }`, compiles identically). A long-form generic `Call` collapses
+but can still print as `Reflect.apply(C, F', [...])`: in fixture 170's
+`o.n.call(t, 1, 2, 3)` the block reads r3 before reassigning it (`r4 = r3.n;
+r3 = r4.call`), and `expressionOnlyCheck` refuses every fold in a statement
+list that has any register read before its first def, even one the fold does
+not touch, so neither the argument `Mov`s nor `C = F.call` fold. Refusing only
+violations the rewrite introduces makes it print `F.call(T, 1, 2, 3)`, but
+the extra folding then breaks the derived-constructor rungs' expected shapes
+(the folded `if (__hbc_empty !== __hbc_empty)` guard, fixtures 81/88/91/110/180)
+and is not landed. The loose `F.apply(T, arguments)` with simple parameters
+prints `F.apply(T, __hbc_arguments(arguments))` (arguments-form R-A3), which
+recompiles without the diamond.
 
 **Tests.** `tests/gate/passes/fcall-diamond.test.ts`: fixture
 `170-function-call-diamond` (two-argument, zero-argument, constant-argument,
@@ -353,8 +352,6 @@ hand-built arms pin the accepted shapes and the refusals (wrong callee, wrong
 `tests/gate/passes/fapply-diamond.test.ts`: fixture `220-function-apply-diamond`
 (strict, `this`-forwarding, loose, parameterless; negative twins: shadowed
 own `.apply`, overridden `Function.prototype.apply`) is T2 PASS at
-84/94/96/98/99 with no shim at 98/99; fixture 170's three-argument long-form
-`.call` prints as `F.call(T, 1, 2, 3)`; hand-built arms pin the apply proof
+84/94/96/98/99 with no shim at 98/99; hand-built arms pin the apply proof
 and its refusals (other builtin, other `this`, other function, non-arguments
-array, untested callee, reify outside the apply form); two
-`expressionOnlyCheck` cases pin carried vs introduced read-before-def.
+array, untested callee, reify outside the apply form).

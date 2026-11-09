@@ -1849,8 +1849,8 @@ function incrementalReadBeforeDef(before: readonly Stmt[], after: readonly Stmt[
   // is ever violated, and the honest fallback for the rare pure-append edge
   // case above.
   if ((head < before.length && aKey === undefined) || (tailAfter < after.length && bKey === undefined)) {
-    coldKeyedDefUse(after);
-    return readBeforeDefBruteForceReference(before, after);
+    const cold = coldKeyedDefUse(after);
+    return firstOf(cold.violating);
   }
 
   let prev = aKey;
@@ -1867,8 +1867,8 @@ function incrementalReadBeforeDef(before: readonly Stmt[], after: readonly Stmt[
     // Thousands of splices landing in the exact same gap: drop the cached
     // lineage and pay one full recompute, same as a cold call for a fresh
     // list — always sound, just not `O(changed region)` this one time.
-    coldKeyedDefUse(after);
-    return readBeforeDefBruteForceReference(before, after);
+    const cold = coldKeyedDefUse(after);
+    return firstOf(cold.violating);
   }
 
   const touched = new Set<string>(midDu.keys());
@@ -1903,73 +1903,19 @@ function incrementalReadBeforeDef(before: readonly Stmt[], after: readonly Stmt[
     if (entry !== undefined && isViolating(entry)) violating.add(name);
   }
   keyedDefUseCache.set(after, { du: merged, posOf, violating }); // same lineage: `posOf` is carried forward, not copied
-  // Only a violation the rewrite introduced refuses (docs/specs/passes/
-  // 04-call-shape.md section 10, >3-argument `f.call`): a name already read
-  // before its first def in `before` (a register live into this list, then
-  // reassigned in it) is carried when its first def is the same statement,
-  // outside the changed region. Then every read before that def is either in
-  // the unchanged prefix, or (first def in the suffix) reads the live-in
-  // value both before and after, with no def of the name in between.
-  const outside = (k: number): boolean => (aKey !== undefined && k < aKey) || (bKey !== undefined && k >= bKey);
-  for (const name of violating) {
-    if (!touched.has(name)) {
-      if (violatingBefore.has(name)) continue;
-      return name;
-    }
-    const bef = duBefore.get(name);
-    const aft = merged.get(name);
-    if (violatingBefore.has(name) && bef !== undefined && aft !== undefined) {
-      const fb = Math.min(...bef.defs);
-      if (fb === Math.min(...aft.defs) && outside(fb)) continue;
-    }
-    return name;
-  }
+  return firstOf(violating);
+}
+
+function firstOf(names: ReadonlySet<string>): string | null {
+  for (const name of names) return name;
   return null;
 }
 
-/** From scratch: the first name `after` reads before its first def that is
- *  not carried over from `before` (the same rule `incrementalReadBeforeDef`
- *  returns by: violating in `before` too, its first def the same statement
- *  object, in the unchanged prefix or suffix). */
-function readBeforeDefBruteForceReference(before: readonly Stmt[], after: readonly Stmt[]): string | null {
-  let head = 0;
-  const minLen = Math.min(before.length, after.length);
-  while (head < minLen && before[head] === after[head]) head++;
-  let tb = before.length;
-  let ta = after.length;
-  while (tb > head && ta > head && before[tb - 1] === after[ta - 1]) {
-    tb--;
-    ta--;
-  }
-  // `defUse` positions count every statement walked (nested ones too), so the
-  // prefix/suffix boundaries are taken as walk positions of the boundary
-  // statements, not top-level indices.
-  const walk = (list: readonly Stmt[]): { du: Map<string, DefUse>; pos: Map<Stmt, number>; end: number } => {
-    let n = 0;
-    const pos = new Map<Stmt, number>();
-    const du = defUseWalk(list, (st) => {
-      pos.set(st, n);
-      return n++;
-    });
-    return { du, pos, end: n };
-  };
-  const B = walk(before);
-  const A = walk(after);
-  const at = (w: typeof B, list: readonly Stmt[], i: number): number => (i < list.length ? (w.pos.get(list[i]!) ?? w.end) : w.end);
-  const headB = at(B, before, head);
-  const tailB = at(B, before, tb);
-  const tailA = at(A, after, ta);
-  for (const [name, { defs, reads }] of A.du) {
+function readBeforeDefBruteForceReference(after: readonly Stmt[]): string | null {
+  for (const [name, { defs, reads }] of defUse(after)) {
     if (defs.length === 0) continue;
     const firstDef = Math.min(...defs);
-    if (!reads.some((r) => r < firstDef)) continue;
-    const b = B.du.get(name);
-    if (b !== undefined && b.defs.length > 0) {
-      const fb = Math.min(...b.defs);
-      const carried = b.reads.some((r) => r < fb) && ((fb < headB && firstDef === fb) || (fb >= tailB && firstDef - tailA === fb - tailB));
-      if (carried) continue;
-    }
-    return name;
+    if (reads.some((r) => r < firstDef)) return name;
   }
   return null;
 }
@@ -2016,7 +1962,7 @@ export function expressionOnlyCheck(before: readonly Stmt[], after: readonly Stm
   const ea = JSON.stringify(effectSequence(after.slice(head, tailAfter)));
   if (eb !== ea) return { ok: false, reason: "the rewrite changed the observable effect sequence" };
   const violation = incrementalReadBeforeDef(before, after, head, tailBefore, tailAfter);
-  if (_expressionOnlyCheckDiffProbe !== null) _expressionOnlyCheckDiffProbe(before, after, readBeforeDefBruteForceReference(before, after), violation);
+  if (_expressionOnlyCheckDiffProbe !== null) _expressionOnlyCheckDiffProbe(before, after, readBeforeDefBruteForceReference(after), violation);
   if (violation !== null) return { ok: false, reason: `${violation} is read before its first def in the rewrite` };
   return { ok: true };
 }

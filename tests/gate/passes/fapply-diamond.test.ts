@@ -1,10 +1,8 @@
-// fcall-diamond, `apply` form and >3-argument `f.call`
+// fcall-diamond, `apply` form
 // (docs/specs/passes/04-call-shape.md section 10, rule R3g): roundtrip review
 // "passes-roundtrip-apply", 2026-11-09 — v98's `JmpBuiltinIs
 // functionPrototypeApply` diamond for `f.apply(t, arguments)` printed as
-// `if (apply === __hbc_b_functionPrototypeApply) {...}`, and a long-form
-// `o.n.call(t, 1, 2, 3)` printed as `Reflect.apply(r3, r12, [...])` because a
-// register live into its statement list blocked every fold there.
+// `if (apply === __hbc_b_functionPrototypeApply) {...}`.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -12,11 +10,8 @@ import { join } from "node:path";
 import { repoRoot } from "../../support/paths.ts";
 import { decompile } from "../../../src/decompile.ts";
 import type { Instruction } from "../../../src/disasm/decode.ts";
-import type { Stmt } from "../../../src/emit/ast.ts";
-import { call, id, lit } from "../../../src/emit/ast.ts";
 import { runTier, hbc2jsDecompiler } from "../../../src/harness/tiers.ts";
 import { VERDICT } from "../../../src/harness/ladder.ts";
-import { expressionOnlyCheck } from "../../../src/passes/ast.ts";
 import { ARGUMENTS, UNDEF, applyCallsCorrespond, evalArm } from "../../../src/passes/fcall-diamond/diamond.ts";
 
 const APPLY = "220-function-apply-diamond";
@@ -43,14 +38,6 @@ test("roundtrip-apply: fixture 220 (incl. shadowed .apply and overridden Functio
   const bad = report.results.filter((r) => r.verdict !== VERDICT.PASS).map((r) => `${r.fixture.name}: ${r.verdict}`);
   assert.deepEqual(bad, []);
   assert.ok(report.results.filter((r) => r.fixture.name.startsWith(APPLY)).length >= 5, `only ${report.results.map((r) => r.fixture.name).join(",")} ran`);
-});
-
-test("roundtrip-apply: a long-form f.call with 3+ arguments prints as F.call(T, a1..an), no Reflect.apply", () => {
-  for (const v of [98, 99]) {
-    const out = code(CALL, v);
-    const fn = out.slice(out.indexOf("function callConst"), out.indexOf("function callMany"));
-    assert.ok(/\.call\(\w+, 1, 2, 3\)/.test(fn) && !fn.includes("Reflect.apply"), `v${v}:\n${fn}`);
-  }
 });
 
 // --- arm proof, hand-built arms ------------------------------------------------
@@ -94,30 +81,4 @@ test("roundtrip-apply: negative twins — arms that are not the same apply are r
   assert.equal(proof([ins("Mov", 7, 3), ins("Mov", 6, 4), ins("CallBuiltin", 2, AA, 3)], generic, 6), "generic-callee-not-tested");
   // without the apply option a reify is an unmodelled instruction (the `call` diamond never reifies)
   assert.equal(evalArm(generic, BASE), "arm-insn:ReifyArgumentsStrict");
-});
-
-// --- expressionOnlyCheck: carried vs introduced read-before-def ---------------
-const store = (r: string, v: ReturnType<typeof lit>): Stmt => ({ k: "expr", expr: { k: "assign", target: id(r), value: v } }) as Stmt;
-const use = (...rs: string[]): Stmt => ({ k: "expr", expr: call(id("f"), rs.map((r) => id(r))) }) as Stmt;
-
-test("roundtrip-apply: a register already live into the list (read, then redefined) no longer blocks an unrelated fold", () => {
-  // r3 is read by `f(r3)` before its first def `r3 = 1` in both lists; only r8 is folded.
-  const readR3 = use("r3");
-  const defR3 = store("r3", lit("1"));
-  const before: Stmt[] = [readR3, defR3, store("r8", lit("2")), use("r3", "r8")];
-  const after: Stmt[] = [readR3, defR3, { k: "expr", expr: call(id("f"), [id("r3"), lit("2")]) } as Stmt];
-  assert.deepEqual(expressionOnlyCheck(before, after), { ok: true });
-});
-
-test("roundtrip-apply: a rewrite that moves the first def of a live-in register is still refused", () => {
-  const readR3 = use("r3");
-  const before: Stmt[] = [store("r3", lit("0")), readR3, store("r3", lit("1")), use("r3")];
-  // deleting the first def leaves `f(r3)` reading r3 before its (new) first def
-  const after: Stmt[] = [readR3, store("r3", lit("1")), use("r3")];
-  const v = expressionOnlyCheck(before, after);
-  assert.equal(v.ok, false);
-  // and a live-in name whose first def moves into the changed region is not carried
-  const before2: Stmt[] = [readR3, store("r3", lit("1")), use("r3")];
-  const after2: Stmt[] = [readR3, store("r3", lit("5")), use("r3")];
-  assert.equal(expressionOnlyCheck(before2, after2).ok, false);
 });
