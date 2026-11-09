@@ -34,7 +34,7 @@ export interface PackageScore {
    *  `embedded` (the hits are a subset of another confirmed, path-bearing
    *  package's own files), `twin` (the same hits as another confirmed
    *  package, which was kept). `by` names the other package. */
-  readonly demotion?: { readonly rule: "few-distinct" | "container" | "scattered" | "embedded" | "twin"; readonly by?: string };
+  readonly demotion?: { readonly rule: "few-distinct" | "container" | "scattered" | "embedded" | "twin" | "bundled-dist"; readonly by?: string };
   /** Set when corpus-path-recall's module-graph rule (`promoteViaDependency`,
    *  docs/PACKAGE-SIGNATURES.md §7 "Recovery through the module graph")
    *  raised a path-bearing package to "high": an app module shaped like one
@@ -232,6 +232,13 @@ const EMBEDDED_HOST_SIZE_RATIO = 2;
 // demoteExplained). A real copy is a module made mostly of the package's
 // own functions.
 export const ANCHOR_DENSITY = 0.1;
+// corpus-precision-bundled-dist (`bundled-dist`): an own file of at least
+// this many functions is a pre-built dist bundle. When EXPLAINED_EVIDENCE_SHARE
+// of the package's hit hashes come from such files and every target module
+// holding each of them is under 1/CONTAINER_SIZE_RATIO of that file, the hits
+// are the libraries the bundle inlined (@babel/standalone's yallist,
+// semver, buffer), not the file: one source file is one target module.
+export const BUNDLED_DIST_MIN_FUNCTIONS = 200;
 
 function tierRank(t: ConfidenceTier): number {
   return { high: 3, medium: 2, low: 1, none: 0 }[t];
@@ -546,6 +553,29 @@ function demoteExplained(scored: readonly ScoredEntry[], inventory: ModuleInvent
         break;
       }
     }
+  }
+  // bundled-dist (corpus-precision-bundled-dist): last, so it changes no
+  // earlier rule's input. Path-bearing signatures only: a pathless file
+  // lumps every module together, so its "file size" is the package's.
+  for (const s of high()) {
+    if ((s.entry.file.modulePaths ?? 0) < 1) continue;
+    const ownSize = new Map<number, number>();
+    for (const fn of s.entry.file.functions) if (fn.moduleId !== undefined) ownSize.set(fn.moduleId, (ownSize.get(fn.moduleId) ?? 0) + 1);
+    const fileOf = new Map<string, number>(); // smallest own file holding the hash
+    for (const fn of s.entry.file.functions) {
+      const k = schemeKey(s.entry.file, fn.exactHash);
+      if (!s.hitKeys.has(k) || fn.moduleId === undefined) continue;
+      const n = ownSize.get(fn.moduleId)!;
+      fileOf.set(k, Math.min(fileOf.get(k) ?? Infinity, n));
+    }
+    let oversized = 0;
+    for (const k of s.hitKeys) {
+      const own = fileOf.get(k);
+      if (own === undefined || own < BUNDLED_DIST_MIN_FUNCTIONS) continue;
+      const largest = Math.max(0, ...(occurrences.get(k) ?? []).map((i) => moduleSize.get(i) ?? Infinity));
+      if (largest > 0 && CONTAINER_SIZE_RATIO * largest < own) oversized++;
+    }
+    if (oversized >= EXPLAINED_EVIDENCE_SHARE * s.hitKeys.size) demote(s, "bundled-dist");
   }
   return scored;
 }
