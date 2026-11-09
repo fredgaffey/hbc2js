@@ -370,16 +370,16 @@ no longer reaches it.
 
 **Known gaps.** `fcall-diamond` labels: the `break L` inside the hidden fast
 arm still counts as a use, so `label-clean` keeps the wrapper (`L0: { ...;
-break L0; }`, compiles identically). A long-form generic `Call` collapses
-but can still print as `Reflect.apply(C, F', [...])`: in fixture 170's
-`o.n.call(t, 1, 2, 3)` the block reads r3 before reassigning it (`r4 = r3.n;
-r3 = r4.call`), and `expressionOnlyCheck` refuses every fold in a statement
-list that has any register read before its first def, even one the fold does
-not touch, so neither the argument `Mov`s nor `C = F.call` fold. Refusing only
-violations the rewrite introduces makes it print `F.call(T, 1, 2, 3)`, but
-the extra folding then breaks the derived-constructor rungs' expected shapes
-(the folded `if (__hbc_empty !== __hbc_empty)` guard, fixtures 81/88/91/110/180)
-and is not landed. The loose `F.apply(T, arguments)` with simple parameters
+break L0; }`, compiles identically). A long-form generic `Call` used to keep printing as
+`Reflect.apply(C, F', [...])` when its block read a register before
+reassigning it (fixture 170's `o.n.call(t, 1, 2, 3)`: `r4 = r3.n; r3 =
+r4.call`), because `expressionOnlyCheck` refused every fold in such a list.
+**Resolved (rt-fcall4):** the check now refuses only read-before-def
+violations a rewrite introduces (spec 02 section 6, "Carried live-in
+reads"), so it prints `F.call(T, 1, 2, 3)` and recompiles to the same call
+shape at v98/v99; derived-constructor frames keep the strict form, so the
+shapes super-call, inline-new and private-fields match are unchanged.
+The loose `F.apply(T, arguments)` with simple parameters
 prints `F.apply(T, __hbc_arguments(arguments))` (arguments-form R-A3), which
 recompiles without the diamond.
 

@@ -610,3 +610,32 @@ for (const version of ["v98", "v99"] as const) {
     assert.doesNotMatch(off, /\n\s+super\(/);
   });
 }
+
+// rt-fcall4 (roundtrip review, 2026-11-09): with the guard's `T = <empty>`
+// spelled as the declaration `let T = __hbc_empty;` and `T` reused right after
+// (`T = <private symbol>`), deleting the dead store also deleted T's only
+// declaration, leaving `r3 = _e0_0` undeclared in a strict class body (fixture
+// 110's FocusManager constructor once the read-before-def relaxation lets the
+// register prologue become an `init`).
+test("rt-fcall4: deleting a guard store that is T's own declaration keeps T declared", () => {
+  const guard: Stmt = {
+    k: "if",
+    test: { k: "bin", op: "!==", left: ident("r7"), right: ident("__hbc_empty") },
+    then: [{ k: "throw", arg: { k: "new", callee: ident("ReferenceError"), args: [lit('"super() called twice"')] } }],
+    else: [],
+  } as unknown as Stmt;
+  const body: readonly Stmt[] = [
+    ...OK_BODY.slice(0, 5),
+    { k: "init", name: "r7", value: ident("__hbc_empty") } as unknown as Stmt,
+    guard,
+    store("r7", ident("_e0_9")),
+    { k: "expr", expr: { k: "assign", target: { k: "member", obj: ident("r0"), prop: ident("r7"), computed: true }, value: ident("r4") } },
+    { k: "return", arg: ident("r0") },
+  ];
+  const { module, cls } = moduleWith(body);
+  const out = foldSuperBody(module, cls, body);
+  assert.ok(!("code" in out), `expected a fold, got ${JSON.stringify(out)}`);
+  const declared = out.body.some((s) => (s.k === "init" && s.name === "r7") || (s.k === "decl" && s.names.includes("r7")));
+  assert.ok(declared, `r7 lost its declaration: ${JSON.stringify(out.body)}`);
+  assert.ok(!JSON.stringify(out.body).includes("__hbc_empty"), "the dead guard and its store are still deleted");
+});
