@@ -103,7 +103,7 @@ function isDerivedCtorFrame(ctx: PassContext): boolean {
   if (cfg === undefined || cfg === null) return false;
   let v = derivedCtorFrame.get(cfg);
   if (v === undefined) {
-    v = cfg.blocks.some((b) => b.instructions.some((insn) => insn.name === "ThrowIfThisInitialized"));
+    v = (cfg.blocks ?? []).some((b) => (b.instructions ?? []).some((insn) => insn.name === "ThrowIfThisInitialized")); // hand-built test contexts carry a stub cfg
     derivedCtorFrame.set(cfg, v);
   }
   return v;

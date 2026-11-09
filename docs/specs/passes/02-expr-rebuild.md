@@ -112,6 +112,23 @@ Class: **expression-only** (ladder §4.3). `check` calls
    and `.writes` is one fewer;
 5. `nested === 0` for `rX` in `before`.
 
+**Carried live-in reads (rt-fcall4).** "No `rN` read before its def" refuses
+only a violation the rewrite *introduces*: a register already read before its
+first def in `before` (live into the list, then reassigned in it) is carried
+when its first def is the same statement in the unchanged prefix or suffix,
+so every read ahead of that def still sees the live-in value, with no def in
+between. The old form refused every fold in any such list, even folds that
+never touch the register, which left fixture 170's `o.n.call(t, 1, 2, 3)` as
+`Reflect.apply`. A frame that runs `ThrowIfThisInitialized` (a derived
+constructor, or a frame a derived `new` was inlined into) keeps the strict
+form (`carryLiveIn: false`). Those frames always contain such a register (the
+dead `Mov` of the uninitialised `this` slot), so they never folded before, and
+super-call, inline-new (a lock-step comparison of the inlined copy against the
+constructor body) and private-fields match their unfolded statements. Turning
+it on there printed `if (__hbc_empty !== __hbc_empty)` and broke fixtures
+81/88/91/110. It also exposed a super-call bug, now fixed: deleting a dead
+`let T = __hbc_empty;` dropped T's only declaration.
+
 The driver adds `parses(fnBody)` once per function (01 F1) and `checkBindings`
 (EM-01) runs afterwards over the whole program.
 
