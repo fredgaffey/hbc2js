@@ -312,6 +312,13 @@ Result on fixture `140-define-property-getter`: `Object.defineProperty(a1,
 r5, {enumerable: true, get: get})`, round-trip IDENTICAL at v94/v96/v98/v99
 (v84 differs earlier on an unrelated TDZ `ThrowIfEmpty`).
 
+**Measured** (react-navigation v98, passes-on, strong normalisation): on its
+own 6590 -> 6883 IDENTICAL (bucket 702 -> 219, no function lost IDENTICAL; the
+other 190 moved on to later first-differences, mainly
+`PutOwnBySlotIdx/PutByIdStrict` +60, `TryGetById(reg)` +31,
+`CreateDerivedClass`/`CreateBaseClass(imm)` +46). Merged with call-shape R3e:
+6645 -> 6938 IDENTICAL (48.06%).
+
 **Rejected.** Re-running `expr-rebuild` a second time after `object-literal`:
 it would inline every adjacent impure definition everywhere (R1a allows an
 impure value into the next statement), not just these, with no inertness
