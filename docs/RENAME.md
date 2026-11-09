@@ -72,6 +72,18 @@ the backstop (0-DIVERGENT). Two names colliding in one frame are disambiguated
 with a deterministic suffix (`dup`, `dup_2`) and the collision is flagged back
 into the store.
 
+**Render cost follows the functions touched.** `render({fn})` passes
+`emitModule` its `onlyFunction`, so only `fn`'s subtree (the function and the
+closures emitted inside it) is emitted and run through the passes; the stage-A
+and stage-B hooks (each builds a whole-module view) are built once by
+`NameService` and reused. `RenderOptions.wholeModule: true` keeps the old
+re-emit-and-slice path as the byte-for-byte oracle
+(`tests/gate/name-overlay/render-cost.test.ts`), and `onEmit` is the
+instrumented counter. The reuse gate reads one function's raw frame
+(`rawFramesFor`) instead of the whole module's. `runNamePass`'s apply-then-revert
+backstop renders only the functions its targets name (`backstopScope`
+`"touched"`, default; `"module"` is the old whole-module pair).
+
 ## CLI
 
 ```

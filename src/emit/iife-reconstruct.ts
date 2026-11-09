@@ -66,6 +66,14 @@ export interface IifeReconstructInput {
    * (`E_UNBOUND_IDENT`). Defaults to refusing everything.
    */
   readonly movableChild?: (name: string) => boolean;
+  /**
+   * Spec 27 section 10: the environment this function creates for ITSELF
+   * (its `CreateFunctionEnvironment` at offset 0), when it owns one. It is the
+   * caller's own scope, never an inlined callee's: it is not a candidate, it
+   * stays in the flat prologue, and a range may name its slots (they are the
+   * enclosing function's bindings, visible inside the wrapper).
+   */
+  readonly ownEnv?: number;
 }
 
 type Obj = Record<string, unknown>;
@@ -302,8 +310,12 @@ export function reconstructIifes(input: IifeReconstructInput): IifeReconstructio
     readonly hoist: string[];
   }
   const candidates: Candidate[] = [];
+  const ownSlots = new Set<string>(input.ownEnv === undefined ? [] : (byEnv.get(input.ownEnv) ?? []));
 
   for (const [env, slots] of [...byEnv.entries()].sort((a, b) => a[0] - b[0])) {
+    // Section 10: the function's own scope is never wrapped, so it is not a
+    // candidate (and not a refusal either: there is nothing to reconstruct).
+    if (env === input.ownEnv) continue;
     if (parentOfOwned.has(env)) {
       refuse(env, "parent of a sibling environment");
       continue;
@@ -387,8 +399,12 @@ export function reconstructIifes(input: IifeReconstructInput): IifeReconstructio
     // emitted inside the range that reads another of the function's
     // environments would gain a scope level from the wrapper, so its parent
     // chain no longer matches the original (`diff:GetParentEnvironment/...`).
+    // The function's OWN environment is exempt (section 10): its slots are
+    // the enclosing function's bindings, and a wrapper adds no scope level
+    // between them and the range's top-level statements. A hoisted closure
+    // that reads both is still refused above (`closure spans two environments`).
     const foreign = new Set<string>();
-    for (const name of owned) if (!c.slots.has(name)) foreign.add(name);
+    for (const name of owned) if (!c.slots.has(name) && !ownSlots.has(name)) foreign.add(name);
     for (let i = c.from; i <= c.to; i++) {
       if (mentionsAny(work[i], foreign)) leaks = true;
     }

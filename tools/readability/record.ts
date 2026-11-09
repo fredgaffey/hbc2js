@@ -53,6 +53,7 @@ import { backendForId, resolveBackendId, BackendSelectionError } from "../../src
 import { cacheKey, parseReadabilityResult, resolveClaudeCliConfig, resolveHaikuConfig, SKILL_FOR_KIND } from "../../src/readability/types.ts";
 import { loadSkill } from "../../src/readability/skills.ts";
 import { computeSrcScope } from "../../src/readability/scope.ts";
+import { bindingHints } from "../../src/readability/binding-hints.ts";
 import { nameableIndex } from "../../src/readability/nameable.ts";
 import type { NameableIndex } from "../../src/readability/nameable.ts";
 import { loadRecording } from "../../src/workers/backends/replay.ts";
@@ -364,7 +365,7 @@ async function main(): Promise<void> {
         continue;
       }
       const ids = regs.map((r) => regId(fn, r.reg, r.web));
-      const context = { fn, targets: ids.map((id) => shortForm(id)), source };
+      const context = { fn, targets: ids.map((id) => shortForm(id)), hints: bindingHints(source, fn, regs), source };
       const key = cacheKey({
         kind: "suggest-name",
         skillId,
