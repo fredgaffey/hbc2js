@@ -281,3 +281,14 @@ Wall: offline 11-86 s; confirm 279-1386 s (3 workers, loaded host).
 - The one false positive: `semver-truncate@3.0.0`, a 1-module package with 26
   eligible functions, exact 69%, 0 of 1 modules exactly matched, no string
   corroboration (rainbow, v4-paths, tier high).
+
+## deps-combined-1110 (2026-11-10, offline, deb, deps-transub-farm)
+
+| tree | react-navigation | Expensify J3 | bluesky | rainbow | MetaMask |
+|---|---|---|---|---|---|
+| main | 21 / 21 / 0 | 107 / 102 / 5 | 46 / 45 / 1 | 115 / 108 / 7 | 176 / 162 / 14 |
+| integrate-1110a | 22 / 22 / 0 | 107 / 102 / 5 | 47 / 46 / 1 | 116 / 109 / 7 | 179 / 165 / 14 |
+| review-deps-rules | 22 / 22 / 0 | 106 / 101 / 5 | 47 / 46 / 1 | 116 / 109 / 7 | 179 / 165 / 14 |
+| deps-combined-1110 | 22 / 22 / 0 | 104 / 101 / 3 | 44 / 43 / 1 | 115 / 109 / 6 | 176 / 164 / 12 |
+
+Confirmed / TP / FP; lost TPs traced in docs/DEPS.md "Combined rule hardening".

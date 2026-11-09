@@ -3167,3 +3167,52 @@ the hits with no matcher change. The other option is to treat code shared by
 two packages that declare a common dependency (and no edge between them) as
 that dependency's. It was not built: without the dependency's own signature
 it is the rejected shared-hits rule plus a name match.
+
+### Combined rule hardening (deps-combined-1110, 2026-11-10)
+
+`review-deps-rules` and `deps-transitive-subtract` (with deps-metamask-fp and
+deps-db-growth) merged, then four gaps closed, each with a synthetic test in
+`tests/gate/deps/deps-combined.test.ts`. `inlined` now reads dependency
+names with `dependencyName()` (a scoped `@s__p@v__hbcN.json` entry never
+matched `@s/p`), and its hosts are the packages high when the rule starts,
+so a host inlined in its own dependent (R declares Q declares P, one dist
+file) still explains P whatever the DB order. `twin` takes the explaining
+twin from the same start-of-rule set: in a chain A ~ B ~ C with A not a twin
+of C, A went to B only when A was judged before B lost to C. The closure
+subtraction kept every closure hash when any one own hash sat outside the
+closure; the own hashes must now be at least two distinct hashes that
+`scorePackage` would count (eligible size, not generic in the target, held
+by fewer than `AMBIGUOUS_OWNER_THRESHOLD` names before the views exist, an
+upper bound on `hashOwnerNames`). Packages the edge rule promotes went
+straight to high after every demotion: a second `demoteExplained` pass runs
+`container`, `twin` and `bundled-dist` on them only, with every high package
+still able to explain (two forks promoted through the same app module were
+both confirmed). `scattered` and `few-distinct` stay off for them: the
+promotion exists for packages whose own exact evidence is a small file.
+
+Measured offline on deb (`meas2.mjs`, full v4 farm with the closure sidecar,
+`deps-transub-farm`, the same DB for every column), confirmed / TP / FP,
+precision, recall:
+
+| app | main | integrate-1110a | review-deps-rules | deps-combined-1110 |
+|---|---|---|---|---|
+| react-navigation | 21 / 21 / 0, 100%, 27.6% | 22 / 22 / 0, 100%, 28.9% | same as integrate | same as integrate |
+| Expensify J3 | 107 / 102 / 5, 95.3%, 35.4% | 107 / 102 / 5, 95.3%, 35.4% | 106 / 101 / 5, 95.3%, 35.1% | 104 / 101 / 3, 97.1%, 35.1% |
+| bluesky | 46 / 45 / 1, 97.8%, 22.7% | 47 / 46 / 1, 97.9%, 23.2% | same as integrate | 44 / 43 / 1, 97.7%, 21.7% |
+| rainbow | 115 / 108 / 7, 93.9%, 20.8% | 116 / 109 / 7, 94.0%, 21.0% | same as integrate | 115 / 109 / 6, 94.8%, 21.0% |
+| MetaMask | 176 / 162 / 14, 92.0%, 21.6% | 179 / 165 / 14, 92.2%, 22.0% | same as integrate | 176 / 164 / 12, 93.2%, 21.9% |
+
+FPs gone: globalthis and readable-stream (Expensify), d3-geo (rainbow),
+fast-xml-builder and is-array-buffer (MetaMask). Five TPs lost against
+integrate-1110a, traced by re-running with one rule switched off:
+abort-controller (Expensify) goes in review-deps-rules already (its
+no-promotion-on-another-package's-module rule). react-native-gesture-handler
+and react-native-svg (bluesky) and readable-web-to-node-stream (MetaMask) are
+lost to the corpus-db-growth attribution: with `attributed` emptied all three
+come back, and on bluesky and MetaMask that rule removes no FP in this
+measurement (MetaMask 177 / 165 / 12 without it). lodash.throttle (bluesky)
+is lost to the stricter closure own-evidence check: back with the old
+one-hash rule or without the closure sidecar, not yet traced to the
+package whose view changed. Open: the db-growth attribution needs a
+bluesky/MetaMask trace before the next merge; the edge-promotion second pass
+and the twin/inlined start-of-rule changes cost nothing measured.
