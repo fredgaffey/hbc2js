@@ -62,9 +62,10 @@ ARCHIVE="$(ls "$STAGE"/dist/sigdb-*-partial.tar.* | head -1)"; IDX="$STAGE/dist/
 EXT="${ARCHIVE#*sigdb-*-partial}"
 FINAL="$STAGE/dist/$TAG$EXT"; mv "$ARCHIVE" "$FINAL"; mv "$IDX" "$STAGE/dist/index-$TAG.json"
 rm -f "$STAGE"/dist/index-partial*.json
-# the tarball must carry the index files (assemble.sh lists only *.json); they
+# the tarball must carry the index files, hash and hop-two string-set (assemble.sh
+# lists only *.json); they
 # are also published as standalone assets (sidecars of the sqlite asset).
-TSVS=$(cd "$DB" && ls candidate-hash-index__hbc*.tsv 2>/dev/null || true)
+TSVS=$(cd "$DB" && ls candidate-hash-index__hbc*.tsv candidate-stringset-index__hbc*.tsv 2>/dev/null || true)
 if [ -n "$TSVS" ]; then
   for t in $TSVS; do cp "$DB/$t" "$STAGE/dist/$t"; done
   case "$EXT" in

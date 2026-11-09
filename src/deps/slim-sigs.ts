@@ -126,8 +126,15 @@ export function slimSigFile(f: SigDbFile, intern: Map<string, string>, target?: 
     }
   }
   const o = head();
+  // corpus-precision-bundled-dist: own file sizes the `bundled-dist` rule reads.
+  const fileSizes: Record<number, number> = {};
+  if (f.modulePaths !== undefined && f.modulePaths >= 1) {
+    const keptIds = new Set<number>();
+    for (const fn of f.functions) if (keptFn.has(fn.index) && fn.moduleId !== undefined) keptIds.add(fn.moduleId);
+    for (const fn of f.functions) if (fn.moduleId !== undefined && keptIds.has(fn.moduleId)) fileSizes[fn.moduleId] = (fileSizes[fn.moduleId] ?? 0) + 1;
+  }
   o.functions = f.functions.filter((fn) => keptFn.has(fn.index)).map(fnRec);
   o.modules = keptModules.map(modRec);
-  o.slim = { minInstr: target.minInstr, eligible, moduleTotal, distinctEligible: distinct.size, ...(f.modulePaths !== undefined && f.modulePaths >= 1 ? { ownPathDistinct: graph.ownPathDistinct, ownFuzzy: graph.ownFuzzy } : {}) };
+  o.slim = { minInstr: target.minInstr, eligible, moduleTotal, distinctEligible: distinct.size, ...(f.modulePaths !== undefined && f.modulePaths >= 1 ? { ownPathDistinct: graph.ownPathDistinct, ownFuzzy: graph.ownFuzzy, fileSizes } : {}) };
   return o as unknown as SigDbFile;
 }
