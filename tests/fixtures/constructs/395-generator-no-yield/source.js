@@ -21,6 +21,16 @@ async function asyncReturn(v) {
 async function asyncThrow(m) {
   throw new Error(m);
 }
+// A strict body carries a "use strict" directive in the stub and the factory
+// (rn-template module 87's probe is in strict code).
+function* strictGen() {
+  "use strict";
+  return this === undefined;
+}
+async function strictAsync() {
+  "use strict";
+  return this === undefined;
+}
 function describe(name, fn) {
   print(name + " gen=" + hasNativeConstructor(fn, "GeneratorFunction") +
     " async=" + hasNativeConstructor(fn, "AsyncFunction") +
@@ -33,6 +43,10 @@ describe("sideEffect", sideEffect);
 describe("asyncEmpty", asyncEmpty);
 describe("asyncReturn", asyncReturn);
 describe("asyncThrow", asyncThrow);
+describe("strictGen", strictGen);
+describe("strictAsync", strictAsync);
+print("strictGen this " + strictGen().next().value);
+strictAsync().then(function (v) { print("strictAsync this " + v); });
 var it = empty();
 print("typeof next " + typeof it.next);
 var r = it.next();

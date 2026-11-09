@@ -355,7 +355,11 @@ function openEntry(list: readonly Stmt[], d: Dispatcher, t: Threader): readonly 
 // §3.1's site: the stub, the factory it declares and the step closure.
 // ---------------------------------------------------------------------------
 
-const isComment = (s: Stmt): boolean => s.k === "comment";
+/** A `"use strict"` directive travels with the comments (rn-template module
+ *  87, BUGS export-boot L1): the stub's own directive is kept at the top of the
+ *  recovered `function*`, and the factory's copy (the same source function,
+ *  so the same strictness) is dropped with the factory. */
+const isComment = (s: Stmt): boolean => s.k === "comment" || s.k === "directive";
 
 /** `<reg> = __hbc_makeGenerator(<factory>, this, arguments);` (R-Y2/R-Y8). */
 function shimCall(e: Expr, factory: string): boolean {
@@ -420,6 +424,7 @@ function group(stub: FuncStmt): Group | Refused {
     // F25-5: the shim's `this`/`arguments` capture disappears with the group.
     if (s.k === "init" && s.name === "__this" && s.value.k === "this") continue;
     if (s.k === "init" && s.name === "__args" && s.value.k === "argumentsObject") continue;
+    if (s.k === "directive") continue;
     if (s.k === "comment" || s.k === "decl" || (s.k === "init" && (s.name === "__pc" || s.name === "__exc"))) {
       prelude.push(s);
       continue;
@@ -505,7 +510,7 @@ function loweredShell(stub: FuncStmt): Recovered | null {
   const call = last.arg;
   if (call.k !== "call" || call.callee.k !== "ident" || call.callee.name !== "__hbc_makeGeneratorLowered" || call.args.length !== 1 || call.args[0]!.k !== "ident") return null;
   for (const s of body.slice(0, -1)) {
-    if (s.k === "func" || isPureStmt(s)) continue;
+    if (s.k === "func" || s.k === "directive" || isPureStmt(s)) continue;
     if (s.k === "init" && isPure(s.value)) continue;
     return null;
   }

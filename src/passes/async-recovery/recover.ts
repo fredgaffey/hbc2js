@@ -128,7 +128,9 @@ export function recover(stub: FuncStmt): Recovery {
   const factories = body.filter((s): s is FuncStmt => s.k === "func");
   if (factories.length !== 1) return no("no-async-site", "the stub declares no single factory");
   const factory = factories[0]!;
-  const rest = body.filter((s) => s !== factory && s.k !== "decl");
+  // A stub `"use strict"` directive is dropped here: the recovered body is the
+  // factory's, which carries the same source function's directive itself.
+  const rest = body.filter((s) => s !== factory && s.k !== "decl" && s.k !== "directive");
   const ret = rest[rest.length - 1];
   if (ret === undefined || ret.k !== "return" || ret.arg === null) return no("no-async-site", "the stub does not return the driver's result");
   // Resolve register moves: every statement before the `return` must be an

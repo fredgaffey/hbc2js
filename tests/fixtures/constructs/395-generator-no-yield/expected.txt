@@ -5,6 +5,9 @@ sideEffect gen=true async=false ctor=GeneratorFunction
 asyncEmpty gen=false async=true ctor=AsyncFunction
 asyncReturn gen=false async=true ctor=AsyncFunction
 asyncThrow gen=false async=true ctor=AsyncFunction
+strictGen gen=true async=false ctor=GeneratorFunction
+strictAsync gen=false async=true ctor=AsyncFunction
+strictGen this true
 typeof next function
 empty next undefined true
 onlyReturn next 42 true true
@@ -15,6 +18,7 @@ proto obj object
 new true
 promise true
 sync end
+strictAsync this true
 asyncEmpty undefined
 asyncReturn 5
 asyncThrow boom

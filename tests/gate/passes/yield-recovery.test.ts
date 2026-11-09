@@ -233,15 +233,18 @@ test("export-boot L1: a zero-yield generator and an await-less async function st
     const out = js("395-generator-no-yield", version);
     // v<=96 recovers the body (the stub keeps its own name); v>=97 keeps the
     // lowered state machine inside a `function*` shell.
-    assert.equal(count(out, /function\* /g), version.startsWith("v9") && Number(version.slice(1)) >= 98 ? 4 + 3 : 4, `${version}: four source generators (+ three async factories at v>=97)`);
-    assert.equal(count(out, /async function /g), 3, `${version}: three source async functions`);
+    assert.equal(count(out, /function\* /g), version.startsWith("v9") && Number(version.slice(1)) >= 98 ? 5 + 4 : 5, `${version}: five source generators (+ four async factories at v>=97)`);
+    assert.equal(count(out, /async function /g), 4, `${version}: four source async functions`);
     if ((OPCODE_ERA as readonly string[]).includes(version)) {
       assert.equal(count(out, /__hbc_makeGenerator\(_fn/g), 0, `${version}: no __hbc_makeGenerator call survives`);
       assert.match(out, /function\* empty\(\)/);
       assert.match(out, /async function asyncEmpty\(\)/);
+      // rn-template module 87: a strict stub's "use strict" directive no longer blocks recovery.
+      assert.match(out, /function\* strictGen\(\) \{\s*(\/\/[^\n]*\s*)*"use strict";/);
+      assert.match(out, /async function strictAsync\(\)/);
     } else {
       assert.equal(count(out, /return yield\* __hbc_makeGeneratorLowered\(/g), count(out, LOWERED) - 1, `${version}: every lowered generator (all but the prelude helper declaration) is behind a yield* shell`);
-      assert.equal(count(out, /return await /g), 3, `${version}: the async shells return await <driver>`);
+      assert.equal(count(out, /return await /g), 4, `${version}: the async shells return await <driver>`);
     }
   }
   const report = await runTier({ tier: "gate", decompiler: hbc2jsDecompiler, versions: [84, 94, 96, 98, 99], only: ["395-generator-no-yield"] });
