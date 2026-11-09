@@ -913,6 +913,8 @@ export function measureSwitchRaise(versions = [94]) {
       afterLabels += blockLabelDecls(after.code);
       const blocks = switchBlockTexts(after.code);
       perFixture[dir] = {
+        beforeLabels: blockLabelDecls(before.code),
+        afterLabels: blockLabelDecls(after.code),
         switchCount: blocks.length,
         labelledBreaksInSwitch: blocks.reduce((a, b) => a + (b.match(/break L\d+;/g) ?? []).length, 0),
         doubledBreaks: blocks.reduce((a, b) => a + (b.match(/break(?: L\d+)?;\n\s*break;/g) ?? []).length, 0),

@@ -151,6 +151,8 @@ export function measureIfChain(versions?: readonly number[]): IfChainMetricsResu
 
 // docs/specs/passes/10-switch-raise.md §7's corpus metric.
 export interface SwitchRaiseFixtureMetric {
+  readonly beforeLabels: number;
+  readonly afterLabels: number;
   readonly switchCount: number;
   /** `break L\d+;` statements inside emitted `switch` blocks. */
   readonly labelledBreaksInSwitch: number;
