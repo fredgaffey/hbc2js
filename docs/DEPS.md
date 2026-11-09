@@ -2930,3 +2930,28 @@ unchanged and it still loses no TP. This mixes in no truth overlay
 Reproduce (deb, `~/_hbc2js/pop2/`): jobs-retry.tsv = jobs-all.tsv minus the
 `ok` results of the first run; `drive.sh` (stops below 15 GB) via `xargs -P6`;
 `subtract.sh`, `after3.sh` (merge, index, `measure.sh <tag> <dir>`).
+
+### DB growth must not cost true positives (corpus-db-growth, 2026-11-09)
+
+Adding the population-retry overlay (`db-overlay-pop2`, 1,251 path-bearing files, branch deps-population-widen-3) to db-v3-clean + `db-overlay-pop` lost true packages and added false ones. Traced per package (deb, `scoreAgainstTruth` plus a per-package probe of candidacy, tier, demotion and each hit hash's claimants) to four mechanisms:
+
+| mechanism | TPs lost (+pop2 vs +pop, main) | FPs added |
+|---|---|---|
+| Copies claimed as own: a path-bearing dist file that inlines other packages (`@vitest/pretty-format` holds react-is and pretty-format, `esquery.min.js` holds estraverse), or a pathless file that carries a copy (`buffer-crc32`, `smart-buffer`: buffer's code), counts the copy as its own. It demotes the real package (`embedded`/`twin`) and confirms on the copy. The extra candidates pop2 adds bring more carriers in. | react-is (Expensify) | buffer-crc32, smart-buffer, @vitest/pretty-format (Expensify), esquery (bluesky) |
+| Ambiguity cutoff growing with the candidate set: `AMBIGUOUS_OWNER_THRESHOLD` (20) counts claimants among the loaded candidates. pop2 grew MetaMask's candidates 816 -> 1,253, and the ljharb hashes went from under 20 pathless claimants to 20-21. None of these claimants is path-bearing, so the paths cannot tell copies from owners. | define-properties, es-define-property, has-symbols, hasown (MetaMask); color, react-native-gesture-handler (bluesky: 2.14.0's 23 module hits sit on factories that about 20 files share) | safe-array-concat, is-string (MetaMask, rainbow) |
+| Proposal uniqueness eroded: js-base64's few unique hashes are small base64 helpers that pop2's large own-path bundles also contain (pdfjs inside officeparser, typescript/lib, terser), so the hash index no longer proposes it | js-base64 (Expensify) | none |
+| Truth gap, not a scoring error: `@sentry/{replay,replay-canvas,browser-utils,feedback}` 10.71.0 hit 0.35-0.91 of their own code. Other path-bearing files attribute that code to those same packages, and @sentry/browser 10, a TP, depends on them. Expensify's truth file lists only browser/core/react/react-native. | none | the four @sentry/* (Expensify), @octokit/oauth-methods |
+
+**Fix (first mechanism).** `matchInventory` collects, from every loaded path-bearing file's foreign modules, which packages a target hash is attributed to. It keeps an attributed package only if its own loaded signature also holds the hash as own code. For any other claimant, that hash is a copy. It is not a hit, not in the denominators and adds no owner to `hashOwnerNames`, the same as the own-file rule for foreign modules (`OwnView` in `src/deps/match.ts`). Slim signatures now keep foreign functions that hold a target hash, together with their module, so slim scoring sees the same attribution. The first cut took attributions to packages with no loaded claimant (a fork's path, a dist that inlined the code). On Expensify + pop it lost hasown, es-define-property and define-properties, and on bluesky color, react-native-svg and react-native-gesture-handler. Requiring a loaded claimant fixed that. Tests: `tests/gate/deps/corpus-db-growth.test.ts` (synthetic: the carrier demotes the real packages only when no path evidence exists, an own path-bearing file keeps its code, and an unclaimed attribution takes nothing).
+
+**Measured** (deb, offline `scoreAgainstTruth`, sha pins matched; main 6e6a2ff vs this branch; each layered dir with its own candidate index; confirmed / TP / FP):
+
+| bundle | base main | base fix | +pop main | +pop fix | +pop+pop2 main | +pop+pop2 fix |
+|---|---|---|---|---|---|---|
+| Expensify | 135 / 96 / 39 | same | 163 / 126 / 37 | 160 / 126 / 34 | 169 / 125 / 44 | 155 / 126 / 29 |
+| react-navigation | 16 / 16 / 0 | same | 19 / 19 / 0 | same | 19 / 19 / 0 | same |
+| bluesky | 45 / 37 / 8 | same | 53 / 45 / 8 | same | 51 / 44 / 7 | 48 / 42 / 6 |
+| rainbow | 129 / 106 / 23 | same | 133 / 108 / 25 | same | 135 / 109 / 26 | same |
+| MetaMask | 186 / 148 / 38 | same | 192 / 153 / 39 | same | 188 / 149 / 39 | same |
+
+The pathless base DB scores exactly as before. On Expensify, +pop loses sax, encoding, typeorm and octokit as FPs and gains source-map-js as one. +pop2 restores react-is and drops 16 FPs, mostly buffer carriers. Expensify +pop2 now matches +pop on TPs (126) with fewer FPs (29 vs 34). Not yet met: bluesky +pop2 loses lodash.debounce and react-native-svg against main (+FP web-streams-polyfill), not traced. The ambiguity-cutoff mechanism (MetaMask's four ljharb TPs, bluesky's color and react-native-gesture-handler) is untouched. Every claimant there is a pathless file, so it needs a claimant-independent rule. Candidates for that rule: count only claimants whose recorded dependency closure does not contain another claimant, or a DB-wide rather than candidate-relative count. js-base64's proposal loss is also still open.
