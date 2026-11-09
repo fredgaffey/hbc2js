@@ -1211,11 +1211,11 @@ nothing about a new app.
 
 **Batch 1** (deb, 2026-11-10): the first 480 jobs of the `--top 5000`
 plan (declared names, then the top-download names to about rank 250, all
-phase 1, 345 package-versions; 342 at hbc96 and 138 at hbc98, because
+phase 1, 345 package-versions; 345 jobs at hbc96 and 135 at hbc98, because
 `db-overlay-pop{,2}` already hold most top names at hbc98). Built with
 `worker.sh` (6 jobs, 3 slots per family, `nice 10`), `dep-subtract.mjs`
 against the v4 farm's hbc96/98 files, into `~/_hbc2js/db-v4-honest`
-(348 files, 47 MB). Built 348 of 480 (hbc96 228 of 335, hbc98 120 of 145; the
+(348 files, 47 MB). Built 348 of 480 (hbc96 238 of 345, hbc98 110 of 135; the
 first attempt lost 752 jobs to poisoned scaffold slots, docs/BUGS.md
 2026-11-10, and was re-run with a per-job slot reset). Failed 132:
 `Unable to resolve module` 70 (mostly SDK-56..58 Expo modules on the RN
