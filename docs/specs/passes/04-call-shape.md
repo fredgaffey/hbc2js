@@ -112,7 +112,7 @@ buckets. Fixture `160-receiverless-member-call` (with the plain method call
 `tests/gate/passes/call-shape-receiverless.test.ts`. The checker additionally
 asserts the callee is exactly `(0, F)` over the source's own `F` node.
 
-**R3g — every write `undefined`** (added 2026-11-09, round-trip review
+**R3h — every write `undefined`** (added 2026-11-09, round-trip review
 `passes-roundtrip-this`). R3a/R3f's register proof is widened from "exactly
 one write, `undefined`" to "at least one write, and every write anywhere in
 the frame is the literal `undefined`". hermesc loads `undefined` into the
@@ -126,7 +126,7 @@ refuses outright. That walk also closes a gap in the old proof, which counted
 only statement-level stores and so accepted a register whose second write was
 a for-in target. A nested `func` is a separate register frame (unchanged).
 
-**R3h — local reaching write.** A register reused for scratch elsewhere is
+**R3i — local reaching write.** A register reused for scratch elsewhere is
 still proven at one call when, in the call's own statement list, the nearest
 earlier statement that writes it at all is exactly `r = undefined`, no
 statement between writes it at any depth, and the call statement writes it
@@ -168,8 +168,8 @@ asserts that plus what `rewrite` assumed:
    deep-equal, in particular the member read of `O.P` in R3b appears in both;
 2. the rewritten node's argument count equals the source array's length;
 3. the callee is still `impure`-free (recompute, do not trust match data);
-4. R3a: `T` is the literal `undefined`, or its register passes R3g (every
-   write in `before` is `undefined`) or R3h (the write reaching the call in
+4. R3a: `T` is the literal `undefined`, or its register passes R3h (every
+   write in `before` is `undefined`) or R3i (the write reaching the call in
    its own list is `undefined`);
 5. R3b: `O` and `R` are the same identifier name in `before`;
 6. R3c: no third argument, or the third is syntactically identical to `C` and

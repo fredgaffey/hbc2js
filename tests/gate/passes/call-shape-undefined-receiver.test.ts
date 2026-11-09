@@ -6,7 +6,7 @@
 // call stayed a real `Reflect.apply` (GetGlobalObject + TryGetById "Reflect" +
 // an args array when recompiled).
 //
-// Docs: docs/specs/passes/04-call-shape.md section 4, R3g.
+// Docs: docs/specs/passes/04-call-shape.md section 4, R3h.
 //
 // Fixture 190: three plain-call functions with two or three `undefined`
 // writes to the receiver register; `mixed` (negative twin) keeps its method
@@ -32,7 +32,7 @@ const reflectApply = (F: Expr, T: Expr, args: readonly Expr[]): Expr & { k: "cal
 const asg = (t: string, v: Expr): Stmt => ({ k: "expr", expr: { k: "assign", target: id(t), value: v } });
 const U = lit("undefined");
 
-test("R3g: a receiver register written `undefined` on two paths is proven", () => {
+test("R3h: a receiver register written `undefined` on two paths is proven", () => {
   const body: Stmt[] = [{ k: "if", test: id("c"), then: [asg("r1", U)], else: [asg("r1", U)] }];
   assert.equal(isProvenUndefinedThis(id("r1"), body), true);
   const r = classifyNode(reflectApply(id("f"), id("r1"), [id("x")]), body);
@@ -40,32 +40,32 @@ test("R3g: a receiver register written `undefined` on two paths is proven", () =
   assert.equal(r.rule, "R3a");
 });
 
-test("R3g: `let r1 = undefined` plus a later `undefined` store is proven, for R3f too", () => {
+test("R3h: `let r1 = undefined` plus a later `undefined` store is proven, for R3f too", () => {
   const body: Stmt[] = [{ k: "init", kind: "let", name: "r1", value: U }, asg("r1", U)];
   const r = classifyNode(reflectApply(member(id("ns"), "fn"), id("r1"), []), body);
   assert.ok(r.ok, JSON.stringify(r));
   assert.equal(r.rule, "R3f");
 });
 
-test("R3g negative: one non-undefined write among several refuses", () => {
+test("R3h negative: one non-undefined write among several refuses", () => {
   const body: Stmt[] = [asg("r1", U), { k: "if", test: id("c"), then: [asg("r1", id("o"))], else: [] }, asg("r1", U)];
   assert.equal(isProvenUndefinedThis(id("r1"), body), false);
   assert.deepEqual(classifyNode(reflectApply(id("f"), id("r1"), []), body), { ok: false, reason: "unproven-this" });
 });
 
-test("R3g negative: a non-undefined write nested inside an expression refuses", () => {
+test("R3h negative: a non-undefined write nested inside an expression refuses", () => {
   const body: Stmt[] = [asg("r1", U), { k: "expr", expr: call(id("g"), [{ k: "assign", target: id("r1"), value: id("o") }]) }, asg("r1", U)];
   assert.equal(isProvenUndefinedThis(id("r1"), body), false);
 });
 
-test("R3g negative: the register as a for-in target, a catch param or a pattern target refuses", () => {
+test("R3h negative: the register as a for-in target, a catch param or a pattern target refuses", () => {
   const forIn: Stmt[] = [asg("r1", U), { k: "for-in", label: null, decl: null, left: id("r1"), right: id("o"), body: [] }];
   const caught: Stmt[] = [asg("r1", U), { k: "try", block: [], param: "r1", handler: [] }];
   const pattern: Stmt[] = [asg("r1", U), { k: "expr", expr: { k: "destructure", pattern: { k: "parr", elements: [{ k: "pel", target: { k: "pid", name: "r1" } }] }, source: id("o") } }];
   for (const body of [forIn, caught, pattern]) assert.equal(isProvenUndefinedThis(id("r1"), body), false, JSON.stringify(body));
 });
 
-test("R3g negative: a register never written is not proven (it may not even be declared)", () => {
+test("R3h negative: a register never written is not proven (it may not even be declared)", () => {
   assert.equal(isProvenUndefinedThis(id("r1"), [asg("r2", U)]), false);
 });
 
@@ -114,7 +114,7 @@ for (const version of [84, 94, 96, 98, 99] as const) {
   });
 }
 
-// R3h: the register is reused for scratch elsewhere, but the write reaching
+// R3i: the register is reused for scratch elsewhere, but the write reaching
 // the call in its own statement list is `undefined`.
 const site = (list: readonly Stmt[]): { node: Expr; i: number } => {
   const i = list.length - 1;
@@ -123,7 +123,7 @@ const site = (list: readonly Stmt[]): { node: Expr; i: number } => {
 };
 const applyStmt = (T: string): Stmt => asg("r0", reflectApply(id("f"), id(T), [id("x")]));
 
-test("R3h: a reused register whose reaching write is `undefined` becomes a plain call", () => {
+test("R3i: a reused register whose reaching write is `undefined` becomes a plain call", () => {
   const list: Stmt[] = [asg("r4", id("o")), asg("r4", U), asg("r9", call(id("g"), [id("r4")])), applyStmt("r4")];
   const { node, i } = site(list);
   assert.equal(isProvenUndefinedThis(id("r4"), list), false);
@@ -132,31 +132,31 @@ test("R3h: a reused register whose reaching write is `undefined` becomes a plain
   assert.equal(r.rule, "R3a");
 });
 
-test("R3h: `r4 = Reflect.apply(f, r4, ...)` itself (the store happens after the call) is accepted", () => {
+test("R3i: `r4 = Reflect.apply(f, r4, ...)` itself (the store happens after the call) is accepted", () => {
   const list: Stmt[] = [asg("r4", id("o")), asg("r4", U), asg("r4", reflectApply(id("f"), id("r4"), []))];
   const { node, i } = site(list);
   assert.ok(classifyNode(node, list, { list, stmtIndex: i }).ok);
 });
 
-test("R3h negative: a write between the `undefined` store and the call, at any depth, refuses", () => {
+test("R3i negative: a write between the `undefined` store and the call, at any depth, refuses", () => {
   const list: Stmt[] = [asg("r4", U), { k: "if", test: id("c"), then: [asg("r4", id("o"))], else: [] }, applyStmt("r4")];
   const { node, i } = site(list);
   assert.deepEqual(classifyNode(node, list, { list, stmtIndex: i }), { ok: false, reason: "unproven-this" });
 });
 
-test("R3h negative: the nearest reaching write is not `undefined`", () => {
+test("R3i negative: the nearest reaching write is not `undefined`", () => {
   const list: Stmt[] = [asg("r4", U), asg("r4", id("o")), applyStmt("r4")];
   const { node, i } = site(list);
   assert.deepEqual(classifyNode(node, list, { list, stmtIndex: i }), { ok: false, reason: "unproven-this" });
 });
 
-test("R3h negative: the call statement writes the register before the call", () => {
+test("R3i negative: the call statement writes the register before the call", () => {
   const inner = reflectApply(id("f"), id("r4"), []);
   const list: Stmt[] = [asg("r4", id("o")), asg("r4", U), asg("r0", { k: "seq", exprs: [{ k: "assign", target: id("r4"), value: id("o") }, inner] })];
   assert.deepEqual(classifyNode(inner, list, { list, stmtIndex: 2 }), { ok: false, reason: "unproven-this" });
 });
 
-test("R3h negative: no write in the call's own list (only in an enclosing one) refuses", () => {
+test("R3i negative: no write in the call's own list (only in an enclosing one) refuses", () => {
   const inner: Stmt[] = [applyStmt("r4")];
   const outer: Stmt[] = [asg("r4", U), { k: "if", test: id("c"), then: inner, else: [] }, asg("r4", id("o"))];
   const { node, i } = site(inner);

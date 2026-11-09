@@ -86,10 +86,10 @@ export function isSimpleCalleeChain(e: Expr): boolean {
 }
 
 /** R3a's `T`: the literal `undefined`, or a register every one of whose
- *  writes in `fnBody` is the literal `undefined` (§4; R3g widened "exactly
+ *  writes in `fnBody` is the literal `undefined` (§4; R3h widened "exactly
  *  one write" to "at least one, all `undefined`"). Any write
  *  of another value, anywhere, refuses here; a register reused for scratch
- *  is R3h's local reaching-write question (`isLocallyUndefinedThis`).
+ *  is R3i's local reaching-write question (`isLocallyUndefinedThis`).
  *
  *  §4's literal text also asks for "no nested-closure read" on `t.name`
  *  (`identUses(fnBody, t.name).nested === 0`); that check is gone —
@@ -110,7 +110,7 @@ export function isProvenUndefinedThis(t: Expr, fnBody: readonly Stmt[]): boolean
   return writes !== null && writes.length >= 1 && writes.every((w) => w.k === "lit" && w.text === "undefined");
 }
 
-/** R3g (spec 04 section 4): every value `reg` is ever assigned anywhere in
+/** R3h (spec 04 section 4): every value `reg` is ever assigned anywhere in
  *  this frame -- `reg = v` at any expression depth, `let reg = v` -- or
  *  `null` when `reg` is written some way whose value is not a plain
  *  expression (a for-in/for-of target, a catch parameter, a destructuring
@@ -120,7 +120,7 @@ export function isProvenUndefinedThis(t: Expr, fnBody: readonly Stmt[]): boolean
  *  Deliberately a generic walk over every field, not the shared
  *  `registerStoreValues` (statement-level stores only): a proof that every
  *  write is `undefined` must not miss one hidden in an expression. */
-/** R3h (spec 04 section 4): `t` is a register whose value at this call is
+/** R3i (spec 04 section 4): `t` is a register whose value at this call is
  *  `undefined` by the write that reaches it, even though the register is
  *  reused for other values elsewhere in the function. Statement lists are
  *  entered only at their head and run in order (JS has no goto: a `break`
@@ -262,8 +262,8 @@ function classifyHelperApply(node: Expr & { readonly k: "call" }): ClassifyResul
  *  no captured `match` data is ever trusted (`check.ts` calls this again on
  *  `before`, exactly as `match` does). */
 /** Where a candidate sits: its own statement list and statement index, for
- *  R3h's local reaching-write proof (spec 04 section 4). Optional so a
- *  caller with only a bare node keeps the whole-function R3a/R3g proof. */
+ *  R3i's local reaching-write proof (spec 04 section 4). Optional so a
+ *  caller with only a bare node keeps the whole-function R3a/R3h proof. */
 export interface SiteAt {
   readonly list: readonly Stmt[];
   readonly stmtIndex: number;
