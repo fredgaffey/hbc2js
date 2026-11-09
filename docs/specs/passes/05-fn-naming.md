@@ -90,6 +90,19 @@ all required:
    entries with the same bytecode name → refuse both (`duplicate-name`); do not
    invent `name_2` suffixes, they read worse than `_fnN`.
 
+**Function expressions (fix-closure-identity-2).** Spec 27 section 12 emits a
+closure created more than once per activation as a named function
+*expression* `function _fnN() {...}` at each creation site, at any depth of
+the body. Each distinct `N` found as an expression name (and not also a root
+`func` statement) is a candidate too, classified by conditions 1-6 exactly
+as a declaration is; every site carrying `_fnN` is renamed alike. The name
+binds only inside the expression, and conditions 4-5 are computed over the
+whole `ctx.fnBody`, which contains it, so no reference in the body can be
+captured. R4b never applies (an expression has no `X.key = _fnN` site).
+The checker pairs function-expression names of `before`/`after` in walk
+order (the rename changes no structure) and treats each `(from, to)` pair
+once.
+
 **R4b — name from the assignment site.** When `raw` is empty (anonymous) and the
 root list contains exactly one statement of the form `X.key = _fnN` (a `member`
 write with `computed:false`) or `{k:"init", name:key, value: ident _fnN}`, and

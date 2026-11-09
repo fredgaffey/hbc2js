@@ -408,7 +408,8 @@ inlined its creator into both) has no single host.
 `150-closure-created-in-inner-fn` (the round trip reproduces the closure tree
 under `makeParser`; failed at v98/v99 before this section with
 `actual: '(()()())' expected: '((())())'`) and its negative twin
-`151-closure-created-in-two-fns` (the callback stays beside `left`/`right`).
+`151-closure-created-in-two-fns` (the callback is not re-parented into either
+creator; since fix-closure-identity-2, section 12, it is an expression in each).
 T2 under the real Hermes VMs: both fixtures' decompiled output matches
 `expected.txt` at v84, v94, v96, v98 and v99.
 
@@ -487,7 +488,33 @@ a step function the factory calls once per `next()`; a site reachable from a
 suspend point's resume block runs once per resumption, so it counts as
 repeating (fixture `341-closure-per-generator-resume`; failed at v84/v94/v96
 with `loop distinct: false`). Negative control: fixture
-`344-closure-once-per-activation`. Still open (docs/BUGS.md): a function whose
-creation sites lie in two functions (hermesc inlined its creator into both)
-stays one declaration at their common host, so each creator call returns the
-same object.
+`344-closure-once-per-activation`.
+
+**fix-closure-identity-2: several creators, and the expression's name.** (1) A
+function whose creation sites lie in two or more functions (hermesc inlined
+its creator `wrap` into both `a` and `b`, or the joined-function rule hosted
+it at the common ancestor of its sites) was one declaration at its home `h`:
+one object per activation of `h`, so `a() !== a()` was false at v98/v99. It is
+now emitted as a function expression at the sites of EVERY creator, one
+instance of the same function index per creator (`perCreatorInline`), when
+every site is a plain `Create*Closure` in a function at or below `h`, no
+creator lies inside the function's own subtree, and neither the function nor
+any creator has creation-context copies. Sound by section 11's argument: the
+body names only environments declared at `h` or above, visible unchanged from
+every creator, so all instances read and write the same captured bindings;
+each site now makes one object per execution, as `CreateClosure` does.
+Inlining is used even when a creator's site runs once per activation: each
+creator activation is a distinct activation of no common function, so the
+hoisted form has no host that is right for all of them. Cost: the body (and
+its subtree) is duplicated once per creator. Fixture
+`381-closure-inlined-creator-identity` (failed at v98/v99 with `distinct:
+false false false`, `weakmap: 2 2 2`); the joined-function placement tests in
+`closure-copies.test.ts` and fixture 151's test now assert one instance per
+creator. (2) The expression keeps the name `_fn<n>` from the emitter, which
+is its `.name`; `fn-naming` now renames function expressions too (spec 05
+section 4), so `function named() {}` in a loop prints `named` again under
+`--passes on` (fixture `380-named-fn-expr-in-loop`, failed with `name: _fn4
+_fn4`). Naming the expression binds the name inside its body, which is why
+the rename keeps spec 05's conditions 4-5 over the whole function: no
+reference inside can resolve to another binding of that name. A refused name
+keeps `_fnN` (docs/BUGS.md, open row).
