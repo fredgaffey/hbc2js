@@ -952,6 +952,59 @@ react-navigation TPs. (3) Persisting each module's one-level
 deeper than one level. (4) Deciding own/foreign at build time and storing
 a boolean: the rule could not change without a DB rebuild.
 
+**Foreign modules in the DB-wide indexes (sigdb-strip-embedded, 2026-11-09).**
+The own-file rule above covered scoring, not the two indexes built over the
+whole DB (`src/deps/hash-index.ts`): the candidate hash index and the hop-two
+string-set index still counted every function of every file as an owner, so a
+package's hash or string set was "not unique" whenever another signature
+carried a copy of its file, and a carrier was proposed by unique hashes that
+were really its copy of an absent package. On the v4-layered hbc96/98 farm
+(db-v4-paths files where the rebuild had written them, else db-v3-clean;
+6,527 of 13,733 hbc96 and 17,151 of 21,751 hbc98 files path-bearing), the
+path-bearing files are mostly copies: 86% of modules and 37% of functions
+(41% of functions with >= 8 instructions) at hbc98, 90% / 46% (49%) at hbc96;
+by module, hoisted copies 87%, `@babel/runtime` helpers 11%, nested
+`node_modules` copies 1.4% (hbc98). 14,326 of the 17,151 hbc98 files carry at
+least one foreign module. **Choice (B): keep the files, filter in the
+builders.** In both index builders a function in a foreign module of a
+path-bearing file (`foreignSets`, the set scoring uses) counts as an
+occurrence of the package its path names (`packageOfPath`: the name after the
+last `node_modules/`; `foreignFunctionPackages` in `src/deps/module-paths.ts`),
+never the carrier's. A hash held only by owner-lib's own file and by copies of
+owner-lib becomes unique to owner-lib; a hash held only by copies of a package
+with no signature file is indexed for nobody (the index header names only
+packages with a file). Simply dropping foreign functions was the first cut and
+measurably wrong in a mixed DB: a PATHLESS file's copy (react-native-root-toast's
+`deprecated-react-native-prop-types`, enzyme-shallow-equal's `object-is`) was
+blocked by a path-bearing copy elsewhere, and once that copy was dropped the
+pathless carrier became the sole owner (two new metamask/rainbow FPs).
+Attribution keeps the copy as evidence of whose code it is. A pathless file
+gives no foreign functions and is indexed exactly as before, so an index over
+`db-v3-clean` is byte-for-byte unchanged and needs no rebuild. No stored field, hash scheme or
+`modulePaths` version changes. Index effect on the farm (final rule): hbc98
+hash index 15.3 -> 13.9 MB, string-set index 4.9 -> 4.4 MB; hbc96 8.9 -> 8.4 and
+4.5 -> 4.2 MB; build time and RSS unchanged. Under the first cut (drop), hbc98
+unique hashes went 530,413 -> 476,745: 10,854 became unique and 64,522 stopped
+being unique (hashes only a copy held). The hop-two TPs named in docs/DEPS.md
+(`is-regex`, `is-date-object`, `has-property-descriptors`, `lodash.debounce`)
+already have unique hashes on this farm (3-22 each) and their counts do not
+change; on metamask `is-regex` and `is-date-object` are FPs either way.
+**Rejected (A): strip foreign modules from the files at finalize time** (a
+derived DB with a `strippedForeign` count and a version marker). It would save
+disk and load memory (37-46% of functions), but the scoring paths already read
+`foreignSets`, the gain for the indexes is identical, and stripping is
+irreversible: the own/foreign rule (a path under `P/` with no further
+`node_modules/`) could not change without rebuilding the DB, which the
+"Rejected (4)" ruling above already declined, and `promoteViaDependency` reads
+the foreign dependency modules an own file requires (`SigModule.depIds`).
+Slimmed records (`slim-sigs.ts`) already drop foreign functions from memory at
+match time. Measured on five truth apps in docs/DEPS.md "Foreign modules in
+the candidate indexes". Test: `tests/gate/deps/sigdb-strip-embedded.test.ts`
+(hash and string-set index ignore a hoisted and a nested copy; a pathless
+file's copies still count; a package blocked only by a copy is proposed, the
+carrier is not; mixed DB: a path-bearing copy still blocks a pathless file's
+copy of the same package).
+
 **sqlite layer.** A sigdb v3 `.sqlite` stores module paths too (schema
 revision 2, additive inside `hbc2js-sigdb/3`): `modules.path`,
 `fingerprint_functions.module_id`, and `fingerprints.module_paths` /

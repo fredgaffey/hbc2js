@@ -32,6 +32,7 @@ import { dirname, join } from "node:path";
 import type { DbLayer } from "./db.ts";
 import type { ModuleInventory } from "./inventory.ts";
 import type { SigDbFile } from "./sigdb-types.ts";
+import { foreignFunctionPackages } from "./module-paths.ts";
 
 export const HASH_INDEX_MAGIC = "#hbc2js-candidate-hash-index 1 ";
 export const DEFAULT_INDEX_MIN_INSTR = 8;
@@ -56,6 +57,31 @@ export interface BuildHashIndexOptions {
   readonly readFile?: (path: string) => string;
 }
 
+/** Package-name interning for the index builders. A name gets an id when a
+ *  signature file is read (`hasFile`) or when a foreign module's path names it
+ *  (sigdb-strip-embedded); `compact` keeps only names with a file, in
+ *  first-file order, so the index never names a package the DB lacks. */
+class PackageIds {
+  private readonly ids = new Map<string, number>();
+  private readonly order: string[] = [];
+  private readonly filed = new Set<number>();
+  id(name: string, hasFile: boolean): number {
+    let id = this.ids.get(name);
+    if (id === undefined) {
+      id = this.order.length;
+      this.order.push(name);
+      this.ids.set(name, id);
+    }
+    if (hasFile && !this.filed.has(id)) this.filed.add(id);
+    return id;
+  }
+  compact(): { packages: string[]; remap: Map<number, number> } {
+    const fileOrder = [...this.filed];
+    const remap = new Map<number, number>(fileOrder.map((old, i) => [old, i]));
+    return { packages: fileOrder.map((i) => this.order[i]!), remap };
+  }
+}
+
 /** Builds the index text for every non-baseline, hash-scheme-2 signature
  *  file in `dir` at `hbcVersion`. Each file is parsed once and dropped. */
 export function buildCandidateHashIndex(dir: string, hbcVersion: number, opts: BuildHashIndexOptions = {}): string {
@@ -63,8 +89,7 @@ export function buildCandidateHashIndex(dir: string, hbcVersion: number, opts: B
   const maxOwners = opts.maxOwners ?? DEFAULT_INDEX_MAX_OWNERS;
   const readFile = opts.readFile ?? ((p: string) => readFileSync(p, "utf8"));
   const suffix = `__hbc${hbcVersion}.json`;
-  const packages: string[] = [];
-  const ids = new Map<string, number>();
+  const names = new PackageIds();
   // hash -> owning package ids; null once more than maxOwners own it.
   const owners = new Map<string, number[] | null>();
   for (const name of readdirSync(dir).sort()) {
@@ -76,24 +101,26 @@ export function buildCandidateHashIndex(dir: string, hbcVersion: number, opts: B
       continue;
     }
     if (file.toolchainBaseline || file.hbcVersion !== hbcVersion || (file.hashScheme ?? 1) < 2) continue;
-    let id = ids.get(file.package);
-    if (id === undefined) {
-      id = packages.length;
-      packages.push(file.package);
-      ids.set(file.package, id);
-    }
+    const id = names.id(file.package, true);
+    // sigdb-strip-embedded: a path-bearing file's copy of another package's
+    // module counts as that package's occurrence, never the carrier's
+    // (pathless files: empty map, as before).
+    const foreign = foreignFunctionPackages(file);
     for (const fn of file.functions) {
       if (fn.instrCount < minInstr) continue;
       if (fn.owner !== undefined && fn.owner !== null && fn.owner !== file.package) continue;
       const cur = owners.get(fn.exactHash);
       if (cur === null) continue;
-      if (cur === undefined) owners.set(fn.exactHash, [id]);
-      else if (!cur.includes(id)) owners.set(fn.exactHash, cur.length >= maxOwners ? null : [...cur, id]);
+      const fp = foreign.get(fn.index);
+      const oid = fp !== undefined ? names.id(fp, false) : id;
+      if (cur === undefined) owners.set(fn.exactHash, [oid]);
+      else if (!cur.includes(oid)) owners.set(fn.exactHash, cur.length >= maxOwners ? null : [...cur, oid]);
     }
   }
+  const { packages, remap } = names.compact();
   const header: HashIndexHeader = { hbcVersion, minInstr, maxOwners, packages };
   const lines: string[] = [];
-  for (const [hash, o] of owners) if (o !== null) lines.push(`${hash}\t${o.join(",")}`);
+  for (const [hash, o] of owners) if (o !== null && o.every((i) => remap.has(i))) lines.push(`${hash}\t${o.map((i) => remap.get(i)).join(",")}`);
   lines.sort();
   return `${HASH_INDEX_MAGIC}${JSON.stringify(header)}\n${lines.join("\n")}${lines.length > 0 ? "\n" : ""}`;
 }
@@ -131,8 +158,7 @@ export function buildCandidateStringSetIndex(dir: string, hbcVersion: number, op
   const minStrings = opts.minStrings ?? DEFAULT_STRINGSET_MIN_STRINGS;
   const readFile = opts.readFile ?? ((p: string) => readFileSync(p, "utf8"));
   const suffix = `__hbc${hbcVersion}.json`;
-  const packages: string[] = [];
-  const ids = new Map<string, number>();
+  const names = new PackageIds();
   // string-set hash -> owning package id; -1 once a second package has it.
   const owner = new Map<string, number>();
   for (const name of readdirSync(dir).sort()) {
@@ -144,25 +170,24 @@ export function buildCandidateStringSetIndex(dir: string, hbcVersion: number, op
       continue;
     }
     if (file.hbcVersion !== hbcVersion) continue;
-    let id = ids.get(file.package);
-    if (id === undefined) {
-      id = packages.length;
-      packages.push(file.package);
-      ids.set(file.package, id);
-    }
     // A baseline file blocks every set it has but is never itself proposed.
-    const ownerId = file.toolchainBaseline ? -2 : id;
+    const fileId = names.id(file.package, true); // interned even for a baseline: header unchanged
+    const ownerId = file.toolchainBaseline ? -2 : fileId;
+    const foreign = foreignFunctionPackages(file);
     for (const fn of file.functions) {
       if (fn.stringCount < minStrings) continue;
       if (fn.owner !== undefined && fn.owner !== null && fn.owner !== file.package) continue;
+      const fp = foreign.get(fn.index);
+      const oid = fp !== undefined && !file.toolchainBaseline ? names.id(fp, false) : ownerId;
       const cur = owner.get(fn.stringSetHash);
-      if (cur === undefined) owner.set(fn.stringSetHash, ownerId);
-      else if (cur !== ownerId) owner.set(fn.stringSetHash, -1);
+      if (cur === undefined) owner.set(fn.stringSetHash, oid);
+      else if (cur !== oid) owner.set(fn.stringSetHash, -1);
     }
   }
+  const { packages, remap } = names.compact();
   const header = { hbcVersion, minStrings, packages };
   const lines: string[] = [];
-  for (const [hash, id] of owner) if (id >= 0) lines.push(`${hash}\t${id}`);
+  for (const [hash, id] of owner) if (id >= 0 && remap.has(id)) lines.push(`${hash}\t${remap.get(id)}`);
   lines.sort();
   return `${STRINGSET_INDEX_MAGIC}${JSON.stringify(header)}\n${lines.join("\n")}${lines.length > 0 ? "\n" : ""}`;
 }
