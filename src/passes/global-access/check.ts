@@ -9,7 +9,7 @@
 import type { Effect, Expr, Stmt } from "../ast.ts";
 import { defUse, effectSequence, isSafeIdentifier } from "../ast.ts";
 import type { CheckResult, PassContext } from "../types.ts";
-import { hasLoopReentryClobber, hasPreGuardClobber, isProvenGlobal, isShadowed, isTargetRead, recognizeGuard } from "./match.ts";
+import { hasLoopReentryClobber, hasPreGuardClobber, isLocallyProvenGlobal, isProvenGlobal, isShadowed, isTargetRead, recognizeGuard } from "./match.ts";
 import { substitute } from "./rewrite.ts";
 
 function sameStmt(a: Stmt, b: Stmt): boolean {
@@ -119,20 +119,22 @@ export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: Pass
 
   // Item 4: `G` is still a proven global reference in `before`.
   const fnBody = ctx.fnBody ?? before;
-  if (!isProvenGlobal(fnBody, global)) return { ok: false, reason: "unproven-global" };
+  // Item 4' (§4 condition 7): the local proof stands in for items 4-4c.
+  const local = isLocallyProvenGlobal(before, guardIndex, useIndex, global);
+  if (!local && !isProvenGlobal(fnBody, global)) return { ok: false, reason: "unproven-global" };
 
   // Item 4b (§4 condition 5, docs/BUGS.md T14): the whole-function proof
   // above is position-blind, so it is only sound where the site runs once.
   // Re-derived here exactly as `classifySite` derives it — `before` is the
   // same list object the driver matched, so `outermostLoopBodyContaining`
   // finds the same enclosing loop from `ctx.fnBody`.
-  if (hasLoopReentryClobber(fnBody, before, global)) return { ok: false, reason: "loop-reentry-clobber" };
+  if (!local && hasLoopReentryClobber(fnBody, before, global)) return { ok: false, reason: "loop-reentry-clobber" };
 
   // Item 4c (§4 condition 6): the same position-blindness in the other
   // region — a write to `G`'s register that runs BEFORE the guard. The last
   // such write that can reach the guard must be the `globalThis` one.
   // Re-derived from `before` + `ctx.fnBody`, independently of `match`.
-  if (hasPreGuardClobber(fnBody, before, guardIndex, global)) return { ok: false, reason: "pre-guard-clobber" };
+  if (!local && hasPreGuardClobber(fnBody, before, guardIndex, global)) return { ok: false, reason: "pre-guard-clobber" };
 
   // Item 5: `p` is not a declared name in `before`.
   if (!isSafeIdentifier(name)) return { ok: false, reason: "unsafe-identifier" };
@@ -164,10 +166,21 @@ export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: Pass
   // No `rN` in `after` is read before its own first def (mirrors
   // `expressionOnlyCheck`'s second half) — a bare identifier introduces no
   // new register, so this only guards against an unrelated regression.
-  for (const [regName, { defs, reads }] of defUse(after)) {
-    if (defs.length === 0) continue;
-    const firstDef = Math.min(...defs);
-    if (reads.some((r) => r < firstDef)) return { ok: false, reason: `${regName} is read before its first def in the rewrite` };
+  // Only a register the rewrite *newly* reads early counts: a nested list
+  // (the §4 condition 7 sites) legitimately reads registers defined outside
+  // it, and `before` reads those just as early.
+  const readsEarly = (stmts: readonly Stmt[]): Set<string> => {
+    const out = new Set<string>();
+    for (const [regName, { defs, reads }] of defUse(stmts)) {
+      if (defs.length === 0) continue;
+      const firstDef = Math.min(...defs);
+      if (reads.some((r) => r < firstDef)) out.add(regName);
+    }
+    return out;
+  };
+  const earlyBefore = readsEarly(before);
+  for (const regName of readsEarly(after)) {
+    if (!earlyBefore.has(regName)) return { ok: false, reason: `${regName} is read before its first def in the rewrite` };
   }
 
   return { ok: true };
