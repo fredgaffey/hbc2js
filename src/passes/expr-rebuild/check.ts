@@ -17,6 +17,7 @@ import { expressionOnlyCheck, isPure, isRegisterName, noteRegisterUsesSplice, re
 
 const NO_USES = { reads: 0, writes: 0, nested: 0 } as const;
 import type { CheckResult, PassContext } from "../types.ts";
+import { childLists } from "../restructure.ts";
 import type { ExprRebuildSite } from "./match.ts";
 import { classifySite, exprCounts } from "./match.ts";
 import { noteStmtIndexSplice } from "./stmt-index.ts";
@@ -90,8 +91,26 @@ function verifyExpectedShape(before: readonly Stmt[], after: readonly Stmt[], ru
   return true;
 }
 
+/** `list` is the very `body` of a `while`/`do-while`/`for`/`for-in`/`for-of`
+ *  somewhere in `fnBody` (identity, not shape). Only asked on the
+ *  read-before-def slow path of `expressionOnlyCheck`. */
+function isLoopBodyIn(fnBody: readonly Stmt[] | undefined, list: readonly Stmt[]): boolean {
+  if (fnBody === undefined) return false;
+  const LOOPS = new Set(["while", "do-while", "for", "for-in", "for-of"]);
+  const walk = (stmts: readonly Stmt[]): boolean => {
+    for (const s of stmts) {
+      for (const { list: child } of childLists(s)) {
+        if (child === list && LOOPS.has(s.k)) return true;
+        if (walk(child)) return true;
+      }
+    }
+    return false;
+  };
+  return walk(fnBody);
+}
+
 export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: PassContext): CheckResult {
-  const eff = expressionOnlyCheck(before, after);
+  const eff = expressionOnlyCheck(before, after, () => isLoopBodyIn(ctx.fnBody, before));
   if (!eff.ok) return eff;
 
   if (after.length !== before.length && after.length !== before.length - 1) {

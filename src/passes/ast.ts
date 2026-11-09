@@ -1930,10 +1930,36 @@ export function _setExpressionOnlyCheckDiffProbeForTests(probe: typeof _expressi
   _expressionOnlyCheckDiffProbe = probe;
 }
 
+/** The slow path behind a read-before-def verdict when `before` is a loop's
+ *  own body (the caller's `isLoopBody`): a name is a violation
+ *  only when the rewrite made it worse -- it newly reads before its first def,
+ *  or more of its reads now precede that first def. A loop-carried register
+ *  (read at the top of a loop body, redefined at its bottom) is read before
+ *  its first def in `before` already; a fold that leaves that read where it
+ *  was is not a new early read (passes-roundtrip-getbyidreg, fixture 340).
+ *  Deleting or moving a def later still grows the count and still fails.
+ *  Any other list keeps the absolute rule: there a read before every def
+ *  has no earlier iteration to come from. */
+function regressedReadBeforeDef(before: readonly Stmt[], after: readonly Stmt[]): string | null {
+  const earlyReads = ({ defs, reads }: DefUse): number => {
+    if (defs.length === 0) return 0;
+    const firstDef = Math.min(...defs);
+    return reads.filter((r) => r < firstDef).length;
+  };
+  const duBefore = defUse(before);
+  for (const [name, entry] of defUse(after)) {
+    const n = earlyReads(entry);
+    if (n === 0) continue;
+    const was = duBefore.get(name);
+    if (was === undefined || n > earlyReads(was)) return name;
+  }
+  return null;
+}
+
 /** §4.3's expression-only `check`: the effect sequence is unchanged, and no
  *  `rN` in `after` is read before its own first def in `after` (a rewrite
  *  must not read a register earlier than the point it is actually computed). */
-export function expressionOnlyCheck(before: readonly Stmt[], after: readonly Stmt[]): CheckResult {
+export function expressionOnlyCheck(before: readonly Stmt[], after: readonly Stmt[], isLoopBody?: () => boolean): CheckResult {
   // `effectSequence` is concatenative (`visitStmts` is a plain left-to-right
   // walk with no state carried between statements), so
   // `effectSequence(before) === effects(before[0,h)) ++ effects(before[h,tb))
@@ -1963,7 +1989,9 @@ export function expressionOnlyCheck(before: readonly Stmt[], after: readonly Stm
   if (eb !== ea) return { ok: false, reason: "the rewrite changed the observable effect sequence" };
   const violation = incrementalReadBeforeDef(before, after, head, tailBefore, tailAfter);
   if (_expressionOnlyCheckDiffProbe !== null) _expressionOnlyCheckDiffProbe(before, after, readBeforeDefBruteForceReference(after), violation);
-  if (violation !== null) return { ok: false, reason: `${violation} is read before its first def in the rewrite` };
+  if (violation === null) return { ok: true };
+  const regressed = isLoopBody?.() === true ? regressedReadBeforeDef(before, after) : violation;
+  if (regressed !== null) return { ok: false, reason: `${regressed} is read before its first def in the rewrite` };
   return { ok: true };
 }
 
