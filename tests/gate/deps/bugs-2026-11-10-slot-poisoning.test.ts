@@ -1,17 +1,18 @@
 // Regression for docs/BUGS.md 2026-11-10 "slot poisoning": a job that mutates
 // its scaffold slot (here: deletes a dependency, rewrites a lockfile in place)
 // must not leave the next job's slot damaged. Offline, tiny fake scaffold.
-import { describe, expect, it } from "vitest";
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const SCRIPT = join(__dirname, "../../../tools/pkgsig/bulk/slot-reset.sh");
+const SCRIPT = join(fileURLToPath(new URL(".", import.meta.url)), "../../../tools/pkgsig/bulk/slot-reset.sh");
 const sh = (cmd: string) => execFileSync("bash", ["-c", `. '${SCRIPT}'; ${cmd}`], { encoding: "utf8" });
 
-describe("worker slot reset (bugs-2026-11-10 slot poisoning)", () => {
-  it("the next job's slot is pristine after a job deleted a scaffold dependency", () => {
+test("worker slot reset: the next job's slot is pristine after a job deleted a scaffold dependency (bugs-2026-11-10 slot poisoning)", () => {
     const root = mkdtempSync(join(tmpdir(), "slotreset-"));
     try {
       const pristine = join(root, "Pristine72");
@@ -30,15 +31,14 @@ describe("worker slot reset (bugs-2026-11-10 slot poisoning)", () => {
       sh(`echo mutated > '${slot}/package-lock.json'; echo mutated > '${slot}/package.json'; echo mutated > '${slot}/node_modules/.package-lock.json'`);
 
       sh(`reset_slot '${pristine}' '${slot}'`);
-      expect(readFileSync(join(slot, "node_modules/@react-native-community/cli/index.js"), "utf8")).toBe("cli");
-      expect(existsSync(join(slot, "node_modules/residue"))).toBe(false);
-      expect(readFileSync(join(slot, "package-lock.json"), "utf8")).toBe("lock0");
-      expect(readFileSync(join(slot, "package.json"), "utf8")).toBe('{"a":1}');
-      expect(readFileSync(join(slot, "node_modules/.package-lock.json"), "utf8")).toBe("hidden0");
+      assert.equal(readFileSync(join(slot, "node_modules/@react-native-community/cli/index.js"), "utf8"), "cli");
+      assert.equal(existsSync(join(slot, "node_modules/residue")), false);
+      assert.equal(readFileSync(join(slot, "package-lock.json"), "utf8"), "lock0");
+      assert.equal(readFileSync(join(slot, "package.json"), "utf8"), '{"a":1}');
+      assert.equal(readFileSync(join(slot, "node_modules/.package-lock.json"), "utf8"), "hidden0");
       // and the pristine copy itself was never touched
-      expect(readFileSync(join(pristine, "package-lock.json"), "utf8")).toBe("lock0");
+      assert.equal(readFileSync(join(pristine, "package-lock.json"), "utf8"), "lock0");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
-});
