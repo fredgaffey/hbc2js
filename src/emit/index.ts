@@ -386,6 +386,31 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
     }
   }
 
+  // Spec 27 section 11 (round-trip bucket `tree:unmatched-closure`): a
+  // function whose every creation site is in ONE function `C`, strictly below
+  // the owner `H` of its closure environment, is emitted inside `C`, not
+  // beside `C` in `H`. `C` owns no environment the body names (the env graph
+  // put the body's environment at `H`), so every `_e<env>_<slot>` the body
+  // reads is declared at `H` or above and resolves the same from inside `C`;
+  // a declaration hoisted to the top of `C` is visible at every site in `C`.
+  // Without this, hermesc compiles the declaration as `H`'s closure: one
+  // instance per `H` call instead of one per `C` call, and `C` creates none.
+  // Several creators keep `H`; several environments at the sites are the LCA
+  // rule's. Runs AFTER the joined/LCA moves above, so `isAncestor(home, host)`
+  // sees where the creator finally sits (a creator moved above `H` keeps the
+  // leftover-7 rule's placement for its children).
+  for (const [f, sites] of envGraph.closureCreationSites) {
+    if (f === globalIndex || envGraph.closureCopies.has(f)) continue;
+    const home = parentOf.get(f) ?? null;
+    if (home === null || sites.size === 0) continue;
+    if (new Set(sites.values()).size > 1) continue;
+    const creators = new Set([...sites.keys()].map((k) => Number(k.slice(0, k.indexOf(":")))));
+    if (creators.size !== 1) continue;
+    const host = [...creators][0]!;
+    if (host === home || host === f || isAncestor(f, host) || !isAncestor(home, host)) continue;
+    parentOf.set(f, host);
+  }
+
   // §6 "Function nesting" (placement, docs/BUGS.md 2026-09-04): an orphan used
   // to be emitted at MODULE level, outside the global function, where nothing
   // any function body declares is in scope — so every `_e<env>_<slot>` its body
