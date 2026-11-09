@@ -2684,6 +2684,7 @@ honest numbers. The stopping-reason table above was measured at main
 87ec7b8, before the path-recall and hash-index merges. Test:
 `tests/gate/deps/corpus-recall-bar.test.ts`.
 
+<<<<<<< HEAD
 ### Rainbow and metamask on the full path-bearing DB (corpus-precision-rainbow-mm, 2026-11-09)
 
 Measured offline on deb (`deps-rm/run.sh`, `meas2.mjs`: `scoreAgainstTruth`, no truth overlay), each DB a symlink farm with its own hash/string-set indexes (`build-candidate-hash-index.mjs --hbc 96,98`): `db-v3-clean`, and "full v4" = every `db-v3-clean` file replaced by its `db-v4-paths` rebuild where one exists (55,046 of 71,222 files).
@@ -2835,3 +2836,62 @@ Still open: rainbow's `react-query` (no `@tanstack` string) and rainbow's
 `whatwg-url`, where some guard holds (not traced). Metamask v3's `react-query`
 also stays an FP, also not traced.
 Test: `tests/gate/deps/corpus-fork-relabel.test.ts`.
+=======
+**Retry of the failed jobs** (deps-population-widen-3, 2026-11-09). The
+1,445 failed jobs were re-run on deb with main's builder fixes
+(`src/deps/builder-support.ts`: Node built-in shims, peer installs,
+unresolved-module retry, `CI=true` watcher), per-job npm/npx timeouts
+raised to 300 s, 6 slots with real scaffold copies (the first run's six
+slots were symlinks to one shared scaffold), into `db-overlay-pop2`
+(`dep-subtract` against db-v3-clean; `db-overlay-pop` untouched). Failure
+class, before (first full run, 2,347 jobs) and after (retry of the 1,445):
+
+| class | before | after retry |
+|---|---|---|
+| built (+ 43 reused) | 859 (+43) | 1,252 of 1,445 |
+| bundle, not a built-in or missing import | 1,160 | 132 |
+| bundle, Node built-in unresolved | 170 | 0 |
+| bundle, other unresolved module | 77 | 21 |
+| `npm install` | 26 | 15 |
+| hermesc | 3 | 24 |
+| npm/npx timeout | 7 | 1 |
+| other | 2 | 0 |
+
+Together 2,154 of 2,347 jobs have a build (92%). The 24 hermesc failures
+are new: shimmed or retried bundles that hermesc rejects (one example is a
+helper bundle with an invalid assignment left-hand side). Overlay
+`db-overlay-pop2`: 1,251 files, 202 MB (one built file had no subtract
+output).
+
+Measured with current main, offline, each layered directory a symlink copy
+with its own `build-candidate-hash-index.mjs` index; base = db-v3-clean,
++pop = base + `db-overlay-pop`, +pop2 = base + both overlays (confirmed / TP
+/ FP, recall all):
+
+| bundle | base | + pop | + pop + pop2 |
+|---|---|---|---|
+| Expensify | 135 / 96 / 39, 33.3% | 163 / 126 / 37, 43.8% | 169 / 125 / 44, 43.4% |
+| react-navigation | 16 / 16 / 0, 21.1% | 19 / 19 / 0, 25.0% | 19 / 19 / 0, 25.0% |
+| bluesky | 45 / 37 / 8, 18.7% | 53 / 45 / 8, 22.7% | 51 / 44 / 7, 22.2% |
+| rainbow | 129 / 106 / 23, 20.5% | 133 / 108 / 25, 20.8% | 135 / 109 / 26, 21.0% |
+| MetaMask | 186 / 148 / 38, 19.8% | 192 / 153 / 39, 20.4% | 188 / 149 / 39, 19.9% |
+
+The retry does not help: 1,251 more packages move the five apps by -1 to +1
+TP and add false positives. Expensify gains `@formatjs/intl-localematcher`
+and loses `js-base64` and `react-is`; new FPs `buffer-crc32`,
+`@sentry/{replay,replay-canvas,browser-utils,feedback}`, `smart-buffer`,
+`@vitest/pretty-format`, `@octokit/oauth-methods` (the `@sentry/*` ones are
+sub-packages whose modules overlap the SDK's own). MetaMask loses four TPs
+(`define-properties`, `es-define-property`, `has-symbols`, `hasown`) and
+gains `is-string`; rainbow and MetaMask gain `safe-array-concat`; bluesky
+gains `@sentry/feedback` and loses `color` and `react-native-gesture-handler`
+while gaining `esquery`. The lost TPs are small shim-like packages; the cause was not
+traced (the larger population probably changes candidate/subtraction context). Against the base, the first
+overlay's gains (Expensify +30 TP, bluesky +8, react-navigation +3) are
+unchanged and it still loses no TP. This mixes in no truth overlay
+(`db-overlay-recall`). Next: trace why those TPs are lost before building more.
+
+Reproduce (deb, `~/_hbc2js/pop2/`): jobs-retry.tsv = jobs-all.tsv minus the
+`ok` results of the first run; `drive.sh` (stops below 15 GB) via `xargs -P6`;
+`subtract.sh`, `after3.sh` (merge, index, `measure.sh <tag> <dir>`).
+>>>>>>> origin/deps-population-widen-3
