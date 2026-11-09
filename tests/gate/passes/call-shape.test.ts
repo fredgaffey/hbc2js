@@ -401,7 +401,7 @@ test("v99 shape: 33-class-inheritance-super — an ordinary two-argument Reflect
   // call-shape's own property, unchanged, on the shape call-shape sees.
   const code = decompile(new Uint8Array(readFileSync(fixturePath("33-class-inheritance-super", 99, ""))), { moduleName: "x", passes: { skip: ["var-naming", "super-call"] } }).code;
   assert.match(code, /new r7(?:_\d+)?\(r12(?:_\d+)?, r11(?:_\d+)?\)/);
-  assert.match(code, /Reflect\.construct\(r2(?:_\d+)?, \[\w+\], r3(?:_\d+)?\)/, "super() forwards a distinct new.target — must not become `new r2(r4)`");
+  assert.match(code, /Reflect\.construct\(r2(?:_\d+)?, \[r4(?:_\d+)?\], r3(?:_\d+)?\)/, "super() forwards a distinct new.target — must not become `new r2(r4)`");
 });
 
 // docs/specs/passes/14-template-literal.md §7: `call-shape` and
