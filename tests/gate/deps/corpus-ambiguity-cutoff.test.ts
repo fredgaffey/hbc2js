@@ -163,3 +163,24 @@ test("deps-land-1110: one or two unique hits do not make a package supported", (
   const r = matchInventory(target, loaded([s, ...carriers(h.path, "other-", AMBIGUOUS_OWNER_THRESHOLD + 5)]));
   assert.ok((scoreOf(r, "s-thin")?.exactHits ?? 0) < 6, "X stays ambiguous for s-thin: " + JSON.stringify(scoreOf(r, "s-thin")));
 });
+
+// deps-land-1110: bluesky lost lodash.throttle on the transitive-
+// subtraction farm. Its 4.0.x files depend on lodash.debounce, 4.1.1
+// depends on nothing and inlines debounce's helpers. The closure rule took
+// each package's closure as the union over its loaded versions, so 4.1.1's
+// inlined helpers were set aside as debounce's code, leaving one own hit.
+// A file's closure is its own version's.
+test("deps-land-1110: a version that depends on nothing keeps the code an older version's dependency also holds", (t) => {
+  const h = requireHermesc(t, 96);
+  if (h === null) return;
+  const DEB = moduleOf("db", 6, 6101);
+  const THR = helpers("db", 6, 6101).join("\n") + "\nfunction th0(f, w) { return db0(w, 3) + db1(w, 5); }\nmodule.exports = { db0: db0, db1: db1, db2: db2, db3: db3, db4: db4, db5: db5, th0: th0 };";
+  const THR_APP = THR + "\nmodule.exports.qq = 2;";
+  const target = buildInventory(compile(h.path, bundle([APP, DEB, THR_APP]))).inventory;
+  const deb = { ...signature(h.path, "debounce", [DEB], []), dependencyClosure: [] };
+  const old = { ...signature(h.path, "throttle", [THR], ["debounce"]), version: "1.0.0", dependencyClosure: ["debounce"] };
+  const cur = { ...signature(h.path, "throttle", [THR], []), version: "2.0.0", dependencyClosure: [] };
+  const r = matchInventory(target, loaded([deb, old, cur]));
+  const thr = r.packages.filter((s) => s.package === "throttle").sort((a, b) => b.exactHits - a.exactHits)[0];
+  assert.ok((thr?.exactHits ?? 0) >= 7, "throttle@2 keeps its inlined helpers: " + JSON.stringify(r.packages.filter((s) => s.package === "throttle")));
+});

@@ -1102,7 +1102,12 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
   const closureHolders = (file: SigDbFile): Set<string>[] => {
     const out: Set<string>[] = [];
     if (file.toolchainBaseline) return out;
-    for (const d of closureOf.get(file.package) ?? []) {
+    // deps-land-1110: the file's own version's closure when it records one
+    // (lodash.throttle 4.1.1 depends on nothing and inlines debounce, while
+    // 4.0.x depends on lodash.debounce); the union over loaded versions only
+    // for a file without one.
+    for (const d of file.dependencyClosure ?? closureOf.get(file.package) ?? []) {
+      if (d === file.package) continue;
       const keys = ownTargetKeys.get(d);
       if (keys !== undefined && keys.size > 0 && closureOf.get(d)?.has(file.package) !== true) out.push(keys);
     }
