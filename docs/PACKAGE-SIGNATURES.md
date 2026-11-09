@@ -1084,6 +1084,24 @@ here publishes; the owner runs the printed command.
    tools/pkgsig/fetch-db.sh [dest]` (no default tag; the current default is
    unchanged until the owner flips it).
 
+**Remaining procedure (status 2026-11-09: pre-retry dry-run only, not shippable).**
+The first rebuild (`db-v4-paths`) left 14,809 files pathless, of which about
+13,027 were never attempted (NOSLOT: all slots locked when the job started),
+1,614 hit bundle ENOSPC (inotify watch limit), 132 "too many unmatched
+modules", 31 ETIMEDOUT, 5 other. The retry (`db-v4-paths-retry`, log
+`db-v4-paths-retry.log`, ends with `ALLDONE`) is the one to ship. After
+ALLDONE, on the build host:
+1. Union by hard links: `cp -al db-v4-paths/. U; cp -alf db-v4-paths-retry/. U`.
+2. The still-pathless list is `db-v4-paths-retry.failed.2.txt` plus
+   `failed.1.txt` (finalize.sh LIST).
+3. `SRC=db-v3-clean OUT=U`, with a `U.log` ending in `DONE` (finalize.sh checks `$OUT.log`).
+4. Rebuild the hash and stringset indexes, run `finalize.sh` (as above), and
+   re-measure the five truth apps with `ship-meas/meas.sh` against the staged
+   `db/` (docs/METRICS.md, replace the pre-retry section).
+5. Only then record tag, sizes and sha256s here and hand the owner the
+   `gh release create` command that finalize.sh prints. None is recorded for
+   the pre-retry DB, deliberately.
+
 **The sqlite asset (schema rev 3, lossless).** Rev 3 stores every
 `SigDbFile` field: `modules.factory_is_dependency`,
 `fingerprints.subtracted_dependencies` (JSON; NULL = absent, `[]` = empty),

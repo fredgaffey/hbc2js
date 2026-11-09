@@ -278,3 +278,24 @@ Wall: offline 11-86 s; confirm 279-1386 s (3 workers, loaded host).
 - The one false positive: `semver-truncate@3.0.0`, a 1-module package with 26
   eligible functions, exact 69%, 0 of 1 modules exactly matched, no string
   corroboration (rainbow, v4-paths, tier high).
+
+## db-v4-paths full v4 vs v3, PRE-RETRY (2026-11-09, offline, no truth overlay)
+
+Pre-retry: the first rebuild never attempted about 13,000 of the 14,809 pathless files. A retry (`db-v4-paths-retry`) is running; these numbers are NOT the release DB and must be re-measured on the union DB (see docs/PACKAGE-SIGNATURES.md, "Remaining procedure").
+
+Final staged DB (`finalize.sh`): 71,222 files, 56,413 with transplanted paths (79.2%), the other 14,809 are the pathless v3 originals hard-linked in (13,027 never reached a slot in the first pass and the retry pass was stopped early; 1,614 bundle ENOSPC on the inotify watch limit; 132 too many unmatched modules; 31 ETIMEDOUT; 5 other). Module path coverage 91.3%, function `moduleId` coverage 65.1%. Same bundles, truth files and code (main a1c0b4d) as above; `ship-meas/meas.sh`.
+
+| app | db | confirmed | TP | FP | precision | recall | direct recall |
+|---|---|---|---|---|---|---|---|
+| Expensify | v3-clean | 133 | 94 | 39 | 0.707 | 0.326 | 0.352 |
+| Expensify | v4 | 103 | 97 | 6 | 0.942 | 0.337 | 0.385 |
+| react-navigation | v3-clean | 16 | 16 | 0 | 1.000 | 0.211 | 0.250 |
+| react-navigation | v4 | 20 | 20 | 0 | 1.000 | 0.263 | 0.317 |
+| bluesky | v3-clean | 45 | 37 | 8 | 0.822 | 0.187 | 0.187 |
+| bluesky | v4 | 45 | 44 | 1 | 0.978 | 0.222 | 0.222 |
+| rainbow | v3-clean | 106 | 84 | 22 | 0.792 | 0.162 | 0.204 |
+| rainbow | v4 | 96 | 86 | 10 | 0.896 | 0.166 | 0.209 |
+| metamask | v3-clean | 173 | 136 | 37 | 0.786 | 0.182 | 0.206 |
+| metamask | v4 | 162 | 143 | 19 | 0.883 | 0.191 | 0.225 |
+
+Every app gains true positives and loses false positives; no app regresses. Rainbow and metamask now improve.
