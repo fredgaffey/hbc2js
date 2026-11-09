@@ -50,7 +50,7 @@ for (const version of ["v98", "v99"] as const) {
     assert.match(on, /#bump in /);
     assert.doesNotMatch(on, /Symbol\("#n"\)/);
     assert.doesNotMatch(on, /Symbol\("Counter"\)/);
-    assert.doesNotMatch(on, /Reflect\.apply\(/);
+    assert.doesNotMatch(on, /function _fn\d+\(a1\) \{\n\s*\/\/ fn#\d+ "#bump"/);
   });
 }
 

@@ -32,6 +32,7 @@
 import type { Expr, Stmt } from "../ast.ts";
 import { identUses, identUsesMany, isHelperCall, mapStmts, walk } from "../ast.ts";
 import type { Match, PassContext } from "../types.ts";
+import { brandSymbolName, foldMethods } from "./methods.ts";
 
 export interface PrivateFieldsGroup {
   /** Display name (with the leading `#`) of every candidate this rung
@@ -58,7 +59,7 @@ function privateSymbolName(e: Expr): string | null {
 /** A statement that stores a value into a single named variable, whichever
  *  of the two shapes the emitter used (`k:"init"` the first time a name is
  *  written, `k:"expr"`+`assign` every time after). */
-function simpleStore(s: Stmt): { readonly name: string; readonly value: Expr } | null {
+export function simpleStore(s: Stmt): { readonly name: string; readonly value: Expr } | null {
   if (s.k === "init") return { name: s.name, value: s.value };
   if (s.k === "expr" && s.expr.k === "assign" && isIdent(s.expr.target)) return { name: s.expr.target.name, value: s.expr.value };
   return null;
@@ -68,7 +69,7 @@ function simpleStore(s: Stmt): { readonly name: string; readonly value: Expr } |
  *  shape `src/passes/super-call/match.ts`'s own `ENV_SLOT` matches. A slot is
  *  the frame's shared binding, so it is what a class member's body reads;
  *  a register is this frame's own temporary and means nothing inside one. */
-const ENV_SLOT = /^_e\d+_\d+$/;
+export const ENV_SLOT = /^_e\d+_\d+$/;
 
 /** One private name this rung may try to fold.
  *
@@ -82,6 +83,9 @@ export interface PrivateFieldCandidate {
   readonly envName: string;
   readonly displayName: string;
   readonly regName: string | null;
+  /** Spec 24 section 1.7.1: a private-method brand (`Symbol("Class")`), folded
+   *  by `./methods.ts` through `foldOne`; its creation has no `#`. */
+  readonly brand?: true;
 }
 
 /** Every top-level private-name creation in `before` -- the emitter's lowering
@@ -105,7 +109,7 @@ export interface PrivateFieldCandidate {
  *  again before the slot store, so a register that held a *different* value by
  *  then is never followed (the position-blind mistake this file's header
  *  comment already warns about, in its store-scanning half). */
-export function findCandidates(before: readonly Stmt[]): readonly PrivateFieldCandidate[] {
+export function findCandidates(before: readonly Stmt[], pick: (e: Expr) => string | null = privateSymbolName): readonly PrivateFieldCandidate[] {
   const out: { envName: string; displayName: string; regName: string | null }[] = [];
   // Register -> the candidate it currently holds, live only while nothing has
   // overwritten it and it has not already been followed into a slot.
@@ -113,7 +117,7 @@ export function findCandidates(before: readonly Stmt[]): readonly PrivateFieldCa
   for (const s of before) {
     const store = simpleStore(s);
     if (store === null) continue;
-    const displayName = privateSymbolName(store.value);
+    const displayName = pick(store.value);
     if (displayName !== null) {
       const c = { envName: store.name, displayName, regName: null };
       out.push(c);
@@ -157,7 +161,7 @@ function objectCall(e: Expr, name: string): readonly Expr[] | null {
 
 /** `Object.prototype.hasOwnProperty.call(obj, key)` -- `hasOwn()` in
  *  `src/emit/lower.ts`, `PrivateIsIn`'s lowering. */
-function hasOwnCall(e: Expr): readonly Expr[] | null {
+export function hasOwnCall(e: Expr): readonly Expr[] | null {
   if (e.k !== "call" || e.callee.k !== "member" || e.callee.computed || e.callee.prop.k !== "lit" || e.callee.prop.text !== "call") return null;
   const target = e.callee.obj;
   if (target.k !== "member" || target.computed || target.prop.k !== "lit" || target.prop.text !== "hasOwnProperty") return null;
@@ -610,7 +614,7 @@ export function foldOne(before: readonly Stmt[], candidate: PrivateFieldCandidat
   const createdIn = regName ?? envName;
   const isCreation = (st: Stmt): boolean => {
     const store = simpleStore(st);
-    return store !== null && store.name === createdIn && privateSymbolName(store.value) !== null;
+    return store !== null && store.name === createdIn && (candidate.brand === true ? brandSymbolName(store.value) : privateSymbolName(store.value)) !== null;
   };
   const isHop = (st: Stmt): boolean => {
     const store = simpleStore(st);
@@ -740,8 +744,12 @@ export interface FoldScope {
 }
 
 export function foldAll(before: readonly Stmt[], scope?: FoldScope): { readonly after: readonly Stmt[]; readonly folded: readonly string[] } {
-  let tree = before;
-  const folded: string[] = [];
+  // Spec 24 section 1.7.1: private methods first, so the field fold below
+  // reaches a method body as an ordinary member (`./methods.ts`).
+  const pm = foldMethods(before, scope === undefined ? undefined : { fnBody: scope.fnBody, list: before });
+  if (process.env.PMDBG && pm !== null) console.error("PM", "", "refused" in pm ? pm.refused + " " + pm.detail : "folded " + pm.methods.join(","));
+  let tree = pm !== null && "tree" in pm ? pm.tree : before;
+  const folded: string[] = pm !== null && "tree" in pm ? [...pm.methods] : [];
   for (const c of findCandidates(before)) {
     const next = foldOne(tree, c, scope === undefined ? undefined : { fnBody: scope.fnBody, list: before });
     if (next !== null) {
