@@ -251,5 +251,7 @@ test("corpus metric (spec §7 floors, measured): switch-local breaks fall to 0 a
     assert.equal(f.doubledBreaks, 0, `${name}: doubled breaks inside a switch`);
   }
   assert.ok(v94.labelDecls.after < v94.labelDecls.before, "label declarations did not fall at all");
+  // Absolute guard: the percentage floor dilutes as fixtures are added, the removed-label count does not.
+  assert.ok(v94.labelDecls.before - v94.labelDecls.after >= 11, `v94 removed only ${v94.labelDecls.before - v94.labelDecls.after} label declarations (< 11)`);
   assert.ok(v94.labelDecls.reductionPct >= 4.5, `v94 label-declaration reduction ${v94.labelDecls.reductionPct.toFixed(1)}% < 4.5%`);
 });
