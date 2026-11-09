@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -27,6 +27,29 @@ function runCli(args: readonly string[]): { status: number | null; stdout: strin
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 
+type CliResult = { status: number | null; stdout: string; stderr: string };
+function runCliAsync(args: readonly string[]): Promise<CliResult> {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [CLI, ...args]);
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (d: string) => (stdout += d));
+    child.stderr.setEncoding("utf8").on("data", (d: string) => (stderr += d));
+    child.once("close", (status) => resolve({ status, stdout, stderr }));
+  });
+}
+
+// The three rn-template CLI runs below are independent, so they are launched
+// together at module load (each into its own out dir) and each test awaits its
+// own run: wall time is the slowest run, not their sum.
+function launch(prefix: string, extra: readonly string[]): { dir: string; run: Promise<CliResult> } {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  return { dir, run: runCliAsync(["render-modules", RN_TEMPLATE, "--only", "components", ...extra, "--out", dir]) };
+}
+const ALL_COMPONENTS = launch("hbc2js-render-modules-cli-", []);
+const ONE_COMPONENT = launch("hbc2js-render-module-scratch-", ["--limit", "1"]);
+const ONE_JSX = launch("hbc2js-render-modules-jsx-", ["--limit", "1", "--tier", "jsx"]);
+
 /** `--only components` selects exactly the module ids `index/modules.json`
  *  tags `rendersJsx: true` -- read independently from the artifact this same
  *  run wrote, never assumed equal by construction. */
@@ -39,10 +62,10 @@ function assertComponentsSelectionEqualsIndex(outDir: string): { componentsCount
   return { componentsCount: expected.size, totalCount: modulesIndex.modules.length };
 }
 
-test("render-modules --only components on rn-template: selection matches the rendersJsx index tag, every readable file node --checks", () => {
-  const outDir = mkdtempSync(join(tmpdir(), "hbc2js-render-modules-cli-"));
+test("render-modules --only components on rn-template: selection matches the rendersJsx index tag, every readable file node --checks", async () => {
+  const outDir = ALL_COMPONENTS.dir;
   try {
-    const r = runCli(["render-modules", RN_TEMPLATE, "--only", "components", "--out", outDir]);
+    const r = await ALL_COMPONENTS.run;
     assert.equal(r.status, 0, r.stderr);
     assert.match(r.stdout, /rendered \d+\/\d+ module\(s\)/);
     const { componentsCount } = assertComponentsSelectionEqualsIndex(outDir);
@@ -66,19 +89,19 @@ test("render-modules --only components on rn-template: selection matches the ren
   }
 });
 
-test("render-module --module N writes readable/module_N.js and honours --limit on render-modules", () => {
+test("render-module --module N writes readable/module_N.js and honours --limit on render-modules", async () => {
   const outDir = mkdtempSync(join(tmpdir(), "hbc2js-render-module-cli-"));
   try {
     // Find one rendersJsx module id first via a components run into a scratch dir.
-    const scratch = mkdtempSync(join(tmpdir(), "hbc2js-render-module-scratch-"));
-    const scratchRun = runCli(["render-modules", RN_TEMPLATE, "--only", "components", "--limit", "1", "--out", scratch]);
+    const scratch = ONE_COMPONENT.dir;
+    const scratchRun = await ONE_COMPONENT.run;
     assert.equal(scratchRun.status, 0, scratchRun.stderr);
     const scratchModules = JSON.parse(readFileSync(join(scratch, "MODULES.json"), "utf8")) as SplitModulesJson;
     const oneId = scratchModules.modules.find((m) => m.readable !== null && m.readable !== undefined)?.id;
     rmSync(scratch, { recursive: true, force: true });
     assert.ok(oneId !== undefined, "expected at least one rendersJsx module id from the scratch run");
 
-    const r = runCli(["render-module", RN_TEMPLATE, "--module", String(oneId), "--out", outDir]);
+    const r = await runCliAsync(["render-module", RN_TEMPLATE, "--module", String(oneId), "--out", outDir]);
     assert.equal(r.status, 0, r.stderr);
     const path = join(outDir, "readable", `module_${String(oneId)}.js`);
     assert.ok(existsSync(path));
@@ -89,10 +112,10 @@ test("render-module --module N writes readable/module_N.js and honours --limit o
   }
 });
 
-test("render-modules --tier jsx: header names the jsx tier (D20: not node --check'd)", () => {
-  const outDir = mkdtempSync(join(tmpdir(), "hbc2js-render-modules-jsx-"));
+test("render-modules --tier jsx: header names the jsx tier (D20: not node --check'd)", async () => {
+  const outDir = ONE_JSX.dir;
   try {
-    const r = runCli(["render-modules", RN_TEMPLATE, "--only", "components", "--limit", "1", "--tier", "jsx", "--out", outDir]);
+    const r = await ONE_JSX.run;
     assert.equal(r.status, 0, r.stderr);
     const splitModules = JSON.parse(readFileSync(join(outDir, "MODULES.json"), "utf8")) as SplitModulesJson;
     const one = splitModules.modules.find((m) => m.readable !== null && m.readable !== undefined);
