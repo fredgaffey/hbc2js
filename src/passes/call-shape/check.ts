@@ -32,7 +32,7 @@
 import type { Expr, Stmt } from "../ast.ts";
 import { effectSequence } from "../ast.ts";
 import type { CheckResult, PassContext } from "../types.ts";
-import { classifyNode, collectCandidates } from "./match.ts";
+import { classifyNode, collectCandidates, matchCondArg } from "./match.ts";
 import { applyReplacement } from "./rewrite.ts";
 
 function sameStmt(a: Stmt, b: Stmt): boolean {
@@ -61,6 +61,17 @@ function recomputeSite(before: readonly Stmt[], fnBody: readonly Stmt[]): { read
 }
 
 export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: PassContext): CheckResult {
+  const first = recomputeSite(before, ctx.fnBody ?? before);
+  if (first.found === null) {
+    // R3e (spec 04 section 9): recompute the site from `before` alone and
+    // require `after` to be exactly that splice.
+    const site = matchCondArg(before, ctx.fnBody ?? before);
+    if (site?.splice === undefined) return { ok: false, reason: first.firstReason ?? "no recognised call-shape site in before" };
+    const { from, to, stmts } = site.splice;
+    const expected = [...before.slice(0, from), ...stmts, ...before.slice(to + 1)];
+    if (expected.length !== after.length || !expected.every((s, i) => sameStmt(s, after[i]!))) return { ok: false, reason: "R3e: after is not the recomputed splice" };
+    return { ok: true };
+  }
   if (after.length !== before.length) {
     return { ok: false, reason: "unexpected shape: call-shape only ever rewrites one call node in place, never adds or removes a statement" };
   }
@@ -80,9 +91,9 @@ export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: Pass
   const expectedArgCount = found.replacement.args.length;
 
   // Item 2: the rewritten node's argument count equals the source array's
-  // length (R3a/R3b/R3c only — R3d has no array literal to compare against,
+  // length (R3a/R3b/R3c/R3e only — R3d has no array literal to compare against,
   // per §4's own note that `.apply`'s `arr` "may be any expression").
-  if (found.rule === "R3a" || found.rule === "R3b" || found.rule === "R3c") {
+  if (found.rule === "R3a" || found.rule === "R3b" || found.rule === "R3c" || found.rule === "R3e" || found.rule === "R3f") {
     const target = found.target as Expr & { readonly k: "call" };
     const arrIndex = found.rule === "R3c" ? 1 : 2;
     const arr = target.args[arrIndex];
@@ -109,6 +120,16 @@ export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: Pass
     const beforeReads = effectSequence([{ k: "expr", expr: found.target }]).filter((e) => e.k === "member-read").length;
     const afterReads = effectSequence([{ k: "expr", expr: found.replacement }]).filter((e) => e.k === "member-read").length;
     if (afterReads < 1 || afterReads > beforeReads) return { ok: false, reason: "R3b's member read of O.P was not preserved" };
+  }
+
+  // R3f: the callee is exactly `(0, F)` with `F` the source's own callee
+  // node, so `this` stays undefined and `F` stays the first effect.
+  if (found.rule === "R3f" && found.replacement.k === "call") {
+    const c = found.replacement.callee;
+    const F = (found.target as Expr & { readonly k: "call" }).args[0];
+    if (c.k !== "seq" || c.exprs.length !== 2 || c.exprs[0]!.k !== "lit" || c.exprs[0]!.text !== "0" || c.exprs[1] !== F) {
+      return { ok: false, reason: "R3f's callee is not `(0, F)` over the source callee" };
+    }
   }
 
   // Deliberately no `expressionOnlyCheck`-style "no `rN` read before its own

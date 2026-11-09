@@ -1,0 +1,291 @@
+; hbc2js disassembly of 130-call-cond-arg/v99.hbc
+; version=99 layout=E opcodeTable=hbc99-mar2026 functions=12 strings=41 globalCodeIndex=0
+function #0 "global"  params=1 frame=26 env=0 flags=dbg,overflowed  @0x00000338 size=616
+  0000  DeclareGlobalVar     s19 "log"
+  0005  DeclareGlobalVar     s24 "trace"
+  000a  DeclareGlobalVar     s20 "obj"
+  000f  DeclareGlobalVar     s33 "pick"
+  0014  DeclareGlobalVar     s29 "twoConds"
+  0019  DeclareGlobalVar     s38 "reassign"
+  001e  DeclareGlobalVar     s39 "viaGlobal"
+  0023  DeclareGlobalVar     s14 "desc"
+  0028  DeclareGlobalVar     s35 "src"
+  002d  DeclareGlobalVar     s22 "ns"
+  0032  GetGlobalObject      r5
+  0034  LoadConstUndefined   r2
+  0036  CreateClosure        r6, r2, f1 "trace"
+  003b  PutByIdLoose         r5, r6, #c0, s24 "trace"
+  0041  CreateClosure        r6, r2, f2 "pick"
+  0046  PutByIdLoose         r5, r6, #c1, s33 "pick"
+  004c  CreateClosure        r6, r2, f3 "twoConds"
+  0051  PutByIdLoose         r5, r6, #c2, s29 "twoConds"
+  0057  CreateClosure        r6, r2, f4 "reassign"
+  005c  PutByIdLoose         r5, r6, #c3, s38 "reassign"
+  0062  CreateClosure        r6, r2, f5 "viaGlobal"
+  0067  PutByIdLoose         r5, r6, #c4, s39 "viaGlobal"
+  006d  NewArray             r6, 0
+  0071  PutByIdLoose         r5, r6, #c5, s19 "log"
+  0077  GetByIdShort         r7, r5, #c0, s24 "trace"
+  007c  LoadConstString      r6, s20 "obj"
+  0080  Call2                r6, r7, r2, r6
+  0085  PutByIdLoose         r5, r6, #c6, s20 "obj"
+  008b  NewObject            r6
+  008d  LoadConstString      r8, s16 "get"
+  0091  CreateClosure        r7, r2, f6 "get get"
+  0096  DefineOwnGetterSetterByVal r6, r8, r7, r2, 1
+  009c  PutByIdLoose         r5, r6, #c7, s14 "desc"
+  00a2  TryGetById           r7, r5, #c1, s36 "print"
+  00a8  GetByIdShort         r9, r5, #c2, s33 "pick"
+  00ad  GetByIdShort         r17, r5, #c3, s20 "obj"
+  00b2  GetByIdShort         r14, r5, #c4, s14 "desc"
+  00b7  LoadConstString      r11, s11 "n"
+  00bb  LoadConstString      r10, s8 "t"
+  00bf  LoadConstUndefined   r18
+  00c1  Mov                  r16, r10
+  00c4  Mov                  r15, r11
+  00c7  Call                 r6, r9, 5
+  00cb  Call2                r6, r7, r2, r6
+  00d0  TryGetById           r7, r5, #c1, s36 "print"
+  00d6  GetByIdShort         r9, r5, #c2, s33 "pick"
+  00db  GetByIdShort         r17, r5, #c3, s20 "obj"
+  00e0  NewObjectWithBuffer  r14, sh0(numProps=1), lit@0x0000
+  00e6  LoadConstUndefined   r18
+  00e8  Call                 r6, r9, 5
+  00ec  Call2                r6, r7, r2, r6
+  00f1  TryGetById           r8, r5, #c1, s36 "print"
+  00f7  GetByIdShort         r7, r5, #c5, s29 "twoConds"
+  00fc  GetByIdShort         r6, r5, #c3, s20 "obj"
+  0101  LoadConstFalse       r3
+  0103  LoadConstTrue        r4
+  0105  Call4                r7, r7, r2, r6, r4, r3
+  010c  GetByIdShort         r9, r5, #c5, s29 "twoConds"
+  0111  GetByIdShort         r6, r5, #c3, s20 "obj"
+  0116  LoadConstUInt8       r1, 1
+  0119  LoadConstZero        r0
+  011b  Call4                r6, r9, r2, r6, r0, r1
+  0122  Call3                r6, r8, r2, r7, r6
+  0128  TryGetById           r8, r5, #c1, s36 "print"
+  012e  GetByIdShort         r7, r5, #c6, s38 "reassign"
+  0133  GetByIdShort         r6, r5, #c3, s20 "obj"
+  0138  Call3                r7, r7, r2, r6, r4
+  013e  GetByIdShort         r9, r5, #c6, s38 "reassign"
+  0143  GetByIdShort         r6, r5, #c3, s20 "obj"
+  0148  Call3                r6, r9, r2, r6, r3
+  014e  Call3                r6, r8, r2, r7, r6
+  0154  TryGetById           r8, r5, #c1, s36 "print"
+  015a  GetByIdShort         r7, r5, #c7, s39 "viaGlobal"
+  015f  LoadConstUInt8       r0, 2
+  0162  NewObject            r6
+  0164  Call4                r7, r7, r2, r1, r0, r6
+  016b  GetByIdShort         r9, r5, #c7, s39 "viaGlobal"
+  0170  NewObjectWithBuffer  r6, sh1(numProps=2), lit@0x0005
+  0176  Call4                r6, r9, r2, r1, r0, r6
+  017d  Call3                r6, r8, r2, r7, r6
+  0183  TryGetById           r7, r5, #c1, s36 "print"
+  0189  GetByIdShort         r8, r5, #c8, s19 "log"
+  018e  GetByIdShort         r6, r8, #c9, s21 "join"
+  0193  LoadConstString      r12, s1 ","
+  0197  Call2                r6, r6, r8, r12
+  019c  Call2                r6, r7, r2, r6
+  01a1  NewObjectWithBuffer  r6, sh2(numProps=1), lit@0x0000
+  01a7  LoadConstString      r8, s17 "b"
+  01ab  CreateClosure        r7, r2, f7 "get b"
+  01b0  DefineOwnGetterSetterByVal r6, r8, r7, r2, 1
+  01b6  PutByIdLoose         r5, r6, #c8, s35 "src"
+  01bc  GetByIdShort         r8, r5, #c10, s35 "src"
+  01c1  CreateFunctionEnvironment r9, 2
+  01c4  StoreToEnvironment   r9, 0, r8
+  01c8  StoreNPToEnvironment r9, 1, r2
+  01cc  JmpFalse             L1, r8
+  01cf  GetByIdShort         r7, r8, #c11, s26 "__esModule"
+  01d4  Mov                  r6, r8
+  01d7  JmpTrue              L3, r7
+L1:
+  01da  NewObject            r7
+  01dc  StoreToEnvironment   r9, 1, r7
+  01e0  JmpFalse             L2, r8
+  01e3  TryGetById           r11, r5, #c12, s23 "Object"
+  01e9  GetByIdShort         r10, r11, #c13, s34 "keys"
+  01ee  Call2                r11, r10, r11, r8
+  01f3  GetByIdShort         r10, r11, #c14, s32 "forEach"
+  01f8  CreateClosure        r9, r9, f9 ""
+  01fd  Call2                r9, r10, r11, r9
+L2:
+  0202  PutByIdLoose         r7, r8, #c9, s28 "default"
+  0208  Mov                  r6, r7
+L3:
+  020b  PutByIdLoose         r5, r6, #c10, s22 "ns"
+  0211  TryGetById           r8, r5, #c1, s36 "print"
+  0217  GetByIdShort         r6, r5, #c15, s22 "ns"
+  021c  GetByIdShort         r7, r6, #c16, s18 "a"
+  0221  GetByIdShort         r6, r5, #c15, s22 "ns"
+  0226  GetByIdShort         r16, r6, #c17, s17 "b"
+  022b  GetByIdShort         r9, r5, #c15, s22 "ns"
+  0230  GetByIdShort         r10, r9, #c18, s28 "default"
+  0235  GetByIdShort         r9, r5, #c10, s35 "src"
+  023a  TryGetById           r13, r5, #c12, s23 "Object"
+  0240  GetByIdShort         r11, r13, #c13, s34 "keys"
+  0245  GetByIdShort         r5, r5, #c15, s22 "ns"
+  024a  Call2                r11, r11, r13, r5
+  024f  GetByIdShort         r5, r11, #c9, s21 "join"
+  0254  Call2                r14, r5, r11, r12
+  0259  StrictEq             r15, r10, r9
+  025d  LoadConstUndefined   r18
+  025f  Mov                  r17, r7
+  0262  Call                 r5, r8, 5
+  0266  Ret                  r5
+
+function #1 "trace"  params=3 frame=4 env=0 flags=dbg,overflowed  @0x000005a0 size=31
+  0000  CreateFunctionEnvironment r2, 1
+  0003  LoadParam            r1, 1
+  0006  StoreToEnvironment   r2, 0, r1
+  000a  NewObject            r1
+  000c  LoadConstString      r3, s13 "m"
+  0010  LoadConstUndefined   r0
+  0012  CreateClosure        r2, r2, f8 "get m"
+  0017  DefineOwnGetterSetterByVal r1, r3, r2, r0, 1
+  001d  Ret                  r1
+
+function #2 "pick"  params=5 frame=16 env=0 flags=dbg,overflowed  @0x000005bf size=40
+  0000  LoadParam            r4, 1
+  0003  LoadParam            r3, 4
+  0006  GetByIdShort         r2, r4, #c0, s13 "m"
+  000b  GetByIdShort         r0, r3, #c1, s16 "get"
+  0010  JmpTrue              L1, r0
+  0013  NewObjectWithBuffer  r3, sh3(numProps=1), lit@0x000e
+L1:
+  0019  LoadParam            r1, 2
+  001c  LoadParam            r0, 3
+  001f  Call4                r0, r2, r4, r1, r0, r3
+  0026  Ret                  r0
+
+function #3 "twoConds"  params=4 frame=16 env=0 flags=dbg,overflowed  @0x000005e7 size=40
+  0000  LoadParam            r4, 1
+  0003  GetByIdShort         r3, r4, #c0, s13 "m"
+  0008  LoadConstUInt8       r0, 2
+  000b  LoadParam            r5, 2
+  000e  JmpFalse             L1, r5
+  0011  LoadConstUInt8       r0, 1
+L1:
+  0014  LoadParam            r5, 3
+  0017  LoadConstUInt8       r1, 4
+  001a  JmpFalse             L2, r5
+  001d  LoadConstUInt8       r1, 3
+L2:
+  0020  Call3                r3, r3, r4, r0, r1
+  0026  Ret                  r3
+
+function #4 "reassign"  params=3 frame=17 env=0 flags=dbg,overflowed  @0x0000060f size=34
+  0000  LoadParam            r5, 1
+  0003  GetByIdShort         r4, r5, #c0, s13 "m"
+  0008  LoadConstUInt8       r0, 2
+  000b  LoadParam            r6, 2
+  000e  Mov                  r3, r5
+  0011  JmpFalse             L1, r6
+  0014  LoadConstUInt8       r3, 7
+  0017  LoadConstUInt8       r0, 1
+L1:
+  001a  Call3                r3, r4, r5, r0, r3
+  0020  Ret                  r3
+
+function #5 "viaGlobal"  params=4 frame=15 env=0 flags=dbg,overflowed  @0x00000631 size=59
+  0000  LoadParam            r2, 3
+  0003  GetGlobalObject      r0
+  0005  TryGetById           r1, r0, #c0, s23 "Object"
+  000b  GetByIdShort         r0, r1, #c1, s34 "keys"
+  0010  GetByIdShort         r3, r2, #c2, s16 "get"
+  0015  JmpTrue              L1, r3
+  0018  LoadParam            r5, 1
+  001b  LoadParam            r4, 2
+  001e  NewObjectWithBuffer  r3, sh4(numProps=2), lit@0x0010
+  0024  PutOwnBySlotIdx      r3, r5, 0
+  0028  PutOwnBySlotIdx      r3, r4, 1
+  002c  Mov                  r2, r3
+L1:
+  002f  Call2                r0, r0, r1, r2
+  0034  GetByIdShort         r0, r0, #c3, s27 "length"
+  0039  Ret                  r0
+
+function #6 "get get"  params=1 frame=13 env=0 flags=dbg,overflowed  @0x0000066c size=25
+  0000  GetGlobalObject      r1
+  0002  GetByIdShort         r3, r1, #c0, s19 "log"
+  0007  GetByIdShort         r2, r3, #c1, s37 "push"
+  000c  LoadConstString      r1, s5 "read d.get"
+  0010  Call2                r1, r2, r3, r1
+  0015  LoadConstZero        r0
+  0017  Ret                  r0
+
+function #7 "get b"  params=1 frame=1 env=0 flags=none  @0x00000685 size=5
+  0000  LoadConstUInt8       r0, 2
+  0003  Ret                  r0
+
+function #8 "get m"  params=1 frame=14 env=0 flags=dbg,overflowed  @0x0000068a size=47
+  0000  GetParentEnvironment r0, 0
+  0003  GetGlobalObject      r1
+  0005  GetByIdShort         r3, r1, #c0, s19 "log"
+  000a  GetByIdShort         r2, r3, #c1, s37 "push"
+  000f  LoadFromEnvironment  r4, r0, 0
+  0013  LoadConstString      r1, s4 "read "
+  0017  Add                  r4, r1, r4
+  001b  LoadConstString      r1, s2 ".m"
+  001f  AddS                 r1, r4, r1
+  0023  Call2                r1, r2, r3, r1
+  0028  CreateClosure        r0, r0, f10 ""
+  002d  Ret                  r0
+
+function #9 ""  params=2 frame=19 env=0 flags=dbg,overflowed  @0x000006b9 size=88
+  0000  GetParentEnvironment r2, 0
+  0003  CreateFunctionEnvironment r7, 1
+  0006  LoadParam            r5, 1
+  0009  StoreToEnvironment   r7, 0, r5
+  000d  GetGlobalObject      r3
+  000f  TryGetById           r6, r3, #c0, s23 "Object"
+  0015  GetByIdShort         r4, r6, #c1, s15 "getOwnPropertyDescriptor"
+  001a  LoadFromEnvironment  r1, r2, 0
+  001e  Call3                r1, r4, r6, r1, r5
+  0024  TryGetById           r4, r3, #c0, s23 "Object"
+  002a  GetByIdShort         r3, r4, #c2, s30 "defineProperty"
+  002f  LoadFromEnvironment  r2, r2, 1
+  0033  GetByIdShort         r6, r1, #c3, s16 "get"
+  0038  JmpTrue              L1, r6
+  003b  NewObjectWithBuffer  r6, sh5(numProps=2), lit@0x000e
+  0041  CreateClosure        r7, r7, f11 "get"
+  0046  PutOwnBySlotIdx      r6, r7, 1
+  004a  Mov                  r1, r6
+L1:
+  004d  Call4                r1, r3, r4, r2, r5, r1
+  0054  LoadConstUndefined   r0
+  0056  Ret                  r0
+
+function #10 ""  params=4 frame=15 env=0 flags=dbg,overflowed  @0x00000711 size=88
+  0000  GetGlobalObject      r1
+  0002  GetByIdShort         r4, r1, #c0, s19 "log"
+  0007  GetByIdShort         r3, r4, #c1, s37 "push"
+  000c  GetParentEnvironment r2, 0
+  000f  LoadFromEnvironment  r5, r2, 0
+  0013  LoadConstString      r2, s3 "call "
+  0017  Add                  r2, r2, r5
+  001b  Call2                r2, r3, r4, r2
+  0020  GetByIdShort         r2, r1, #c2, s20 "obj"
+  0025  NewArray             r3, 4
+  0029  LoadThisNS           r1
+  002b  StrictEq             r0, r1, r2
+  002f  DefineOwnInDenseArray r3, r0, 0
+  0033  LoadParam            r1, 1
+  0036  DefineOwnInDenseArray r3, r1, 1
+  003a  LoadParam            r1, 2
+  003d  DefineOwnInDenseArray r3, r1, 2
+  0041  LoadParam            r1, 3
+  0044  DefineOwnInDenseArray r3, r1, 3
+  0048  GetByIdShort         r2, r3, #c3, s21 "join"
+  004d  LoadConstString      r1, s12 "|"
+  0051  Call2                r1, r2, r3, r1
+  0056  Ret                  r1
+
+function #11 "get"  params=1 frame=2 env=0 flags=dbg,overflowed  @0x00000769 size=20
+  0000  GetParentEnvironment r0, 1
+  0003  LoadFromEnvironment  r1, r0, 0
+  0007  GetParentEnvironment r0, 0
+  000a  LoadFromEnvironment  r0, r0, 0
+  000e  GetByVal             r0, r1, r0
+  0012  Ret                  r0
