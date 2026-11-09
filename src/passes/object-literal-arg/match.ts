@@ -25,7 +25,7 @@
 //    the effect sequence after the move — this is expr-rebuild's own R1a
 //    adjacent case (02-expr-rebuild.md §4), which could not fire earlier
 //    because kind A's literal still stood between the two statements.
-import { identUses, isPureStmt, isRegisterName, opcodeAt, originOf, registerUses } from "../ast.ts";
+import { identUses, isRegisterName, opcodeAt, originOf, registerUses } from "../ast.ts";
 import type { Expr, Stmt } from "../ast.ts";
 import type { Match, PassContext } from "../types.ts";
 
@@ -170,10 +170,22 @@ function literalArg(list: readonly Stmt[], fnBody: readonly Stmt[], ctx: PassCon
   return null;
 }
 
+/** A statement kind B may move `E` past: no value, or `rX = <literal or
+ *  register>`. Nothing narrower than this commutes with `E`, which may run
+ *  user code (a global getter, a getter on the chain): `isPureStmt` admits
+ *  global reads (another getter, or a ReferenceError) and operators that call
+ *  `valueOf`/`toString`, and a non-register target (a closure variable) the
+ *  getter could read (review-1110 objlit/fold, fixture 330). */
+function commutesWithGetter(s: Stmt): boolean {
+  if (s.k === "comment" || s.k === "decl") return true;
+  const d = defOf(s);
+  return d !== null && (d.value.k === "lit" || (d.value.k === "ident" && d.value.global !== true && isRegisterName(d.value.name)));
+}
+
 /** Kind B: `rC = E` (E a global identifier or a member chain over one, so it
- *  reads no register), then only `isPureStmt` statements that never mention
- *  `rC`, then a call whose callee is `rC.m`. E is the first thing that call
- *  evaluates, and the skipped statements have no effect to commute with. */
+ *  reads no register), then only `commutesWithGetter` statements that never
+ *  mention `rC`, then a call whose callee is `rC.m`. E is the first thing that
+ *  call evaluates, and the skipped statements have no effect to commute with. */
 function calleeBase(list: readonly Stmt[], fnBody: readonly Stmt[], ctx: PassContext): ArgInlineMatch | null {
   const mentions = (s: Stmt, reg: string): boolean => {
     const u = identUses([s], reg);
@@ -183,7 +195,7 @@ function calleeBase(list: readonly Stmt[], fnBody: readonly Stmt[], ctx: PassCon
     const def = defOf(list[i]!);
     if (def === null || !isBaseChain(def.value)) continue;
     let j = i + 1;
-    while (j < list.length && isPureStmt(list[j]!) && !mentions(list[j]!, def.reg)) j++;
+    while (j < list.length && commutesWithGetter(list[j]!) && !mentions(list[j]!, def.reg)) j++;
     if (j >= list.length) continue;
     const call = callOf(list[j]!);
     if (call === null || call.callee.k !== "member" || call.callee.obj.k !== "ident" || call.callee.obj.name !== def.reg) continue;

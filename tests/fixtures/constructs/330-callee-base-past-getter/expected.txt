@@ -1,0 +1,10 @@
+get G
+get H
+m 5
+5
+get G
+valueOf
+m 3
+3
+get G
+caught ReferenceError
