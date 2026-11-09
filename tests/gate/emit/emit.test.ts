@@ -2,7 +2,7 @@
 // lowering assertions) and the EM-01…EM-12 invariants.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -30,7 +30,7 @@ function fixture(name: string, version: number): string {
 // T1 / EM-02 — the cheapest possible gate, over the whole corpus.
 // ---------------------------------------------------------------------------
 
-test("T1: every gate binary emits JavaScript that passes node --check", () => {
+test("T1: every gate binary emits JavaScript that passes node --check", async () => {
   const binaries = m4Binaries(["", ".min"]);
   const dir = mkdtempSync(join(tmpdir(), "hbc2js-emit-"));
   const failures: string[] = [];
@@ -50,13 +50,20 @@ test("T1: every gate binary emits JavaScript that passes node --check", () => {
     }
     // One `node --check` per file; batched here so the corpus stays under a
     // minute.
-    for (const file of files) {
-      try {
-        execFileSync(process.execPath, ["--check", file], { stdio: ["ignore", "ignore", "pipe"] });
-      } catch (e) {
-        failures.push(`${file}: ${String((e as { stderr?: Buffer }).stderr ?? e).slice(0, 200)}`);
+    // The checks are independent child processes: run them in a bounded pool.
+    const queue = [...files];
+    const worker = async (): Promise<void> => {
+      for (let file = queue.shift(); file !== undefined; file = queue.shift()) {
+        const f = file;
+        await new Promise<void>((resolve) => {
+          execFile(process.execPath, ["--check", f], { encoding: "utf8" }, (err, _o, stderr) => {
+            if (err !== null) failures.push(`${f}: ${String(stderr ?? err).slice(0, 200)}`);
+            resolve();
+          });
+        });
       }
-    }
+    };
+    await Promise.all(Array.from({ length: 6 }, worker));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
