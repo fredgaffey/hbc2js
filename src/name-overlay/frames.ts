@@ -40,6 +40,27 @@ export function rawFrames(analysis: ModuleAnalysis, opts: { readonly passes?: Pa
   return frames;
 }
 
+/** The raw frames of ONE function's subtree (the function and the closures
+ *  emitted inside it), via emitModule's scoped `onlyFunction` render, so cost
+ *  follows the subtree instead of the module. Each frame equals the one the
+ *  whole-module `rawFrames` captures (scoped emit is byte-identical by
+ *  construction; pinned by tests/gate/name-overlay/render-cost.test.ts). */
+export function rawFramesFor(analysis: ModuleAnalysis, fn: number, opts: { readonly passes?: PassPipelineOptions; readonly strictEnv?: boolean } = {}): Map<number, RawFrame> {
+  const frames = new Map<number, RawFrame>();
+  if (!Number.isInteger(fn) || fn < 0 || fn >= analysis.module.functions.length) return frames;
+  emitModule(analysis, {
+    provenanceComments: false,
+    strictEnv: opts.strictEnv ?? true,
+    passes: stageAPassHook(analysis, opts.passes),
+    onlyFunction: fn,
+    astPasses: (node, cfg) => {
+      if (node.k === "func") frames.set(cfg.functionIndex, { node, cfg });
+      return { fn: node, diagnostics: [] };
+    },
+  });
+  return frames;
+}
+
 /** Map from Hermes function index to its raw `k:"func"` body statements. A
  *  function that stubbed or emitted as a non-func is absent. `strictEnv` mirrors
  *  the decompile default so the same functions resolve. */

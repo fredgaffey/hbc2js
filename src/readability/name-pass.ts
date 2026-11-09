@@ -117,6 +117,13 @@ export interface NamePassOptions {
    *  finishes writing before the loop stops. */
   readonly budgetTokens?: number;
   readonly renderOptions?: RenderOptions;
+  /** What the apply-then-revert backstop renders. `"touched"` (default) renders
+   *  only the functions the targets name, each scoped (cost follows the
+   *  functions touched; a name can only change its own function's render, and
+   *  an embedding parent's render is a function of the child's). `"module"`
+   *  re-emits the whole module before and after (the old behaviour). Ignored
+   *  when `renderOptions.fn` is set. */
+  readonly backstopScope?: "touched" | "module";
   readonly signal?: AbortSignal;
   /** spec 28 section 1b step 8 (landing 5), "runs inside the naming pass when
    *  `evaluate` is `agent`": when wired, every WRITTEN high-value proposal
@@ -160,7 +167,13 @@ export interface NamePassResult {
  *  evidence-directed ordering, spec 28 section 3, before calling this). */
 export async function runNamePass(targets: readonly NamePassTarget[], opts: NamePassOptions): Promise<NamePassResult> {
   const renderOptions = opts.renderOptions ?? {};
-  const before = opts.service.render(renderOptions).code;
+  const touched = [...new Set(targets.flatMap((t) => (isFunctionTarget(t) ? [t.fn, ...t.regs.map((r) => r.fn)] : [t.bindingId.fn])))].sort((a, b) => a - b);
+  const scoped = renderOptions.fn === undefined && (opts.backstopScope ?? "touched") === "touched";
+  const backstopRender = (): string =>
+    scoped
+      ? touched.map((fn) => `// fn ${fn}\n${opts.service.render({ ...renderOptions, fn }).code}`).join("\n")
+      : opts.service.render(renderOptions).code;
+  const before = backstopRender();
 
   const outcomes: NamePassOutcome[] = [];
   const written: { readonly id: BindingId; readonly ts: string }[] = [];
@@ -330,7 +343,7 @@ export async function runNamePass(targets: readonly NamePassTarget[], opts: Name
   // The batch backstop (spec 28 section 9.4 NAME row): revert every write
   // this run made and render again; PASS iff that matches the pre-run render.
   for (const w of written) opts.service.revert(w.id);
-  const restored = opts.service.render(renderOptions).code;
+  const restored = backstopRender();
   const verdict = restored === before ? "PASS" : "DIVERGENT";
   const equiv: EquivProof = {
     scope: "name",
