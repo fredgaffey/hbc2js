@@ -1245,3 +1245,22 @@ FPs are the ones docs/DEPS.md "Population widening" lists, plus the
 `@sentry/*` subpackages.
 Next by cost: the hbc96 Expo failures need a newer hbc96 scaffold, not
 more jobs; phase 1 has 5,266 jobs left.
+
+**Batch 2** (deb, 2026-11-10): jobs 481-1,280 of the same plan (800 jobs: 530
+at hbc96, 270 at hbc98; names from about download rank 250 to 600), built
+with the fixed `worker.sh` (per-job slot reset, `slot-reset.sh`; 4 jobs, 2
+slots per family) in about 50 minutes, then `dep-subtract.mjs`, into the same
+`~/_hbc2js/db-v4-honest` (additive: 348 -> 966 files). Built 618 of 800
+(hbc96 399 of 530, hbc98 219 of 270); no job was lost to slot poisoning
+(batch 1's 752 lost jobs were that bug). Failed 182: module or `main` not
+resolvable 99 (73 of them node-only CLIs such as `pnpm` whose `main` does not
+exist, the rest SDK-era modules on the RN 0.72 scaffold), other bundle
+errors 67 (node-only syntax and dynamic `import()`), hermesc 9, platform-only
+binaries 6, npm install 1. Measured the same way as batch 1 (table in
+docs/METRICS.md): batch 2 adds 6 TPs across the five apps (Expensify +3,
+MetaMask +3, rainbow 0), react-navigation and bluesky unchanged, 2 new FPs
+(`ejs` on rainbow, `@testing-library/user-event` on MetaMask; both the
+bundled-dist/copies classes) and no TP lost. Marginal return fell sharply
+(batch 1 +32 TPs for 480 jobs, batch 2 +6 for 800): ranking by downloads
+runs out of names the apps actually ship by about rank 250, which is the
+overlap table's ceiling showing up in the measurement.
