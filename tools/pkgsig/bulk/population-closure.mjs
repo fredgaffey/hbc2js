@@ -168,7 +168,7 @@ function parseArgs(argv) {
 }
 
 /** Abbreviated-packument fetcher with a reduced on-disk cache, bounded concurrency and backoff. */
-function registryFetcher(cachePath, concurrency) {
+export function registryFetcher(cachePath, concurrency) {
   const cache = cachePath && existsSync(cachePath) ? JSON.parse(readFileSync(cachePath, "utf8")) : {};
   const inflight = new Map();
   let active = 0, fetched = 0;

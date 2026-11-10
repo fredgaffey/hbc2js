@@ -281,3 +281,18 @@ Wall: offline 11-86 s; confirm 279-1386 s (3 workers, loaded host).
 - The one false positive: `semver-truncate@3.0.0`, a 1-module package with 26
   eligible functions, exact 69%, 0 of 1 modules exactly matched, no string
   corroboration (rainbow, v4-paths, tier high).
+
+## Honest population, batches 1 and 2 (2026-11-10, offline, `meas2.mjs`)
+
+App-blind population (docs/PACKAGE-SIGNATURES.md section 9) layered on the v4
+farm; confirmed / TP / FP, precision, recall. "+ pop" also links the
+`db-overlay-pop{,2}` overlays (a separate column, never in f-v4).
+
+| app | f-v4 | + honest b1 | + honest b1+b2 | + honest b1+b2 + pop |
+|---|---|---|---|---|
+| Expensify | 107 / 102 / 5, 95.3%, 35.4% | 115 / 109 / 6, 94.8%, 37.8% | 118 / 112 / 6, 94.9%, 38.9% | 152 / 139 / 13, 91.4%, 48.3% |
+| react-navigation | 22 / 22 / 0, 100%, 28.9% | 22 / 22 / 0, 100%, 28.9% | 22 / 22 / 0, 100%, 28.9% | 25 / 25 / 0, 100%, 32.9% |
+| bluesky | 47 / 46 / 1, 97.9%, 23.2% | 52 / 49 / 3, 94.2%, 24.7% | 52 / 49 / 3, 94.2%, 24.7% | 60 / 56 / 4, 93.3%, 28.3% |
+| rainbow | 116 / 109 / 7, 94.0%, 21.0% | 123 / 115 / 8, 93.5%, 22.2% | 124 / 115 / 9, 92.7%, 22.2% | 132 / 120 / 12, 90.9%, 23.2% |
+| MetaMask | 179 / 165 / 14, 92.2%, 22.0% | 196 / 181 / 15, 92.3%, 24.2% | 200 / 184 / 16, 92.0%, 24.6% | 204 / 185 / 19, 90.7%, 24.7% |
+
