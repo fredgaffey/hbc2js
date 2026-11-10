@@ -26,6 +26,7 @@ import { forIn } from "./for-in/index.ts";
 import { forOf } from "./for-of/index.ts";
 import { globalAccess } from "./global-access/index.ts";
 import { globalthisDeadStore } from "./globalthis-dead-store/index.ts";
+import { hermesInternalDeadStore } from "./hermes-internal-dead-store/index.ts";
 import { closureInline } from "./closure-inline/index.ts";
 import { ifChain } from "./if-chain/index.ts";
 import { labelClean } from "./label-clean/index.ts";
@@ -128,6 +129,7 @@ export const REGISTRY: readonly Pass[] = [
   destructure as Pass,
   spreadRest as Pass,
   templateLiteral as Pass,
+  hermesInternalDeadStore as Pass,
   optionalChain as Pass,
   objectLiteral as Pass,
   // docs/specs/passes/31-array-literal.md: the array-literal analogue of
