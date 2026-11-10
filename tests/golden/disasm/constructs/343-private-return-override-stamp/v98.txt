@@ -1,0 +1,188 @@
+; hbc2js disassembly of 343-private-return-override-stamp/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=10 strings=27 globalCodeIndex=0
+function #0 "global"  params=1 frame=25 env=0 flags=exc,dbg,overflowed  @0x00000288 size=395
+  .try T1..T2 -> L1 ; handler 0
+  0000  CreateFunctionEnvironment r2, 7
+  0003  DeclareGlobalVar     s25 "obj"
+  0008  LoadConstUndefined   r7
+  000a  CreateBaseClass      r1, r0, r7, 1
+  0010  CreatePrivateName    r0, s21 "#x"
+  0016  StoreToEnvironment   r2, 2, r0
+  001a  CreateDerivedClass   r3, r0, r2, r1, 2
+  0021  LoadConstString      r1, s17 "has"
+  0025  CreateClosure        r0, r2, f3 "has"
+  002a  DefineOwnByVal       r3, r0, r1, 0
+  002f  LoadConstString      r1, s24 "get"
+  0033  CreateClosure        r0, r2, f4 "get"
+  0038  DefineOwnByVal       r3, r0, r1, 0
+  003d  StoreToEnvironment   r2, 1, r3
+  0041  GetGlobalObject      r0
+  0043  NewObject            r1
+  0045  PutByIdLoose         r0, r1, #c0, s25 "obj"
+  004b  GetByIdShort         r16, r0, #c0, s25 "obj"
+  0050  LoadConstUndefined   r17
+  0052  Construct            r1, r3, 2
+  0056  TryGetById           r9, r0, #c1, s13 "print"
+  005c  GetByIdShort         r4, r3, #c2, s17 "has"
+  0061  GetByIdShort         r1, r0, #c0, s25 "obj"
+  0066  Call2                r15, r4, r3, r1
+  006b  GetByIdShort         r4, r3, #c3, s24 "get"
+  0070  GetByIdShort         r1, r0, #c0, s25 "obj"
+  0075  Call2                r14, r4, r3, r1
+  007a  TryGetById           r5, r0, #c4, s20 "Object"
+  0080  GetByIdShort         r4, r5, #c5, s18 "keys"
+  0085  GetByIdShort         r1, r0, #c0, s25 "obj"
+  008a  Call2                r1, r4, r5, r1
+  008f  GetByIdShort         r13, r1, #c6, s16 "length"
+  0094  TryGetById           r10, r0, #c7, s22 "JSON"
+  009a  GetByIdShort         r4, r10, #c8, s26 "stringify"
+  009f  GetByIdShort         r1, r0, #c0, s25 "obj"
+  00a4  Call2                r12, r4, r10, r1
+  00a9  LoadConstString      r16, s7 "stamped:"
+  00ad  LoadConstUndefined   r17
+  00af  Call                 r1, r9, 6
+T1:
+  00b3  GetByIdShort         r16, r0, #c0, s25 "obj"
+  00b8  LoadConstUndefined   r17
+  00ba  Construct            r1, r3, 2
+  00be  TryGetById           r3, r0, #c1, s13 "print"
+  00c4  LoadConstString      r1, s10 "twice: no throw"
+  00c8  Call2                r1, r3, r7, r1
+  00cd  Jmp                  L2
+T2:
+L1:
+  00cf  Catch                r3
+  00d1  TryGetById           r4, r0, #c1, s13 "print"
+  00d7  TryGetById           r1, r0, #c9, s23 "TypeError"
+  00dd  InstanceOf           r3, r3, r1
+  00e1  LoadConstString      r1, s9 "twice threw:"
+  00e5  Call3                r1, r4, r7, r1, r3
+L2:
+  00eb  StoreNPToEnvironment r2, 0, r7
+  00ef  CreatePrivateName    r1, s19 "#count"
+  00f5  StoreToEnvironment   r2, 3, r1
+  00f9  CreatePrivateName    r1, s11 "S"
+  00ff  StoreToEnvironment   r2, 4, r1
+  0103  CreateBaseClass      r8, r3, r7, 5
+  0109  LoadConstString      r4, s14 "bump"
+  010d  CreateClosure        r3, r2, f6 "bump"
+  0112  DefineOwnByVal       r8, r3, r4, 0
+  0117  LoadConstString      r4, s12 "isS"
+  011b  CreateClosure        r3, r2, f7 "isS"
+  0120  DefineOwnByVal       r8, r3, r4, 0
+  0125  StoreToEnvironment   r2, 0, r8
+  0129  StoreToEnvironment   r2, 5, r8
+  012d  AddOwnPrivateBySym   r8, r7, r1
+  0131  LoadConstZero        r3
+  0133  CreateClosure        r1, r2, f8 "<static_elements_initializer:S>"
+  0138  Call1                r1, r1, r3
+  013c  CreateDerivedClass   r1, r1, r2, r8, 9
+  0143  StoreToEnvironment   r2, 6, r1
+  0147  TryGetById           r6, r0, #c1, s13 "print"
+  014d  GetByIdShort         r0, r8, #c10, s14 "bump"
+  0152  Call1                r15, r0, r8
+  0156  GetByIdShort         r0, r8, #c10, s14 "bump"
+  015b  Call1                r14, r0, r8
+  015f  GetByIdShort         r0, r8, #c11, s12 "isS"
+  0164  Call2                r13, r0, r8, r8
+  0169  GetByIdShort         r2, r8, #c11, s12 "isS"
+  016e  NewObject            r0
+  0170  Call2                r12, r2, r8, r0
+  0175  GetByIdShort         r0, r8, #c11, s12 "isS"
+  017a  Call2                r11, r0, r8, r1
+  017f  LoadConstString      r16, s8 "static:"
+  0183  LoadConstUndefined   r17
+  0185  Call                 r0, r6, 7
+  0189  Ret                  r0
+
+function #1 "Base"  params=2 frame=2 env=0 flags=strict,dbg,overflowed,ctor  @0x00000413 size=19
+  0000  GetNewTarget         r0
+  0002  GetByIdShort         r0, r0, #c0, s15 "prototype"
+  0007  NewObjectWithParent  r1, r0
+  000a  LoadParam            r0, 1
+  000d  SelectObject         r0, r1, r0
+  0011  Ret                  r0
+
+function #2 "Stamp"  params=2 frame=16 env=0 flags=strict,dbg,overflowed,ctor  @0x00000426 size=65
+  0000  GetParentEnvironment r3, 0
+  0003  GetNewTarget         r6
+  0005  LoadFromEnvironment  r2, r3, 1
+  0009  LoadParentNoTraps    r5, r2
+  000c  CreateThisForSuper   r4, r5, r6, 0
+  0011  LoadParam            r7, 1
+  0014  Mov                  r8, r4
+  0017  CallWithNewTarget    r2, r5, r6, 2
+  001c  SelectObject         r2, r4, r2
+  0020  LoadConstEmpty       r4
+  0022  ThrowIfThisInitialized r4
+  0024  LoadFromEnvironment  r3, r3, 2
+  0028  PrivateIsIn          r1, r3, r2, r0
+  002d  JmpTrue              L1, r1
+  0030  LoadConstUInt8       r0, 7
+  0033  AddOwnPrivateBySym   r2, r0, r3
+  0037  Ret                  r2
+L1:
+  0039  LoadConstString      r7, s2 "Cannot initialize private field …"
+  003d  CallBuiltin          r2, b44 "throwTypeError", 2
+
+function #3 "has"  params=2 frame=3 env=0 flags=strict,dbg,overflowed,nc  @0x00000467 size=17
+  0000  GetParentEnvironment r1, 0
+  0003  LoadFromEnvironment  r2, r1, 2
+  0007  LoadParam            r1, 1
+  000a  PrivateIsIn          r0, r2, r1, r0
+  000f  Ret                  r0
+
+function #4 "get"  params=2 frame=2 env=0 flags=strict,dbg,overflowed,nc  @0x00000478 size=17
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r1, r0, 2
+  0007  LoadParam            r0, 1
+  000a  GetOwnPrivateBySym   r0, r0, 0, r1
+  000f  Ret                  r0
+
+function #5 "S"  params=1 frame=1 env=0 flags=strict,dbg,overflowed,ctor  @0x00000489 size=12
+  0000  GetNewTarget         r0
+  0002  GetByIdShort         r0, r0, #c0, s15 "prototype"
+  0007  NewObjectWithParent  r0, r0
+  000a  Ret                  r0
+
+function #6 "bump"  params=1 frame=13 env=0 flags=strict,dbg,overflowed,nc  @0x00000495 size=46
+  0000  GetParentEnvironment r1, 0
+  0003  LoadFromEnvironment  r3, r1, 0
+  0007  LoadFromEnvironment  r2, r1, 4
+  000b  PrivateIsIn          r0, r2, r3, r0
+  0010  JmpTrue              L1, r0
+  0013  LoadConstString      r4, s3 "Private element not found"
+  0017  CallBuiltin          r2, b44 "throwTypeError", 2
+L1:
+  001b  LoadFromEnvironment  r2, r1, 3
+  001f  GetOwnPrivateBySym   r1, r3, 1, r2
+  0024  Inc                  r1, r1
+  0027  PutOwnPrivateBySym   r3, r1, 1, r2
+  002c  Ret                  r1
+
+function #7 "isS"  params=2 frame=3 env=0 flags=strict,dbg,overflowed,nc  @0x000004c3 size=17
+  0000  GetParentEnvironment r1, 0
+  0003  LoadFromEnvironment  r2, r1, 3
+  0007  LoadParam            r1, 1
+  000a  PrivateIsIn          r0, r2, r1, r0
+  000f  Ret                  r0
+
+function #8 "<static_elements_initializer:S>"  params=1 frame=4 env=0 flags=strict  @0x000004d4 size=21
+  0000  GetParentEnvironment r2, 0
+  0003  LoadFromEnvironment  r3, r2, 5
+  0007  LoadFromEnvironment  r2, r2, 3
+  000b  LoadConstZero        r0
+  000d  AddOwnPrivateBySym   r3, r0, r2
+  0011  LoadConstUndefined   r1
+  0013  Ret                  r1
+
+function #9 "Sub"  params=1 frame=14 env=0 flags=strict,dbg,overflowed,ctor  @0x000004e9 size=29
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r0, r0, 6
+  0007  LoadParentNoTraps    r2, r0
+  000a  GetNewTarget         r1
+  000c  CreateThisForSuper   r4, r2, r1, 0
+  0011  Mov                  r5, r2
+  0014  Mov                  r3, r1
+  0017  CallBuiltin          r0, b50 "applyArguments", 4
+  001b  Ret                  r0

@@ -1,0 +1,4 @@
+get a | rhs 5 | set a=5 | get b
+key a | get a | rhs 0 | set a=0 | key c | get c
+get c | rhs 8 | set c=8 | get d
+1 1 rhs 1

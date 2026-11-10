@@ -354,7 +354,7 @@ Two layers; measure with `tools/passes-metrics.mjs` (add
    3.1 % full matrix, 3.4 % gate v94+v99 base subset, 4.1 % RN template
    bundle (rN tokens 204,381 → 199,307). Target: **≥ 15 %** on the gate
    subset; regression floor in
-   `tests/gate/passes/reg-split-metrics.test.ts` at **8 %** (a hard
+   a planned `reg-split-metrics` gate test (not yet written; `tools/passes-metrics.mjs` reports the number) at **8 %** (a hard
    doubling; if measurement lands below 8 %, that is a pushback on this
    spec, not a lowered floor). Report the bundle rN-token count and the
    named-% per version.

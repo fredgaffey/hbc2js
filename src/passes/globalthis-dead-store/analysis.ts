@@ -95,7 +95,11 @@ function isDeadLocally(list: readonly Stmt[], fromIndex: number, reg: string, is
 export function analyze(fnBody: readonly Stmt[]): Analysis {
   const deadStores = new Set<Stmt>();
   const deadRegisters = new Map<Stmt, string>();
-  for (const list of stmtLists(fnBody)) {
+  // `sameFrame`: the resume closure's lists too (Pass.sameFrame). A list in
+  // there is never `fnBody`, so reaching its end is "unknown" (a later
+  // resume may read the register) and only the whole-function read count,
+  // which already sees through the closure, can call the store dead.
+  for (const list of stmtLists(fnBody, { sameFrame: true })) {
     const isFnBody = list === fnBody;
     for (let k = 0; k < list.length; k++) {
       const s = list[k]!;
@@ -115,7 +119,7 @@ export function analyze(fnBody: readonly Stmt[]): Analysis {
  *  identity, every other field) untouched. */
 export function applyAnalysis(fnBody: readonly Stmt[], a: Analysis): readonly Stmt[] {
   let current = fnBody;
-  for (const list of stmtLists(fnBody)) {
+  for (const list of stmtLists(fnBody, { sameFrame: true })) {
     const keep = list.filter((s) => !a.deadStores.has(s));
     if (keep.length !== list.length) current = spliceList(current, list, keep);
   }

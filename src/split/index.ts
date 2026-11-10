@@ -13,7 +13,7 @@ import type { HbcModule } from "../parse/types.ts";
 import { astPassHook, passHook } from "../passes/index.ts";
 import type { PassPipelineOptions } from "../passes/index.ts";
 import { helperPrelude } from "../runtime/helpers.ts";
-import { resolveEntryModuleId } from "./entry.ts";
+import { resolveStartupModuleIds } from "./entry.ts";
 import { rewriteFactoryBody } from "./rewrite.ts";
 
 /**
@@ -124,6 +124,10 @@ export interface SplitResult {
   readonly files: ReadonlyMap<string, string>;
   readonly modules: readonly SplitModuleInfo[];
   readonly entryModuleId: number | null;
+  /** Every module id the bundle's global function runs with a top-level
+   *  `__r(<id>)`, in order (run-before-main modules, then the entry), limited
+   *  to ids this split knows. The entry is the last one. */
+  readonly startupModuleIds: readonly number[];
   readonly diagnostics: readonly string[];
   /** P2.1 §2.7: fnIndex -> the `{file, lines:[start,end]}` it actually
    *  printed at. Only covers functions this split pass rendered as a
@@ -535,7 +539,8 @@ export function splitProject(bytes: Uint8Array, opts: SplitOptions = {}): SplitR
   modules.sort((a, b) => a.id - b.id);
 
   const globalFn = bodies.get(module.header.globalCodeIndex);
-  const entryModuleId = isFuncStmt(globalFn) ? resolveEntryModuleId(globalFn.body) : null;
+  const startupIds = isFuncStmt(globalFn) ? resolveStartupModuleIds(globalFn.body) : [];
+  const entryModuleId = startupIds.length > 0 ? startupIds[startupIds.length - 1]! : null;
   if (entryModuleId === null || !known.has(entryModuleId)) {
     diagnostics.push(`could not resolve an entry module id from the global function's __r() call`);
   }
@@ -557,5 +562,6 @@ export function splitProject(bytes: Uint8Array, opts: SplitOptions = {}): SplitR
     ) + "\n",
   );
 
-  return { files, modules, entryModuleId: resolvedEntry, diagnostics, functionRanges, module, analysis, helpersUsed };
+  const startupModuleIds = startupIds.filter((id) => known.has(id));
+  return { files, modules, entryModuleId: resolvedEntry, startupModuleIds, diagnostics, functionRanges, module, analysis, helpersUsed };
 }

@@ -158,3 +158,32 @@ Three tests passed alone but failed intermittently in `npm test` (`node --test`,
 - **Playwright smoke (`tests/gate/ui/e2e-smoke.test.ts`)** spawned the whole 82-spec run inside the parallel batch (~1 min alone, 90-240 s and failing under load). `npm test` / `npm run test:gate` now set `HBC2JS_E2E_DEFER=1` for the parallel batch (the test skips with that reason) and then run `node --test tests/gate/ui/e2e-smoke.test.ts` as a serial stage afterwards, alone on the box. Still in the gate: a red spec fails `npm test`. Running the file directly (no env var) runs the suite inline.
 - **`routes.test.ts` segregation settle waits** polled 200 x 20 ms (4 s) for a worker-thread compute; under load that is load, not a hang. Now a 120 s deadline (the loop still exits the instant the compute settles; a genuine hang still fails).
 - **`tiers.test.ts` identity run 120 s wall budget** measured 67 s alone vs 165 s under the gate: contention. The wall assertion now follows mechanism 3 (`tooBusyForTiming()`: logged, not enforced, on a busy box); DIVERGENT/ERROR correctness assertions are unconditional.
+
+## Load sampling over the measured interval (2026-11)
+
+Both `tiers.test.ts` (120 s identity budget) and `routes.test.ts` (segregation
+warm-up) still failed in full gates at 1-min load 40-85 on 10 cores. The 1-min
+average lags bursts and is a single end-of-test sample, so a long test can be
+judged "quiet" by a stale reading. `tests/support/tiers.ts` now has
+`startLoadMonitor()` (samples `loadavg()[0]` at start, every 2 s, and at stop;
+`stop()` returns the peak) and `tooBusyForTiming(minCores, maxLoad, peak)`
+takes the max of the peak and the current reading. The tiers test logs
+`gate identity load: peak X, busy=...` every run so a miss is diagnosable.
+Threshold stays an absolute 1-min load of 8; override with
+`HBC2JS_PERF_MAX_LOAD` (proves an assertion is live on a box that is never
+quiet). `HBC2JS_PERF_INJECT_MS` adds fake elapsed ms to the tiers run for a
+manual red check (`HBC2JS_PERF_MAX_LOAD=100000 HBC2JS_PERF_INJECT_MS=100000`
+must fail).
+
+The segregation warm-up test is now a state claim: it waits up to 60 s x
+`HBC2JS_TIME_SCALE` for `segregationCached()` (load only delays it) and the
+"<1000 ms warmed answer" bound is enforced only when not busy.
+
+## Running a subset: `npm test -- <paths>`
+
+`npm test` runs `tools/run-tests.mjs`. With no arguments it is the full gate
+(typecheck, the gate globs, then the deferred UI e2e smoke file). With path or
+glob arguments it runs **only those files** under `node --test` (no typecheck, no
+e2e smoke); `-`-prefixed flags pass through to `node --test`. Before this, npm
+appended the arguments to the last `node --test` in an `&&` chain, so the full
+gate still ran. Covered by `tests/gate/docs/run-tests-script.test.ts`.

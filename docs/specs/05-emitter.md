@@ -435,6 +435,27 @@ callee identity comparison, and re-evaluates the receiver. Do not.
   readable, and it covers the overwhelming majority of calls.
 * **General case.** `Reflect.apply(r<callee>, r<this>, [r<a>, r<b>])`. No helper
   needed — `Reflect.apply` is standard.
+* **Evaluation order (docs/BUGS.md 2026-11-09 "method read moved past an
+  intervening getter").** The fused `r<obj>.<name>(…)` reads `.name` at the
+  call, so it is used only when every instruction between the `GetById` and
+  the `Call*` is unobservable to that read: frame-local instructions
+  (register moves, constants, environments, closures, `ReifyArguments*`), a
+  fresh object/array and its own-property initialisation before it escapes,
+  closure-variable reads (`LoadFromEnvironment*`) and property reads on the
+  global object. The last two are a modelled assumption: a getter on the
+  method that rebinds a closure or global variable read in between is not
+  tracked. Otherwise the read stays a statement and the call is the general
+  case tagged `methodRead` (`src/emit/ast.ts`). The stage-B rung
+  `method-read` (`src/passes/method-read`, after `object-literal`,
+  `array-literal` and `private-fields`, before `jsx-recover` and
+  `object-literal-arg`) re-fuses it as `R.m((<work>), A1, …)` — read, work,
+  arguments, the original order — and folds each trailing `rX = E` back into
+  the one read of `rX` when everything evaluated before that read is a
+  literal or a binding read E does not write. When the remaining work still
+  holds a call (an inline require, a child element), the call stays unfused:
+  later rungs read that work in statement form, and the unfused form is
+  already in source order. Regression: `tests/gate/emit/method-read-fusion-order.test.ts`
+  (construct fixture 250, all versions) and `tests/gate/passes/method-read.test.ts`.
 ### 7.5 `new` — a three-instruction pattern, never lowered per opcode
 
 `hermesc` **never** emits a bare `Construct` for `new X(…)`. It emits a triple,

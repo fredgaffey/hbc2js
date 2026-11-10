@@ -1,0 +1,162 @@
+; hbc2js disassembly of 341-closure-per-generator-resume/v94.hbc
+; version=94 layout=C opcodeTable=hbc94 functions=8 strings=19 globalCodeIndex=0
+function #0 "global"  params=1 frame=17 env=0 flags=dbg  @0x000001f4 size=279
+  0000  DeclareGlobalVar     s11 "hi"
+  0005  DeclareGlobalVar     s12 "it"
+  000a  DeclareGlobalVar     s14 "x"
+  000f  DeclareGlobalVar     s18 "y"
+  0014  DeclareGlobalVar     s10 "h"
+  0019  DeclareGlobalVar     s9 "g"
+  001e  CreateEnvironment    r0
+  0020  CreateGeneratorClosure r1, r0, f1 "h"
+  0025  GetGlobalObject      r2
+  0027  PutById              r2, r1, #c1, s10 "h"
+  002d  CreateGeneratorClosure r0, r0, f4 "g"
+  0032  PutById              r2, r0, #c2, s9 "g"
+  0038  GetByIdShort         r0, r2, #c1, s10 "h"
+  003d  LoadConstUndefined   r5
+  003f  Call1                r0, r0, r5
+  0043  PutById              r2, r0, #c3, s11 "hi"
+  0049  TryGetById           r3, r2, #c2, s15 "print"
+  004f  GetByIdShort         r1, r2, #c3, s11 "hi"
+  0054  GetByIdShort         r0, r1, #c4, s13 "next"
+  0059  Call1                r0, r0, r1
+  005d  GetByIdShort         r4, r0, #c5, s17 "value"
+  0062  GetByIdShort         r1, r2, #c3, s11 "hi"
+  0067  GetByIdShort         r0, r1, #c4, s13 "next"
+  006c  Call1                r0, r0, r1
+  0070  GetByIdShort         r0, r0, #c5, s17 "value"
+  0075  LoadConstString      r1, s3 "loop distinct:"
+  0079  StrictNeq            r0, r4, r0
+  007d  Call3                r0, r3, r5, r1, r0
+  0083  GetByIdShort         r0, r2, #c6, s9 "g"
+  0088  Call1                r0, r0, r5
+  008c  PutById              r2, r0, #c4, s12 "it"
+  0092  GetByIdShort         r1, r2, #c7, s12 "it"
+  0097  GetByIdShort         r0, r1, #c4, s13 "next"
+  009c  Call1                r0, r0, r1
+  00a0  GetByIdShort         r0, r0, #c5, s17 "value"
+  00a5  PutById              r2, r0, #c5, s14 "x"
+  00ab  GetByIdShort         r1, r2, #c7, s12 "it"
+  00b0  GetByIdShort         r0, r1, #c4, s13 "next"
+  00b5  Call1                r0, r0, r1
+  00b9  GetByIdShort         r0, r0, #c5, s17 "value"
+  00be  PutById              r2, r0, #c6, s18 "y"
+  00c4  GetByIdShort         r1, r2, #c7, s12 "it"
+  00c9  GetByIdShort         r0, r1, #c4, s13 "next"
+  00ce  Call1                r0, r0, r1
+  00d2  GetByIdShort         r1, r2, #c7, s12 "it"
+  00d7  GetByIdShort         r0, r1, #c4, s13 "next"
+  00dc  Call1                r0, r0, r1
+  00e0  TryGetById           r4, r2, #c2, s15 "print"
+  00e6  GetByIdShort         r1, r2, #c8, s14 "x"
+  00eb  GetByIdShort         r0, r2, #c9, s18 "y"
+  00f0  GetByIdShort         r3, r2, #c7, s12 "it"
+  00f5  GetByIdShort         r2, r3, #c4, s13 "next"
+  00fa  Call1                r2, r2, r3
+  00fe  GetByIdShort         r6, r2, #c5, s17 "value"
+  0103  LoadConstString      r9, s6 "before-yield same:"
+  0107  StrictEq             r8, r1, r0
+  010b  LoadConstString      r7, s5 "after-yield distinct:"
+  010f  LoadConstUndefined   r10
+  0111  Call                 r0, r4, 5
+  0115  Ret                  r0
+
+function #1 "h"  params=1 frame=1 env=0 flags=nc  @0x0000030b size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f2 "?anon_0_h"
+  0007  Ret                  r0
+
+function #2 "?anon_0_h"  params=1 frame=4 env=0 flags=dbg  @0x00000314 size=30
+  0000  StartGenerator
+  0001  CreateEnvironment    r3
+  0003  ResumeGenerator      r0, r1
+  0006  JmpTrue              L3, r1
+L1:
+  0009  CreateClosure        r1, r3, f3 "z"
+  000e  SaveGenerator        L2
+  0010  Ret                  r1
+L2:
+  0012  ResumeGenerator      r1, r2
+  0015  JmpFalse             L1, r2
+  0018  CompleteGenerator
+  0019  Ret                  r1
+L3:
+  001b  CompleteGenerator
+  001c  Ret                  r0
+
+function #3 "z"  params=1 frame=1 env=0 flags=none  @0x00000332 size=4
+  0000  LoadConstUndefined   r0
+  0002  Ret                  r0
+
+function #4 "g"  params=1 frame=1 env=0 flags=nc  @0x00000336 size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f5 "?anon_0_g"
+  0007  Ret                  r0
+
+function #5 "?anon_0_g"  params=1 frame=18 env=0 flags=dbg  @0x0000033f size=122
+  0000  StartGenerator
+  0001  LoadConstZero        r4
+  0003  LoadConstUInt8       r8, 2
+  0006  CreateEnvironment    r7
+  0008  ResumeGenerator      r0, r1
+  000b  JmpTrue              L10, r1
+  000e  CreateClosure        r2, r7, f6 "f"
+  0013  SaveGenerator        L1
+  0015  Ret                  r2
+L1:
+  0017  ResumeGenerator      r1, r3
+  001a  JmpTrue              L9, r3
+  001d  SaveGenerator        L2
+  001f  Ret                  r2
+L2:
+  0021  ResumeGenerator      r2, r3
+  0024  JmpTrue              L8, r3
+  0027  NewArray             r5, 0
+  002b  LoadConstZero        r6
+L3:
+  002d  GetByIdShort         r9, r5, #c1, s16 "push"
+  0032  CreateClosure        r3, r7, f7 ""
+  0037  Call2                r3, r9, r5, r3
+  003c  SaveGenerator        L4
+  003e  Ret                  r4
+L4:
+  0040  ResumeGenerator      r3, r9
+  0043  JmpTrue              L7, r9
+  0046  Inc                  r6, r6
+  0049  JLess                L3, r6, r8
+  004d  GetByVal             r6, r5, r4
+  0051  LoadConstUInt8       r4, 1
+  0054  GetByVal             r4, r5, r4
+  0058  StrictNeq            r4, r6, r4
+  005c  SaveGenerator        L5
+  005e  Ret                  r4
+L5:
+  0060  ResumeGenerator      r4, r5
+  0063  JmpTrue              L6, r5
+  0066  LoadConstUndefined   r5
+  0068  CompleteGenerator
+  0069  Ret                  r5
+L6:
+  006b  CompleteGenerator
+  006c  Ret                  r4
+L7:
+  006e  CompleteGenerator
+  006f  Ret                  r3
+L8:
+  0071  CompleteGenerator
+  0072  Ret                  r2
+L9:
+  0074  CompleteGenerator
+  0075  Ret                  r1
+L10:
+  0077  CompleteGenerator
+  0078  Ret                  r0
+
+function #6 "f"  params=1 frame=1 env=0 flags=none  @0x00000332 size=4
+  0000  LoadConstUndefined   r0
+  0002  Ret                  r0
+
+function #7 ""  params=1 frame=1 env=0 flags=none  @0x00000332 size=4
+  0000  LoadConstUndefined   r0
+  0002  Ret                  r0

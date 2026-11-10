@@ -893,6 +893,10 @@ function trySite(f: Fold, i: number, call: Extract<Expr, { k: "call" }>, list: r
       if (impure.length > 1) throw new Refuse("moved-impure");
       if (impure.length === 1) {
         const m = impure[0]!;
+        // fix-jsx-read-order: a member callee (`R.createElement`, `M.jsx`)
+        // is read at the call, before every argument, so a value computed
+        // ahead of the call would move after that read.
+        if (call.callee.k === "member") throw new Refuse("moved-impure");
         const loweredIdx = a.moved.indexOf(m);
         // Everything evaluated before it in the lowered form must be pure or
         // originally positioned before it too.

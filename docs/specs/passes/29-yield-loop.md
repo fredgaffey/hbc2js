@@ -130,7 +130,7 @@ dispatcher's" -- becomes, under `loops: true`, "the two keys must be equal once
 a handler's reach or rebind a bare `break`/`continue`, and is refused exactly as
 before.
 
-The rung (`src/passes/yield-recovery/loop.ts`) shares spec 25's site rule, writer and
+The rung (`src/passes/yield-loop/`) shares spec 25's site rule, writer and
 generator-shape checker through `makeMatch`/`makeCheck`; only
 `RecoverOptions.loops` differs, so the two rungs cannot drift apart.
 Registration: `after: [expr-rebuild, global-access, call-shape, yield-recovery]`,

@@ -45,8 +45,10 @@ const CLASS_VERSIONS = ["v98", "v99"];
 // A class method/accessor install: non-enumerable, configurable (spec 24
 // section 1.1). The object-literal accessors of section 1.5 are `enumerable:
 // true` and must never be counted as class members.
-const MEMBER_INSTALL = /Object\.defineProperty\([^\n]*enumerable: false, configurable: true\}\)/g;
-const ENUMERABLE_INSTALL = /Object\.defineProperty\([^\n]*enumerable: true, configurable: true\}\)/g;
+// The descriptor may span lines: closure-inline (spec 32) can put the
+// method itself in it. A match never crosses into the next call.
+const MEMBER_INSTALL = /Object\.defineProperty\((?:(?!Object\.defineProperty\()[\s\S])*?enumerable: false, configurable: true\}\)/g;
+const ENUMERABLE_INSTALL = /Object\.defineProperty\((?:(?!Object\.defineProperty\()[\s\S])*?enumerable: true, configurable: true\}\)/g;
 const SET_PROTO = /Object\.setPrototypeOf\(/g;
 
 // ---------------------------------------------------------------------------

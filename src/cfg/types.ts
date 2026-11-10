@@ -222,8 +222,26 @@ export interface EnvGraph {
    */
   readonly envInSlot: ReadonlyMap<string, EnvNodeId>;
   readonly unresolved: readonly EnvAccess[];
+  /**
+   * Spec 03 §6.2 "closure environment views": siteKey -> how the emitter must
+   * lower an environment instruction whose environment is a *closure's*
+   * captured environment that is not lexically visible at the reader (hermesc
+   * inlined a call to that closure somewhere outside its scope). Such sites are
+   * not in `accesses`/`resolvedAt`: they go through a runtime view object the
+   * closure carries (`__hbc_bind_env` at every creation site).
+   */
+  readonly envViewOps: ReadonlyMap<string, EnvViewOp>;
+  /** functionIndex -> chain level (0 = captured env) -> slots read or written
+   *  through a view; every creation site of the function binds a view exposing them. */
+  readonly closureEnvExposed: ReadonlyMap<number, ReadonlyMap<number, ReadonlySet<number>>>;
   readonly diagnostics: readonly Diagnostic[];
 }
+
+export type EnvViewOp =
+  | { readonly k: "closure-env" }
+  | { readonly k: "up"; readonly levels: number }
+  | { readonly k: "load"; readonly slot: number }
+  | { readonly k: "store"; readonly slot: number };
 
 /** Key for `EnvGraph.resolvedAt`. */
 export function siteKey(functionIndex: number, offset: number): string {

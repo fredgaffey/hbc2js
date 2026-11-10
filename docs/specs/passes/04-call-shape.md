@@ -141,6 +141,21 @@ the same site position. Fixture `190-undefined-receiver-rewritten` (negative
 twin `mixed`: a method call on one path keeps its receiver), test
 `tests/gate/passes/call-shape-undefined-receiver.test.ts`.
 
+**Cost of the R3h/R3i write proofs** (2026-11-10). Both proofs read only
+three facts per register — written some non-value way (for-in/for-of target,
+catch parameter, any other string field naming it), the number of plain
+writes, and how many of those are not `undefined` — and those facts add up
+over a statement list. So they are summarised once per stage-B node for
+every register at once (memoised on node identity: the trees are immutable,
+a rewrite rebuilds only the spine) and folded per list identity, instead of
+re-walking the function body per call site (Θ(sites × body) before). The one
+register-dependent branch of the walk, an `init` naming the register (only
+its `value` is visited), is reproduced by walking the other fields with that
+name excluded. The original walk stays as the test oracle;
+`tests/gate/passes/call-shape-register-writes.test.ts` checks the facts and
+both verdicts against it on every construct fixture (rn-template on the
+sweep tier) and bounds the walk's node visits linearly in the site count.
+
 **Not done — `this` is the literal `0`.** hermesc v98 passes `LoadConstZero`
 as `this` when it knows the callee closure and that it never reads `this`
 (react-navigation-example: 242 sites, all over env-slot or register
@@ -216,6 +231,8 @@ the histogram in the project status is the deliverable, not just the percentage.
 
 **Estimated size:** ~150 lines across `match/rewrite/check`, ~200 lines of
 tests.
+
+*(There is no section 8: it was never written, and the numbering is kept so that the `section 9`/`section 10` anchors cited from code comments and other docs stay valid.)*
 
 ## 9. R3e -- the method read separated from its call by the arguments
 
@@ -370,16 +387,16 @@ no longer reaches it.
 
 **Known gaps.** `fcall-diamond` labels: the `break L` inside the hidden fast
 arm still counts as a use, so `label-clean` keeps the wrapper (`L0: { ...;
-break L0; }`, compiles identically). A long-form generic `Call` collapses
-but can still print as `Reflect.apply(C, F', [...])`: in fixture 170's
-`o.n.call(t, 1, 2, 3)` the block reads r3 before reassigning it (`r4 = r3.n;
-r3 = r4.call`), and `expressionOnlyCheck` refuses every fold in a statement
-list that has any register read before its first def, even one the fold does
-not touch, so neither the argument `Mov`s nor `C = F.call` fold. Refusing only
-violations the rewrite introduces makes it print `F.call(T, 1, 2, 3)`, but
-the extra folding then breaks the derived-constructor rungs' expected shapes
-(the folded `if (__hbc_empty !== __hbc_empty)` guard, fixtures 81/88/91/110/180)
-and is not landed. The loose `F.apply(T, arguments)` with simple parameters
+break L0; }`, compiles identically). A long-form generic `Call` used to keep printing as
+`Reflect.apply(C, F', [...])` when its block read a register before
+reassigning it (fixture 170's `o.n.call(t, 1, 2, 3)`: `r4 = r3.n; r3 =
+r4.call`), because `expressionOnlyCheck` refused every fold in such a list.
+**Resolved (rt-fcall4):** the check now refuses only read-before-def
+violations a rewrite introduces (spec 02 section 6, "Carried live-in
+reads"), so it prints `F.call(T, 1, 2, 3)` and recompiles to the same call
+shape at v98/v99; derived-constructor frames keep the strict form, so the
+shapes super-call, inline-new and private-fields match are unchanged.
+The loose `F.apply(T, arguments)` with simple parameters
 prints `F.apply(T, __hbc_arguments(arguments))` (arguments-form R-A3), which
 recompiles without the diamond.
 
@@ -395,3 +412,21 @@ own `.apply`, overridden `Function.prototype.apply`) is T2 PASS at
 84/94/96/98/99 with no shim at 98/99; hand-built arms pin the apply proof
 and its refusals (other builtin, other `this`, other function, non-arguments
 array, untested callee, reify outside the apply form).
+
+**Review 1110** (`tests/gate/passes/review-1110-diamonds.test.ts`). Fixture
+`320-review-diamonds-probes` is a negative control, T2 PASS at
+84/94/96/98/99 with all 26 v99 diamonds collapsed: bound, Proxy and
+non-callable callees; `Function.prototype.call/apply` deleted, overridden
+and restored mid-function and mid-loop; a getter on the callee read and on
+`.call`; the receiver register reassigned inside the argument list; nested
+diamonds; throws between the read and the call (long-form call in `try`);
+parameters reassigned before a loose/strict/default-param `apply`;
+`arguments` written (`[0]`, `length`), escaping through an arrow or an
+alias, or used twice (hermesc emits no diamond then: the
+`CreateArgumentsInst` has another user). One bug, outside the diamond
+proof: the `__hbc_arguments` copy was a strict arguments object, so a loose
+function's forwarded/escaping `arguments` lost `callee` (reading it threw
+instead of giving the function); the copy is now made by a loose,
+parameterless function (still unmapped) and takes the source object's own
+`callee` descriptor (fixture `321-review-diamonds-arguments-callee`,
+DIVERGENT at every version before).

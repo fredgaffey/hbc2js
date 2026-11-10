@@ -2,9 +2,8 @@
 // expression-only check flagged a loop-carried register (read at the top of
 // a loop body, redefined at its bottom) as "read before its first def in the
 // rewrite" even though it was exactly as read-before-def in `before`; the
-// refusal dropped every fold in that body. The check now flags only a
-// register whose reads-before-first-def grew (or that newly violates) when
-// the list is a loop's own body; every other list keeps the absolute rule.
+// refusal dropped every fold in that body. Fixed on main by the carried
+// live-in rule (rt-fcall4, spec 02 s6); these tests pin the loop-body case.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -46,9 +45,9 @@ test("roundtrip-getbyidreg: a fold that keeps a loop-carried read before its def
   const tail = set("r3", add1("r3"));
   const before = [set("r2", idx("r4", "r3")), set("r5", call(id("g"), id("r2"))), tail];
   const after = [set("r5", call(id("g"), idx("r4", "r3"))), tail];
-  assert.deepEqual(expressionOnlyCheck(before, after, () => true), { ok: true });
-  // the same lists outside a loop body: a read before every def has no earlier iteration to come from
-  assert.equal(expressionOnlyCheck(before, after).ok, false);
+  assert.deepEqual(expressionOnlyCheck(before, after), { ok: true });
+  // the strict form (derived-constructor frames) still refuses it
+  assert.equal(expressionOnlyCheck(before, after, { carryLiveIn: false }).ok, false);
 });
 
 test("roundtrip-getbyidreg: deleting a def so more reads precede the first def still fails (negative twin)", () => {
@@ -56,9 +55,9 @@ test("roundtrip-getbyidreg: deleting a def so more reads precede the first def s
   const tail = set("r3", add1("r3"));
   const use: Stmt = { k: "expr", expr: call(id("f"), id("r3")) };
   const before = [set("r3", { k: "lit", text: "0" }), use, tail];
-  assert.equal(expressionOnlyCheck(before, [use, tail], () => true).ok, false);
+  assert.equal(expressionOnlyCheck(before, [use, tail]).ok, false);
   // already violating, but the deletion adds a read before the (new) first def
   const top: Stmt = { k: "expr", expr: call(id("g"), id("r3")) };
   const before2 = [top, set("r3", { k: "lit", text: "0" }), use, tail];
-  assert.equal(expressionOnlyCheck(before2, [top, use, tail], () => true).ok, false);
+  assert.equal(expressionOnlyCheck(before2, [top, use, tail]).ok, false);
 });

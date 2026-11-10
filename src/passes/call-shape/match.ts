@@ -103,11 +103,11 @@ export function isSimpleCalleeChain(e: Expr): boolean {
  *  `this`-holding register in a closure-bearing function coincidentally
  *  collides with some nested closure's own numbering, so the literal-§4
  *  check refused `unproven-this` on every single site there. */
-export function isProvenUndefinedThis(t: Expr, fnBody: readonly Stmt[]): boolean {
+export function isProvenUndefinedThis(t: Expr, fnBody: readonly Stmt[], oracle: RegisterWriteOracle = SUMMARY_ORACLE): boolean {
   if (t.k === "lit" && t.text === "undefined") return true;
   if (t.k !== "ident" || !isRegisterName(t.name)) return false;
-  const writes = everyRegisterWrite(fnBody, t.name);
-  return writes !== null && writes.length >= 1 && writes.every((w) => w.k === "lit" && w.text === "undefined");
+  const f = oracle.list(fnBody, t.name);
+  return !f.opaque && f.writes >= 1 && f.notUndefined === 0;
 }
 
 /** R3h (spec 04 section 4): every value `reg` is ever assigned anywhere in
@@ -132,34 +132,202 @@ export function isProvenUndefinedThis(t: Expr, fnBody: readonly Stmt[]): boolean
  *  writes `t` nowhere except as its own top-level assignment target (that
  *  store happens after the call). No such `k` in this list -> not proven
  *  (the enclosing list is not consulted). */
-function isLocallyUndefinedThis(t: Expr, at: SiteAt): boolean {
+export function isLocallyUndefinedThis(t: Expr, at: SiteAt, oracle: RegisterWriteOracle = SUMMARY_ORACLE): boolean {
   if (t.k !== "ident" || !isRegisterName(t.name)) return false;
   const reg = t.name;
   const s = at.list[at.stmtIndex];
   if (s === undefined) return false;
   const own = s.k === "expr" && s.expr.k === "assign" && s.expr.target.k === "ident" && s.expr.target.name === reg ? s.expr.value : s.k === "init" && s.name === reg ? s.value : s;
-  const ownWrites = everyRegisterWrite([own as Stmt], reg);
-  if (ownWrites === null || ownWrites.length !== 0) return false;
+  const ownWrites = oracle.node(own, reg);
+  if (ownWrites.opaque || ownWrites.writes !== 0) return false;
   for (let k = at.stmtIndex - 1; k >= 0; k--) {
     const w = at.list[k]!;
     if (w.k === "expr" && w.expr.k === "assign" && w.expr.target.k === "ident" && w.expr.target.name === reg) return w.expr.value.k === "lit" && w.expr.value.text === "undefined";
-    const between = everyRegisterWrite([w], reg);
-    if (between === null || between.length !== 0) return false;
+    const between = oracle.node(w, reg);
+    if (between.opaque || between.writes !== 0) return false;
   }
   return false;
 }
 
-function everyRegisterWrite(fnBody: readonly Stmt[], reg: string): Expr[] | null {
+/** Object nodes (arrays included) the R3h/R3i write walk has entered, ever.
+ *  Test instrumentation for the per-function cost bound; monotonic. */
+export const registerWriteWalkStats = { nodes: 0 };
+
+/** What R3h/R3i need to know about one register's writes in a subtree:
+ *  `opaque` = written some way that is not a plain value (for-in/for-of
+ *  target, catch parameter, any other string field naming it -- the walk's
+ *  `null`); `writes` = number of plain-value writes; `notUndefined` = how many
+ *  of those are not the literal `undefined`. Exactly the three facts the two
+ *  callers read off `everyRegisterWrite`'s array (`null`, `length`,
+ *  `every(lit undefined)`). */
+export interface RegisterWriteFacts {
+  readonly opaque: boolean;
+  readonly writes: number;
+  readonly notUndefined: number;
+}
+
+/** How a predicate learns a register's write facts: over a whole statement
+ *  list, or over one node (a statement, or the call statement's own value). */
+export interface RegisterWriteOracle {
+  list(list: readonly Stmt[], reg: string): RegisterWriteFacts;
+  node(node: object, reg: string): RegisterWriteFacts;
+}
+
+const NO_WRITES: RegisterWriteFacts = { opaque: false, writes: 0, notUndefined: 0 };
+type WriteSummary = ReadonlyMap<string, RegisterWriteFacts>;
+const EMPTY_SUMMARY: WriteSummary = new Map();
+
+/** Statement kinds: a nested `Stmt[]`'s elements get their own memo entry,
+ *  so a rewrite deep inside one statement re-walks only the rebuilt spine. */
+const STMT_KINDS: ReadonlySet<unknown> = new Set(["expr", "decl", "init", "if", "while", "do-while", "for", "for-in", "for-of", "labeled", "break", "continue", "return", "throw", "try", "switch", "func", "classdecl", "directive", "iife", "comment", "raw"]);
+
+const nodeSummaryMemo = new WeakMap<object, WriteSummary>();
+const listSummaryMemo = new WeakMap<readonly unknown[], WriteSummary>();
+
+/** Only register names are ever asked about (both predicates check
+ *  `isRegisterName` first), so only they are recorded. */
+function bump(out: Map<string, RegisterWriteFacts>, reg: string, opaque: boolean, writes: number, notUndefined: number): void {
+  if (!isRegisterName(reg)) return;
+  const c = out.get(reg) ?? NO_WRITES;
+  out.set(reg, { opaque: c.opaque || opaque, writes: c.writes + writes, notUndefined: c.notUndefined + notUndefined });
+}
+
+function mergeInto(out: Map<string, RegisterWriteFacts>, from: WriteSummary, excluded: ReadonlySet<string> | null): void {
+  for (const [reg, f] of from) if (excluded === null || !excluded.has(reg)) bump(out, reg, f.opaque, f.writes, f.notUndefined);
+}
+
+/** `everyRegisterWriteReference([node], reg)` for **every** `reg` at once,
+ *  as facts, memoised on the node's identity. Sound to memoise: stage-B
+ *  trees are immutable (a rewrite builds new nodes along the spine, see
+ *  `spliceList` in `../ast.ts`), so a node object's writes never change.
+ *
+ *  One pass reproduces the per-register walk exactly. The walk's only
+ *  register-dependent branches are (a) `init` whose `name` is the register
+ *  -- it then visits `value` only, while every other register's generic
+ *  branch visits all fields: so non-`value` object fields are walked with
+ *  that name *excluded*, and a string field opaques every register but the
+ *  name -- and (b) a for-in/for-of `left` ident naming it, which is opaque
+ *  for that register and generic for the rest. A subtree a register is
+ *  excluded from contributes nothing to it, which is all `excluded` does. */
+function nodeWriteSummary(node: object): WriteSummary {
+  if (Array.isArray(node)) return listWriteSummary(node);
+  let memo = nodeSummaryMemo.get(node);
+  if (memo !== undefined) return memo;
+  const out = new Map<string, RegisterWriteFacts>();
+  const isExcluded = (reg: string, excluded: ReadonlySet<string> | null): boolean => excluded !== null && excluded.has(reg);
+  const visit = (v: unknown, excluded: ReadonlySet<string> | null, root: boolean): void => {
+    if (v === null || typeof v !== "object") return;
+    if (Array.isArray(v)) {
+      registerWriteWalkStats.nodes++;
+      for (const x of v) {
+        if (x !== null && typeof x === "object" && !Array.isArray(x) && STMT_KINDS.has((x as { k?: unknown }).k)) mergeInto(out, nodeWriteSummary(x), excluded);
+        else visit(x, excluded, false);
+      }
+      return;
+    }
+    if (!root) {
+      const hit = nodeSummaryMemo.get(v);
+      if (hit !== undefined) {
+        mergeInto(out, hit, excluded);
+        return;
+      }
+    }
+    registerWriteWalkStats.nodes++;
+    const n = v as { readonly k?: unknown } & Record<string, unknown>;
+    // A `sameFrame` resume closure is this frame's own body: its writes count
+    // (00-LADDER "Resumable bodies"), as in the reference walk below.
+    if (n.k === "func" && n.sameFrame !== true) return;
+    if (n.k === "ident") return; // a read (writes are caught at their parent)
+    if (n.k === "assign" && (n.target as Expr).k === "ident") {
+      const t = (n.target as Expr & { k: "ident" }).name;
+      if (!isExcluded(t, excluded)) bump(out, t, false, 1, isUndefinedLit(n.value) ? 0 : 1);
+      visit(n.value, excluded, false);
+      return;
+    }
+    if (n.k === "init" && typeof n.name === "string") {
+      const name = n.name;
+      if (!isExcluded(name, excluded)) bump(out, name, false, 1, isUndefinedLit(n.value) ? 0 : 1);
+      let without: Set<string> | null = null;
+      for (const [key, f] of Object.entries(n)) {
+        if (typeof f === "string") {
+          if (f !== name && !isExcluded(f, excluded)) bump(out, f, true, 0, 0);
+        } else if (key === "value") visit(f, excluded, false);
+        else if (f !== null && typeof f === "object") visit(f, (without ??= new Set([...(excluded ?? []), name])), false);
+      }
+      return;
+    }
+    if ((n.k === "for-in" || n.k === "for-of") && (n.left as Expr).k === "ident") {
+      const l = (n.left as Expr & { k: "ident" }).name;
+      if (!isExcluded(l, excluded)) bump(out, l, true, 0, 0);
+    }
+    for (const [key, f] of Object.entries(n)) {
+      if (n.k === "decl" && key === "names") continue; // `let reg;` = undefined
+      if (typeof f === "string") {
+        if (!isExcluded(f, excluded)) bump(out, f, true, 0, 0);
+      } else visit(f, excluded, false);
+    }
+  };
+  visit(node, null, true);
+  memo = out.size === 0 ? EMPTY_SUMMARY : out;
+  nodeSummaryMemo.set(node, memo);
+  return memo;
+}
+
+/** A list's summary: the fold of its elements' memoised summaries (the walk
+ *  is a plain left-to-right accumulation, and the facts are order-free),
+ *  memoised on the list's identity -- the driver hands every `match` call of
+ *  one iteration the same `ctx.fnBody`, so all sites share one fold. */
+function listWriteSummary(list: readonly unknown[]): WriteSummary {
+  let memo = listSummaryMemo.get(list);
+  if (memo !== undefined) return memo;
+  registerWriteWalkStats.nodes++;
+  const out = new Map<string, RegisterWriteFacts>();
+  for (const x of list) if (x !== null && typeof x === "object") mergeInto(out, nodeWriteSummary(x), null);
+  memo = out.size === 0 ? EMPTY_SUMMARY : out;
+  listSummaryMemo.set(list, memo);
+  return memo;
+}
+
+function isUndefinedLit(v: unknown): boolean {
+  const e = v as Expr;
+  return e.k === "lit" && e.text === "undefined";
+}
+
+export const SUMMARY_ORACLE: RegisterWriteOracle = {
+  list: (list, reg) => listWriteSummary(list).get(reg) ?? NO_WRITES,
+  node: (node, reg) => nodeWriteSummary(node).get(reg) ?? NO_WRITES,
+};
+
+function factsOf(values: readonly Expr[] | null): RegisterWriteFacts {
+  if (values === null) return { opaque: true, writes: 0, notUndefined: 0 };
+  return { opaque: false, writes: values.length, notUndefined: values.filter((w) => !isUndefinedLit(w)).length };
+}
+
+/** Test-only: the original per-register walk, as an oracle, for the
+ *  differential in `tests/gate/passes/call-shape-register-writes.test.ts`.
+ *  `opaque` facts carry zero counts (the walk returns `null`), which every
+ *  predicate treats identically to any count. */
+export const REFERENCE_ORACLE: RegisterWriteOracle = {
+  list: (list, reg) => factsOf(everyRegisterWriteReference(list, reg)),
+  node: (node, reg) => factsOf(everyRegisterWriteReference([node as Stmt], reg)),
+};
+
+/** The original O(body) per-register walk, kept as the differential test's
+ *  reference. Never called on the decompile path. */
+export function everyRegisterWriteReference(fnBody: readonly Stmt[], reg: string): Expr[] | null {
   const values: Expr[] = [];
   let opaque = false;
   const visit = (node: unknown): void => {
     if (opaque || node === null || typeof node !== "object") return;
+    registerWriteWalkStats.nodes++;
     if (Array.isArray(node)) {
       for (const x of node) visit(x);
       return;
     }
     const n = node as { readonly k?: unknown } & Record<string, unknown>;
-    if (n.k === "func") return;
+    // A `sameFrame` resume closure is this frame's own body (its registers
+    // are these registers): its writes count (00-LADDER "Resumable bodies").
+    if (n.k === "func" && n.sameFrame !== true) return;
     if (n.k === "ident") return; // a read (writes are caught at their parent)
     if (n.k === "assign" && (n.target as Expr).k === "ident") {
       if ((n.target as Expr & { k: "ident" }).name === reg) values.push(n.value as Expr);
@@ -417,6 +585,9 @@ function leadingCall(s: Stmt, assigned: string[] = []): (Expr & { readonly k: "c
       e = e.value;
     }
     else if (e.k === "member") e = e.obj;
+    // `x + call(...)`: a register or literal left operand evaluates nothing a
+    // getter could observe, so the call is still the first effect.
+    else if (e.k === "bin" && (e.left.k === "lit" || (e.left.k === "ident" && isRegisterName(e.left.name)))) e = e.right;
     else return null;
   }
   return null;
@@ -485,7 +656,12 @@ function symbolSlotLoad(e: Expr): string | null {
 /** `x = O[rN]` or `O[rN]` for the register `rN`. */
 function symbolKeyRead(e: Expr | undefined, reg: string): boolean {
   const v = e !== undefined && e.k === "assign" ? e.value : e;
-  return v !== undefined && v.k === "member" && v.computed && v.prop.k === "ident" && v.prop.name === reg;
+  if (v === undefined) return false;
+  if (v.k === "member" && v.computed && v.prop.k === "ident" && v.prop.name === reg) return true;
+  // `src/emit/lower.ts`'s own-only private read `__hbc_privGet(o, sym)`
+  // (review-1110 iife/private, fixture 342; fixture 112 is the shape).
+  const k = isHelperCall(v, "__hbc_privGet") ? v.args[1] : undefined;
+  return k !== undefined && k.k === "ident" && k.name === reg;
 }
 
 /** `F.apply(T, arguments)` (section 10, the `apply` diamond's generic arm):
@@ -521,14 +697,17 @@ export function matchCondArg(list: readonly Stmt[], fnBody: readonly Stmt[]): Ca
     // `this` undefined); R3e applies only when R is the real receiver.
     if (isProvenUndefinedThis(R!, fnBody)) continue;
     const args = extractArgsArray(arr!);
-    if (args === null || args.length === 0) continue;
+    // `methodRead`: lower (spec 05 section 7.4) left this read unfused for
+    // evaluation order and proved `F` dead after the call itself.
+    const proven = call.methodRead === true;
+    if (args === null || (args.length === 0 && !proven)) continue;
     const f = F!.name;
     const r = R!.name;
     // The value `F = R.P` stores must die at this call: F read once in it,
     // and either F used nowhere else or this statement overwrites F.
     const uses = identUses(fnBody, f);
     if (identUses([list[j]!], f).reads !== 1) continue;
-    if (!(uses.reads === 1 && uses.writes === 1) && !assigned.includes(f)) continue;
+    if (!(uses.reads === 1 && uses.writes === 1) && !assigned.includes(f) && !proven) continue;
     // The statement writing F, scanning back from the call.
     let k = j - 1;
     while (k >= 0 && identUses([list[k]!], f).writes === 0) k--;
@@ -574,6 +753,10 @@ export function matchCondArg(list: readonly Stmt[], fnBody: readonly Stmt[]): Ca
       const fu = identUses(mid, f);
       if (identUses(mid, r).writes !== 0 || fu.reads !== 0 || fu.writes !== 0) continue;
     }
+    if (args.length === 0 && seq.length > 0) continue;
+    // A `methodRead` call with work in between is the `method-read` rung's
+    // (spec 05 section 7.4), after `object-literal` has folded that work.
+    if (proven && seq.length > 0) continue;
     const sunk = sinkReifiedArguments(seq, args, list[j]!, assigned, fnBody);
     if (sunk !== null) {
       seq.length = 0;

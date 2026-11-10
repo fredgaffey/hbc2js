@@ -95,3 +95,21 @@ test("T7: hbc2js export rejects an unknown --instrument value", SKIP, () => {
     cleanup(out);
   }
 });
+
+// export-boot L4: the boot timer read `globalThis.performance.now()`, which on
+// RN 0.85 is the app's own polyfill calling the NativePerformanceCxx
+// TurboModule, so the export made a native call around every factory that
+// the original never makes (the held-out app's B1 diverged at entry 66). The
+// clock must be the runtime's raw `nativePerformanceNow` when it exists.
+test("export-boot L4: the boot timer prefers the runtime's nativePerformanceNow over the app's performance polyfill", SKIP, () => {
+  const { out, run } = exportTo(RN_TEMPLATE, ["--instrument=modules"]);
+  try {
+    assert.equal(run.status, 0, `export --instrument=modules failed: ${run.stderr}`);
+    const registry = readFileSync(join(out, REGISTRY_REL), "utf8");
+    const raw = registry.indexOf("globalThis.nativePerformanceNow");
+    assert.ok(raw >= 0, "no nativePerformanceNow clock branch");
+    assert.ok(raw < registry.indexOf("globalThis.performance.now()"), "nativePerformanceNow must be tried before performance.now()");
+  } finally {
+    cleanup(out);
+  }
+});

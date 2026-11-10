@@ -42,6 +42,12 @@ export function buildRegistryJs(substitutions: ReadonlyMap<number, string> = new
     lines.push(`// --instrument=modules: per-module boot timing.`);
     lines.push(`// See this file's own doc comment above for the ring-buffer/flush contract.`);
     lines.push(`var __hbc_now = (function () {`);
+    // The runtime's raw clock first: on RN >= 0.80 \`performance\` is the
+    // app's own polyfill, whose now() calls a TurboModule (a native call the
+    // un-instrumented app never makes; export-boot L4).
+    lines.push(`  if (typeof globalThis.nativePerformanceNow === "function") {`);
+    lines.push(`    return function () { return globalThis.nativePerformanceNow(); };`);
+    lines.push(`  }`);
     lines.push(`  if (typeof globalThis.performance === "object" && globalThis.performance !== null && typeof globalThis.performance.now === "function") {`);
     lines.push(`    return function () { return globalThis.performance.now(); };`);
     lines.push(`  }`);
@@ -88,12 +94,29 @@ export function buildRegistryJs(substitutions: ReadonlyMap<number, string> = new
   lines.push(`  requireFn.importDefault = importDefault;`);
   lines.push(`  requireFn.importAll = importAll;`);
   if (instrument) {
+    // Spec 33 §4(b): the boot-proof probe, keyed by ORIGINAL module id. A
+    // host that defines \`__HBC_BOOT_PROBE__\` (the headless boot proof)
+    // sees enter/exit/throw; on a device it is undefined and costs one read.
+    lines.push(`  var __hbc_probe = globalThis.__HBC_BOOT_PROBE__;`);
+    lines.push(`  if (typeof __hbc_probe !== "function") __hbc_probe = null;`);
+    lines.push(`  if (__hbc_probe !== null) __hbc_probe("enter", id);`);
     lines.push(`  var __hbc_t0 = __hbc_now();`);
-    lines.push(`  entry.factory(globalThis, requireFn, importDefault, importAll, mod, mod.exports, entry.deps);`);
-    lines.push(`  var __hbc_dt = __hbc_now() - __hbc_t0;`);
-    lines.push(`  var __hbc_ring = globalThis.__HBC_BOOT_TIMINGS__;`);
-    lines.push(`  __hbc_ring.push({ id: id, t0: __hbc_t0, dt: __hbc_dt });`);
-    lines.push(`  if (__hbc_ring.length >= __HBC_BOOT_RING_CAPACITY__) __hbc_flushBootTimings();`);
+    lines.push(`  try {`);
+    lines.push(`    entry.factory(globalThis, requireFn, importDefault, importAll, mod, mod.exports, entry.deps);`);
+    lines.push(`  } catch (e) {`);
+    lines.push(`    if (__hbc_probe !== null) __hbc_probe("throw", id, e);`);
+    lines.push(`    throw e;`);
+    lines.push(`  }`);
+    lines.push(`  if (__hbc_probe !== null) __hbc_probe("exit", id, mod.exports);`);
+    // Under the probe host the timing ring stays silent: a flush is a
+    // console.log, i.e. a nativeLoggingHook call the original never makes
+    // (export-boot L4), and the probe already observes every factory.
+    lines.push(`  if (__hbc_probe === null) {`);
+    lines.push(`    var __hbc_dt = __hbc_now() - __hbc_t0;`);
+    lines.push(`    var __hbc_ring = globalThis.__HBC_BOOT_TIMINGS__;`);
+    lines.push(`    __hbc_ring.push({ id: id, t0: __hbc_t0, dt: __hbc_dt });`);
+    lines.push(`    if (__hbc_ring.length >= __HBC_BOOT_RING_CAPACITY__) __hbc_flushBootTimings();`);
+    lines.push(`  }`);
   } else {
     lines.push(`  entry.factory(globalThis, requireFn, importDefault, importAll, mod, mod.exports, entry.deps);`);
   }

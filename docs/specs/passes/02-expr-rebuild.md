@@ -79,7 +79,14 @@ or the `disc` of a `switch` (never inside a body, never inside a nested `func`);
 
 * if `isPure(E)`: every statement in `L[i+1..j-1]` is simple, `isPureStmt`,
   does not mention `rX`, and does not write any register `E` reads;
-* else: `j === i + 1` (no intervening statement at all).
+* else: `j === i + 1` (no intervening statement at all), and inside `L[j]`
+  the read of `rX` is the first observable evaluation (`firstReadOrder` in
+  `src/passes/ast.ts`: only literals, non-global binding reads `E` does not
+  write, closures and `isPure` operators come before it, never under a
+  `&&`/`||`/`?:` branch; the emitter's `Reflect.apply(F, T, [A…])` evaluates
+  `F, T, A…`). Without it `rT = X.Text; r1 = r3.createElement(rT, null)`
+  folded to a call that reads `r3.createElement` before `X.Text`
+  (fix-jsx-read-order, construct fixture 360).
 
 **R1b — dead store.** `L[i]` is `rX = E` and `rX` is dead after `i` (use `j =
 i` in the deadness test). Refuse when `E` is `ident rX` (that is R1c).
@@ -112,18 +119,27 @@ Class: **expression-only** (ladder §4.3). `check` calls
    and `.writes` is one fewer;
 5. `nested === 0` for `rX` in `before`.
 
-**Loop bodies (amendment 2026-11-10, passes-roundtrip-getbyidreg).** When
-`before` is a loop's own `body` list (`while`/`do-while`/`for`/`for-in`/`for-of`,
-by identity in `fnBody`), "read before its def" is relative: a loop-carried
-register (`i` in `s[i](); i = i + 1`) is read before its first def in the body
-already, its value coming from the previous iteration or from before the loop.
-There a name fails only if the rewrite *grew* its count of reads preceding its
-first def (or it newly has one) — deleting or postponing a def still fails;
-leaving the loop-carried read where it was does not. Before this one such name
-refused every fold in the body (the `s[i]()` call stayed `Reflect.apply`, whose
-global read shifted every later register: round-trip `diff:GetById(reg)`).
-Every other list keeps the absolute rule. Fixture 340 (with a getter-ordered
-twin); `tests/gate/passes/expr-rebuild-loop-carried.test.ts`.
+**Carried live-in reads (rt-fcall4).** "No `rN` read before its def" refuses
+only a violation the rewrite *introduces*: a register already read before its
+first def in `before` (live into the list, then reassigned in it) is carried
+when its first def is the same statement in the unchanged prefix or suffix,
+so every read ahead of that def still sees the live-in value, with no def in
+between. The old form refused every fold in any such list, even folds that
+never touch the register, which left fixture 170's `o.n.call(t, 1, 2, 3)` as
+`Reflect.apply`. A frame that runs `ThrowIfThisInitialized` (a derived
+constructor, or a frame a derived `new` was inlined into) keeps the strict
+form (`carryLiveIn: false`). Those frames always contain such a register (the
+dead `Mov` of the uninitialised `this` slot), so they never folded before, and
+super-call, inline-new (a lock-step comparison of the inlined copy against the
+constructor body) and private-fields match their unfolded statements. Turning
+it on there printed `if (__hbc_empty !== __hbc_empty)` and broke fixtures
+81/88/91/110. Fixture 340 (passes-roundtrip-getbyidreg) is the loop-body
+case: `i` in `s[i](); i = i + 1` is read before its first def in the body
+(the previous iteration's value), so the strict form left `s[i]()` as
+`Reflect.apply`, whose global read shifted later registers (round-trip
+`diff:GetById(reg)`); its getter-ordered twin pins the element read before
+the call. It also exposed a super-call bug, now fixed: deleting a dead
+`let T = __hbc_empty;` dropped T's only declaration.
 
 The driver adds `parses(fnBody)` once per function (01 F1) and `checkBindings`
 (EM-01) runs afterwards over the whole program.
@@ -140,7 +156,7 @@ one list.
 
 * `nested-capture` — a nested `func` mentions `rX`.
 * `not-dead` — neither (D-a) nor (D-b).
-* `impure-move` — `E` impure and `j > i + 1`.
+* `impure-move` — `E` impure and `j > i + 1`, or something observable in `L[j]` is evaluated before the read.
 * `input-clobbered` — a skipped statement writes a register `E` reads.
 * `env-slot-order` — `E` reads a lexical environment slot (`_e<env>_<slot>`)
   and a skipped statement stores into a slot of the **same** environment.
@@ -177,7 +193,7 @@ an effect — `isPure` returns false for `member`, which is what forces that).
 `two-reads`, `impure-move`, `nested-capture`; ≥1 site the `check` refuses.
 Red→green at all five HBC versions plus `.min`/`.obf`.
 
-**Corpus metric** (`tools/passes-metrics.ts`, 01): total `rN` identifier
+**Corpus metric** (`tools/passes-metrics.mjs`, 01): total `rN` identifier
 occurrences over `tests/fixtures/constructs/**` at v94 must fall by **≥ 50 %**,
 and median statements per emitted function by **≥ 35 %**, with 492/492 fixture
 PASS unchanged and PL-09 (PASS with passes on *and* off) holding.

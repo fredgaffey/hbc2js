@@ -13,7 +13,7 @@
 // sees.
 import type { Expr, Stmt } from "../ast.ts";
 import type { IdentUses } from "../ast.ts";
-import { expressionOnlyCheck, isPure, stmtLists, isRegisterName, noteRegisterUsesSplice, registerUses } from "../ast.ts";
+import { expressionOnlyCheck, isPure, isRegisterName, noteRegisterUsesSplice, registerUses } from "../ast.ts";
 
 const NO_USES = { reads: 0, writes: 0, nested: 0 } as const;
 import type { CheckResult, PassContext } from "../types.ts";
@@ -90,21 +90,27 @@ function verifyExpectedShape(before: readonly Stmt[], after: readonly Stmt[], ru
   return true;
 }
 
-/** `list` is the very `body` of a `while`/`do-while`/`for`/`for-in`/`for-of`
- *  somewhere in `fnBody` (identity, not shape). Only asked on the
- *  read-before-def slow path of `expressionOnlyCheck`. */
-function isLoopBodyIn(fnBody: readonly Stmt[] | undefined, list: readonly Stmt[]): boolean {
-  if (fnBody === undefined) return false;
-  for (const l of stmtLists(fnBody)) {
-    for (const s of l) {
-      if ((s.k === "while" || s.k === "do-while" || s.k === "for" || s.k === "for-in" || s.k === "for-of") && s.body === list) return true;
-    }
+/** A frame that runs `ThrowIfThisInitialized` (a derived constructor, or a
+ *  frame hermesc inlined a derived `new` into). Its lowering keeps the
+ *  strict read-before-def check: super-call, inline-new (a lock-step
+ *  comparison of the inlined copy against the constructor body) and
+ *  private-fields match the unfolded statements, and these frames always
+ *  have a live-in register (the uninitialised `this` slot's dead `Mov`), so
+ *  the strict form never folded them (rt-fcall4). */
+const derivedCtorFrame = new WeakMap<object, boolean>();
+function isDerivedCtorFrame(ctx: PassContext): boolean {
+  const cfg = ctx.cfg;
+  if (cfg === undefined || cfg === null) return false;
+  let v = derivedCtorFrame.get(cfg);
+  if (v === undefined) {
+    v = (cfg.blocks ?? []).some((b) => (b.instructions ?? []).some((insn) => insn.name === "ThrowIfThisInitialized")); // hand-built test contexts carry a stub cfg
+    derivedCtorFrame.set(cfg, v);
   }
-  return false;
+  return v;
 }
 
 export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: PassContext): CheckResult {
-  const eff = expressionOnlyCheck(before, after, () => isLoopBodyIn(ctx.fnBody, before));
+  const eff = expressionOnlyCheck(before, after, { carryLiveIn: !isDerivedCtorFrame(ctx) });
   if (!eff.ok) return eff;
 
   if (after.length !== before.length && after.length !== before.length - 1) {

@@ -25,6 +25,7 @@ export const globalAccess: Pass<readonly Stmt[], GlobalAccessSite> = {
   stage: "B",
   targets: ["19-var-hoisting", "01-if-else-chain", "02-while-loop"],
   catalogue: ["R2"],
+  sameFrame: true, // audited for the resume closure: 00-LADDER "Resumable bodies"
   after: ["expr-rebuild"],
   match,
   rewrite,

@@ -1,0 +1,4 @@
+hi leaf! get greet this.n=leaf
+true false proto set val 3 on leaf
+7 proto get val leaf | proto set val 7 on leaf
+yo swapped

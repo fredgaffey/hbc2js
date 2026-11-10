@@ -239,7 +239,8 @@ package name and would be resolved out of `node_modules/`).
 ```js
 // hbc2js export -- React Native entry point.
 require("./src/_hbc/helpers.js");   // installs __hbc_b_* on globalThis
-require("./src/_hbc/registry.js");  // installs __d / __r
+var __hbc = require("./src/_hbc/registry.js");  // installs __d / __r
+require("./src/_vendor/react-native/module_48.js");  // run-before-main (spec 33 L1)
 require("./src/module_986.js");     // the entry module's REAL export-tree path,
                                      // whatever bucket it landed in -- never a
                                      // literal "./src/index.js" guess (queue
@@ -247,6 +248,8 @@ require("./src/module_986.js");     // the entry module's REAL export-tree path,
                                      // ever right by coincidence, e.g. when the
                                      // name-overlay heuristic separately named
                                      // some other module `index.js`)
+__hbc.r(48);                        // a file require only REGISTERS; factories run
+__hbc.r(986);                       // in the original's top-level __r order
 ```
 
 The decompiled entry module's own body is what calls
@@ -601,7 +604,7 @@ Listed here so nobody reads an omission as an oversight; each is also in the
 manifest's `leftOut`.
 
 - **Booting.** Running the exported app on a device or emulator. The bundle
-  builds; whether it boots is a later spec.
+  builds; whether it boots is spec 33 (headless boot proof).
 - **The native host projects** `android/` and `ios/`. The user supplies them
   (`npx react-native init` at the pinned version, then copy this tree over its
   JS half). Reconstructing them is spec 27's territory.

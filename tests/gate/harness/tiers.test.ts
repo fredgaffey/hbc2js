@@ -12,7 +12,7 @@ import type { DecompilerFn } from "../../../src/harness/tiers.ts";
 import { mutants } from "../../../src/harness/mutate.ts";
 import { repoRoot } from "../../support/paths.ts";
 import { findHermesc } from "../../support/hermesc.ts";
-import { requireOracles, timeScale, tooBusyForTiming, loadTag } from "../../support/tiers.ts";
+import { requireOracles, timeScale, tooBusyForTiming, startLoadMonitor, loadTag } from "../../support/tiers.ts";
 import { KNOWN_AMBIGUOUS_V98 } from "../../support/known-issues.ts";
 
 // A subset chosen for speed and for being outside every documented gap
@@ -88,9 +88,12 @@ test("full gate tier, identity decompiler: DIVERGENT count is zero (perf budget:
   // the status notes's CI line.
   const budgetMs = 120000 * scale;
   const traceTimeoutMs = 8000 * scale;
+  const mon = startLoadMonitor();
   const started = Date.now();
   const report = await runTier({ tier: "gate", budgets: { timeoutMs: traceTimeoutMs } });
-  const elapsed = Date.now() - started;
+  // HBC2JS_PERF_INJECT_MS: manual red-check knob (docs/PERF-TESTS.md): pretend the run was this much slower.
+  const elapsed = Date.now() - started + (Number(process.env["HBC2JS_PERF_INJECT_MS"]) || 0);
+  const peakLoad = mon.stop();
   await t.test("timing", () => {
     console.log(`full gate identity run: ${elapsed}ms for ${report.results.length} checks (budget ${budgetMs}ms)`);
   });
@@ -98,7 +101,10 @@ test("full gate tier, identity decompiler: DIVERGENT count is zero (perf budget:
   // (docs/PERF-TESTS.md mechanism 3). Under the parallel gate the same run
   // measured 165s vs 67s alone, pure contention. Correctness checks below
   // stay unconditional.
-  const busy = tooBusyForTiming();
+  // Peak load across the whole run, not a single end sample (the 1-min
+  // average lags, and the run itself is ~1-2 min).
+  const busy = tooBusyForTiming(4, 8, peakLoad);
+  console.log(`gate identity load: peak ${peakLoad.toFixed(1)}, ${loadTag()}, busy=${busy || "no"}`);
   if (busy) console.log(`gate identity budget not enforced (${busy}; ${loadTag()}): ${elapsed}ms vs ${budgetMs}ms`);
   else assert.ok(elapsed < budgetMs, `gate identity run took ${elapsed}ms, over the ${budgetMs}ms budget (${loadTag()})`);
 

@@ -11,7 +11,10 @@ export interface AppNameResult {
 }
 
 const REGISTER_COMPONENT_LITERAL_RE = /\.registerComponent\(\s*(['"])([^'"]+)\1\s*,/;
-const REGISTER_COMPONENT_VAR_RE = /\.registerComponent\(\s*\w+\s*,/;
+// Any non-literal first argument: a bare name, or (spec 05 section 7.4: the
+// method read stays before the argument's require) `require(N).name` inline.
+// Also the unfused `rF = rO.registerComponent; ...; Reflect.apply(rF, rO, [arg, ...])`.
+const REGISTER_COMPONENT_VAR_RE = /\.registerComponent\(\s*[^,'"]+,|(\w+) = (\w+)\.registerComponent;[\s\S]*?Reflect\.apply\(\1, \2, \[/;
 const NAME_DISPLAYNAME_RE = /\bname\s*:\s*(['"])([^'"]+)\1\s*,\s*displayName\s*:\s*\1\2\1/;
 
 export interface RecoverAppNameModule {
@@ -179,7 +182,8 @@ export function buildMetroConfigJs(rnVersion: string | null): string {
   ].join("\n");
 }
 
-/** §4.1: boots the registry, then runs the entry module (which registers
+/** §4.1: boots the registry, registers and runs the run-before-main modules
+ *  and then the entry module (which registers
  *  itself with `AppRegistry`). No second registration is synthesised here —
  *  see the module comment on `entryModuleId === null`.
  *
@@ -192,7 +196,11 @@ export function buildMetroConfigJs(rnVersion: string | null): string {
  *  recognises, e.g. a `store/index.js` shape), so a literal
  *  `require("./src/index.js")` here silently pointed at a file that may not
  *  exist. See `docs/BUGS.md` (build-proof). */
-export function buildIndexJs(entryModuleId: number | null, entryPath: string | null): string {
+export function buildIndexJs(
+  entryModuleId: number | null,
+  entryPath: string | null,
+  runBeforeMain: readonly { readonly id: number; readonly path: string }[] = [],
+): string {
   const lines: string[] = [
     `// hbc2js export -- React Native entry point.`,
   ];
@@ -205,10 +213,15 @@ export function buildIndexJs(entryModuleId: number | null, entryPath: string | n
     lines.push(`// "unresolved" (entry-module-path-unknown).`);
   }
   lines.push(`require("./src/_hbc/helpers.js");`); // installs __hbc_b_* on globalThis
-  lines.push(`require("./src/_hbc/registry.js");`); // installs the module registry, unused directly here
-  if (entryModuleId !== null && entryPath !== null) {
-    lines.push(`require("./${entryPath}");`); // the entry module registers itself, then runs
-  }
+  lines.push(`var __hbc = require("./src/_hbc/registry.js");`); // installs the module registry
+  // Requiring a module FILE only registers it (`__hbc.define`, §4.4); the
+  // factories run through `__hbc.r(id)`, in the original bundle's own
+  // top-level `__r` order: run-before-main modules first, entry last
+  // (spec 33 L1: requiring the entry file alone ran no factory at all).
+  for (const m of runBeforeMain) lines.push(`require("./${m.path}");`);
+  if (entryModuleId !== null && entryPath !== null) lines.push(`require("./${entryPath}");`);
+  for (const m of runBeforeMain) lines.push(`__hbc.r(${m.id});`);
+  if (entryModuleId !== null && entryPath !== null) lines.push(`__hbc.r(${entryModuleId});`);
   lines.push(``);
   return lines.join("\n");
 }

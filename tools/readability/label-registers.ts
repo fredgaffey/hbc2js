@@ -271,15 +271,24 @@ export function registerTargets(labels: readonly ResolvedLabel[]): Record<string
 
 // -- driver -----------------------------------------------------------------
 
-export function runHermesc(hermesc: string, bundle: string, extra: readonly string[]): string {
-  const r = spawnSync(hermesc, ["-O", "-g", ...extra, bundle], { encoding: "utf8", maxBuffer: 1 << 30 });
-  return r.stdout;
+/** Run hermesc and keep only the lines the parsers read. A large app's full
+ *  `-dump-ra` exceeds V8's 512 MB string limit, so the dump is filtered by
+ *  `grep` in the pipe (`keep` is an extended regex; `-B1` keeps the function
+ *  header that precedes each `source location:` line). */
+export function runHermesc(hermesc: string, bundle: string, extra: readonly string[], keep?: string): string {
+  if (keep === undefined) {
+    const r = spawnSync(hermesc, ["-O", "-g", ...extra, bundle], { encoding: "utf8", maxBuffer: 1 << 30 });
+    return r.stdout;
+  }
+  const q = (a: string): string => `'${a.replace(/'/g, "'\\''")}'`;
+  const cmd = `${[hermesc, "-O", "-g", ...extra, bundle].map(q).join(" ")} | grep -a -B1 -E ${q(keep)}`;
+  return spawnSync("sh", ["-c", cmd], { encoding: "utf8", maxBuffer: 1 << 30 }).stdout;
 }
 
 /** Compile `bundle` and return the joined functions (no source map). */
 export function labelBundle(hermesc: string, bundle: string): ReturnType<typeof joinDumps> {
-  const ra = parseRaDump(runHermesc(hermesc, bundle, ["-dump-ra", "-dump-source-location=loc"]));
-  const bc = parseBytecodeHeaders(runHermesc(hermesc, bundle, ["-dump-bytecode", "-dump-source-location=loc"]));
+  const ra = parseRaDump(runHermesc(hermesc, bundle, ["-dump-ra", "-dump-source-location=loc"], "^source location:|LoadParamInst|LoadFrameInst|StoreFrameInst"));
+  const bc = parseBytecodeHeaders(runHermesc(hermesc, bundle, ["-dump-bytecode", "-dump-source-location=loc"], "^(NC)?[A-Za-z]+<.*>\\([0-9]+ params, "));
   return joinDumps(ra, bc);
 }
 

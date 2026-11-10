@@ -1,0 +1,2 @@
+ALPHA:1 ALPHA:1 alpha
+alpha#1

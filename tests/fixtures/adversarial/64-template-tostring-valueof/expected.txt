@@ -1,0 +1,6 @@
+<T1|T2> toString 1 toString 2
+<1|2> valueOf 1 valueOf 2
+3 valueOf 1 valueOf 2
+3T1 valueOf 1 valueOf 2 toString 1
+T21 toString 2 valueOf 1
+T1-T2 toString 1 toString 2

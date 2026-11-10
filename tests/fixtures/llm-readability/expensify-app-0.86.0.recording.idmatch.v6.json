@@ -1,0 +1,722 @@
+{
+  "f7c648ebac39db08f1e7abfe97446c2e30e4263b3555c0ffaa64fb376f1c3407": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":20427,\"reg\":1},\"name\":\"uri\",\"confidence\":\"med\",\"evidence\":\"copy of a1; checked typeof string, passed to isLocalFile, and later rewritten to a file:// URL\"},{\"bindingId\":{\"fn\":20427,\"reg\":0},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"assigned undefined and used as the this-argument for every Reflect.apply call\"},{\"bindingId\":{\"fn\":20427,\"reg\":2},\"name\":\"isLocalFile\",\"confidence\":\"low\",\"evidence\":\"reused register; holds the isLocalFile function and its boolean result tested by if(r2)\"},{\"bindingId\":{\"fn\":20427,\"reg\":3},\"name\":\"scratchValue\",\"confidence\":\"low\",\"evidence\":\"initialized undefined, then holds _e2285_8 for a function check whose result is never used\"},{\"bindingId\":{\"fn\":20427,\"reg\":4},\"name\":\"tempValue\",\"confidence\":\"low\",\"evidence\":\"reused temp: imported function, getter result, template string, includes result, and documents directory\"},{\"bindingId\":{\"fn\":20427,\"reg\":5},\"name\":\"fileName\",\"confidence\":\"med\",\"evidence\":\"last segment from r7.split('/').pop(), later interpolated as the file part of file://${dir}/${fileName}\"},{\"bindingId\":{\"fn\":20427,\"reg\":6},\"name\":\"pathSeparator\",\"confidence\":\"high\",\"evidence\":\"assigned the literal \\\"/\\\" and passed to split()\"},{\"bindingId\":{\"fn\":20427,\"reg\":7},\"name\":\"decodedPath\",\"confidence\":\"low\",\"evidence\":\"result of calling an imported function on the uri; checked with includes and split on '/'\"},{\"bindingId\":{\"fn\":20427,\"reg\":9},\"name\":\"baseDirName\",\"confidence\":\"med\",\"evidence\":\"last '/' segment of r5 (the output of a default-export call), used in the `/${r9}/` includes check\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9872,
+      "tokensOut": 669,
+      "usd": 0.0330154
+    },
+    "meta": {
+      "fn": 20427,
+      "requested": 9
+    }
+  },
+  "b58efb033eaebf0e091ac497b2506ebffda1909944adc861906f01e91d8a2b2d": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":20506,\"reg\":7},\"name\":\"globalScope\",\"confidence\":\"high\",\"evidence\":\"assigned from globalThis; used for `\\\"Blob\\\" in r7`, `r7.File`, `r7.URL` and similar lookups\"},{\"bindingId\":{\"fn\":20506,\"reg\":12},\"name\":\"fileName\",\"confidence\":\"med\",\"evidence\":\"`r12 = a2` is passed as the second argument to `new File(parts, name, options)`\"},{\"bindingId\":{\"fn\":20506,\"reg\":9},\"name\":\"dataUri\",\"confidence\":\"low\",\"evidence\":\"initially `r9 = a1`, which is split on \\\",\\\"; the register is reused later\"},{\"bindingId\":{\"fn\":20506,\"reg\":10},\"name\":\"binaryString\",\"confidence\":\"med\",\"evidence\":\"`atob(base64 payload)` result; its charCodeAt values are copied into a Uint8Array\"},{\"bindingId\":{\"fn\":20506,\"reg\":8},\"name\":\"mimeType\",\"confidence\":\"med\",\"evidence\":\"derived from split(\\\",\\\")[0].split(\\\":\\\")[1].split(\\\";\\\")[0]; used as `type` in the Blob and File options\"},{\"bindingId\":{\"fn\":20506,\"reg\":1},\"name\":\"one\",\"confidence\":\"low\",\"evidence\":\"constant 1 used as the split index and as the loop increment\"},{\"bindingId\":{\"fn\":20506,\"reg\":3},\"name\":\"nullValue\",\"confidence\":\"low\",\"evidence\":\"`r3 = null`, compared with `==` for nullish checks, then reused as a loop condition\"},{\"bindingId\":{\"fn\":20506,\"reg\":4},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"`r4 = undefined`, never read afterwards\"},{\"bindingId\":{\"fn\":20506,\"reg\":6},\"name\":\"scratchValue\",\"confidence\":\"low\",\"evidence\":\"reused register: base64 payload, then ArrayBuffer, then Uint8Array, then Blob options, then File\"},{\"bindingId\":{\"fn\":20506,\"reg\":11},\"name\":\"scratchRef\",\"confidence\":\"low\",\"evidence\":\"reused as a split segment, then as the Uint8Array, Blob and File constructors\"},{\"bindingId\":{\"fn\":20506,\"reg\":14},\"name\":\"fileOptions\",\"confidence\":\"med\",\"evidence\":\"holds {type, lastModified} and is passed as the third argument to `new File`\"},{\"bindingId\":{\"fn\":20506,\"reg\":15},\"name\":\"constructorArg2\",\"confidence\":\"low\",\"evidence\":\"second constructor argument: Blob options, then the file name for File\"},{\"bindingId\":{\"fn\":20506,\"reg\":16},\"name\":\"constructorArg1\",\"confidence\":\"low\",\"evidence\":\"first constructor argument: a length, a buffer, a parts array\"},{\"bindingId\":{\"fn\":20506,\"reg\":17},\"name\":\"unusedArg\",\"confidence\":\"low\",\"evidence\":\"assigned stale values before `new` calls and never read\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 10324,
+      "tokensOut": 1645,
+      "usd": 0.0445834
+    },
+    "meta": {
+      "fn": 20506,
+      "requested": 14
+    }
+  },
+  "3dbc0124c8c047daf0b52fc9f5af894413824e2287a5c730f11886ccaaf12238": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":20575,\"reg\":4},\"name\":\"translate\",\"confidence\":\"high\",\"evidence\":\"a1 is called with keys like \\\"statusPage.timePeriods.afterToday\\\" and \\\"common.am\\\" and returns the display string\"},{\"bindingId\":{\"fn\":20575,\"reg\":10},\"name\":\"dateValue\",\"confidence\":\"med\",\"evidence\":\"a3 is compared with the formatted end-of-today string and CUSTOM_STATUS_TYPES.NEVER, then passed to new Date(r15)\"},{\"bindingId\":{\"fn\":20575,\"reg\":11},\"name\":\"dateFns\",\"confidence\":\"med\",\"evidence\":\"holds _e2337_0 and is called with r6[8] to get a module exposing endOfDay and format (date-fns style)\"},{\"bindingId\":{\"fn\":20575,\"reg\":6},\"name\":\"dateFnsModules\",\"confidence\":\"low\",\"evidence\":\"holds _e2337_1 and is indexed with [8] to get the argument passed to dateFns\"},{\"bindingId\":{\"fn\":20575,\"reg\":5},\"name\":\"globalScope\",\"confidence\":\"med\",\"evidence\":\"assigned globalThis and then used to look up Date\"},{\"bindingId\":{\"fn\":20575,\"reg\":8},\"name\":\"endOfDay\",\"confidence\":\"med\",\"evidence\":\"reads .endOfDay from the dateFns module and is called with new Date()\"},{\"bindingId\":{\"fn\":20575,\"reg\":7},\"name\":\"formattedEndOfToday\",\"confidence\":\"med\",\"evidence\":\"holds format(endOfDay, \\\"yyyy-MM-dd HH:mm:ss\\\") and is compared with the input date\"},{\"bindingId\":{\"fn\":20575,\"reg\":9},\"name\":\"emptyString\",\"confidence\":\"med\",\"evidence\":\"first holds the end-of-today Date, later assigned \\\"\\\" and compared with the input and used as the concat receiver\"},{\"bindingId\":{\"fn\":20575,\"reg\":3},\"name\":\"result\",\"confidence\":\"med\",\"evidence\":\"holds the returned description strings such as the translated afterToday and never keys\"},{\"bindingId\":{\"fn\":20575,\"reg\":12},\"name\":\"constants\",\"confidence\":\"med\",\"evidence\":\"holds _e2337_3 and is read via [\\\"default\\\"].CUSTOM_STATUS_TYPES and .DATE\"},{\"bindingId\":{\"fn\":20575,\"reg\":15},\"name\":\"dateInput\",\"confidence\":\"low\",\"evidence\":\"copy of a3 passed as the argument to new Date\"},{\"bindingId\":{\"fn\":20575,\"reg\":16},\"name\":\"unusedTemp\",\"confidence\":\"low\",\"evidence\":\"assigned from other registers but never read\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 10514,
+      "tokensOut": 910,
+      "usd": 0.037993400000000004
+    },
+    "meta": {
+      "fn": 20575,
+      "requested": 13
+    }
+  },
+  "7047c05f4644f5e7257b9112591967ce0f96f901178f19afac5dae5abc28624d": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\": {\"fn\": 20603, \"reg\": 0, \"web\": 1}, \"name\": \"dateConfig\", \"confidence\": \"low\", \"evidence\": \"r0 = _e2337_3.default.DATE, then r0.FNS_FORMAT_STRING is read from it. The register is reused later for the format result and the caught error.\"},\n    {\"bindingId\": {\"fn\": 20603, \"reg\": 0, \"web\": 2}, \"name\": \"emptyResult\", \"confidence\": \"med\", \"evidence\": \"r0_2 = \\\"\\\" is the fallback returned when a1 or a2 is falsy.\"},\n    {\"bindingId\": {\"fn\": 20603, \"reg\": 1}, \"name\": \"logContext\", \"confidence\": \"med\", \"evidence\": \"Assigned {utcDateTime, timeZone, error} and passed as the second argument to the warn call.\"},\n    {\"bindingId\": {\"fn\": 20603, \"reg\": 2}, \"name\": \"zonedDate\", \"confidence\": \"low\", \"evidence\": \"First holds the toDate function, then the result of calling it with (a1, {timeZone: \\\"UTC\\\"}). That result is passed to the formatter.\"},\n    {\"bindingId\": {\"fn\": 20603, \"reg\": 3}, \"name\": \"undefinedValue\", \"confidence\": \"low\", \"evidence\": \"r3 = undefined, used as the thisArg in Reflect.apply and in the arguments[2] check. Later reused for the logger.\"},\n    {\"bindingId\": {\"fn\": 20603, \"reg\": 4}, \"name\": \"timeZone\", \"confidence\": \"high\", \"evidence\": \"r4 = a2, truthiness-checked and logged under the key timeZone.\"},\n    {\"bindingId\": {\"fn\": 20603, \"reg\": 5}, \"name\": \"utcDateTime\", \"confidence\": \"high\", \"evidence\": \"r5 = a1, passed to toDate and logged under the key utcDateTime. The warning message says \\\"UTC datetime\\\".\"},\n    {\"bindingId\": {\"fn\": 20603, \"reg\": 6}, \"name\": \"formatString\", \"confidence\": \"high\", \"evidence\": \"Set to arguments[2] or the default DATE.FNS_FORMAT_STRING, and passed as the third argument to the format call.\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9371,
+      "tokensOut": 1157,
+      "usd": 0.035891400000000004
+    },
+    "meta": {
+      "fn": 20603,
+      "requested": 8
+    }
+  },
+  "5e2efa92fc138a9ce4f80e084750256c0d76614757fb1a52b20550c933a5161b": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\": {\"fn\": 20829, \"reg\": 0, \"web\": 1}, \"name\": \"forPrefix\", \"confidence\": \"med\", \"evidence\": \"holds the literal \\\"für \\\" that is interpolated into r3 in the truthy branch\"},\n    {\"bindingId\": {\"fn\": 20829, \"reg\": 0, \"web\": 2}, \"name\": \"reportName\", \"confidence\": \"high\", \"evidence\": \"result of the template `${r2_2} gesendet${r3}` and returned; the function is named threadPaySomeoneReportName\"},\n    {\"bindingId\": {\"fn\": 20829, \"reg\": 2, \"web\": 1}, \"name\": \"recipientName\", \"confidence\": \"low\", \"evidence\": \"copy of a2, tested for truthiness and interpolated after \\\"für \\\"; the exact meaning of a2 is not visible\"},\n    {\"bindingId\": {\"fn\": 20829, \"reg\": 2, \"web\": 2}, \"name\": \"sentAmount\", \"confidence\": \"low\", \"evidence\": \"copy of a1, placed at the start of the template before \\\" gesendet\\\"; the amount reading is inferred from the function name\"},\n    {\"bindingId\": {\"fn\": 20829, \"reg\": 3}, \"name\": \"forSuffix\", \"confidence\": \"med\", \"evidence\": \"starts as \\\"\\\" and becomes `für ${r2}` when a2 is truthy; appended after \\\"gesendet\\\"\"},\n    {\"bindingId\": {\"fn\": 20829, \"reg\": 4}, \"name\": \"emptyString\", \"confidence\": \"med\", \"evidence\": \"assigned \\\"\\\" and copied into r3 as the default suffix\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9308,
+      "tokensOut": 807,
+      "usd": 0.0321394
+    },
+    "meta": {
+      "fn": 20829,
+      "requested": 6
+    }
+  },
+  "9c4aea5c154cf599f29fc197a736ec761f0c87ec2cbd3069e5d6225b8173b1c8": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":21531,\"reg\":3},\"name\":\"value\",\"confidence\":\"med\",\"evidence\":\"copies parameter a1, defaults to \\\"\\\" via ?? and is interpolated into the template `Größer als ${r3}` (fn named greaterThan), so it is the comparison value\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9088,
+      "tokensOut": 114,
+      "usd": 0.0243294
+    },
+    "meta": {
+      "fn": 21531,
+      "requested": 1
+    }
+  },
+  "a286fa3be5982be3180e62cd05e839d37cdc6328c1890cf087bc661c90742c06": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":21591,\"reg\":0},\"name\":\"message\",\"confidence\":\"med\",\"evidence\":\"Holds the German fallback string \\\"Entfernung übersteigt die berechnete Route\\\" or the template message with the distance, and is returned\"},{\"bindingId\":{\"fn\":21591,\"reg\":3},\"name\":\"distance\",\"confidence\":\"med\",\"evidence\":\"Copy of a1, tested for truthiness and interpolated into \\\"Die Entfernung übersteigt die berechnete Route von ${r3}\\\"\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9172,
+      "tokensOut": 189,
+      "usd": 0.0254154
+    },
+    "meta": {
+      "fn": 21591,
+      "requested": 2
+    }
+  },
+  "55d8b1610be1e81633556affe5b89789ea990904f806b8a48cf8ca12426e161a": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":22930,\"reg\":0,\"web\":1},\"name\":\"forSeparator\",\"confidence\":\"low\",\"evidence\":\"assigned the literal \\\" for \\\" which is the prefix of the template `for ${r2}` built just after\"},{\"bindingId\":{\"fn\":22930,\"reg\":2,\"web\":1},\"name\":\"entityName\",\"confidence\":\"low\",\"evidence\":\"copy of a2, tested for truthiness and interpolated after \\\" for \\\" in the suffix; fn named trackedAmount\"},{\"bindingId\":{\"fn\":22930,\"reg\":2,\"web\":2},\"name\":\"trackedAmount\",\"confidence\":\"low\",\"evidence\":\"copy of a1, passed as the first piece after \\\"tracking \\\" in the concat via Reflect.apply\"},{\"bindingId\":{\"fn\":22930,\"reg\":3},\"name\":\"forSuffix\",\"confidence\":\"med\",\"evidence\":\"starts as \\\"\\\" and is set to ` for ${r2}` when a2 is truthy; passed as final piece of the \\\"tracking \\\" concat\"}]],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9270,
+      "tokensOut": 359,
+      "usd": 0.0275074
+    },
+    "meta": {
+      "fn": 22930,
+      "requested": 4
+    }
+  },
+  "d0b2273df5bb124e3b7cbc3c37cfa11574166f7117d8f7c7ea799c4a3ecae36b": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":23938,\"reg\":0},\"name\":\"message\",\"confidence\":\"med\",\"evidence\":\"holds the template-literal HTML string that is returned at the end of the function\"},{\"bindingId\":{\"fn\":23938,\"reg\":5},\"name\":\"policyName\",\"confidence\":\"med\",\"evidence\":\"copy of a4, interpolated as the link text after 'al espacio de trabajo <a href=...>' (workspace name)\"},{\"bindingId\":{\"fn\":23938,\"reg\":6},\"name\":\"policyLink\",\"confidence\":\"med\",\"evidence\":\"copy of a3, interpolated as the href of the workspace anchor in both branches\"},{\"bindingId\":{\"fn\":23938,\"reg\":10,\"web\":1},\"name\":\"closeAnchorTag\",\"confidence\":\"low\",\"evidence\":\"assigned the literal \\\"</a>\\\", the closing tag fragment of the template\"},{\"bindingId\":{\"fn\":23938,\"reg\":10,\"web\":2},\"name\":\"hrefCloseFragment\",\"confidence\":\"low\",\"evidence\":\"assigned the literal \\\"\\\\\\\">\\\", the end of the href attribute in the template\"},{\"bindingId\":{\"fn\":23938,\"reg\":11,\"web\":1},\"name\":\"policyNameText\",\"confidence\":\"low\",\"evidence\":\"copy of r5 (workspace name), interpolated as the anchor text in the first template\"},{\"bindingId\":{\"fn\":23938,\"reg\":11,\"web\":2},\"name\":\"policyHref\",\"confidence\":\"low\",\"evidence\":\"copy of r6 (workspace link), interpolated as the workspace href in the second template\"},{\"bindingId\":{\"fn\":23938,\"reg\":12,\"web\":1},\"name\":\"hrefCloseFragment\",\"confidence\":\"low\",\"evidence\":\"assigned the literal \\\"\\\\\\\">\\\", the end of the href attribute in the first template\"},{\"bindingId\":{\"fn\":23938,\"reg\":12,\"web\":2},\"name\":\"reportLinkTailFragment\",\"confidence\":\"low\",\"evidence\":\"assigned the literal \\\"\\\\\\\">informe</a> al espacio de trabajo <a href=\\\\\\\"\\\" used between the two links\"},{\"bindingId\":{\"fn\":23938,\"reg\":13,\"web\":1},\"name\":\"policyHrefArg\",\"confidence\":\"low\",\"evidence\":\"copy of r6 (workspace link), interpolated as the href in the first template\"},{\"bindingId\":{\"fn\":23938,\"reg\":13,\"web\":2},\"name\":\"reportUrl\",\"confidence\":\"med\",\"evidence\":\"copy of a2, interpolated as the href around the word 'informe' (report) in the second template\"},{\"bindingId\":{\"fn\":23938,\"reg\":14,\"web\":1},\"name\":\"movedReportPrefixFragment\",\"confidence\":\"low\",\"evidence\":\"assigned the literal 'movió este informe al espacio de trabajo <a href=\\\"' used as the template prefix\"},{\"bindingId\":{\"fn\":23938,\"reg\":14,\"web\":2},\"name\":\"movedThisPrefixFragment\",\"confidence\":\"low\",\"evidence\":\"assigned the literal 'movió este <a href=\\\"' used as the template prefix of the second branch\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9610,
+      "tokensOut": 1042,
+      "usd": 0.0356974
+    },
+    "meta": {
+      "fn": 23938,
+      "requested": 13
+    }
+  },
+  "a0e76a1b86f245467d6a6735805bf94e126df547ac1c1fc471fe2484861338ae": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":24996,\"reg\":4},\"name\":\"payerName\",\"confidence\":\"med\",\"evidence\":\"copy of a1, truthiness-checked then interpolated as `${r4} ` before the literal \\\"paiement reçu\\\" (French 'payment received'); function is receivedPaymentReportAction\"},{\"bindingId\":{\"fn\":24996,\"reg\":3},\"name\":\"emptyString\",\"confidence\":\"low\",\"evidence\":\"constant \\\"\\\" assigned to r3 and copied into r1 as the default prefix\"},{\"bindingId\":{\"fn\":24996,\"reg\":1},\"name\":\"prefix\",\"confidence\":\"med\",\"evidence\":\"holds \\\"\\\" or `${r4} ` and is concatenated before \\\"paiement reçu\\\"\"},{\"bindingId\":{\"fn\":24996,\"reg\":0,\"web\":1},\"name\":\"spaceSeparator\",\"confidence\":\"low\",\"evidence\":\"r0 = \\\" \\\" assigned just before the template that appends a space after r4\"},{\"bindingId\":{\"fn\":24996,\"reg\":0,\"web\":2},\"name\":\"message\",\"confidence\":\"med\",\"evidence\":\"r0_2 = prefix + \\\"paiement re\\\\u00e7u\\\" and is returned as the final text\"},{\"bindingId\":{\"fn\":24996,\"reg\":2},\"name\":\"concat\",\"confidence\":\"low\",\"evidence\":\"local already named concat, holds __hbc_HermesInternal.concat\"}],\"abstained\":false}\n\nWait — correction: target `{24996,2}` was not in the request, and `concat` already has a good name. Dropping that entry; the effective answer is the five entries above for the requested targets.",
+    "cost": {
+      "tokensIn": 9246,
+      "tokensOut": 541,
+      "usd": 0.0292314
+    },
+    "meta": {
+      "fn": 24996,
+      "requested": 5
+    }
+  },
+  "0a5987e714934769aad5ba1bde69de0a02648e4714ff4d3512e9a8f563c54d22": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":25006,\"reg\":0,\"web\":1},\"name\":\"indicatingPrefixLiteral\",\"confidence\":\"low\",\"evidence\":\"r0 holds the literal \\\", indiquant « \\\" at the only assignment in the branch; it is a template fragment and is never read afterwards\"},{\"bindingId\":{\"fn\":25006,\"reg\":0,\"web\":2},\"name\":\"submittedMessage\",\"confidence\":\"high\",\"evidence\":\"assigned \\\"soumis\\\" + r1 and returned; fn is labelled \\\"submitted\\\"\"},{\"bindingId\":{\"fn\":25006,\"reg\":1},\"name\":\"indicatingSuffix\",\"confidence\":\"med\",\"evidence\":\"starts as \\\"\\\" and, when a1 is truthy, becomes `, indiquant « ${r4} »`; it is appended to \\\"soumis\\\"\"},{\"bindingId\":{\"fn\":25006,\"reg\":4},\"name\":\"indicatedText\",\"confidence\":\"med\",\"evidence\":\"copy of a1, tested for truthiness and interpolated after \\\"indiquant\\\" in the suffix\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9232,
+      "tokensOut": 368,
+      "usd": 0.027445400000000002
+    },
+    "meta": {
+      "fn": 25006,
+      "requested": 4
+    }
+  },
+  "83860a705b75cd729cdb251e11787ac49581deec7e0b3021fbe7ee2f9adeb88e": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":26046,\"reg\":2},\"name\":\"emptyString\",\"confidence\":\"low\",\"evidence\":\"r2 = \\\"\\\" constant, copied into r7 as the fallback when a1 is falsy\"},{\"bindingId\":{\"fn\":26046,\"reg\":3},\"name\":\"policyOrAccountName\",\"confidence\":\"low\",\"evidence\":\"copy of a1, interpolated as `${r3} ` before 'con il conto bancario' in the Italian 'paid automatically' string; exact meaning of a1 is not visible\"},{\"bindingId\":{\"fn\":26046,\"reg\":7},\"name\":\"prefixText\",\"confidence\":\"med\",\"evidence\":\"holds '' or `${a1} ` and is interpolated right after 'pagato ' in the returned template\"},{\"bindingId\":{\"fn\":26046,\"reg\":0,\"web\":1},\"name\":\"spaceSeparator\",\"confidence\":\"low\",\"evidence\":\"r0 = \\\" \\\" assigned only in the truthy branch, matching the trailing space in `${r3} `\"},{\"bindingId\":{\"fn\":26046,\"reg\":0,\"web\":2},\"name\":\"message\",\"confidence\":\"med\",\"evidence\":\"r0_2 holds the final Italian template string 'pagato ... con il conto bancario ...' and is returned\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9333,
+      "tokensOut": 437,
+      "usd": 0.0285394
+    },
+    "meta": {
+      "fn": 26046,
+      "requested": 5
+    }
+  },
+  "97719d5c779f6684d6008e8bf32556790a73da772f3167e2d82870a3591815bf": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 26059, \"reg\": 0, \"web\": 1 },\n      \"name\": \"space\",\n      \"confidence\": \"low\",\n      \"evidence\": \"assigned the literal \\\" \\\" but never read afterwards; the same space is built into the `${r2} ` template\"\n    },\n    {\n      \"bindingId\": { \"fn\": 26059, \"reg\": 0, \"web\": 2 },\n      \"name\": \"paidMessage\",\n      \"confidence\": \"med\",\n      \"evidence\": \"holds the template `${r3}ha pagato ${r2_2}` (\\\"... paid ...\\\") and is returned\"\n    },\n    {\n      \"bindingId\": { \"fn\": 26059, \"reg\": 2, \"web\": 1 },\n      \"name\": \"payerName\",\n      \"confidence\": \"med\",\n      \"evidence\": \"a2 is copied here and, when truthy, becomes the prefix before \\\"ha pagato\\\" (\\\"has paid\\\"), so it is the subject who paid\"\n    },\n    {\n      \"bindingId\": { \"fn\": 26059, \"reg\": 2, \"web\": 2 },\n      \"name\": \"amount\",\n      \"confidence\": \"med\",\n      \"evidence\": \"copy of a1, interpolated after \\\"ha pagato\\\" and the function is named payerPaidAmount\"\n    },\n    {\n      \"bindingId\": { \"fn\": 26059, \"reg\": 3 },\n      \"name\": \"payerPrefix\",\n      \"confidence\": \"med\",\n      \"evidence\": \"starts as \\\"\\\" and becomes `${payerName} ` when a2 is truthy, then is placed in front of \\\"ha pagato\\\"\"\n    },\n    {\n      \"bindingId\": { \"fn\": 26059, \"reg\": 4 },\n      \"name\": \"emptyString\",\n      \"confidence\": \"low\",\n      \"evidence\": \"assigned the literal \\\"\\\" and only used as the default value for the prefix\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9296,
+      "tokensOut": 778,
+      "usd": 0.0318014
+    },
+    "meta": {
+      "fn": 26059,
+      "requested": 6
+    }
+  },
+  "4ed21865572cdc952facc2029f7ad63873ed0e3a02a5be6705fd375a5839dd86": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":26806,\"reg\":0},\"name\":\"message\",\"confidence\":\"med\",\"evidence\":\"holds the returned Italian string: 'ha modificato lo spazio di lavoro in ...' or 'ha modificato il workspace' + suffix\"},{\"bindingId\":{\"fn\":26806,\"reg\":1},\"name\":\"previousSuffixOrPrefix\",\"confidence\":\"low\",\"evidence\":\"reused temp: holds literal prefix strings, then the '(precedentemente ...)' suffix in the no-policy branch\"},{\"bindingId\":{\"fn\":26806,\"reg\":2},\"name\":\"concatFn\",\"confidence\":\"low\",\"evidence\":\"mostly holds __hbc_HermesInternal.concat passed to Reflect.apply; also briefly the ')' literal\"},{\"bindingId\":{\"fn\":26806,\"reg\":3},\"name\":\"previousPolicyNote\",\"confidence\":\"med\",\"evidence\":\"starts as '' and becomes `(precedentemente ${r6})` when oldPolicy is truthy; passed as the last concat piece\"},{\"bindingId\":{\"fn\":26806,\"reg\":4},\"name\":\"newPolicy\",\"confidence\":\"med\",\"evidence\":\"copy of a1, tested for truthiness to choose 'ha modificato lo spazio di lavoro in' and concatenated into the message\"},{\"bindingId\":{\"fn\":26806,\"reg\":5},\"name\":\"concatHelper\",\"confidence\":\"low\",\"evidence\":\"assigned __hbc_HermesInternal.concat and never used afterwards\"},{\"bindingId\":{\"fn\":26806,\"reg\":6},\"name\":\"oldPolicy\",\"confidence\":\"med\",\"evidence\":\"copy of a2, interpolated into '(precedentemente X)' (Italian for 'previously X')\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9520,
+      "tokensOut": 605,
+      "usd": 0.0309674
+    },
+    "meta": {
+      "fn": 26806,
+      "requested": 7
+    }
+  },
+  "744045f5f7da625577781514ab581d2a94b1e387f584ae4aad434d8dc0f6660e": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":28180,\"reg\":3},\"name\":\"chatName\",\"confidence\":\"med\",\"evidence\":\"copies a2 and falls back to `chat met ${a1}`; interpolated into 'heeft uitgave verplaatst ... naar ${r3}' as the destination\"},{\"bindingId\":{\"fn\":28180,\"reg\":4},\"name\":\"fallbackLabel\",\"confidence\":\"low\",\"evidence\":\"copies a1 and is only used in the `chat met ${r4}` fallback when a2 is nullish\"},{\"bindingId\":{\"fn\":28180,\"reg\":1},\"name\":\"message\",\"confidence\":\"med\",\"evidence\":\"holds the final template string 'heeft uitgave verplaatst van persoonlijke ruimte naar ...' which is returned\"},{\"bindingId\":{\"fn\":28180,\"reg\":2},\"name\":\"concatHelper\",\"confidence\":\"high\",\"evidence\":\"assigned from __hbc_HermesInternal.concat, the string concatenation helper\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9231,
+      "tokensOut": 344,
+      "usd": 0.0272014
+    },
+    "meta": {
+      "fn": 28180,
+      "requested": 4
+    }
+  },
+  "352e74bf0b1652aed17332ab517912acf0abc836d6262b3277d36d60bd7433d6": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":28707,\"reg\":0},\"name\":\"message\",\"confidence\":\"high\",\"evidence\":\"holds the Dutch template string chosen by the branch and is the function's return value\"},{\"bindingId\":{\"fn\":28707,\"reg\":6},\"name\":\"previousMaxAmount\",\"confidence\":\"med\",\"evidence\":\"truthiness-checked and interpolated as \\\"(voorheen ${r6})\\\" (formerly), selecting the 'changed from' message\"},{\"bindingId\":{\"fn\":28707,\"reg\":7},\"name\":\"newMaxAmount\",\"confidence\":\"med\",\"evidence\":\"interpolated as the value changed 'naar' (to); function name is updateCategoryMaxAmountNoReceipt\"},{\"bindingId\":{\"fn\":28707,\"reg\":8},\"name\":\"categoryName\",\"confidence\":\"high\",\"evidence\":\"interpolated in quotes as 'de categorie \\\"${r8}\\\"' in both templates\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9287,
+      "tokensOut": 327,
+      "usd": 0.0272554
+    },
+    "meta": {
+      "fn": 28707,
+      "requested": 4
+    }
+  },
+  "1ef9e8dc3c61a9bbdfd1e438dda9e333fb56b38f9241d9a1864ed021307fe9da": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":28806,\"reg\":3,\"web\":1},\"name\":\"cardholderName\",\"confidence\":\"med\",\"evidence\":\"copy of a2, truthiness-checked and interpolated as a quoted name into the message string\"},{\"bindingId\":{\"fn\":28806,\"reg\":6},\"name\":\"quotedNamePart\",\"confidence\":\"med\",\"evidence\":\"is \\\"\\\" or `\\\"${name}\\\" ` and is interpolated after 'niet-toegewezen' in the message\"},{\"bindingId\":{\"fn\":28806,\"reg\":7},\"name\":\"lastFour\",\"confidence\":\"med\",\"evidence\":\"copy of a3, interpolated after 'eindigend op' (ending in)\"},{\"bindingId\":{\"fn\":28806,\"reg\":9},\"name\":\"bankName\",\"confidence\":\"low\",\"evidence\":\"copy of a1, interpolated after 'bedrijfskaart van' (company card of); likely the card provider or bank\"},{\"bindingId\":{\"fn\":28806,\"reg\":0,\"web\":1},\"name\":\"quoteChar\",\"confidence\":\"low\",\"evidence\":\"assigned the literal '\\\"' and never used afterwards\"},{\"bindingId\":{\"fn\":28806,\"reg\":0,\"web\":2},\"name\":\"message\",\"confidence\":\"high\",\"evidence\":\"holds the final template 'niet-toegewezen ... bedrijfskaart van ... eindigend op ...' that is returned\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9324,
+      "tokensOut": 478,
+      "usd": 0.0289134
+    },
+    "meta": {
+      "fn": 28806,
+      "requested": 6
+    }
+  },
+  "e373fb6d9133ba2594c78da02b1b60718f5c633caae7458a1bb28f6ec5f998e6": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":28807,\"reg\":0,\"web\":1},\"name\":\"isEnabled\",\"confidence\":\"med\",\"evidence\":\"copy of a2, tested for truthiness to choose \\\"ingeschakeld\\\" (enabled) over \\\"uitgeschakeld\\\" (disabled)\"},{\"bindingId\":{\"fn\":28807,\"reg\":0,\"web\":2},\"name\":\"message\",\"confidence\":\"med\",\"evidence\":\"holds the template string \\\"... kaarthouders om kaarttransacties te verwijderen voor kaartfeed ...\\\" that is returned; fn is named updatedCardFeedLiability\"},{\"bindingId\":{\"fn\":28807,\"reg\":5},\"name\":\"stateText\",\"confidence\":\"high\",\"evidence\":\"assigned the Dutch literals \\\"uitgeschakeld\\\" or \\\"ingeschakeld\\\" depending on a2, then interpolated at the start of the message\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9216,
+      "tokensOut": 514,
+      "usd": 0.0288414
+    },
+    "meta": {
+      "fn": 28807,
+      "requested": 3
+    }
+  },
+  "7780932f0fd9ea4e1b499851b84aaefe8b7aa8fa479206aaa01a62f00096fd4a": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":29171,\"reg\":0},\"name\":\"label\",\"confidence\":\"med\",\"evidence\":\"Holds the default Polish string \\\"Zapłać portfelem\\\" (\\\"Pay with wallet\\\"), overwritten by the template `Zapłać ${r4} z portfela` when a1 is truthy; it is the value returned.\"},{\"bindingId\":{\"fn\":29171,\"reg\":4},\"name\":\"amount\",\"confidence\":\"low\",\"evidence\":\"Copy of a1, tested for truthiness and interpolated into \\\"Zapłać ${r4} z portfela\\\" (\\\"Pay X from wallet\\\"), so it is most likely a payment amount, though the type is not visible.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9156,
+      "tokensOut": 242,
+      "usd": 0.025881400000000002
+    },
+    "meta": {
+      "fn": 29171,
+      "requested": 2
+    }
+  },
+  "a202638854f4d1c0b18d10604d6c92e51717ccba980661c8c2223ea76e7546cb": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":29300,\"reg\":0},\"name\":\"message\",\"confidence\":\"high\",\"evidence\":\"holds the returned Polish broken-connection message string, assigned in both branches and returned\"},{\"bindingId\":{\"fn\":29300,\"reg\":3},\"name\":\"messagePrefix\",\"confidence\":\"low\",\"evidence\":\"assigned the literal \\\"Połączenie Twojej karty \\\" and never used afterward; it is the leading fragment of the message\"},{\"bindingId\":{\"fn\":29300,\"reg\":5},\"name\":\"bankLoginUrl\",\"confidence\":\"med\",\"evidence\":\"copies a2 and is tested for truthiness; when set it is interpolated into the <a href=...> link to log in to the bank\"},{\"bindingId\":{\"fn\":29300,\"reg\":6},\"name\":\"cardName\",\"confidence\":\"med\",\"evidence\":\"copies a1 and is interpolated after \\\"Połączenie Twojej karty\\\" (\\\"your card's connection\\\") in both message variants\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9329,
+      "tokensOut": 339,
+      "usd": 0.0275434
+    },
+    "meta": {
+      "fn": 29300,
+      "requested": 4
+    }
+  },
+  "38bdbdf6e30c5d533bdf9824c6eb5ab29b1a44845ef90e833fe636a69057bb0a": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\": {\"fn\": 29549, \"reg\": 1, \"web\": 1}, \"name\": \"shouldShowAccountingLink\", \"confidence\": \"med\", \"evidence\": \"read from arguments[1], defaulted to true when undefined, and gates whether the accounting link sentence is built\"},\n    {\"bindingId\": {\"fn\": 29549, \"reg\": 1, \"web\": 2}, \"name\": \"hermesInternal\", \"confidence\": \"high\", \"evidence\": \"holds the __hbc_HermesInternal object, from which .concat is read\"},\n    {\"bindingId\": {\"fn\": 29549, \"reg\": 1, \"web\": 3}, \"name\": \"linkPrefixText\", \"confidence\": \"med\", \"evidence\": \"holds the literal ' Przejdź do sekcji <a href=\\\"', the text before the interpolated URL in the template\"},\n    {\"bindingId\": {\"fn\": 29549, \"reg\": 1, \"web\": 4}, \"name\": \"subtitleHtml\", \"confidence\": \"high\", \"evidence\": \"the returned template string wrapped in <muted-text><centered-text>\"},\n    {\"bindingId\": {\"fn\": 29549, \"reg\": 2, \"web\": 1}, \"name\": \"linkSuffixText\", \"confidence\": \"med\", \"evidence\": \"holds the literal '\\\">księgowość</a>, aby wprowadzić zmiany.', the text after the interpolated URL\"},\n    {\"bindingId\": {\"fn\": 29549, \"reg\": 2, \"web\": 2}, \"name\": \"closingTagsText\", \"confidence\": \"med\", \"evidence\": \"holds the literal '</centered-text></muted-text>', the closing tags of the returned template\"},\n    {\"bindingId\": {\"fn\": 29549, \"reg\": 4}, \"name\": \"accountingLinkSentence\", \"confidence\": \"high\", \"evidence\": \"starts as '' and is set to the 'Przejdź do sekcji <a href=...>' template, then interpolated into the subtitle\"},\n    {\"bindingId\": {\"fn\": 29549, \"reg\": 5}, \"name\": \"accountingHref\", \"confidence\": \"med\", \"evidence\": \"copy of a1, interpolated into the href attribute of the accounting link\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9568,
+      "tokensOut": 1145,
+      "usd": 0.0365594
+    },
+    "meta": {
+      "fn": 29549,
+      "requested": 8
+    }
+  },
+  "4f3d5abbbecd745c46945f3f6c366323f410d44e0ad04fd28b92d62664522e6c": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":30223,\"reg\":0},\"name\":\"label\",\"confidence\":\"med\",\"evidence\":\"holds the returned template string: `Pagar ${r4} via ${r5}` or `Pagar via ${r5}`, the payment label\"},{\"bindingId\":{\"fn\":30223,\"reg\":4},\"name\":\"policyName\",\"confidence\":\"low\",\"evidence\":\"copy of a2; optional, truthy-checked, and interpolated between 'Pagar' and 'via'; function is named payWithPolicy\"},{\"bindingId\":{\"fn\":30223,\"reg\":5},\"name\":\"paymentMethod\",\"confidence\":\"low\",\"evidence\":\"copy of a1; always interpolated after 'via' in the 'Pagar ... via ...' string\"},{\"bindingId\":{\"fn\":30223,\"reg\":3},\"name\":\"concat\",\"confidence\":\"low\",\"evidence\":\"unused\"}],\"abstained\":false}\n\nWait — `{30223,3}` is not in targets, so that last entry would be dropped. Corrected answer:\n\n```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 30223, \"reg\": 0 },\n      \"name\": \"label\",\n      \"confidence\": \"med\",\n      \"evidence\": \"holds the returned template string: `Pagar ${r4} via ${r5}` or `Pagar via ${r5}`, the payment label\"\n    },\n    {\n      \"bindingId\": { \"fn\": 30223, \"reg\": 4 },\n      \"name\": \"policyName\",\n      \"confidence\": \"low\",\n      \"evidence\": \"copy of a2; optional, truthy-checked, and interpolated between 'Pagar' and 'via'; function is named payWithPolicy\"\n    },\n    {\n      \"bindingId\": { \"fn\": 30223, \"reg\": 5 },\n      \"name\": \"paymentMethod\",\n      \"confidence\": \"low\",\n      \"evidence\": \"copy of a1; always interpolated after 'via' in the 'Pagar ... via ...' string\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9197,
+      "tokensOut": 672,
+      "usd": 0.030345399999999998
+    },
+    "meta": {
+      "fn": 30223,
+      "requested": 3
+    }
+  },
+  "93b26815fd6031cf7fe4132aa0cdeff4bc87fe1c0f2b9859228a46200d44f22e": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":30972,\"reg\":3},\"name\":\"value\",\"confidence\":\"med\",\"evidence\":\"copies parameter a1, defaults it to \\\"\\\" via ?? and interpolates it into the template `Igual a ${r3}` (function is named equalTo)\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9087,
+      "tokensOut": 106,
+      "usd": 0.0242454
+    },
+    "meta": {
+      "fn": 30972,
+      "requested": 1
+    }
+  },
+  "b973301b43865ed6832ba5e5b7c9995d106d1163986aec3e4595452165ac7a97": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":31769,\"reg\":4},\"name\":\"currencySymbol\",\"confidence\":\"med\",\"evidence\":\"a1 defaulted to \\\"\\\" and interpolated right before \\\"20,000\\\" in the message \\\"请输入小于 ${r4}20,000 的金额\\\" (enter an amount less than ...), so it is the currency prefix\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9107,
+      "tokensOut": 132,
+      "usd": 0.0245854
+    },
+    "meta": {
+      "fn": 31769,
+      "requested": 1
+    }
+  },
+  "4c7ac88a461f3dfd46947d70de0fb10aa43945b2fe517ff02975ec8cc675320a": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":32122,\"reg\":6},\"name\":\"renewalDate\",\"confidence\":\"med\",\"evidence\":\"copy of a2, interpolated twice in the template after '之前' (before) and '在 … 通过关闭自动续订' (on … by turning off auto-renew), so it is the date the annual commitment ends\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9129,
+      "tokensOut": 125,
+      "usd": 0.0246034
+    },
+    "meta": {
+      "fn": 32122,
+      "requested": 1
+    }
+  },
+  "75ec2d6a54737194471c1243c53d3f601499b5bfd85b97f073986e15eded565f": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":32190,\"reg\":0},\"name\":\"result\",\"confidence\":\"low\",\"evidence\":\"set to null then undefined and returned; the function's return value, which is always undefined\"},{\"bindingId\":{\"fn\":32190,\"reg\":2},\"name\":\"user\",\"confidence\":\"med\",\"evidence\":\"copies a1 and is read as r2?.email, so it is an object with an email property\"},{\"bindingId\":{\"fn\":32190,\"reg\":3},\"name\":\"email\",\"confidence\":\"high\",\"evidence\":\"assigned from r2?.email, defaulted with ?? \\\"\\\" and stored to the outer variable _e2413_5\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8932,
+      "tokensOut": 222,
+      "usd": 0.0247854
+    },
+    "meta": {
+      "fn": 32190,
+      "requested": 3
+    }
+  },
+  "343936dad47a0d5ed8c1773ed488e93ae1fa6121150abecf6f027923d684ca3d": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":32522,\"reg\":0},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"r0 = undefined, never used afterwards\"},{\"bindingId\":{\"fn\":32522,\"reg\":1,\"web\":1},\"name\":\"moduleExports\",\"confidence\":\"low\",\"evidence\":\"r1 = _e2512_1[4] is passed as the argument to r2 (the module require function _e2512_0), so it is a module id read from an array\"},{\"bindingId\":{\"fn\":32522,\"reg\":2,\"web\":1},\"name\":\"requireModule\",\"confidence\":\"low\",\"evidence\":\"r2 = _e2512_0 is called with r1 and its result's getUrlWithParams is read, so it behaves like a module loader\"},{\"bindingId\":{\"fn\":32522,\"reg\":2,\"web\":2},\"name\":\"routePath\",\"confidence\":\"med\",\"evidence\":\"template literal `a/${a1}` is passed as the first argument to getUrlWithParams, together with {login: a2}\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9212,
+      "tokensOut": 347,
+      "usd": 0.0271554
+    },
+    "meta": {
+      "fn": 32522,
+      "requested": 4
+    }
+  },
+  "a3e4e2570547509538955e8ce19cf97994f679332fa206dbd1c14c3100a16aa4": {
+    "text": "{\n  \"names\": [\n    {\"bindingId\":{\"fn\":32630,\"reg\":4},\"name\":\"route\",\"confidence\":\"high\",\"evidence\":\"starts as \\\"settings/wallet/add-bank-account\\\", gets suffixes appended, and is the first piece of the final concat\"},\n    {\"bindingId\":{\"fn\":32630,\"reg\":7},\"name\":\"querySeparator\",\"confidence\":\"high\",\"evidence\":\"is \\\"?\\\" unless route.includes(\\\"?\\\"), in which case it is \\\"&\\\"; it is then placed before \\\"backTo=\\\"\"},\n    {\"bindingId\":{\"fn\":32630,\"reg\":2},\"name\":\"backToQuery\",\"confidence\":\"med\",\"evidence\":\"holds `${sep}backTo=${encoded}` or \\\"\\\", and is the last piece of the final concat\"},\n    {\"bindingId\":{\"fn\":32630,\"reg\":6},\"name\":\"encodedBackTo\",\"confidence\":\"low\",\"evidence\":\"copies a3, then a1, which is passed through encodeURIComponent and interpolated after \\\"backTo=\\\"; the register is reused, so this name only fits the last value\"},\n    {\"bindingId\":{\"fn\":32630,\"reg\":3},\"name\":\"subPageSuffix\",\"confidence\":\"low\",\"evidence\":\"is \\\"\\\" or `/${a3}` and is concatenated after a2 in the route; it is later reset to \\\"\\\" and used as the concat `this`\"},\n    {\"bindingId\":{\"fn\":32630,\"reg\":5},\"name\":\"accountSegment\",\"confidence\":\"low\",\"evidence\":\"copies a2 and is concatenated into the route after \\\"settings/wallet/add-bank-account/\\\"; later reused for \\\"?\\\"\"},\n    {\"bindingId\":{\"fn\":32630,\"reg\":1},\"name\":\"fullRoute\",\"confidence\":\"low\",\"evidence\":\"scratch register used for concat pieces and method calls; the last value is the concat result that is returned\"}\n  ],\n  \"abstained\": false\n}",
+    "cost": {
+      "tokensIn": 9771,
+      "tokensOut": 1185,
+      "usd": 0.0377714
+    },
+    "meta": {
+      "fn": 32630,
+      "requested": 7
+    }
+  },
+  "327b7cd259b4113f4adb4677fcedc7f0c77118d6426b913b24a231595717c93f": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\": {\"fn\": 32659, \"reg\": 5}, \"name\": \"state\", \"confidence\": \"high\", \"evidence\": \"copy of a1, encoded into the \\\"?state=\\\" query parameter\"},\n    {\"bindingId\": {\"fn\": 32659, \"reg\": 7}, \"name\": \"backTo\", \"confidence\": \"high\", \"evidence\": \"copy of a2, encoded into the \\\"backTo=\\\" query parameter\"},\n    {\"bindingId\": {\"fn\": 32659, \"reg\": 6}, \"name\": \"encodedValue\", \"confidence\": \"med\", \"evidence\": \"holds the result of encodeURIComponent applied to a parameter, reused for state, backTo and label\"},\n    {\"bindingId\": {\"fn\": 32659, \"reg\": 4}, \"name\": \"emptyString\", \"confidence\": \"med\", \"evidence\": \"assigned \\\"\\\"; used as the default query suffix and as the this value for concat\"},\n    {\"bindingId\": {\"fn\": 32659, \"reg\": 9}, \"name\": \"backToSeparator\", \"confidence\": \"med\", \"evidence\": \"\\\"&\\\" when the path already includes \\\"?\\\", otherwise \\\"?\\\"; interpolated before \\\"backTo=\\\"\"},\n    {\"bindingId\": {\"fn\": 32659, \"reg\": 8}, \"name\": \"routeWithState\", \"confidence\": \"low\", \"evidence\": \"\\\"settings/profile/address/state\\\" + state query; later reused as the label separator (\\\"?\\\" or \\\"&\\\")\"},\n    {\"bindingId\": {\"fn\": 32659, \"reg\": 2}, \"name\": \"querySuffix\", \"confidence\": \"low\", \"evidence\": \"starts as \\\"\\\" or \\\"?state=...\\\", later reused for the \\\"label=\\\" query piece\"},\n    {\"bindingId\": {\"fn\": 32659, \"reg\": 3}, \"name\": \"backToQuery\", \"confidence\": \"low\", \"evidence\": \"holds the \\\"backTo=\\\" query piece or \\\"\\\", then the concatenated path plus backTo\"},\n    {\"bindingId\": {\"fn\": 32659, \"reg\": 1}, \"name\": \"globalScope\", \"confidence\": \"low\", \"evidence\": \"assigned globalThis for the encodeURIComponent lookup; reused as a scratch temp\"},\n    {\"bindingId\": {\"fn\": 32659, \"reg\": 0}, \"name\": \"undefinedValue\", \"confidence\": \"low\", \"evidence\": \"assigned undefined, passed as the this argument to Reflect.apply\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10277,
+      "tokensOut": 1143,
+      "usd": 0.0393754
+    },
+    "meta": {
+      "fn": 32659,
+      "requested": 10
+    }
+  },
+  "3545981d2b2f44ecbbb7d757db90e652472efa2aa748fcc0f306eea968ecc5d9": {
+    "text": "{\"names\":[\n{\"bindingId\":{\"fn\":32673,\"reg\":6},\"name\":\"backTo\",\"confidence\":\"high\",\"evidence\":\"defaults to \\\"\\\" when arguments[4] is undefined; later encoded with encodeURIComponent and appended as \\\"backTo=\\\"\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":11},\"name\":\"transactionID\",\"confidence\":\"high\",\"evidence\":\"copy of a3; the warn message mentions \\\"Invalid transactionID or reportID\\\" and it is placed right after \\\"/vendor/\\\" in the route\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":10},\"name\":\"reportID\",\"confidence\":\"high\",\"evidence\":\"copy of a4; checked together with transactionID in the warn guard and placed after it in the route\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":15},\"name\":\"transactionIDSegment\",\"confidence\":\"med\",\"evidence\":\"transactionID copy passed as a concat piece after \\\"/vendor/\\\"\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":13},\"name\":\"reportIDSegment\",\"confidence\":\"med\",\"evidence\":\"reportID copy passed as a concat piece after the second \\\"/\\\"\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":19},\"name\":\"action\",\"confidence\":\"low\",\"evidence\":\"a1 is the first piece of the route concat; the role is presumed from the usual route shape\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":17},\"name\":\"iouType\",\"confidence\":\"low\",\"evidence\":\"a2 is the second piece of the route concat, before the \\\"/vendor/\\\" segment; the role is presumed from the usual route shape\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":3},\"name\":\"routeBase\",\"confidence\":\"med\",\"evidence\":\"first holds arguments[5] (the optional trailing id), then the concat result; it is later checked with .includes(\\\"?\\\") and concatenated with the backTo query\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":9},\"name\":\"reportActionIDSuffix\",\"confidence\":\"med\",\"evidence\":\"`/${arguments[5]}` when arguments[5] is truthy, otherwise \\\"\\\"; appended to the route\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":12},\"name\":\"reportActionIDSuffixPiece\",\"confidence\":\"low\",\"evidence\":\"copy of the suffix passed as the last concat piece\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":2},\"name\":\"backToQuery\",\"confidence\":\"med\",\"evidence\":\"holds `${separator}backTo=${encoded}`, or \\\"\\\" when backTo is empty; concatenated onto the route\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":8},\"name\":\"querySeparator\",\"confidence\":\"high\",\"evidence\":\"\\\"&\\\" if the route already includes \\\"?\\\", otherwise \\\"?\\\"\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":7},\"name\":\"encodedBackTo\",\"confidence\":\"med\",\"evidence\":\"result of encodeURIComponent(backTo); before that it holds the \\\"?\\\" literal\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":4},\"name\":\"emptyString\",\"confidence\":\"med\",\"evidence\":\"assigned \\\"\\\"; used as the concat receiver and as the default for the suffix\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":20},\"name\":\"concatThis\",\"confidence\":\"low\",\"evidence\":\"copy of the empty string passed as the this argument to Reflect.apply of concat\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":5},\"name\":\"concatFn\",\"confidence\":\"med\",\"evidence\":\"r2.concat, i.e. HermesInternal.concat, passed to Reflect.apply\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":1},\"name\":\"globalScope\",\"confidence\":\"med\",\"evidence\":\"holds globalThis, then is used for the 'encodeURIComponent' in check and property read\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":16},\"name\":\"vendorSegment\",\"confidence\":\"high\",\"evidence\":\"literal \\\"/vendor/\\\" passed to the concat\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":18},\"name\":\"slash\",\"confidence\":\"med\",\"evidence\":\"literal \\\"/\\\" used as a route separator in the concat\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":14},\"name\":\"slashSeparator\",\"confidence\":\"low\",\"evidence\":\"second \\\"/\\\" literal copy in the concat args\"},\n{\"bindingId\":{\"fn\":32673,\"reg\":0},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"set to undefined and compared against arguments[4]\"}\n],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 10279,
+      "tokensOut": 2097,
+      "usd": 0.048923400000000006
+    },
+    "meta": {
+      "fn": 32673,
+      "requested": 21
+    }
+  },
+  "7250f061d9f2df80690ab2625ea7cc8f47dee2e6393e9a887f80e90535b9226c": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":32779,\"reg\":0,\"web\":2},\"name\":\"approvalModeRoute\",\"confidence\":\"high\",\"evidence\":\"holds the template string `workspaces/${policyID}/hr/gusto/approval-mode` which is returned\"},{\"bindingId\":{\"fn\":32779,\"reg\":2,\"web\":1},\"name\":\"logger\",\"confidence\":\"med\",\"evidence\":\"loaded from _e2512_2[\\\"default\\\"] and only used to call .warn(...) with an invalid policyID message\"},{\"bindingId\":{\"fn\":32779,\"reg\":3},\"name\":\"policyID\",\"confidence\":\"high\",\"evidence\":\"copy of a1, checked for truthiness, warning says 'Invalid policyID', and interpolated into the route path\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9251,
+      "tokensOut": 265,
+      "usd": 0.0264914
+    },
+    "meta": {
+      "fn": 32779,
+      "requested": 3
+    }
+  },
+  "89e28fad7aef9b3342aa871d9511a72b485e509a006af848d1aa48b400c0cce2": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\": {\"fn\": 33675, \"reg\": 5}, \"name\": \"targetPath\", \"confidence\": \"med\", \"evidence\": \"copy of a1, compared with `.path` of each entry's second element\"},\n    {\"bindingId\": {\"fn\": 33675, \"reg\": 3}, \"name\": \"entries\", \"confidence\": \"low\", \"evidence\": \"free value _e2663_4 is iterated with for...of, and each item is destructured as a pair\"},\n    {\"bindingId\": {\"fn\": 33675, \"reg\": 8}, \"name\": \"entry\", \"confidence\": \"med\", \"evidence\": \"for-of loop variable passed to the slicedToArray-like helper with length 2\"},\n    {\"bindingId\": {\"fn\": 33675, \"reg\": 2}, \"name\": \"pairLength\", \"confidence\": \"low\", \"evidence\": \"initialised to 2 and passed as the second argument to the destructuring helper\"},\n    {\"bindingId\": {\"fn\": 33675, \"reg\": 0}, \"name\": \"routeConfig\", \"confidence\": \"low\", \"evidence\": \"holds entry[1], whose `.path` is compared with a1, then `.routeNames` is returned from it\"},\n    {\"bindingId\": {\"fn\": 33675, \"reg\": 7}, \"name\": \"tempValue\", \"confidence\": \"low\", \"evidence\": \"reused as a scratch register: helper module, helper function, pair, then pair[1], then its path\"},\n    {\"bindingId\": {\"fn\": 33675, \"reg\": 4}, \"name\": \"undefinedValue\", \"confidence\": \"low\", \"evidence\": \"assigned undefined and never used\"},\n    {\"bindingId\": {\"fn\": 33675, \"reg\": 1}, \"name\": \"iterator\", \"confidence\": \"low\", \"evidence\": \"copied into r2 and passed to __hbc_iterClose, so it is the iterator being closed on early return; it is never assigned\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9334,
+      "tokensOut": 1019,
+      "usd": 0.0343634
+    },
+    "meta": {
+      "fn": 33675,
+      "requested": 8
+    }
+  },
+  "48cc324e2fd4d2ff595a2782cb7e48ffa092cff2ef58d56523295ae9a32ec4c3": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":33680,\"reg\":0},\"name\":\"hasStringBackTo\",\"confidence\":\"med\",\"evidence\":\"r0 accumulates the checks params !== undefined, 'backTo' in params, typeof params.backTo === 'string' and is returned\"},{\"bindingId\":{\"fn\":33680,\"reg\":2,\"web\":1},\"name\":\"route\",\"confidence\":\"med\",\"evidence\":\"copy of a1; reads .params, which carries a 'backTo' key checked in the body\"},{\"bindingId\":{\"fn\":33680,\"reg\":3,\"web\":2},\"name\":\"backToKey\",\"confidence\":\"high\",\"evidence\":\"assigned the literal \\\"backTo\\\" and used as the left operand of the `in` check\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8994,
+      "tokensOut": 254,
+      "usd": 0.025353399999999998
+    },
+    "meta": {
+      "fn": 33680,
+      "requested": 3
+    }
+  },
+  "5cf68801af390b102f30458285437bf6659587a60d22fcef84648349a0881166": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 33760, \"reg\": 7 },\n      \"name\": \"report\",\n      \"confidence\": \"high\",\n      \"evidence\": \"copy of a1; read as .chatType, .type, .participants and .parentReportID, and compared with REPORT.TYPE.CHAT\"\n    },\n    {\n      \"bindingId\": { \"fn\": 33760, \"reg\": 6 },\n      \"name\": \"accountID\",\n      \"confidence\": \"med\",\n      \"evidence\": \"a2 ?? default; the value is compared against the participant keys after Number mapping, tested with includes, and passed as the second argument to the parent check\"\n    },\n    {\n      \"bindingId\": { \"fn\": 33760, \"reg\": 10 },\n      \"name\": \"chatType\",\n      \"confidence\": \"med\",\n      \"evidence\": \"first assigned from r7.chatType, then compared with REPORT.CHAT_TYPE.SELF_DM; later reused as a temporary for Object.keys\"\n    },\n    {\n      \"bindingId\": { \"fn\": 33760, \"reg\": 5 },\n      \"name\": \"otherParticipantCount\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r5 = participantIDs.filter(id !== accountID).length, then compared with 0; later reused for the parent report lookup\"\n    },\n    {\n      \"bindingId\": { \"fn\": 33760, \"reg\": 1 },\n      \"name\": \"result\",\n      \"confidence\": \"low\",\n      \"evidence\": \"starts as undefined, is set to true for the early return, and receives the parent-check call result before the final return\"\n    },\n    {\n      \"bindingId\": { \"fn\": 33760, \"reg\": 2 },\n      \"name\": \"nullValue\",\n      \"confidence\": \"low\",\n      \"evidence\": \"assigned null and used for the nullish comparison r7 == r2; later reused for the null check on the collection\"\n    },\n    {\n      \"bindingId\": { \"fn\": 33760, \"reg\": 3 },\n      \"name\": \"isReportNullish\",\n      \"confidence\": \"low\",\n      \"evidence\": \"r3 = r7 == null, which gates reading chatType; later reused as the literal true for a return\"\n    },\n    {\n      \"bindingId\": { \"fn\": 33760, \"reg\": 4 },\n      \"name\": \"isParentSelfDMCheck\",\n      \"confidence\": \"low\",\n      \"evidence\": \"starts as undefined, then holds the module-level callee _e2679_88, which is applied to (parentReport, accountID) and returned\"\n    },\n    {\n      \"bindingId\": { \"fn\": 33760, \"reg\": 8 },\n      \"name\": \"tempValue\",\n      \"confidence\": \"low\",\n      \"evidence\": \"reused for the module object, REPORT.TYPE.CHAT, participants, parentReportID, globalThis, the mapped participant IDs and the report collection; no single role\"\n    },\n    {\n      \"bindingId\": { \"fn\": 33760, \"reg\": 9 },\n      \"name\": \"tempConstant\",\n      \"confidence\": \"low\",\n      \"evidence\": \"holds a chain of config lookups (REPORT.CHAT_TYPE.SELF_DM, report.type, participants, COLLECTION.REPORT, the concat function); a general scratch register\"\n    },\n    {\n      \"bindingId\": { \"fn\": 33760, \"reg\": 11 },\n      \"name\": \"ObjectCtor\",\n      \"confidence\": \"med\",\n      \"evidence\": \"r11 = globalThis.Object, used as the receiver in Reflect.apply(Object.keys, r11, ...); later reused for COLLECTION.REPORT\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10352,
+      "tokensOut": 1653,
+      "usd": 0.04477540000000001
+    },
+    "meta": {
+      "fn": 33760,
+      "requested": 11
+    }
+  },
+  "879116318b87559375866db4074f0cedf8e4e315cd1fcb4a4e0df34ecb6281bd": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":33840,\"reg\":0},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"set to undefined and compared against arguments[1]; later reused as null temp\"},{\"bindingId\":{\"fn\":33840,\"reg\":1},\"name\":\"filteredItems\",\"confidence\":\"med\",\"evidence\":\"result of r3.filter(_fn65134), returned\"},{\"bindingId\":{\"fn\":33840,\"reg\":2},\"name\":\"defaultItems\",\"confidence\":\"low\",\"evidence\":\"holds the looked-up list (or [] when a1 falsy), later copied into r3\"},{\"bindingId\":{\"fn\":33840,\"reg\":3},\"name\":\"items\",\"confidence\":\"med\",\"evidence\":\"arguments[1] if provided, else the looked-up list; then .filter is called on it\"},{\"bindingId\":{\"fn\":33840,\"reg\":4},\"name\":\"lookupResult\",\"confidence\":\"low\",\"evidence\":\"starts as the captured table _e2679_53, indexed by a1, defaulted to [] via ??\"},{\"bindingId\":{\"fn\":33840,\"reg\":5},\"name\":\"lookupKey\",\"confidence\":\"med\",\"evidence\":\"copy of a1, used as the index into _e2679_53 and tested for truthiness\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9048,
+      "tokensOut": 430,
+      "usd": 0.0273294
+    },
+    "meta": {
+      "fn": 33840,
+      "requested": 6
+    }
+  },
+  "062f9b3aae93b8246b453bae21ba3292caf75268e585d4212574217c99df88b4": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\":{\"fn\":33861,\"reg\":9},\"name\":\"reportAction\",\"confidence\":\"med\",\"evidence\":\"a1; reads .actorAccountID and .reportActionID, which are stored as parentReportActionID\"},\n    {\"bindingId\":{\"fn\":33861,\"reg\":7},\"name\":\"parentReport\",\"confidence\":\"med\",\"evidence\":\"a2; its reportID is written to parentReportID and chatReportID, and its policyID to policyID\"},\n    {\"bindingId\":{\"fn\":33861,\"reg\":10},\"name\":\"currentUserAccountID\",\"confidence\":\"high\",\"evidence\":\"a3; first entry in the participant set and assigned to the currentUserAccountID key\"},\n    {\"bindingId\":{\"fn\":33861,\"reg\":4},\"name\":\"report\",\"confidence\":\"low\",\"evidence\":\"a4; if truthy and non-empty it is copied into a new object via copyDataProperties, otherwise a new report object is built; the same register holds the returned report\"},\n    {\"bindingId\":{\"fn\":33861,\"reg\":5},\"name\":\"globalScope\",\"confidence\":\"med\",\"evidence\":\"holds globalThis, then Boolean is read from it, then reused for other values\"},\n    {\"bindingId\":{\"fn\":33861,\"reg\":6},\"name\":\"policyID\",\"confidence\":\"med\",\"evidence\":\"holds r7?.policyID, assigned to r5.policyID\"},\n    {\"bindingId\":{\"fn\":33861,\"reg\":8},\"name\":\"participantSet\",\"confidence\":\"low\",\"evidence\":\"the [currentUserAccountID, actorAccountID] array is wrapped in new Set(...), then the register is reused for the copied object\"},\n    {\"bindingId\":{\"fn\":33861,\"reg\":11},\"name\":\"participantList\",\"confidence\":\"low\",\"evidence\":\"holds the Set constructor, then the spread-and-filtered array, which is stored under the participantList key; reused afterwards\"},\n    {\"bindingId\":{\"fn\":33861,\"reg\":12},\"name\":\"actorAccountID\",\"confidence\":\"med\",\"evidence\":\"Number(r9?.actorAccountID) stored at index 1 of the participants array\"},\n    {\"bindingId\":{\"fn\":33861,\"reg\":13},\"name\":\"NumberCtor\",\"confidence\":\"high\",\"evidence\":\"holds the global Number and is called on actorAccountID\"},\n    {\"bindingId\":{\"fn\":33861,\"reg\":14},\"name\":\"startIndex\",\"confidence\":\"med\",\"evidence\":\"the constant 0 passed as the index argument to arraySpread\"},\n    {\"bindingId\":{\"fn\":33861,\"reg\":15},\"name\":\"spreadSource\",\"confidence\":\"low\",\"evidence\":\"alias of the Set passed as the source argument to arraySpread\"},\n    {\"bindingId\":{\"fn\":33861,\"reg\":16},\"name\":\"callArg\",\"confidence\":\"low\",\"evidence\":\"temporary used to pass arguments to the Set constructor, arraySpread and copyDataProperties\"},\n    {\"bindingId\":{\"fn\":33861,\"reg\":17},\"name\":\"actorAccountIDCopy\",\"confidence\":\"low\",\"evidence\":\"copy of the Number-converted actorAccountID; never read\"},\n    {\"bindingId\":{\"fn\":33861,\"reg\":2},\"name\":\"nullValue\",\"confidence\":\"low\",\"evidence\":\"assigned null and never read\"},\n    {\"bindingId\":{\"fn\":33861,\"reg\":0},\"name\":\"spreadEndIndex\",\"confidence\":\"low\",\"evidence\":\"receives the return value of arraySpread and is never read\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10762,
+      "tokensOut": 1858,
+      "usd": 0.048465400000000006
+    },
+    "meta": {
+      "fn": 33861,
+      "requested": 16
+    }
+  },
+  "af70939dd909bb100db3b5b363516dcf098ebadc9cff7db3f31356fbd45265d9": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\": {\"fn\": 33986, \"reg\": 12}, \"name\": \"report\", \"confidence\": \"med\", \"evidence\": \"copy of a2; passed as {report: r12} to _e2679_68, whose result has .chatType and .isPolicyExpenseChat\"},\n    {\"bindingId\": {\"fn\": 33986, \"reg\": 7}, \"name\": \"entry\", \"confidence\": \"low\", \"evidence\": \"r8[r6[0]] looked up by the first key; then read via ?.timezone, ?.validated and negated as a presence check\"},\n    {\"bindingId\": {\"fn\": 33986, \"reg\": 6}, \"name\": \"keys\", \"confidence\": \"low\", \"evidence\": \"result of _e2679_114(report, a3); .length > 1 and [0] used as lookup key (later reused for validated flag)\"},\n    {\"bindingId\": {\"fn\": 33986, \"reg\": 5}, \"name\": \"shouldSkip\", \"confidence\": \"med\", \"evidence\": \"short-circuit OR accumulator across L5-L15; final result is !r5\"},\n    {\"bindingId\": {\"fn\": 33986, \"reg\": 8}, \"name\": \"timezone\", \"confidence\": \"low\", \"evidence\": \"after a1 is consumed, holds r7?.timezone ?? DEFAULT_TIME_ZONE and is read via ?.selected\"},\n    {\"bindingId\": {\"fn\": 33986, \"reg\": 10}, \"name\": \"chatInfo\", \"confidence\": \"low\", \"evidence\": \"result of _e2679_68({report}); .chatType and isPolicyExpenseChat are read from it\"},\n    {\"bindingId\": {\"fn\": 33986, \"reg\": 11}, \"name\": \"chatType\", \"confidence\": \"low\", \"evidence\": \"r10?.chatType compared with REPORT.CHAT_TYPE.POLICY_EXPENSE_CHAT\"},\n    {\"bindingId\": {\"fn\": 33986, \"reg\": 3}, \"name\": \"isEligible\", \"confidence\": \"low\", \"evidence\": \"initially null temp, finally !shouldSkip and returned\"},\n    {\"bindingId\": {\"fn\": 33986, \"reg\": 1}, \"name\": \"comparisonResult\", \"confidence\": \"low\", \"evidence\": \"temporary holding a == null check and later a === POLICY_EXPENSE_CHAT check\"},\n    {\"bindingId\": {\"fn\": 33986, \"reg\": 9}, \"name\": \"scratch\", \"confidence\": \"low\", \"evidence\": \"reused temporary for constants chain and typeof/in checks\"},\n    {\"bindingId\": {\"fn\": 33986, \"reg\": 4}, \"name\": \"isNotPolicyExpenseChatFlag\", \"confidence\": \"low\", \"evidence\": \"r4 = !r9 where r9 is the isPolicyExpenseChat check; immediately negated again\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9939,
+      "tokensOut": 1641,
+      "usd": 0.043003400000000004
+    },
+    "meta": {
+      "fn": 33986,
+      "requested": 12
+    }
+  },
+  "1b449d860f34884a3ad1fde8c7516613a762c57b67f292324b32489185686dcc": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":34019,\"reg\":0},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"assigned undefined and never read afterwards\"},{\"bindingId\":{\"fn\":34019,\"reg\":1},\"name\":\"nullValue\",\"confidence\":\"low\",\"evidence\":\"assigned null, never read\"},{\"bindingId\":{\"fn\":34019,\"reg\":2},\"name\":\"findResult\",\"confidence\":\"low\",\"evidence\":\"reused register: holds the module array, then IOUTransactionID, and finally r5.find(r3) which is returned\"},{\"bindingId\":{\"fn\":34019,\"reg\":3},\"name\":\"originalMessage\",\"confidence\":\"med\",\"evidence\":\"first holds a1, the action; in the money-request branch it takes getOriginalMessage(action) and is read as r3?.IOUTransactionID\"},{\"bindingId\":{\"fn\":34019,\"reg\":4},\"name\":\"iouTransactionID\",\"confidence\":\"med\",\"evidence\":\"set from r2 = r3?.IOUTransactionID, captured as _e11968_0 and compared with a1.transactionID in the find predicate\"},{\"bindingId\":{\"fn\":34019,\"reg\":5},\"name\":\"transactions\",\"confidence\":\"low\",\"evidence\":\"after the first use r5 is overwritten with a2, the array whose .find() is called with the transactionID predicate\"},{\"bindingId\":{\"fn\":34019,\"reg\":6},\"name\":\"isMoneyRequest\",\"confidence\":\"med\",\"evidence\":\"r6 = isMoneyRequestAction(r3) and is tested with if (!r6) to skip the branch\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9235,
+      "tokensOut": 547,
+      "usd": 0.029247399999999996
+    },
+    "meta": {
+      "fn": 34019,
+      "requested": 7
+    }
+  },
+  "0a6034b133756d3f6a1265417b6ac786931688446b6ccc3e88bf5ab3d6056922": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":34036,\"reg\":2},\"name\":\"item\",\"confidence\":\"low\",\"evidence\":\"copy of parameter a1; only its .description is read\"},{\"bindingId\":{\"fn\":34036,\"reg\":0},\"name\":\"fallbackDescription\",\"confidence\":\"med\",\"evidence\":\"in the catch branch holds r2?.description ?? \\\"\\\" returned when JSON.parse fails\"},{\"bindingId\":{\"fn\":34036,\"reg\":1},\"name\":\"nullValue\",\"confidence\":\"low\",\"evidence\":\"assigned null and never used\"},{\"bindingId\":{\"fn\":34036,\"reg\":4},\"name\":\"rawDescription\",\"confidence\":\"med\",\"evidence\":\"holds r2?.description string that is passed to JSON.parse and used as fallback\"},{\"bindingId\":{\"fn\":34036,\"reg\":3,\"web\":1},\"name\":\"description\",\"confidence\":\"low\",\"evidence\":\"initially r2?.description, used as truthiness check before parsing\"},{\"bindingId\":{\"fn\":34036,\"reg\":3,\"web\":2},\"name\":\"emptyString\",\"confidence\":\"low\",\"evidence\":\"assigned \\\"\\\" in the else branch and returned\"},{\"bindingId\":{\"fn\":34036,\"reg\":6},\"name\":\"descriptionJson\",\"confidence\":\"med\",\"evidence\":\"r2?.description passed to JSON.parse(r6).html\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9191,
+      "tokensOut": 464,
+      "usd": 0.0282414
+    },
+    "meta": {
+      "fn": 34036,
+      "requested": 7
+    }
+  },
+  "5daf38fc104b0d49ea3a2c50fb1592357e3ca4c97607ef2bb384c640e0e24af5": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":34068,\"reg\":5},\"name\":\"report\",\"confidence\":\"med\",\"evidence\":\"copy of parameter a1; read as r5?.errorFields?.reportName, so it is a report-like object\"},{\"bindingId\":{\"fn\":34068,\"reg\":4},\"name\":\"isEmptyObject\",\"confidence\":\"high\",\"evidence\":\"assigned from the .isEmptyObject property of the module result, then called on reportName\"},{\"bindingId\":{\"fn\":34068,\"reg\":3},\"name\":\"reportNameError\",\"confidence\":\"med\",\"evidence\":\"first holds a module id, then r5?.errorFields?.reportName, then the isEmptyObject call result that is negated; the final live value is the reportName error field\"},{\"bindingId\":{\"fn\":34068,\"reg\":0},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"assigned undefined and used as the this argument of Reflect.apply; the final value is a boolean result, but the main role is the undefined this\"},{\"bindingId\":{\"fn\":34068,\"reg\":1},\"name\":\"nullValue\",\"confidence\":\"low\",\"evidence\":\"assigned null and never used afterwards\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8961,
+      "tokensOut": 398,
+      "usd": 0.0266614
+    },
+    "meta": {
+      "fn": 34068,
+      "requested": 5
+    }
+  },
+  "220fc27e3a7ac18b703062474aaf4b52daa125cc90c4c31e6e4d505ba76c48f9": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\": {\"fn\": 34117, \"reg\": 0}, \"name\": \"undefinedValue\", \"confidence\": \"low\", \"evidence\": \"assigned undefined and only compared against arguments[2] to default it to false\"},\n    {\"bindingId\": {\"fn\": 34117, \"reg\": 2}, \"name\": \"shouldHide\", \"confidence\": \"low\", \"evidence\": \"accumulator OR-chained through the L2..L13 guards and returned; the checks cover split bill, deleted, whisper and thread-disabled actions\"},\n    {\"bindingId\": {\"fn\": 34117, \"reg\": 3}, \"name\": \"isDynamicWorkflowRoutedAction\", \"confidence\": \"high\", \"evidence\": \"result of isActionOfType(action, REPORT.ACTIONS.TYPE.DYNAMIC_EXTERNAL_WORKFLOW_ROUTED)\"},\n    {\"bindingId\": {\"fn\": 34117, \"reg\": 4}, \"name\": \"isWhisperOrTrackAction\", \"confidence\": \"med\", \"evidence\": \"holds isWhisperAction(action), or isActionableTrackExpense(action) when that is false; later negated\"},\n    {\"bindingId\": {\"fn\": 34117, \"reg\": 5}, \"name\": \"isMoneyRequestAction\", \"confidence\": \"high\", \"evidence\": \"result of the isMoneyRequestAction(action) call\"},\n    {\"bindingId\": {\"fn\": 34117, \"reg\": 6}, \"name\": \"isReportPreviewAction\", \"confidence\": \"high\", \"evidence\": \"result of the isReportPreviewAction(action) call\"},\n    {\"bindingId\": {\"fn\": 34117, \"reg\": 7}, \"name\": \"shouldHideEmptyThread\", \"confidence\": \"low\", \"evidence\": \"arguments[2] defaulted to false; when true and the action has no childVisibleActionCount, the result is hide\"},\n    {\"bindingId\": {\"fn\": 34117, \"reg\": 8}, \"name\": \"isDeletedAction\", \"confidence\": \"high\", \"evidence\": \"result of isDeletedAction(action); combined with !childVisibleActionCount\"},\n    {\"bindingId\": {\"fn\": 34117, \"reg\": 9}, \"name\": \"reportAction\", \"confidence\": \"med\", \"evidence\": \"copy of a1, passed to the isXAction predicates; childVisibleActionCount is read from it and the closure compares its actionName\"},\n    {\"bindingId\": {\"fn\": 34117, \"reg\": 10}, \"name\": \"isSplitBillAction\", \"confidence\": \"med\", \"evidence\": \"result of isSplitBillAction(action); the register is later reused for childVisibleActionCount\"},\n    {\"bindingId\": {\"fn\": 34117, \"reg\": 11}, \"name\": \"moduleDeps\", \"confidence\": \"low\", \"evidence\": \"indexed with [37] to get the module passed to the loader, then reused for REPORT.ACTIONS\"},\n    {\"bindingId\": {\"fn\": 34117, \"reg\": 12}, \"name\": \"requireModule\", \"confidence\": \"low\", \"evidence\": \"called as r12(r11[37]) to obtain the module that exposes the isXAction predicates\"},\n    {\"bindingId\": {\"fn\": 34117, \"reg\": 13}, \"name\": \"isActionableTrackExpense\", \"confidence\": \"med\", \"evidence\": \"holds the isActionableTrackExpense function that is called with the action on the next line\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10354,
+      "tokensOut": 1735,
+      "usd": 0.0456034
+    },
+    "meta": {
+      "fn": 34117,
+      "requested": 13
+    }
+  },
+  "eeb3e922134de18f939d0a49f285a061191103b6ddcd5452fbcf4076927c0a6d": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":34133,\"reg\":2},\"name\":\"session\",\"confidence\":\"med\",\"evidence\":\"copies a1 and reads .email, .accountID, .authTokenType from it; later reused for temporaries\"},{\"bindingId\":{\"fn\":34133,\"reg\":4},\"name\":\"authTokenType\",\"confidence\":\"med\",\"evidence\":\"assigned from r2.authTokenType and compared with AUTH_TOKEN_TYPES.ANONYMOUS; also reused for accountID and a module lookup\"},{\"bindingId\":{\"fn\":34133,\"reg\":1},\"name\":\"isAnonymous\",\"confidence\":\"med\",\"evidence\":\"r1 = authTokenType === AUTH_TOKEN_TYPES.ANONYMOUS, stored to a captured variable\"},{\"bindingId\":{\"fn\":34133,\"reg\":5},\"name\":\"requireModule\",\"confidence\":\"low\",\"evidence\":\"called with r4[33] and r4[34] to obtain objects exposing isEmailPublicDomain and Str.extractEmailDomain\"},{\"bindingId\":{\"fn\":34133,\"reg\":6},\"name\":\"isPublicDomain\",\"confidence\":\"med\",\"evidence\":\"first holds r2.isEmailPublicDomain, then the result of calling it on the email; tested with if\"},{\"bindingId\":{\"fn\":34133,\"reg\":7},\"name\":\"emptyString\",\"confidence\":\"med\",\"evidence\":\"r7 = \\\"\\\" and used as the fallback for email ?? \\\"\\\" and as the default domain\"},{\"bindingId\":{\"fn\":34133,\"reg\":3},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"assigned undefined and never read\"},{\"bindingId\":{\"fn\":34133,\"reg\":0},\"name\":\"undefinedValue2\",\"confidence\":\"low\",\"evidence\":\"assigned undefined and never read\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9436,
+      "tokensOut": 629,
+      "usd": 0.0308714
+    },
+    "meta": {
+      "fn": 34133,
+      "requested": 8
+    }
+  },
+  "f491f022da5d524bd872a09b083227d283a61954fc007b4fa4cd8ed10c9d9077": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":34309,\"reg\":0,\"web\":1},\"name\":\"disallowedCharsPattern\",\"confidence\":\"high\",\"evidence\":\"regex /[^0-9., ]/g is passed to replaceAll to strip characters other than digits, '.', ',' and space\"},{\"bindingId\":{\"fn\":34309,\"reg\":0,\"web\":2},\"name\":\"leadingZerosPattern\",\"confidence\":\"high\",\"evidence\":\"regex /^0+(?=\\\\d)/ passed to replace to strip leading zeros before a digit\"},{\"bindingId\":{\"fn\":34309,\"reg\":2,\"web\":1},\"name\":\"text\",\"confidence\":\"med\",\"evidence\":\"copy of parameter a1, which is a string on which replaceAll is called; function is named prepareTextForDisplay\"},{\"bindingId\":{\"fn\":34309,\"reg\":3},\"name\":\"emptyString\",\"confidence\":\"high\",\"evidence\":\"literal \\\"\\\" used as the replacement argument in both replaceAll and replace calls\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8901,
+      "tokensOut": 348,
+      "usd": 0.0259214
+    },
+    "meta": {
+      "fn": 34309,
+      "requested": 4
+    }
+  },
+  "50913c0b7e680714a027b101bfb2f5ed01cb2957cf9b765ebe000036918f37b4": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 34454, \"reg\": 2, \"web\": 1 },\n      \"name\": \"rateKey\",\n      \"confidence\": \"low\",\n      \"evidence\": \"copy of a1, stored in _e12082_0 and tested with `r3 in r2.rates` in the inner closure, so it is a key looked up in a `rates` object\"\n    },\n    {\n      \"bindingId\": { \"fn\": 34454, \"reg\": 2, \"web\": 2 },\n      \"name\": \"globalScope\",\n      \"confidence\": \"high\",\n      \"evidence\": \"assigned globalThis, then checked with `\\\"Object\\\" in r2_2` before reading r2_2.Object\"\n    },\n    {\n      \"bindingId\": { \"fn\": 34454, \"reg\": 4 },\n      \"name\": \"policies\",\n      \"confidence\": \"low\",\n      \"evidence\": \"copy of a2, passed to Object.values(...).find(...), and the inner closure reads `.customUnits` on each element, so it is a map of container objects that each hold customUnits\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9324,
+      "tokensOut": 654,
+      "usd": 0.0306734
+    },
+    "meta": {
+      "fn": 34454,
+      "requested": 3
+    }
+  },
+  "e4214f2c4756d3853475deae770c91057a05010a0e214d17b32f2744017a9a7e": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":34679,\"reg\":0},\"name\":\"latestTime\",\"confidence\":\"med\",\"evidence\":\"r0 starts as parameter a1, is replaced by the getDBTime value when that is >= a1, and is returned, so it holds the later of the two times\"},{\"bindingId\":{\"fn\":34679,\"reg\":2},\"name\":\"dbTimeModule\",\"confidence\":\"low\",\"evidence\":\"loaded from _e2747_2[\\\"default\\\"] and only used to call .getDBTime(); the module's real role is not visible\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8878,
+      "tokensOut": 418,
+      "usd": 0.0265294
+    },
+    "meta": {
+      "fn": 34679,
+      "requested": 2
+    }
+  },
+  "7b4077ce07e8a0c6ea04d64de5ad4fe8c729c4500bc14bd71c21f9f5406b13e2": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":35012,\"reg\":8},\"name\":\"phoneNumber\",\"confidence\":\"med\",\"evidence\":\"copy of a1, passed to parsePhoneNumber and isValidE164Phone, sliced\"},{\"bindingId\":{\"fn\":35012,\"reg\":6},\"name\":\"requireModule\",\"confidence\":\"low\",\"evidence\":\"called as r6(index) to load modules from _e2805_1[5] and [6], then .parsePhoneNumber/.Str read from results\"},{\"bindingId\":{\"fn\":35012,\"reg\":5},\"name\":\"modulesTable\",\"confidence\":\"low\",\"evidence\":\"initially _e2805_1, indexed with [5] and [6] and passed to the module loader; later reused for other values\"},{\"bindingId\":{\"fn\":35012,\"reg\":4},\"name\":\"parsedPhone\",\"confidence\":\"med\",\"evidence\":\"result of parsePhoneNumber(phoneNumber); .possible is checked and .number?.e164 read\"},{\"bindingId\":{\"fn\":35012,\"reg\":7},\"name\":\"isPossible\",\"confidence\":\"low\",\"evidence\":\"r7 = r4.possible, tested to bail out early; later reused for the Str validator module\"},{\"bindingId\":{\"fn\":35012,\"reg\":3},\"name\":\"result\",\"confidence\":\"med\",\"evidence\":\"starts undefined, assigned the concat of e164 and SMS.DOMAIN, then returned\"},{\"bindingId\":{\"fn\":35012,\"reg\":0},\"name\":\"startIndex\",\"confidence\":\"low\",\"evidence\":\"constant 0 passed to r8.slice(r0)\"},{\"bindingId\":{\"fn\":35012,\"reg\":1},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"assigned undefined and never read\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9507,
+      "tokensOut": 599,
+      "usd": 0.0308554
+    },
+    "meta": {
+      "fn": 35012,
+      "requested": 8
+    }
+  },
+  "1cafbeaf8a4e4fca8007d42ae2d7fcccb8aff0fbe22d49bbe6cd4b4ba81640aa": {
+    "text": "{\n  \"names\": [\n    {\"bindingId\": {\"fn\": 35013, \"reg\": 7}, \"name\": \"parsedPhone\", \"confidence\": \"high\", \"evidence\": \"result of Reflect.apply(parsePhoneNumber, undefined, [phone, a2]); its .possible is checked and it is returned or spread into the result\"},\n    {\"bindingId\": {\"fn\": 35013, \"reg\": 6}, \"name\": \"normalizedPhone\", \"confidence\": \"med\", \"evidence\": \"copy of a1, then reassigned to replaceAll(SPECIAL_CHARS_WITHOUT_NEWLINE, \\\"\\\"); tested against REGEX.PHONE_NUMBER and used as e164\"},\n    {\"bindingId\": {\"fn\": 35013, \"reg\": 9}, \"name\": \"countryPrefix\", \"confidence\": \"med\", \"evidence\": \"substring(0, 2) of the number matching /^\\\\+11[0-9]{10}$/; used in the international and rfc3966 strings\"},\n    {\"bindingId\": {\"fn\": 35013, \"reg\": 5}, \"name\": \"nationalNumber\", \"confidence\": \"low\", \"evidence\": \"in the +11 branch it is substring(2) and is stored in .national and .significant; elsewhere the register is reused for the parsePhoneNumber function and for temporary strings\"},\n    {\"bindingId\": {\"fn\": 35013, \"reg\": 3}, \"name\": \"result\", \"confidence\": \"low\", \"evidence\": \"register reused for several temporaries, but in both branches it ends as the object built from the spread parsedPhone with valid/possible=false and number, which is returned\"},\n    {\"bindingId\": {\"fn\": 35013, \"reg\": 4}, \"name\": \"numberInfo\", \"confidence\": \"low\", \"evidence\": \"register reused for temporaries, but ends as the object holding e164, international, national, rfc3966 and significant, assigned to result.number\"},\n    {\"bindingId\": {\"fn\": 35013, \"reg\": 2}, \"name\": \"undefinedValue\", \"confidence\": \"low\", \"evidence\": \"initially undefined, used as the this argument of Reflect.apply; later reassigned to false for valid/possible\"},\n    {\"bindingId\": {\"fn\": 35013, \"reg\": 0}, \"name\": \"prefixLength\", \"confidence\": \"low\", \"evidence\": \"constant 2 used as the end of substring(0, 2) and the start of substring(2)\"},\n    {\"bindingId\": {\"fn\": 35013, \"reg\": 1}, \"name\": \"startIndex\", \"confidence\": \"low\", \"evidence\": \"constant 0 used as the start argument of substring(0, 2)\"},\n    {\"bindingId\": {\"fn\": 35013, \"reg\": 10}, \"name\": \"emptyString\", \"confidence\": \"med\", \"evidence\": \"the \\\"\\\" replacement argument passed to replaceAll\"},\n    {\"bindingId\": {\"fn\": 35013, \"reg\": 8}, \"name\": \"concatFn\", \"confidence\": \"low\", \"evidence\": \"holds HermesInternal.concat, which is loaded for the template strings\"},\n    {\"bindingId\": {\"fn\": 35013, \"reg\": 12}, \"name\": \"copySource\", \"confidence\": \"med\", \"evidence\": \"second argument (source) of __hbc_b_copyDataProperties; holds parsedPhone and then parsedPhone.number\"},\n    {\"bindingId\": {\"fn\": 35013, \"reg\": 13}, \"name\": \"copyTarget\", \"confidence\": \"med\", \"evidence\": \"first argument (target) of __hbc_b_copyDataProperties; holds the fresh result object and then the number object\"}\n  ],\n  \"abstained\": false\n}",
+    "cost": {
+      "tokensIn": 10563,
+      "tokensOut": 1746,
+      "usd": 0.046549400000000005
+    },
+    "meta": {
+      "fn": 35013,
+      "requested": 13
+    }
+  },
+  "a971fad441ed1fcc3459069212f5577f418b4c2fbdba4ea76cbfdaa102b01929": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":35055,\"reg\":7},\"name\":\"onyx\",\"confidence\":\"med\",\"evidence\":\"list.default has merge(SESSION, obj) and set(LAST_VISITED_PATH, '') called on it, so it is a key-value store with merge/set.\"},{\"bindingId\":{\"fn\":35055,\"reg\":4,\"web\":3},\"name\":\"onyx\",\"confidence\":\"med\",\"evidence\":\"Re-read of list.default, the same module as r7, then .set(LAST_VISITED_PATH, '') is called on it.\"},{\"bindingId\":{\"fn\":35055,\"reg\":4,\"web\":1},\"name\":\"onyxKeys\",\"confidence\":\"med\",\"evidence\":\"list2.default is read for .SESSION and is used as the key namespace for the store.\"},{\"bindingId\":{\"fn\":35055,\"reg\":1,\"web\":2},\"name\":\"onyxKeys\",\"confidence\":\"med\",\"evidence\":\"list2.default is read again for .LAST_VISITED_PATH, the same key namespace as r4.\"},{\"bindingId\":{\"fn\":35055,\"reg\":1,\"web\":3},\"name\":\"emptyPath\",\"confidence\":\"low\",\"evidence\":\"The literal \\\"\\\" is the value passed to set(LAST_VISITED_PATH, ...).\"},{\"bindingId\":{\"fn\":35055,\"reg\":8,\"web\":2},\"name\":\"constants\",\"confidence\":\"low\",\"evidence\":\"list3.default is read for .AUTH_TOKEN_TYPES, so it is a constants module.\"},{\"bindingId\":{\"fn\":35055,\"reg\":8,\"web\":5},\"name\":\"authToken\",\"confidence\":\"high\",\"evidence\":\"Copy of a1, assigned to obj.authToken.\"},{\"bindingId\":{\"fn\":35055,\"reg\":8,\"web\":6},\"name\":\"email\",\"confidence\":\"high\",\"evidence\":\"Copy of a2, assigned to obj.email.\"},{\"bindingId\":{\"fn\":35055,\"reg\":8,\"web\":7},\"name\":\"accountID\",\"confidence\":\"high\",\"evidence\":\"Copy of a3, assigned to obj.accountID.\"},{\"bindingId\":{\"fn\":35055,\"reg\":8,\"web\":8},\"name\":\"globalScope\",\"confidence\":\"high\",\"evidence\":\"Holds globalThis; \\\"Date\\\" in it is checked before Date is read.\"},{\"bindingId\":{\"fn\":35055,\"reg\":3,\"web\":2},\"name\":\"onSessionMerged\",\"confidence\":\"low\",\"evidence\":\"_fn65689 is passed to merge.then(...) as the callback after the session merge.\"},{\"bindingId\":{\"fn\":35055,\"reg\":3,\"web\":1},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"Initialised to undefined and not used afterwards.\"},{\"bindingId\":{\"fn\":35055,\"reg\":9,\"web\":1},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"r9 is declared but never assigned; it is only copied into r12.\"},{\"bindingId\":{\"fn\":35055,\"reg\":12},\"name\":\"unusedUndefined\",\"confidence\":\"low\",\"evidence\":\"Copy of the unassigned r9 and never read.\"},{\"bindingId\":{\"fn\":35055,\"reg\":0},\"name\":\"undefinedResult\",\"confidence\":\"low\",\"evidence\":\"Set to undefined and returned as the function's return value.\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9606,
+      "tokensOut": 1738,
+      "usd": 0.0426414
+    },
+    "meta": {
+      "fn": 35055,
+      "requested": 15
+    }
+  },
+  "b198d1840860ce1713c3efd2b97a6c78ca9ca7f5e6d4ad292155b3d1a25a4e83": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":35379,\"reg\":0},\"name\":\"undefinedResult\",\"confidence\":\"low\",\"evidence\":\"r0 = undefined, never reassigned, and returned at the end\"},{\"bindingId\":{\"fn\":35379,\"reg\":2,\"web\":1},\"name\":\"reportID\",\"confidence\":\"high\",\"evidence\":\"copies a1 and is stored as reportID in the payload {file, reportID} sent with UPDATE_GROUP_CHAT_AVATAR\"},{\"bindingId\":{\"fn\":35379,\"reg\":3},\"name\":\"file\",\"confidence\":\"high\",\"evidence\":\"copies a3 and is stored as the file property in the UPDATE_GROUP_CHAT_AVATAR payload\"},{\"bindingId\":{\"fn\":35379,\"reg\":4,\"web\":1},\"name\":\"onyxData\",\"confidence\":\"med\",\"evidence\":\"holds the result of _e2846_64(reportID, a2, file), whose optimisticData, successData and failureData fields are later passed as the third argument to write\"},{\"bindingId\":{\"fn\":35379,\"reg\":4,\"web\":2},\"name\":\"API\",\"confidence\":\"med\",\"evidence\":\"the value _e2846_7 has .write(WRITE_COMMANDS.UPDATE_GROUP_CHAT_AVATAR, params, onyxData) called on it, which is the shape of an API module\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9098,
+      "tokensOut": 634,
+      "usd": 0.0295694
+    },
+    "meta": {
+      "fn": 35379,
+      "requested": 5
+    }
+  },
+  "5cc8015c0c8b301281f09894d6926f9d18bf555d738e2b292a5a23676f7a5f36": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":35415,\"reg\":3},\"name\":\"key\",\"confidence\":\"low\",\"evidence\":\"copy of a1; truthiness-checked, then lowercased via toLowerCase() and used as a lookup key into a captured table (_e2852_7)\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8791,
+      "tokensOut": 104,
+      "usd": 0.0230414
+    },
+    "meta": {
+      "fn": 35415,
+      "requested": 1
+    }
+  },
+  "ea902f19d9120c54408a7bc0f6bab0c7a6fd09716d3889f11a94b3644dfb5907": {
+    "text": "```json\n{\n  \"names\": [\n    {\n      \"bindingId\": { \"fn\": 35430, \"reg\": 5 },\n      \"name\": \"login\",\n      \"confidence\": \"med\",\n      \"evidence\": \"copies parameter a1, which is truthiness-checked, lowercased and used as a lookup key into a map\"\n    },\n    {\n      \"bindingId\": { \"fn\": 35430, \"reg\": 4 },\n      \"name\": \"accountID\",\n      \"confidence\": \"med\",\n      \"evidence\": \"after the map reference (_e2852_7) it holds r2?.accountID, which is passed to Number() and returned\"\n    },\n    {\n      \"bindingId\": { \"fn\": 35430, \"reg\": 2 },\n      \"name\": \"numericAccountID\",\n      \"confidence\": \"low\",\n      \"evidence\": \"register is reused: first the map entry, finally Number(accountID), which is returned. Named for the returned value\"\n    },\n    {\n      \"bindingId\": { \"fn\": 35430, \"reg\": 3 },\n      \"name\": \"lowercasedLogin\",\n      \"confidence\": \"low\",\n      \"evidence\": \"first holds r5.toLowerCase() as the map key; later reused to hold globalThis and then the Number constructor\"\n    }\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9093,
+      "tokensOut": 702,
+      "usd": 0.0302294
+    },
+    "meta": {
+      "fn": 35430,
+      "requested": 5
+    }
+  },
+  "0875e5708f9bbcc4aa01cff526501ca26fccb4875f62081705f838945387bdbd": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":35918,\"reg\":0},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"assigned undefined and only compared against thresholds/spend values with === to detect missing\"},{\"bindingId\":{\"fn\":35918,\"reg\":1},\"name\":\"nullValue\",\"confidence\":\"low\",\"evidence\":\"r1 = null, used for `r5 == r1` and `r7 != r1` nullish checks\"},{\"bindingId\":{\"fn\":35918,\"reg\":2},\"name\":\"isErrorNullish\",\"confidence\":\"low\",\"evidence\":\"r2 = (r5 == null) where r5 is the error argument\"},{\"bindingId\":{\"fn\":35918,\"reg\":4},\"name\":\"result\",\"confidence\":\"low\",\"evidence\":\"initially globalThis, later reused for the return value of translate call / fallback call\"},{\"bindingId\":{\"fn\":35918,\"reg\":5},\"name\":\"error\",\"confidence\":\"med\",\"evidence\":\"copy of a2; reads .message and .originalMessage and is passed to fallback _e2924_61\"},{\"bindingId\":{\"fn\":35918,\"reg\":6},\"name\":\"messageParams\",\"confidence\":\"med\",\"evidence\":\"object (or {}) whose fields budgetAmount, budgetName, totalSpend etc. are destructured\"},{\"bindingId\":{\"fn\":35918,\"reg\":7},\"name\":\"rawMessage\",\"confidence\":\"low\",\"evidence\":\"holds Array.isArray fn, then message/originalMessage value that is checked to be an object\"},{\"bindingId\":{\"fn\":35918,\"reg\":8},\"name\":\"translate\",\"confidence\":\"med\",\"evidence\":\"copy of a1, called with keys like 'workspace.common.budgetFrequency.X' and 'workspaceActions.updatedSharedBudgetNotification'\"},{\"bindingId\":{\"fn\":35918,\"reg\":9},\"name\":\"summaryLink\",\"confidence\":\"med\",\"evidence\":\"href extracted by regex from summaryLinkMessage, passed as a translation argument\"},{\"bindingId\":{\"fn\":35918,\"reg\":10},\"name\":\"unsubmittedSpend\",\"confidence\":\"high\",\"evidence\":\"r10 = messageParams.unsubmittedSpend\"},{\"bindingId\":{\"fn\":35918,\"reg\":11},\"name\":\"totalSpend\",\"confidence\":\"high\",\"evidence\":\"r11 = messageParams.totalSpend\"},{\"bindingId\":{\"fn\":35918,\"reg\":12},\"name\":\"thresholdPercentage\",\"confidence\":\"high\",\"evidence\":\"r12 = messageParams.thresholdPercentage\"},{\"bindingId\":{\"fn\":35918,\"reg\":13},\"name\":\"budgetName\",\"confidence\":\"high\",\"evidence\":\"r13 = messageParams.budgetName\"},{\"bindingId\":{\"fn\":35918,\"reg\":14},\"name\":\"budgetAmount\",\"confidence\":\"high\",\"evidence\":\"r14 = messageParams.budgetAmount\"},{\"bindingId\":{\"fn\":35918,\"reg\":15},\"name\":\"awaitingApprovalSpend\",\"confidence\":\"high\",\"evidence\":\"r15 = messageParams.awaitingApprovalSpend\"},{\"bindingId\":{\"fn\":35918,\"reg\":16},\"name\":\"approvedReimbursedClosedSpend\",\"confidence\":\"high\",\"evidence\":\"r16 = messageParams.approvedReimbursedClosedSpend\"},{\"bindingId\":{\"fn\":35918,\"reg\":17},\"name\":\"budgetTypeForNotificationMessage\",\"confidence\":\"high\",\"evidence\":\"r17 = messageParams.budgetTypeForNotificationMessage, compared with 'category'/'tag'\"},{\"bindingId\":{\"fn\":35918,\"reg\":18},\"name\":\"budgetFrequency\",\"confidence\":\"high\",\"evidence\":\"r18 = messageParams.budgetFrequency, used in 'workspace.common.budgetFrequency.' key\"},{\"bindingId\":{\"fn\":35918,\"reg\":19},\"name\":\"emptyString\",\"confidence\":\"low\",\"evidence\":\"r19 = \\\"\\\" used as default for href extraction\"},{\"bindingId\":{\"fn\":35918,\"reg\":20},\"name\":\"singleQuoteHrefMatch\",\"confidence\":\"high\",\"evidence\":\"result of regex exec for href='...' form\"},{\"bindingId\":{\"fn\":35918,\"reg\":21},\"name\":\"summaryLinkMessage\",\"confidence\":\"high\",\"evidence\":\"r21 = messageParams.summaryLinkMessage, input to href regexes\"},{\"bindingId\":{\"fn\":35918,\"reg\":22},\"name\":\"approvedReimbursedClosedSpendArg\",\"confidence\":\"low\",\"evidence\":\"copy of r16 placed as last argument of translate call\"},{\"bindingId\":{\"fn\":35918,\"reg\":23},\"name\":\"awaitingApprovalSpendArg\",\"confidence\":\"low\",\"evidence\":\"copy of r15 as call argument\"},{\"bindingId\":{\"fn\":35918,\"reg\":24},\"name\":\"unsubmittedSpendArg\",\"confidence\":\"low\",\"evidence\":\"copy of r10 as call argument\"},{\"bindingId\":{\"fn\":35918,\"reg\":25},\"name\":\"totalSpendArg\",\"confidence\":\"low\",\"evidence\":\"copy of r11 as call argument\"},{\"bindingId\":{\"fn\":35918,\"reg\":26},\"name\":\"thresholdPercentageArg\",\"confidence\":\"low\",\"evidence\":\"copy of r12 as call argument\"},{\"bindingId\":{\"fn\":35918,\"reg\":27},\"name\":\"summaryLinkArg\",\"confidence\":\"low\",\"evidence\":\"copy of r9 (summaryLink) as call argument\"},{\"bindingId\":{\"fn\":35918,\"reg\":28},\"name\":\"budgetTypeLabel\",\"confidence\":\"med\",\"evidence\":\"translate result for 'workspace.common.budgetTypeForNotificationMessage.' key\"},{\"bindingId\":{\"fn\":35918,\"reg\":29},\"name\":\"budgetNameArg\",\"confidence\":\"low\",\"evidence\":\"copy of r13 as call argument\"},{\"bindingId\":{\"fn\":35918,\"reg\":30},\"name\":\"budgetFrequencyLabel\",\"confidence\":\"med\",\"evidence\":\"translate result for 'workspace.common.budgetFrequency.' key\"},{\"bindingId\":{\"fn\":35918,\"reg\":31},\"name\":\"budgetAmountArg\",\"confidence\":\"low\",\"evidence\":\"copy of r14 as call argument\"},{\"bindingId\":{\"fn\":35918,\"reg\":32},\"name\":\"translationKey\",\"confidence\":\"high\",\"evidence\":\"literal \\\"workspaceActions.updatedSharedBudgetNotification\\\" passed as first arg to translate\"},{\"bindingId\":{\"fn\":35918,\"reg\":33},\"name\":\"undefinedArg\",\"confidence\":\"low\",\"evidence\":\"assigned undefined, never used afterwards\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 11234,
+      "tokensOut": 2292,
+      "usd": 0.0546934
+    },
+    "meta": {
+      "fn": 35918,
+      "requested": 33
+    }
+  },
+  "0a54bbae450b5b8d1fb39b5eaedd3c4af1e604704b086c3654be0e31fa65e1dd": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":35936,\"reg\":1},\"name\":\"nullValue\",\"confidence\":\"low\",\"evidence\":\"assigned null once (r1 = null) and only used in == / === null comparisons\"},{\"bindingId\":{\"fn\":35936,\"reg\":4},\"name\":\"messagePayload\",\"confidence\":\"low\",\"evidence\":\"holds r9.message or r9.originalMessage, later checked for object type; reused later for translation key and result\"},{\"bindingId\":{\"fn\":35936,\"reg\":5},\"name\":\"fieldType\",\"confidence\":\"med\",\"evidence\":\"last assigned from r6.fieldType and passed to getReportFieldTypeTranslationKey(r5)\"},{\"bindingId\":{\"fn\":35936,\"reg\":6},\"name\":\"messageObject\",\"confidence\":\"low\",\"evidence\":\"after the early reuses it holds the object-valued message (r6 ?? {}) from which fieldName, fieldType and defaultValue are read\"},{\"bindingId\":{\"fn\":35936,\"reg\":9},\"name\":\"error\",\"confidence\":\"med\",\"evidence\":\"copy of a2; its .message and .originalMessage properties are read, and it is passed to the fallback call\"},{\"bindingId\":{\"fn\":35936,\"reg\":13},\"name\":\"translationKey\",\"confidence\":\"high\",\"evidence\":\"loaded from literal \\\"workspaceActions.addedReportField\\\" and passed as first argument to the translate function a1\"},{\"bindingId\":{\"fn\":35936,\"reg\":14},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"assigned undefined and never read afterwards\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9721,
+      "tokensOut": 885,
+      "usd": 0.0345714
+    },
+    "meta": {
+      "fn": 35936,
+      "requested": 7
+    }
+  },
+  "3c09a4a384c7a80ab3b599232486084fb7c0f7da4960daec54c8735a356a7449": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":36242,\"reg\":2},\"name\":\"isValid\",\"confidence\":\"med\",\"evidence\":\"accumulates the checks: not NaN, > 0, <= SUBSCRIPTION_SIZE_LIMIT, Number.isInteger; returned as the result\"},{\"bindingId\":{\"fn\":36242,\"reg\":3},\"name\":\"globalScope\",\"confidence\":\"high\",\"evidence\":\"assigned globalThis and used for the \\\"Number\\\" in r3 lookup and r3.Number\"},{\"bindingId\":{\"fn\":36242,\"reg\":4,\"web\":2},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"assigned undefined and never read afterwards\"},{\"bindingId\":{\"fn\":36242,\"reg\":4,\"web\":4},\"name\":\"constants\",\"confidence\":\"med\",\"evidence\":\"holds list[\\\"default\\\"] and then SUBSCRIPTION_SIZE_LIMIT is read from it, so it is the default export of the constants module\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 9239,
+      "tokensOut": 346,
+      "usd": 0.0272534
+    },
+    "meta": {
+      "fn": 36242,
+      "requested": 4
+    }
+  },
+  "8a7b3e639e456ee5fb9f5ddbd383b0b23c2d88988d3e2be0c622cdbcb9fd383e": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\":{\"fn\":36267,\"reg\":8},\"name\":\"startIndex\",\"confidence\":\"med\",\"evidence\":\"parseInt of the first element of a2, defaulting to 0, then passed as the first argument to a1.substring(r8, ...)\"},\n    {\"bindingId\":{\"fn\":36267,\"reg\":5},\"name\":\"length\",\"confidence\":\"low\",\"evidence\":\"initially the first element's string, then the parsed second element, and finally startIndex + length as the substring end; the name is the role the register plays at its last use\"},\n    {\"bindingId\":{\"fn\":36267,\"reg\":6},\"name\":\"parseIntFn\",\"confidence\":\"low\",\"evidence\":\"holds parseInt (called with radix 10), then briefly the result of a2.at(1)\"},\n    {\"bindingId\":{\"fn\":36267,\"reg\":4},\"name\":\"result\",\"confidence\":\"med\",\"evidence\":\"reused as scratch (globalThis, .at); the final value is the substring result that is returned\"},\n    {\"bindingId\":{\"fn\":36267,\"reg\":1},\"name\":\"radix\",\"confidence\":\"high\",\"evidence\":\"constant 10 passed as the second argument to parseInt\"},\n    {\"bindingId\":{\"fn\":36267,\"reg\":2},\"name\":\"undefinedValue\",\"confidence\":\"med\",\"evidence\":\"assigned undefined and compared with r5 (!== r2) to decide whether a length was given\"},\n    {\"bindingId\":{\"fn\":36267,\"reg\":0},\"name\":\"index\",\"confidence\":\"low\",\"evidence\":\"constant 0, then 1, used as the argument to .at() for the two array elements\"},\n    {\"bindingId\":{\"fn\":36267,\"reg\":3},\"name\":\"nullValue\",\"confidence\":\"low\",\"evidence\":\"assigned null and never used\"},\n    {\"bindingId\":{\"fn\":36267,\"reg\":7},\"name\":\"input\",\"confidence\":\"low\",\"evidence\":\"holds a2 (the range array read with .at) and later a1 (the string passed to substring)\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 9325,
+      "tokensOut": 995,
+      "usd": 0.034087400000000004
+    },
+    "meta": {
+      "fn": 36267,
+      "requested": 9
+    }
+  },
+  "28be2336c7e0adc0a99954bc75316b5fc3765edc9248aa80c720bbf04b94e546": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":36378,\"reg\":0},\"name\":\"isPendingOrLabelFlag\",\"confidence\":\"low\",\"evidence\":\"first holds the double-negated truthiness of status then the comparison status === TRANSACTION.STATUS.PENDING; used as the branch to return \\\"iou.pending\\\"\"},{\"bindingId\":{\"fn\":36378,\"reg\":1},\"name\":\"isCompanyCard\",\"confidence\":\"med\",\"evidence\":\"set to !!r7?.managedCard and gates the return of \\\"cardTransactions.companyCard\\\"\"},{\"bindingId\":{\"fn\":36378,\"reg\":4},\"name\":\"labelKey\",\"confidence\":\"high\",\"evidence\":\"holds the returned translation-key strings such as \\\"iou.pending\\\", \\\"common.distance\\\", \\\"cardTransactions.travelCard\\\"\"},{\"bindingId\":{\"fn\":36378,\"reg\":5},\"name\":\"constants\",\"confidence\":\"low\",\"evidence\":\"reused: first status, then _e2947_8 default (constants object) whose SEARCH.TRANSACTION_TYPE is read; also feedCountry\"},{\"bindingId\":{\"fn\":36378,\"reg\":6},\"name\":\"transactionType\",\"confidence\":\"med\",\"evidence\":\"assigned from _e2947_18(transaction, a2) and compared against SEARCH.TRANSACTION_TYPE.DISTANCE/CARD/CASH/PER_DIEM/TIME\"},{\"bindingId\":{\"fn\":36378,\"reg\":7},\"name\":\"transaction\",\"confidence\":\"high\",\"evidence\":\"copy of a1; reads ?.status, ?.feedCountry, ?.bank, ?.managedCard and is passed to _e2947_18\"},{\"bindingId\":{\"fn\":36378,\"reg\":8},\"name\":\"isTravelCardTransaction\",\"confidence\":\"high\",\"evidence\":\"loaded from r6(_e2947_1[16]).isTravelCardTransaction and called with (feedCountry, a2); later reused for bank value\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 10078,
+      "tokensOut": 676,
+      "usd": 0.0339094
+    },
+    "meta": {
+      "fn": 36378,
+      "requested": 7
+    }
+  },
+  "affbd010d29ed7e46af54caa8ce7fc96ed2e38c7629125faf3f126af3826fe99": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":36602,\"reg\":3},\"name\":\"value\",\"confidence\":\"med\",\"evidence\":\"copy of parameter a1; checked with typeof === \\\"string\\\" then passed to _e2967_0.includes(r3)\"},{\"bindingId\":{\"fn\":36602,\"reg\":0},\"name\":\"isKnownString\",\"confidence\":\"low\",\"evidence\":\"result is false when not a string, otherwise the result of _e2967_0.includes(value); returned as a predicate\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8859,
+      "tokensOut": 173,
+      "usd": 0.0240034
+    },
+    "meta": {
+      "fn": 36602,
+      "requested": 2
+    }
+  },
+  "3f2f9c6577e38ff523f30d08f24f16baa145259c7855d1321d57ecf998377b0b": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\":{\"fn\":36929,\"reg\":0,\"web\":1},\"name\":\"nullValue\",\"confidence\":\"low\",\"evidence\":\"r0 = null, passed as the value to the Onyx set calls for the role and approver drafts\"},\n    {\"bindingId\":{\"fn\":36929,\"reg\":0,\"web\":2},\"name\":\"undefinedResult\",\"confidence\":\"low\",\"evidence\":\"r0_2 = undefined, returned as the function's result\"},\n    {\"bindingId\":{\"fn\":36929,\"reg\":1,\"web\":2},\"name\":\"CONST\",\"confidence\":\"med\",\"evidence\":\"list2[\\\"default\\\"] is read for .FORMS here and for .COLLECTION elsewhere, so it is a constants object\"},\n    {\"bindingId\":{\"fn\":36929,\"reg\":3,\"web\":1},\"name\":\"hermesInternal\",\"confidence\":\"high\",\"evidence\":\"holds __hbc_HermesInternal and its .concat is read next\"},\n    {\"bindingId\":{\"fn\":36929,\"reg\":3,\"web\":5},\"name\":\"FormActions\",\"confidence\":\"low\",\"evidence\":\"module _e3011_17 exposes clearDraftValues(WORKSPACE_INVITE_MESSAGE_FORM), so it is a form actions module\"},\n    {\"bindingId\":{\"fn\":36929,\"reg\":5,\"web\":3},\"name\":\"CONST\",\"confidence\":\"med\",\"evidence\":\"list2[\\\"default\\\"], .COLLECTION is read from it next\"},\n    {\"bindingId\":{\"fn\":36929,\"reg\":5,\"web\":5},\"name\":\"hermesInternal\",\"confidence\":\"high\",\"evidence\":\"holds __hbc_HermesInternal and its .concat is read next\"},\n    {\"bindingId\":{\"fn\":36929,\"reg\":5,\"web\":9},\"name\":\"onyx\",\"confidence\":\"med\",\"evidence\":\"list[\\\"default\\\"], the same object whose .set(key, value) is called for the draft keys\"},\n    {\"bindingId\":{\"fn\":36929,\"reg\":6,\"web\":3},\"name\":\"CONST\",\"confidence\":\"med\",\"evidence\":\"list2[\\\"default\\\"], .COLLECTION.WORKSPACE_INVITE_APPROVER_DRAFT is read from it\"},\n    {\"bindingId\":{\"fn\":36929,\"reg\":7},\"name\":\"emptyString\",\"confidence\":\"low\",\"evidence\":\"r7 = \\\"\\\" is used as the receiver (this) in each Reflect.apply(concat, r7, ...), i.e. a string-concatenation helper\"},\n    {\"bindingId\":{\"fn\":36929,\"reg\":8},\"name\":\"policyID\",\"confidence\":\"low\",\"evidence\":\"copy of a1, appended to each WORKSPACE_INVITE_*_DRAFT collection key; likely the workspace ID, but only the key suffix is visible\"},\n    {\"bindingId\":{\"fn\":36929,\"reg\":9},\"name\":\"onyx\",\"confidence\":\"med\",\"evidence\":\"list[\\\"default\\\"], with .set(key, null) called on it\"},\n    {\"bindingId\":{\"fn\":36929,\"reg\":10,\"web\":1},\"name\":\"onyx\",\"confidence\":\"med\",\"evidence\":\"list[\\\"default\\\"], with .set(key, {}) called on it\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 10047,
+      "tokensOut": 1519,
+      "usd": 0.0422154
+    },
+    "meta": {
+      "fn": 36929,
+      "requested": 13
+    }
+  },
+  "d496798814f9411ca77ad22e0d374c8985a3e8652c42878023bf3db1c607590a": {
+    "text": "{\"names\":[{\"bindingId\":{\"fn\":36947,\"reg\":2},\"name\":\"options\",\"confidence\":\"low\",\"evidence\":\"copies parameter a1 and defaults it to {} via `?? {}`, then stores it in a free variable; looks like an optional options/config argument\"},{\"bindingId\":{\"fn\":36947,\"reg\":0},\"name\":\"result\",\"confidence\":\"low\",\"evidence\":\"initialised to null, then overwritten with undefined and returned; it only holds the return value\"}],\"abstained\":false}",
+    "cost": {
+      "tokensIn": 8844,
+      "tokensOut": 168,
+      "usd": 0.0238934
+    },
+    "meta": {
+      "fn": 36947,
+      "requested": 2
+    }
+  },
+  "a3e97ff1b94226b44f5f3c1b6a53a6d986f40440368840f14fdb6edab91ca4e3": {
+    "text": "```json\n{\n  \"names\": [\n    {\"bindingId\":{\"fn\":36972,\"reg\":0},\"name\":\"rateIDs\",\"confidence\":\"low\",\"evidence\":\"r0 = Object.keys(customUnit.rates), then iterated with U applied to each key\"},\n    {\"bindingId\":{\"fn\":36972,\"reg\":1},\"name\":\"pendingFieldKey\",\"confidence\":\"low\",\"evidence\":\"copy of a4, captured as _e12529_1 and used as the computed key in the pendingFields and errorFields objects\"},\n    {\"bindingId\":{\"fn\":36972,\"reg\":2},\"name\":\"getCustomUnitRateID\",\"confidence\":\"med\",\"evidence\":\"r2 = _fn66642, which returns a1.customUnitRateID, passed to r8.map\"},\n    {\"bindingId\":{\"fn\":36972,\"reg\":3},\"name\":\"updateRate\",\"confidence\":\"low\",\"evidence\":\"r3 = U, applied via Reflect.apply to each key of rates\"},\n    {\"bindingId\":{\"fn\":36972,\"reg\":4},\"name\":\"undefinedValue\",\"confidence\":\"low\",\"evidence\":\"r4 = undefined, used as the this argument of Reflect.apply\"},\n    {\"bindingId\":{\"fn\":36972,\"reg\":5},\"name\":\"customUnit\",\"confidence\":\"med\",\"evidence\":\"copy of a2; reads .rates and .customUnitID, which are customUnits fields\"},\n    {\"bindingId\":{\"fn\":36972,\"reg\":6},\"name\":\"SetCtor\",\"confidence\":\"med\",\"evidence\":\"r6 = globalThis.Set, used in new r6(map)\"},\n    {\"bindingId\":{\"fn\":36972,\"reg\":8},\"name\":\"policyID\",\"confidence\":\"low\",\"evidence\":\"initially a3 (the rates list); later reassigned to a1 and concatenated with COLLECTION.POLICY to build the Onyx key\"},\n    {\"bindingId\":{\"fn\":36972,\"reg\":9},\"name\":\"Onyx\",\"confidence\":\"med\",\"evidence\":\"r9[\\\"default\\\"].METHOD.MERGE gives the onyxMethod of each update\"},\n    {\"bindingId\":{\"fn\":36972,\"reg\":10},\"name\":\"optimisticCustomUnit\",\"confidence\":\"low\",\"evidence\":\"{rates: r12} stored under customUnitID inside the optimistic customUnits value\"},\n    {\"bindingId\":{\"fn\":36972,\"reg\":11},\"name\":\"customUnitID\",\"confidence\":\"med\",\"evidence\":\"r11 = r5.customUnitID, used as a key in customUnits\"},\n    {\"bindingId\":{\"fn\":36972,\"reg\":12},\"name\":\"optimisticRates\",\"confidence\":\"med\",\"evidence\":\"r12 = {} is filled with rates by U and becomes optimisticData's rates, via _e12529_3\"}\n  ],\n  \"abstained\": false\n}\n```",
+    "cost": {
+      "tokensIn": 11845,
+      "tokensOut": 1861,
+      "usd": 0.05282740000000001
+    },
+    "meta": {
+      "fn": 36972,
+      "requested": 13
+    }
+  }
+}

@@ -73,7 +73,8 @@ test("an environment stored into another environment's slot is declared where th
   // `declaredNames` walking into #1's already-renamed nested body) — the
   // wrapper `_fn1` itself stays unrenamed, so the regex below still anchors
   // on it, just looking for `function sequence` instead of `function _fn3`.
-  const wrapper = /function _fn1\([^)]*\) \{([\s\S]*?)function sequence/.exec(text);
+  // Since BUGS export-boot L1 the v>=97 wrapper is a `function*` shell.
+  const wrapper = /function\*? _fn1\([^)]*\) \{([\s\S]*?)function sequence/.exec(text);
   assert.ok(wrapper !== null, "the emitted nesting changed shape");
   assert.match(wrapper[1]!, /let _e1_0[^;]*_e3_0;/);
 });

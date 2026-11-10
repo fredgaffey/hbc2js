@@ -1,0 +1,50 @@
+; hbc2js disassembly of 351-computed-proto-key/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=1 strings=18 globalCodeIndex=0
+function #0 "global"  params=1 frame=23 env=0 flags=dbg,overflowed  @0x000001c8 size=247
+  0000  DeclareGlobalVar     s13 "o3"
+  0005  DeclareGlobalVar     s5 "p"
+  000a  GetGlobalObject      r2
+  000c  NewObjectWithBuffer  r3, sh0(numProps=1), lit@0x0000
+  0012  NewObjectWithBufferAndParent r3, r3, sh1(numProps=1), lit@0x0005
+  001d  PutByIdLoose         r2, r3, #c0, s13 "o3"
+  0023  TryGetById           r6, r2, #c0, s14 "print"
+  0029  GetByIdShort         r3, r2, #c1, s13 "o3"
+  002e  GetByIdShort         r5, r3, #c2, s12 "inh"
+  0033  TryGetById           r7, r2, #c3, s3 "Object"
+  0039  GetByIdShort         r4, r7, #c4, s8 "keys"
+  003e  GetByIdShort         r3, r2, #c1, s13 "o3"
+  0043  Call2                r7, r4, r7, r3
+  0048  GetByIdShort         r4, r7, #c5, s11 "join"
+  004d  LoadConstString      r3, s0 ","
+  0051  Call2                r4, r4, r7, r3
+  0056  TryGetById           r8, r2, #c3, s3 "Object"
+  005c  GetByIdShort         r7, r8, #c6, s10 "getOwnPropertyDescriptor"
+  0061  GetByIdShort         r3, r2, #c1, s13 "o3"
+  0066  LoadConstString      r11, s4 "__proto__"
+  006a  Call3                r3, r7, r8, r3, r11
+  0070  GetByIdShort         r3, r3, #c7, s16 "value"
+  0075  LoadConstUndefined   r0
+  0077  Call4                r3, r6, r0, r5, r4, r3
+  007e  NewObjectWithBuffer  r3, sh2(numProps=2), lit@0x000a
+  0084  NewObjectWithBuffer  r4, sh3(numProps=1), lit@0x0010
+  008a  PutOwnBySlotIdx      r3, r4, 0
+  008e  PutByIdLoose         r2, r3, #c1, s5 "p"
+  0094  TryGetById           r4, r2, #c0, s14 "print"
+  009a  TryGetById           r6, r2, #c3, s3 "Object"
+  00a0  GetByIdShort         r5, r6, #c8, s6 "getPrototypeOf"
+  00a5  GetByIdShort         r3, r2, #c9, s5 "p"
+  00aa  Call2                r6, r5, r6, r3
+  00af  TryGetById           r3, r2, #c3, s3 "Object"
+  00b5  GetByIdShort         r5, r3, #c10, s15 "prototype"
+  00ba  GetByIdShort         r3, r2, #c9, s5 "p"
+  00bf  GetByIdShort         r3, r3, #c11, s7 "fake"
+  00c4  TryGetById           r8, r2, #c12, s2 "JSON"
+  00ca  GetByIdShort         r7, r8, #c13, s9 "stringify"
+  00cf  TryGetById           r10, r2, #c3, s3 "Object"
+  00d5  GetByIdShort         r9, r10, #c6, s10 "getOwnPropertyDescriptor"
+  00da  GetByIdShort         r2, r2, #c9, s5 "p"
+  00df  Call3                r2, r9, r10, r2, r11
+  00e5  Call2                r2, r7, r8, r2
+  00ea  StrictEq             r1, r6, r5
+  00ee  Call4                r2, r4, r0, r1, r3, r2
+  00f5  Ret                  r2

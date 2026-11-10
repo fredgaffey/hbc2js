@@ -83,7 +83,20 @@ Not rungs: `29-promise-chaining`, `31-microtask-ordering`, `50-this-binding`
 (no idiom); `30-async-generator` (uncompilable); `21-iife-closures` (module
 wrapper `_fn0.call(globalThis)` is the emitter's, not a lowering).
 
-**Count: 31 rungs** (12 stage A, 19 stage B); 27 merged (jsx-recover opt-in) as of the 2026-09-05 ladder landing; remaining: gen-lowered and the hard/unscheduled rows below.
+**Count (2026-11-10): 37 registered passes** (10 stage A, 27 stage B; `jsx-recover` opt-in), per `src/passes/registry.ts`. The 31-rung table above is the original inventory; passes added since that have no row above: `fcall-diamond` (spec 04 §10), `globalthis-dead-store`, `array-literal` (spec 31), `inline-new` (spec 24 §9), `object-literal-arg` (spec 20 §9). Still unshipped: `gen-lowered`, `string-array-decode`, `closure-naming` (§5 hard rows); the ordering diagram below names them as planned positions only.
+
+### Registered order (authoritative: `src/passes/registry.ts`)
+
+Checked mechanically by `tests/gate/docs/pass-order.test.ts`; update both when a pass is added.
+
+<!-- registry-order:start -->
+```
+finally-dedup fcall-diamond loop-cond for-header for-in for-of switch-raise if-chain try-shape label-clean
+expr-rebuild global-access globalthis-dead-store call-shape default-params destructure spread-rest template-literal optional-chain object-literal array-literal yield-recovery yield-loop async-recovery arguments-form literal-forms try-clean class-recover super-call ctor-this inline-new private-fields method-read jsx-recover object-literal-arg fn-naming closure-inline reg-split var-naming
+```
+<!-- registry-order:end -->
+
+Note the diagram below predates this order: `fn-naming` is registered after `jsx-recover`/`object-literal-arg` (not directly after `class-recover`), and `try-shape` is stage A, not a child of `finally-dedup` only.
 
 ---
 
@@ -190,6 +203,33 @@ are never rewritten by any rung except the generator rungs.
 | `class-recover` | `func`, `assign` to `.prototype`, helper calls named in row 20 | bodies of the methods |
 | `try-clean` | `try`, `assign`/`init` of `__pc`/`__exc` | anything the handler still reads |
 | `jsx-recover` | `call` trees rooted at a proven React callee | non-React calls |
+
+**Resumable bodies (2026-11-10, `Pass.sameFrame`).** At v84/94/96 a
+generator or `async function` body is emitted as `return function (__sent,
+__isReturn, __isThrow) { switch (__state) ... }`, a `func` marked
+`sameFrame`: not a second Hermes function but this frame's own body,
+re-entered at its top on every resume with whatever registers the previous
+resume left. `stmtLists` skips it by default; a stage-B rung that sets
+`sameFrame: true` is also handed the lists inside it (`stmtLists(body, {
+sameFrame: true })`, `spliceList` splices through it), with `ctx.fnBody`
+still the whole enclosing function. Opting in is an audit claim: every
+whole-function helper the rung uses must (1) see writes inside the closure
+as writes of this frame (`identUses`/`defUse` already do) and (2) treat the
+closure body as the outermost loop body whose entry has unknown register
+state, so a chronological "earlier in the text" fact never crosses a
+resume. Opted in: `global-access` (store/prefix walks see the closure, it is
+condition 5's outermost loop, and condition 6 refuses a guard with no
+`globalThis` store earlier in the same resume -- the cross-resume reuse
+Hermes emits for every later resume stays guarded on purpose),
+`call-shape` (R3h's every-write proof counts closure writes; "every write is
+`undefined`" is order-free), `object-literal` (list-local proofs only), and
+`globalthis-dead-store` (whole-body rung; its analysis walks the closure
+and the end of a closure list is "unknown", never dead). Not opted in, so
+still blind there: `expr-rebuild` (its live-in carry assumes one entry),
+the sugar rungs, and the renamers; `yield-recovery`/`yield-loop`/
+`async-recovery` consume the closure from the parent function as before and
+are unaffected by what ran inside it (fixture 370; 310 keeps 3 of its 6
+guards, all cross-resume).
 
 ### 3.3 Invariants every rung preserves (in addition to PL-01…PL-11)
 
@@ -350,7 +390,7 @@ a measured count of decodable sites in the hardened tier.
 ## 6. Measurement
 
 Reported in the project status per rung and in aggregate, produced by one script
-(`tools/passes-metrics.ts`, batch 1) over `tests/fixtures/constructs/**` at all
+(`tools/passes-metrics.mjs`, batch 1) over `tests/fixtures/constructs/**` at all
 five versions × base/`.min`/`.obf`, plus the RN template bundle.
 
 **Per rung:** `sites rewritten / abandoned` (from the driver records, already
