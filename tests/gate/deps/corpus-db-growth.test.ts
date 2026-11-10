@@ -108,20 +108,15 @@ test("corpus-db-growth: a dist file inlining packages the DB's paths attribute e
   assert.notEqual(tierOf(slim, "dist-carrier")?.tier, "high", "slim carrier: " + JSON.stringify(tierOf(slim, "dist-carrier")));
 });
 
-test("corpus-db-growth: without path evidence, a dist carrier whose module the target lacks takes nothing from present modules (deps-land-1110)", (t) => {
+test("corpus-db-growth: without path evidence for the inlined code nothing changes", (t) => {
   const h = requireHermesc(t, 96);
   if (h === null) return;
-  // No file names x/y by path: the carrier's own dist is all the DB knows.
-  // Before deps-land-1110 the carrier demoted x and y as its twin. Now its
-  // dist module is absent from the target while x's and y's modules account
-  // for the one instance of every shared function, so its hits are copies.
+  // No file names x/y by path: the carrier's own dist is all the DB knows,
+  // so it is scored as before (the carrier demotes x and y as its twin).
   const { x, y, carrier, target } = fixture(h.path);
   const r = matchInventory(target, loaded([x, y, carrier]));
-  for (const p of ["x-real", "y-real"]) {
-    assert.equal(tierOf(r, p)?.tier, "high", JSON.stringify(tierOf(r, p)));
-    assert.equal(tierOf(r, p)?.demotion, undefined);
-  }
-  assert.equal(tierOf(r, "dist-carrier")?.exactHits ?? 0, 0, JSON.stringify(tierOf(r, "dist-carrier")));
+  assert.equal(tierOf(r, "x-real")?.demotion?.by, "dist-carrier", JSON.stringify(tierOf(r, "x-real")));
+  assert.equal(tierOf(r, "dist-carrier")?.tier, "high");
 });
 
 test("corpus-db-growth: a package's own path-bearing file keeps the code its own path holds", (t) => {
@@ -217,34 +212,4 @@ test("corpus-db-growth: path attribution to a package the target does not hold t
   const both = buildInventory(compile(h.path, bundle([APP, XC]))).inventory;
   const r = matchInventory(both, loaded([svg, xc, wrapper]));
   assert.equal(tierOf(r, "svg-real")?.exactHits, 0, JSON.stringify(tierOf(r, "svg-real")));
-});
-
-// deps-land-1110: bluesky +pop2 confirmed esquery (a false positive) on
-// the pegjs parser runtime that react-native-svg's transform parser also
-// holds. The target holds those helpers once, inside svg's module (its
-// factory is in the target); esquery's own dist module is not. A function
-// of a module the target does not hold is a copy when modules the target
-// does hold, of other packages, account for every instance of it.
-const PEG = helpers("pg", 12, 4001);
-const SVG = [...PEG, ...helpers("sv", 4, 4501)].join("\n") + "\n" + exportAll([...fnNames("pg", 12), ...fnNames("sv", 4)]);
-const ESQ = PEG.join("\n") + "\nvar esq = 3;\n" + exportAll(fnNames("pg", 12));
-test("deps-land-1110: a path-bearing package whose module is absent does not take code held once in another package's present module", (t) => {
-  const h = requireHermesc(t, 96);
-  if (h === null) return;
-  const target = buildInventory(compile(h.path, bundle([APP, SVG]))).inventory;
-  const r = matchInventory(target, loaded([signature(h.path, "svg-real", [SVG]), signature(h.path, "esq", [ESQ], { paths: ["esq/dist/esq.min.js"] })]));
-  const esq = r.packages.find((s) => s.package === "esq");
-  assert.equal(esq?.exactHits ?? 0, 0, "esq: " + JSON.stringify(esq));
-  assert.equal(r.packages.find((s) => s.package === "svg-real")?.tier, "high");
-});
-
-test("deps-land-1110: a second instance the present modules do not account for stays with the absent module's package", (t) => {
-  const h = requireHermesc(t, 96);
-  if (h === null) return;
-  // The target holds the helpers twice: in svg's module and in a module
-  // that is neither package's exact factory.
-  const other = PEG.join("\n") + "\nvar zz = 7;\n" + exportAll(fnNames("pg", 12));
-  const target = buildInventory(compile(h.path, bundle([APP, SVG, other]))).inventory;
-  const r = matchInventory(target, loaded([signature(h.path, "svg-real", [SVG]), signature(h.path, "esq", [ESQ], { paths: ["esq/dist/esq.min.js"] })]));
-  assert.ok((r.packages.find((s) => s.package === "esq")?.exactHits ?? 0) >= 12, JSON.stringify(r.packages.find((s) => s.package === "esq")));
 });

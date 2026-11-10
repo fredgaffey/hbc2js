@@ -1133,32 +1133,6 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
     }
     return preView;
   };
-  // deps-land-1110: per target hash, the loaded packages whose own module
-  // holding it is in the target (factory exact hash present): by
-  // `moduleId` for path-bearing files, any held module for pathless ones
-  // (they record no function-to-module map).
-  let heldClaimants: Map<string, Set<string>> | undefined;
-  const heldClaimantsOf = (key: string): ReadonlySet<string> | undefined => {
-    if (heldClaimants === undefined) {
-      heldClaimants = new Map();
-      for (const { file } of eligibleDbs) {
-        if (file.toolchainBaseline) continue;
-        const foreign = foreignSets(file);
-        const held = new Set<number | null>();
-        for (const m of file.modules) if (!m.factoryIsBaseline && m.factoryExactHash !== null && !foreign.factories.has(m.factoryFunctionIndex) && targetExact.has(schemeKey(file, m.factoryExactHash))) held.add(m.localModuleId);
-        if (held.size === 0) continue;
-        for (const fn of file.functions) {
-          if (foreign.functions.has(fn.index) || (fn.moduleId !== undefined && !held.has(fn.moduleId))) continue;
-          const k = schemeKey(file, fn.exactHash);
-          if (!targetExact.has(k)) continue;
-          let set = heldClaimants.get(k);
-          if (set === undefined) heldClaimants.set(k, (set = new Set()));
-          set.add(file.package);
-        }
-      }
-    }
-    return heldClaimants.get(key);
-  };
   const views = new Map<SigDbFile, OwnView>();
   const viewOf = (file: SigDbFile): OwnView => {
     let v = views.get(file);
@@ -1207,24 +1181,6 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
         }
       }
       if (ownHits.size < 2) for (const i of inClosure) functions.add(i);
-    }
-    // deps-land-1110: a function of a path-bearing file whose own module is
-    // not in the target is a copy when other packages' modules that ARE in
-    // the target account for every instance the target holds (esquery's
-    // pegjs runtime, held once, in react-native-svg's module).
-    if (!file.toolchainBaseline && (file.modulePaths ?? 0) >= 1) {
-      const held = new Set<number | null>();
-      for (const m of file.modules) if (!m.factoryIsBaseline && m.factoryExactHash !== null && !foreign.factories.has(m.factoryFunctionIndex) && targetExact.has(schemeKey(file, m.factoryExactHash))) held.add(m.localModuleId);
-      for (const fn of file.functions) {
-        if (fn.moduleId === undefined || held.has(fn.moduleId) || foreign.functions.has(fn.index)) continue;
-        const key = schemeKey(file, fn.exactHash);
-        if (!targetExact.has(key)) continue;
-        const h = heldClaimantsOf(key);
-        if (h === undefined) continue;
-        let others = h.size;
-        if (h.has(file.package)) others--;
-        if (others >= (targetCopies.get(key) ?? 0)) functions.add(fn.index);
-      }
     }
     const factories = new Set<number>();
     if (functions.size > 0) for (const m of file.modules) if (functions.has(m.factoryFunctionIndex)) factories.add(m.factoryFunctionIndex);
