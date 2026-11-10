@@ -766,6 +766,50 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
     }
   }
 
+  // Spec 27 §12, fix-closure-identity-2: a closure whose creation sites lie in
+  // TWO OR MORE functions (hermesc inlined its creator `wrap` into both `a`
+  // and `b`) has no single creator, so section 11 leaves it one declaration
+  // at its home `h` -- one object per activation of `h`, while every
+  // execution of every site makes a new one in the VM (`a() !== a()`). Such a
+  // function is emitted as a function expression at every site instead: one
+  // instance per creator, inlined there. The copies are the SAME function
+  // index under the same remap, so they read the very environment bindings
+  // the declaration did (declared at `h` or above, all ancestors of every
+  // creator; the functions in between declare only their own `_e<id>_<slot>`
+  // names -- section 11's argument), and share every captured variable.
+  // Refused (the declaration stays) unless every site is a plain
+  // `Create*Closure` in a function at or below `h`, outside the closure's own
+  // subtree, and neither the closure nor any creator has creation-context
+  // copies (the "closure copies" machinery owns those).
+  const perCreatorInline = new Map<number, number[]>();
+  const perCreatorFns = new Set<number>();
+  for (const [host, kids] of childrenOf) {
+    for (const child of kids) {
+      if (inlineFunctions.has(child) || envGraph.closureCopies.has(child)) continue;
+      const all = envGraph.closureCreationSites.get(child);
+      if (all === undefined) continue;
+      const creators = new Set([...all.keys()].map((k) => Number(k.slice(0, k.indexOf(":")))));
+      if (creators.size < 2) continue;
+      const ok = [...creators].every((c) => {
+        if (!Number.isInteger(c) || c === child || !isAncestor(host, c) || isAncestor(child, c) || envGraph.closureCopies.has(c)) return false;
+        let ccfg: FunctionCfg;
+        try {
+          ccfg = analysis.cfg(c);
+        } catch {
+          return false;
+        }
+        return ccfg.blocks.every((b) => b.instructions.every((insn) => closureFunctionId(insn) !== child || CREATE_CLOSURE_OPS.has(insn.name)));
+      });
+      if (!ok) continue;
+      perCreatorFns.add(child);
+      for (const c of creators) {
+        const list = perCreatorInline.get(c);
+        if (list === undefined) perCreatorInline.set(c, [child]);
+        else list.push(child);
+      }
+    }
+  }
+
   /** True when a copy hosted in `host` must be emitted INLINE at its creation
    *  site rather than hoisted: it captured an environment `host` declares
    *  inside a loop body's block (report §5 "Landing item 3"). */
@@ -866,8 +910,16 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
       const hoisted: Stmt[] = [];
       const inlined = new Map<number, Stmt>();
       for (const child of kids) {
+        if (perCreatorFns.has(child)) continue; // emitted in each creator, below
         const body = emitOne(child, childCtx);
         if (inlineFunctions.has(child) && body.k === "func") inlined.set(child, body);
+        else hoisted.push(body);
+      }
+      // fix-closure-identity-2: this function's own instance of a closure
+      // several functions create (see `perCreatorInline`).
+      for (const g of perCreatorInline.get(index) ?? []) {
+        const body = emitOne(g, { ...childCtx, path: `${ctx.path}/${index}m` });
+        if (body.k === "func") inlined.set(g, body);
         else hoisted.push(body);
       }
       // They travel with their whole lexical subtree, under the composed
@@ -914,6 +966,7 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
         for (const site of createdIn.get(index) ?? []) {
           const g = site.fn;
           if (g === index || active.has(g)) continue;
+          if (perCreatorFns.has(g)) continue; // inlined at this site already
           const home = parentOf.get(g) ?? null;
           if (home === null) continue; // module level: in scope from everywhere
           if (isAncestor(index, home)) continue; // already emitted in this subtree
