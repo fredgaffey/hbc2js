@@ -248,3 +248,37 @@ original never makes). B1 is still DIVERGENT, on a decompile gap: module 991
 fn#11865 loads slot 0 of an environment read out of another environment's
 slot, which renders as an `__hbc_unresolved_env` marker and throws under
 module 193 (whatwg-fetch); the export enters 85 factories to the original's 1568. Test 10 stays `todo`.
+
+**L4, part 2 (2026-11-10).** Three more fixes, and the held-out app proves.
+(1) The module-991 decompile gap is closed: the environment graph tracks a
+*closure* held in an environment slot the way it tracks an environment, so
+`GetClosureEnvironment` on the value loaded back out of the slot resolves
+(fixture `400-inlined-closure-env`). (2) The split's startup scan missed the
+app entry: `hermesc -O` materialises the entry id `0` into a register once,
+inside a labelled block, and the top-level-only scan dropped the final
+`__r(0)`, so the export never ran its entry; the scan now follows a register
+set inside a nested block (`tests/gate/split/entry-nested-const.test.ts`).
+(3) The `--instrument=modules` timing ring flushed every 256 entries through
+`console.log`, a `nativeLoggingHook` call the original never makes, so B1
+diverged at the 256th module; the registry stays silent while
+`__HBC_BOOT_PROBE__` is defined (`instrument-silent-under-probe.test.ts`).
+With those B1 was EQUIVALENT (1568 factories) and B2 died in the run phase
+with `TypeError: target is not callable` in React's `prepareFreshStack`:
+`root.cancelPendingCommit` was undefined, not null. The cause was a bare v98
+`Construct`. Where the optimiser knows the callee of `new`, it allocates
+`this` itself (`GetById "prototype"` + `NewObjectWithParent`), moves it
+into the frame's `this` slot, and, having proved the constructor returns no
+object, keeps using that register with no `SelectObject`. `Construct` runs
+the callee *on* that object (BytecodeList.def: "the first argument 'this' is
+assumed to be created with CreateThis"); the decompiler lowered it as
+`Reflect.construct`, a fresh allocation, so `FiberRootNode` initialised an
+object nobody kept. That shape (same block, the stand-in read only by the
+moves, callee unchanged since its prototype was read) now lowers to
+`this-slot = new C(…)`, every register still holding the stand-in takes the
+result, and the `Construct` destination becomes `undefined` (fixture
+`410-construct-prebuilt-this`, which needs a ctor too large to inline and
+two call sites; v99 emits a different call there). Result, flat tier with
+`--substitute none --lenient-env`: B1 and B2 EQUIVALENT (`main`, 1586
+factories, 1 view, 1 commit each side). Test 10 is real (sweep tier). It
+exports with `--lenient-env`: 87 `__hbc_unresolved_env` markers remain in
+the held-out export, and none is reached by boot.
