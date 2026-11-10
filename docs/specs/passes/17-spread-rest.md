@@ -350,7 +350,7 @@ iterator rest loop (must not match), a broken index chain, two
 `copyRestArgs` calls in one body, an `__hbc_b_apply` with a defined `this`;
 ≥1 site the `check` refuses.
 
-**Corpus metric** (`tools/passes-metrics.ts`): count of
+**Corpus metric** (`tools/passes-metrics.mjs`): count of
 `__hbc_b_arraySpread` + `__hbc_b_apply` + `__hbc_b_copyRestArgs` + 2-arg
 `__hbc_b_copyDataProperties` occurrences in printed output. Baseline: 13
 in `40`, 9 in `41`, 3 in `42` per version. **Floor: ≥ 90 % removed** across
@@ -415,3 +415,17 @@ setup. Plain elements and call arguments now go through `subst.resolve` too.
 Regression fixture: `tests/fixtures/adversarial/44-fuzz-spread-shared-register`
 (+ four behavioural tests in `tests/gate/passes/spread-rest.test.ts`, one per
 traced version).
+
+### 9.3 The two-argument `apply` is a construct, not a call
+
+`new C(...xs)` lowers to `HermesBuiltin.apply` with two operands
+(`__hbc_b_apply(fn, args)`, no `this`), which the runtime helper turns into
+`Reflect.construct`. The S2 matcher destructured a third operand
+unconditionally and resolved `undefined` through `Subst`, so the pass threw
+(E_PASS_CRASH) and the whole enclosing function was stubbed. S2 now refuses
+any `__hbc_b_apply` that is not the three-operand call form; a spread `new`
+stays in its lowered shape (correct, less readable). Found by
+adversarial-1110 (`adversarial/63-new-observable-args`); regression
+`constructs/350-spread-new-construct`, tests "adversarial-1110: spread-rest
+leaves a spread `new` …" in `tests/gate/passes/spread-rest.test.ts`. A
+`new (…)(...xs)` rewrite rule is a possible follow-up.

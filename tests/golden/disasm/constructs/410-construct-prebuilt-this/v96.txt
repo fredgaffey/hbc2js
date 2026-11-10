@@ -1,0 +1,298 @@
+; hbc2js disassembly of 410-construct-prebuilt-this/v96.hbc
+; version=96 layout=C opcodeTable=hbc96 functions=4 strings=85 globalCodeIndex=0
+function #0 "global"  params=1 frame=9 env=0 flags=dbg  @0x000004c4 size=15
+  0000  CreateEnvironment    r0
+  0002  CreateClosure        r1, r0, f1 ""
+  0007  LoadConstUndefined   r0
+  0009  Call1                r1, r1, r0
+  000d  Ret                  r0
+
+function #1 ""  params=1 frame=29 env=2 flags=strict,dbg  @0x000004d3 size=293
+  0000  CreateEnvironment    r1
+  0002  CreateClosure        r3, r1, f2 "Root"
+  0007  StoreToEnvironment   r1, 1, r3
+  000b  CreateClosure        r5, r1, f3 "render"
+  0010  GetGlobalObject      r2
+  0012  TryGetById           r0, r2, #c1, s21 "Map"
+  0018  GetByIdShort         r4, r0, #c2, s18 "prototype"
+  001d  CreateThis           r4, r4, r0
+  0021  Mov                  r22, r4
+  0024  Construct            r0, r0, 1
+  0028  SelectObject         r0, r4, r0
+  002c  StoreToEnvironment   r1, 0, r0
+  0030  LoadConstUndefined   r0
+  0032  LoadConstUInt8       r4, 11
+  0035  LoadConstNull        r10
+  0037  Call3                r6, r5, r0, r4, r10
+  003d  NewObject            r1
+  003f  LoadConstString      r7, s11 "x"
+  0043  PutNewOwnByIdShort   r1, r7, s81 "onUncaught"
+  0047  Call3                r4, r5, r0, r4, r1
+  004d  TryGetById           r9, r2, #c3, s84 "print"
+  0053  InstanceOf           r20, r6, r3
+  0057  GetByIdShort         r1, r6, #c4, s30 "cancelPendingCommit"
+  005c  GetByIdShort         r18, r6, #c5, s12 "tag"
+  0061  GetByIdShort         r17, r6, #c6, s16 "containerInfo"
+  0066  StrictEq             r21, r6, r4
+  006a  StrictEq             r19, r1, r10
+  006e  LoadConstUndefined   r22
+  0070  Call                 r1, r9, 6
+  0074  GetByIdShort         r21, r6, #c6, s16 "containerInfo"
+  0079  GetByIdShort         r13, r6, #c7, s14 "state"
+  007e  GetByIdShort         r1, r3, #c2, s18 "prototype"
+  0083  CreateThis           r4, r1, r3
+  0087  LoadConstUInt8       r20, 2
+  008a  LoadConstTrue        r19
+  008c  LoadConstString      r18, s5 "f"
+  0090  LoadConstString      r17, s10 "u2"
+  0094  LoadConstString      r16, s4 "c2"
+  0098  LoadConstString      r15, s8 "r2"
+  009c  Mov                  r22, r4
+  009f  Mov                  r14, r6
+  00a2  Construct            r1, r3, 10
+  00a6  SelectObject         r10, r4, r1
+  00aa  TryGetById           r8, r2, #c3, s84 "print"
+  00b0  GetByIdShort         r7, r10, #c5, s12 "tag"
+  00b5  GetByIdShort         r1, r10, #c8, s31 "transition"
+  00ba  GetByIdShort         r19, r10, #c4, s30 "cancelPendingCommit"
+  00bf  InstanceOf           r18, r10, r3
+  00c3  TryGetById           r9, r2, #c9, s23 "Object"
+  00c9  GetByIdShort         r3, r9, #c10, s78 "keys"
+  00ce  Call2                r3, r3, r9, r10
+  00d3  GetByIdShort         r17, r3, #c11, s25 "length"
+  00d8  StrictEq             r20, r1, r6
+  00dc  LoadConstUndefined   r22
+  00de  Mov                  r21, r7
+  00e1  Call                 r1, r8, 6
+  00e5  TryGetById           r5, r2, #c3, s84 "print"
+  00eb  GetByIdShort         r1, r6, #c12, s33 "current"
+  00f0  GetByIdShort         r1, r1, #c13, s15 "stateNode"
+  00f5  GetByIdShort         r20, r6, #c14, s82 "onUncaughtError"
+  00fa  GetByIdShort         r3, r6, #c15, s13 "lanes"
+  00ff  GetByIdShort         r19, r3, #c11, s25 "length"
+  0104  TryGetById           r7, r2, #c9, s23 "Object"
+  010a  GetByIdShort         r2, r7, #c10, s78 "keys"
+  010f  Call2                r2, r2, r7, r6
+  0114  GetByIdShort         r18, r2, #c11, s25 "length"
+  0119  StrictEq             r21, r1, r6
+  011d  LoadConstUndefined   r22
+  011f  Call                 r1, r5, 5
+  0123  Ret                  r0
+
+function #2 "Root"  params=10 frame=18 env=0 flags=strict,dbg  @0x000005f8 size=747
+  0000  LoadParam            r7, 2
+  0003  LoadParam            r3, 0
+  0006  PutById              r3, r7, #c1, s12 "tag"
+  000c  LoadParam            r0, 1
+  000f  PutById              r3, r0, #c2, s16 "containerInfo"
+  0015  LoadConstNull        r2
+  0017  PutById              r3, r2, #c3, s19 "pendingChildren"
+  001d  PutById              r3, r2, #c4, s33 "current"
+  0023  PutById              r3, r2, #c5, s83 "pingCache"
+  0029  LoadConstInt         r0, -1
+  002f  PutById              r3, r0, #c6, s24 "timeoutHandle"
+  0035  PutById              r3, r2, #c7, s30 "cancelPendingCommit"
+  003b  PutById              r3, r2, #c8, s20 "context"
+  0041  PutById              r3, r2, #c9, s22 "pendingContext"
+  0047  PutById              r3, r2, #c10, s27 "next"
+  004d  PutById              r3, r2, #c11, s28 "callbackNode"
+  0053  LoadConstZero        r1
+  0055  PutById              r3, r1, #c12, s29 "callbackPriority"
+  005b  LoadParam            r0, 4
+  005e  PutById              r3, r0, #c13, s77 "identifierPrefix"
+  0064  LoadParam            r0, 5
+  0067  PutById              r3, r0, #c14, s82 "onUncaughtError"
+  006d  LoadParam            r0, 6
+  0070  PutById              r3, r0, #c15, s32 "onCaughtError"
+  0076  LoadParam            r0, 7
+  0079  PutById              r3, r0, #c16, s17 "onRecoverableError"
+  007f  LoadParam            r0, 3
+  0082  PutById              r3, r0, #c17, s76 "hydrate"
+  0088  LoadParam            r0, 8
+  008b  PutById              r3, r0, #c18, s31 "transition"
+  0091  LoadParam            r0, 9
+  0094  PutById              r3, r0, #c19, s14 "state"
+  009a  Mul                  r0, r1, r7
+  009e  PutById              r3, r0, #c20, s34 "f0"
+  00a4  LoadConstUInt8       r0, 1
+  00a7  Mul                  r0, r0, r7
+  00ab  PutById              r3, r0, #c21, s35 "f1"
+  00b1  LoadConstUInt8       r6, 2
+  00b4  Mul                  r0, r6, r7
+  00b8  PutById              r3, r0, #c22, s46 "f2"
+  00be  LoadConstUInt8       r0, 3
+  00c1  Mul                  r4, r0, r7
+  00c5  PutById              r3, r4, #c23, s57 "f3"
+  00cb  LoadConstUInt8       r4, 4
+  00ce  Mul                  r4, r4, r7
+  00d2  PutById              r3, r4, #c24, s68 "f4"
+  00d8  LoadConstUInt8       r4, 5
+  00db  Mul                  r4, r4, r7
+  00df  PutById              r3, r4, #c25, s69 "f5"
+  00e5  LoadConstUInt8       r4, 6
+  00e8  Mul                  r4, r4, r7
+  00ec  PutById              r3, r4, #c26, s70 "f6"
+  00f2  LoadConstUInt8       r4, 7
+  00f5  Mul                  r4, r4, r7
+  00f9  PutById              r3, r4, #c27, s71 "f7"
+  00ff  LoadConstUInt8       r5, 8
+  0102  Mul                  r4, r5, r7
+  0106  PutById              r3, r4, #c28, s72 "f8"
+  010c  LoadConstUInt8       r4, 9
+  010f  Mul                  r4, r4, r7
+  0113  PutById              r3, r4, #c29, s73 "f9"
+  0119  LoadConstUInt8       r4, 10
+  011c  Mul                  r4, r4, r7
+  0120  PutById              r3, r4, #c30, s36 "f10"
+  0126  LoadConstUInt8       r4, 11
+  0129  Mul                  r4, r4, r7
+  012d  PutById              r3, r4, #c31, s37 "f11"
+  0133  LoadConstUInt8       r4, 12
+  0136  Mul                  r4, r4, r7
+  013a  PutById              r3, r4, #c32, s38 "f12"
+  0140  LoadConstUInt8       r4, 13
+  0143  Mul                  r4, r4, r7
+  0147  PutById              r3, r4, #c33, s39 "f13"
+  014d  LoadConstUInt8       r4, 14
+  0150  Mul                  r4, r4, r7
+  0154  PutById              r3, r4, #c34, s40 "f14"
+  015a  LoadConstUInt8       r4, 15
+  015d  Mul                  r4, r4, r7
+  0161  PutById              r3, r4, #c35, s41 "f15"
+  0167  LoadConstUInt8       r4, 16
+  016a  Mul                  r4, r4, r7
+  016e  PutById              r3, r4, #c36, s42 "f16"
+  0174  LoadConstUInt8       r4, 17
+  0177  Mul                  r4, r4, r7
+  017b  PutById              r3, r4, #c37, s43 "f17"
+  0181  LoadConstUInt8       r4, 18
+  0184  Mul                  r4, r4, r7
+  0188  PutById              r3, r4, #c38, s44 "f18"
+  018e  LoadConstUInt8       r4, 19
+  0191  Mul                  r4, r4, r7
+  0195  PutById              r3, r4, #c39, s45 "f19"
+  019b  LoadConstUInt8       r4, 20
+  019e  Mul                  r4, r4, r7
+  01a2  PutById              r3, r4, #c40, s47 "f20"
+  01a8  LoadConstUInt8       r4, 21
+  01ab  Mul                  r4, r4, r7
+  01af  PutById              r3, r4, #c41, s48 "f21"
+  01b5  LoadConstUInt8       r4, 22
+  01b8  Mul                  r4, r4, r7
+  01bc  PutById              r3, r4, #c42, s49 "f22"
+  01c2  LoadConstUInt8       r4, 23
+  01c5  Mul                  r4, r4, r7
+  01c9  PutById              r3, r4, #c43, s50 "f23"
+  01cf  LoadConstUInt8       r4, 24
+  01d2  Mul                  r4, r4, r7
+  01d6  PutById              r3, r4, #c44, s51 "f24"
+  01dc  LoadConstUInt8       r4, 25
+  01df  Mul                  r4, r4, r7
+  01e3  PutById              r3, r4, #c45, s52 "f25"
+  01e9  LoadConstUInt8       r4, 26
+  01ec  Mul                  r4, r4, r7
+  01f0  PutById              r3, r4, #c46, s53 "f26"
+  01f6  LoadConstUInt8       r4, 27
+  01f9  Mul                  r4, r4, r7
+  01fd  PutById              r3, r4, #c47, s54 "f27"
+  0203  LoadConstUInt8       r4, 28
+  0206  Mul                  r4, r4, r7
+  020a  PutById              r3, r4, #c48, s55 "f28"
+  0210  LoadConstUInt8       r4, 29
+  0213  Mul                  r4, r4, r7
+  0217  PutById              r3, r4, #c49, s56 "f29"
+  021d  LoadConstUInt8       r4, 30
+  0220  Mul                  r4, r4, r7
+  0224  PutById              r3, r4, #c50, s58 "f30"
+  022a  LoadConstUInt8       r4, 31
+  022d  Mul                  r4, r4, r7
+  0231  PutById              r3, r4, #c51, s59 "f31"
+  0237  LoadConstUInt8       r4, 32
+  023a  Mul                  r4, r4, r7
+  023e  PutById              r3, r4, #c52, s60 "f32"
+  0244  LoadConstUInt8       r4, 33
+  0247  Mul                  r4, r4, r7
+  024b  PutById              r3, r4, #c53, s61 "f33"
+  0251  LoadConstUInt8       r4, 34
+  0254  Mul                  r4, r4, r7
+  0258  PutById              r3, r4, #c54, s62 "f34"
+  025e  LoadConstUInt8       r4, 35
+  0261  Mul                  r4, r4, r7
+  0265  PutById              r3, r4, #c55, s63 "f35"
+  026b  LoadConstUInt8       r4, 36
+  026e  Mul                  r4, r4, r7
+  0272  PutById              r3, r4, #c56, s64 "f36"
+  0278  LoadConstUInt8       r4, 37
+  027b  Mul                  r4, r4, r7
+  027f  PutById              r3, r4, #c57, s65 "f37"
+  0285  LoadConstUInt8       r4, 38
+  0288  Mul                  r4, r4, r7
+  028c  PutById              r3, r4, #c58, s66 "f38"
+  0292  LoadConstUInt8       r4, 39
+  0295  Mul                  r4, r4, r7
+  0299  PutById              r3, r4, #c59, s67 "f39"
+  029f  NewArray             r4, 0
+  02a3  PutById              r3, r4, #c60, s13 "lanes"
+  02a9  LoadConstZero        r4
+L1:
+  02ab  GetByIdShort         r9, r3, #c1, s13 "lanes"
+  02b0  GetByIdShort         r8, r9, #c2, s75 "push"
+  02b5  Mul                  r7, r4, r6
+  02b9  Call2                r7, r8, r9, r7
+  02be  Inc                  r4, r4
+  02c1  JLess                L1, r4, r5
+  02c5  NewArray             r4, 0
+  02c9  PutById              r3, r4, #c61, s26 "hidden"
+  02cf  LoadConstZero        r1
+L2:
+  02d1  GetByIdShort         r5, r3, #c3, s26 "hidden"
+  02d6  GetByIdShort         r4, r5, #c2, s75 "push"
+  02db  Call2                r4, r4, r5, r2
+  02e0  Inc                  r1, r1
+  02e3  JLess                L2, r1, r0
+  02e7  LoadConstUndefined   r0
+  02e9  Ret                  r0
+
+function #3 "render"  params=3 frame=28 env=0 flags=strict,dbg  @0x000008e3 size=144
+  0000  LoadParam            r1, 2
+  0003  GetEnvironment       r2, 0
+  0006  LoadFromEnvironment  r3, r2, 0
+  000a  GetByIdShort         r0, r3, #c1, s74 "get"
+  000f  LoadConstUInt8       r4, 11
+  0012  Call2                r0, r0, r3, r4
+  0017  JmpTrue              L2, r0
+  001a  LoadConstString      r6, s9 "u"
+  001e  Mov                  r11, r6
+  0021  JmpFalse             L1, r1
+  0024  GetByIdShort         r5, r1, #c2, s81 "onUncaught"
+  0029  LoadConstUndefined   r3
+  002b  Mov                  r11, r6
+  002e  JStrictEqual         L1, r5, r3
+  0032  GetByIdShort         r11, r1, #c2, s81 "onUncaught"
+L1:
+  0037  LoadFromEnvironment  r10, r2, 1
+  003b  GetByIdShort         r1, r10, #c3, s18 "prototype"
+  0040  CreateThis           r3, r1, r10
+  0044  LoadConstUInt8       r19, 1
+  0047  LoadConstFalse       r18
+  0049  LoadConstString      r17, s0 ""
+  004d  LoadConstString      r15, s3 "c"
+  0051  LoadConstString      r14, s7 "r"
+  0055  Mov                  r21, r3
+  0058  Mov                  r20, r4
+  005b  Mov                  r16, r11
+  005e  LoadConstNull        r13
+  0060  LoadConstNull        r12
+  0062  Construct            r1, r10, 10
+  0066  SelectObject         r1, r3, r1
+  006a  NewObject            r3
+  006c  PutNewOwnByIdShort   r3, r1, s15 "stateNode"
+  0070  LoadConstZero        r5
+  0072  PutNewOwnByIdShort   r3, r5, s80 "mode"
+  0076  PutById              r1, r3, #c1, s33 "current"
+  007c  LoadFromEnvironment  r3, r2, 0
+  0080  GetByIdShort         r2, r3, #c4, s79 "set"
+  0085  Call3                r2, r2, r3, r4, r1
+  008b  Mov                  r0, r1
+L2:
+  008e  Ret                  r0

@@ -1,0 +1,399 @@
+; hbc2js disassembly of 370-passes-in-generator-body/v96.hbc
+; version=96 layout=C opcodeTable=hbc96 functions=12 strings=48 globalCodeIndex=0
+function #0 "global"  params=1 frame=28 env=0 flags=dbg  @0x00000364 size=521
+  0000  DeclareGlobalVar     s18 "w"
+  0005  DeclareGlobalVar     s15 "c"
+  000a  DeclareGlobalVar     s36 "c2"
+  000f  DeclareGlobalVar     s19 "walk"
+  0014  DeclareGlobalVar     s16 "carry"
+  0019  DeclareGlobalVar     s12 "later"
+  001e  CreateEnvironment    r0
+  0020  CreateGeneratorClosure r2, r0, f1 "walk"
+  0025  GetGlobalObject      r1
+  0027  PutById              r1, r2, #c1, s19 "walk"
+  002d  CreateGeneratorClosure r2, r0, f4 "carry"
+  0032  PutById              r1, r2, #c2, s16 "carry"
+  0038  CreateAsyncClosure   r2, r0, f6 "later"
+  003d  PutById              r1, r2, #c3, s12 "later"
+  0043  GetByIdShort         r2, r1, #c1, s19 "walk"
+  0048  LoadConstUndefined   r3
+  004a  LoadConstUInt8       r5, 3
+  004d  Call2                r2, r2, r3, r5
+  0052  PutById              r1, r2, #c4, s18 "w"
+  0058  TryGetById           r8, r1, #c2, s43 "print"
+  005e  GetByIdShort         r4, r1, #c3, s18 "w"
+  0063  GetByIdShort         r2, r4, #c4, s42 "next"
+  0068  Call1                r2, r2, r4
+  006c  GetByIdShort         r7, r2, #c5, s46 "value"
+  0071  GetByIdShort         r6, r1, #c3, s18 "w"
+  0076  GetByIdShort         r4, r6, #c4, s42 "next"
+  007b  LoadConstUInt8       r2, 4
+  007e  Call2                r2, r4, r6, r2
+  0083  GetByIdShort         r19, r2, #c5, s46 "value"
+  0088  GetByIdShort         r4, r1, #c3, s18 "w"
+  008d  GetByIdShort         r2, r4, #c4, s42 "next"
+  0092  Call1                r2, r2, r4
+  0096  GetByIdShort         r18, r2, #c5, s46 "value"
+  009b  TryGetById           r10, r1, #c6, s28 "JSON"
+  00a1  GetByIdShort         r9, r10, #c7, s35 "stringify"
+  00a6  GetByIdShort         r11, r1, #c3, s18 "w"
+  00ab  GetByIdShort         r2, r11, #c4, s42 "next"
+  00b0  Call1                r2, r2, r11
+  00b4  Call2                r17, r9, r10, r2
+  00b9  LoadConstUndefined   r21
+  00bb  Mov                  r20, r7
+  00be  Call                 r2, r8, 5
+  00c2  GetByIdShort         r2, r1, #c8, s16 "carry"
+  00c7  Call2                r2, r2, r3, r5
+  00cc  PutById              r1, r2, #c5, s15 "c"
+  00d2  TryGetById           r11, r1, #c2, s43 "print"
+  00d8  GetByIdShort         r4, r1, #c9, s15 "c"
+  00dd  GetByIdShort         r2, r4, #c4, s42 "next"
+  00e2  Call1                r2, r2, r4
+  00e6  GetByIdShort         r10, r2, #c5, s46 "value"
+  00eb  GetByIdShort         r6, r1, #c9, s15 "c"
+  00f0  GetByIdShort         r4, r6, #c4, s42 "next"
+  00f5  LoadConstDouble      r2, 2.5
+  00ff  Call2                r2, r4, r6, r2
+  0104  GetByIdShort         r19, r2, #c5, s46 "value"
+  0109  GetByIdShort         r6, r1, #c9, s15 "c"
+  010e  GetByIdShort         r4, r6, #c4, s42 "next"
+  0113  LoadConstZero        r2
+  0115  Call2                r4, r4, r6, r2
+  011a  GetByIdShort         r18, r4, #c5, s46 "value"
+  011f  GetByIdShort         r6, r1, #c9, s15 "c"
+  0124  GetByIdShort         r4, r6, #c4, s42 "next"
+  0129  Call1                r4, r4, r6
+  012d  GetByIdShort         r17, r4, #c5, s46 "value"
+  0132  GetByIdShort         r12, r1, #c9, s15 "c"
+  0137  GetByIdShort         r6, r12, #c4, s42 "next"
+  013c  LoadConstUInt8       r4, 7
+  013f  Call2                r4, r6, r12, r4
+  0144  GetByIdShort         r16, r4, #c5, s46 "value"
+  0149  TryGetById           r13, r1, #c6, s28 "JSON"
+  014f  GetByIdShort         r12, r13, #c7, s35 "stringify"
+  0154  GetByIdShort         r14, r1, #c9, s15 "c"
+  0159  GetByIdShort         r4, r14, #c4, s42 "next"
+  015e  Call1                r4, r4, r14
+  0162  Call2                r15, r12, r13, r4
+  0167  LoadConstUndefined   r21
+  0169  Mov                  r20, r10
+  016c  Call                 r4, r11, 7
+  0170  GetByIdShort         r6, r1, #c8, s16 "carry"
+  0175  LoadConstUInt8       r4, 1
+  0178  Call2                r4, r6, r3, r4
+  017d  PutById              r1, r4, #c6, s36 "c2"
+  0183  TryGetById           r8, r1, #c2, s43 "print"
+  0189  GetByIdShort         r6, r1, #c10, s36 "c2"
+  018e  GetByIdShort         r4, r6, #c4, s42 "next"
+  0193  Call1                r4, r4, r6
+  0197  GetByIdShort         r7, r4, #c5, s46 "value"
+  019c  GetByIdShort         r6, r1, #c10, s36 "c2"
+  01a1  GetByIdShort         r4, r6, #c4, s42 "next"
+  01a6  Call1                r4, r4, r6
+  01aa  GetByIdShort         r6, r4, #c5, s46 "value"
+  01af  TryGetById           r10, r1, #c6, s28 "JSON"
+  01b5  GetByIdShort         r9, r10, #c7, s35 "stringify"
+  01ba  GetByIdShort         r11, r1, #c10, s36 "c2"
+  01bf  GetByIdShort         r4, r11, #c4, s42 "next"
+  01c4  Call2                r4, r4, r11, r2
+  01c9  Call2                r4, r9, r10, r4
+  01ce  Call4                r4, r8, r3, r7, r6, r4
+  01d5  GetByIdShort         r4, r1, #c11, s12 "later"
+  01da  Call2                r6, r4, r3, r5
+  01df  GetByIdShort         r5, r6, #c12, s31 "then"
+  01e4  CreateClosure        r4, r0, f10 ""
+  01e9  Call2                r4, r5, r6, r4
+  01ee  GetByIdShort         r1, r1, #c11, s12 "later"
+  01f3  Call2                r2, r1, r3, r2
+  01f8  GetByIdShort         r1, r2, #c12, s31 "then"
+  01fd  CreateClosure        r0, r0, f11 ""
+  0202  Call2                r0, r1, r2, r0
+  0207  Ret                  r0
+
+function #1 "walk"  params=2 frame=1 env=0 flags=nc  @0x0000056d size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f2 "?anon_0_walk"
+  0007  Ret                  r0
+
+function #2 "?anon_0_walk"  params=2 frame=18 env=0 flags=dbg  @0x00000576 size=219
+  0000  StartGenerator
+  0001  LoadParam            r1, 1
+  0004  ResumeGenerator      r0, r2
+  0007  JmpTrueLong          L8, r2
+  000d  LoadConstUInt8       r8, 1
+  0010  Mov                  r2, r8
+  0013  JmpFalse             L1, r1
+  0016  Mov                  r2, r1
+L1:
+  0019  GetGlobalObject      r4
+  001b  TryGetById           r5, r4, #c1, s30 "Math"
+  0021  GetByIdShort         r3, r5, #c2, s34 "abs"
+  0026  Negate               r1, r1
+  0029  Call2                r1, r3, r5, r1
+  002e  Add                  r1, r2, r1
+  0032  SaveGenerator        L2
+  0034  Ret                  r1
+L2:
+  0036  ResumeGenerator      r1, r2
+  0039  JmpTrueLong          L7, r2
+  003f  NewObject            r7
+  0041  PutNewOwnByIdShort   r7, r1, s22 "x"
+  0045  TryGetById           r5, r4, #c1, s30 "Math"
+  004b  GetByIdShort         r3, r5, #c3, s21 "max"
+  0050  LoadConstUInt8       r2, 2
+  0053  Call3                r2, r3, r5, r1, r2
+  0059  PutNewOwnByIdShort   r7, r2, s17 "y"
+  005d  LoadConstString      r2, s5 "k"
+  0061  PutNewOwnByIdShort   r7, r2, s47 "z"
+  0065  GetByIdShort         r3, r7, #c4, s22 "x"
+  006a  GetByIdShort         r2, r7, #c5, s17 "y"
+  006f  Add                  r2, r3, r2
+  0073  SaveGenerator        L3
+  0075  Ret                  r2
+L3:
+  0077  ResumeGenerator      r2, r3
+  007a  JmpTrue              L6, r3
+  007d  CreateEnvironment    r3
+  007f  CreateClosure        r6, r3, f3 "f"
+  0084  GetByIdShort         r5, r6, #c6, s37 "call"
+  0089  LoadConstUndefined   r3
+  008b  Call3                r5, r5, r6, r3, r1
+  0091  GetByIdShort         r3, r6, #c6, s37 "call"
+  0096  Call3                r3, r3, r6, r7, r8
+  009c  Add                  r3, r5, r3
+  00a0  SaveGenerator        L4
+  00a2  Ret                  r3
+L4:
+  00a4  ResumeGenerator      r3, r5
+  00a7  JmpTrue              L5, r5
+  00aa  TryGetById           r6, r4, #c7, s28 "JSON"
+  00b0  GetByIdShort         r5, r6, #c8, s35 "stringify"
+  00b5  Call2                r5, r5, r6, r7
+  00ba  TryGetById           r4, r4, #c9, s29 "Number"
+  00c0  GetByIdShort         r4, r4, #c10, s39 "isFinite"
+  00c5  TypeOf               r4, r4
+  00c8  Add                  r4, r5, r4
+  00cc  CompleteGenerator
+  00cd  Ret                  r4
+L5:
+  00cf  CompleteGenerator
+  00d0  Ret                  r3
+L6:
+  00d2  CompleteGenerator
+  00d3  Ret                  r2
+L7:
+  00d5  CompleteGenerator
+  00d6  Ret                  r1
+L8:
+  00d8  CompleteGenerator
+  00d9  Ret                  r0
+
+function #3 "f"  params=2 frame=3 env=0 flags=dbg  @0x00000651 size=23
+  0000  LoadConstUInt8       r1, 2
+  0003  LoadThisNS           r2
+  0005  LoadConstUndefined   r0
+  0007  JStrictNotEqual      L1, r2, r0
+  000b  LoadConstUInt8       r1, 1
+L1:
+  000e  LoadParam            r0, 1
+  0011  Add                  r0, r0, r1
+  0015  Ret                  r0
+
+function #4 "carry"  params=2 frame=1 env=0 flags=nc  @0x00000668 size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f5 "?anon_0_carry"
+  0007  Ret                  r0
+
+function #5 "?anon_0_carry"  params=2 frame=21 env=0 flags=exc,dbg  @0x00000671 size=227
+  .try T1..T2 -> L9 ; handler 0
+  .try T3..T4 -> L9 ; handler 1
+  0000  StartGenerator
+  0001  LoadParam            r8, 1
+  0004  ResumeGenerator      r0, r1
+  0007  JmpTrueLong          L12, r1
+  000d  LoadConstUndefined   r7
+  000f  LoadConstUndefined   r5
+  0011  LoadConstZero        r6
+  0013  LoadConstZero        r2
+  0015  Less                 r1, r6, r8
+  0019  LoadConstUInt8       r4, 2
+  001c  GetGlobalObject      r3
+  001e  JmpFalse             L5, r1
+L1:
+  0021  SaveGenerator        L2
+  0023  Ret                  r6
+L2:
+  0025  ResumeGenerator      r1, r9
+  0028  JmpTrueLong          L11, r9
+  002e  Mov                  r10, r2
+  0031  TryGetById           r12, r3, #c1, s30 "Math"
+  0037  JmpTrue              L3, r1
+  003a  GetByIdShort         r11, r12, #c2, s38 "ceil"
+  003f  Div                  r9, r6, r4
+  0043  Call2                r9, r11, r12, r9
+  0048  Jmp                  L4
+L3:
+  004a  GetByIdShort         r11, r12, #c3, s23 "floor"
+  004f  Call2                r9, r11, r12, r1
+L4:
+  0054  Add                  r2, r10, r9
+  0058  Inc                  r6, r6
+  005b  JLess                L1, r6, r8
+T1:
+L5:
+  005f  Mov                  r4, r2
+  0062  SaveGenerator        L6
+  0064  Ret                  r4
+L6:
+  0066  ResumeGenerator      r4, r6
+  0069  JmpTrue              L8, r6
+  006c  Mov                  r5, r4
+  006f  JmpTrue              L7, r4
+T2:
+  0072  Jmp                  L10
+T3:
+L7:
+  0074  TryGetById           r8, r3, #c4, s26 "Error"
+  007a  Mov                  r6, r5
+  007d  LoadConstString      r5, s8 "boom"
+  0081  Add                  r13, r5, r6
+  0085  GetByIdShort         r6, r8, #c5, s44 "prototype"
+  008a  CreateThis           r6, r6, r8
+  008e  Mov                  r14, r6
+  0091  Construct            r5, r8, 2
+  0095  SelectObject         r5, r6, r5
+  0099  Throw                r5
+T4:
+L8:
+  009b  CompleteGenerator
+  009c  Ret                  r4
+L9:
+  009e  Catch                r4
+  00a0  Mov                  r5, r2
+  00a3  TryGetById           r6, r3, #c6, s24 "String"
+  00a9  GetByIdShort         r4, r4, #c7, s40 "message"
+  00ae  Call2                r4, r6, r7, r4
+  00b3  GetByIdShort         r4, r4, #c8, s25 "length"
+  00b8  Add                  r4, r5, r4
+  00bc  TryGetById           r6, r3, #c1, s30 "Math"
+  00c2  GetByIdShort         r5, r6, #c9, s27 "round"
+  00c7  LoadConstDouble      r3, 0.6
+  00d1  Call2                r3, r5, r6, r3
+  00d6  Add                  r2, r4, r3
+L10:
+  00da  CompleteGenerator
+  00db  Ret                  r2
+L11:
+  00dd  CompleteGenerator
+  00de  Ret                  r1
+L12:
+  00e0  CompleteGenerator
+  00e1  Ret                  r0
+
+function #6 "later"  params=2 frame=15 env=0 flags=dbg,nc  @0x00000754 size=30
+  0000  LoadConstUndefined   r4
+  0002  LoadConstUndefined   r0
+  0004  ReifyArguments       r0
+  0006  Mov                  r3, r0
+  0009  GetBuiltinClosure    r2, b52 "spawnAsync"
+  000c  CreateEnvironment    r0
+  000e  CreateGeneratorClosure r1, r0, f7 "?anon_0_later"
+  0013  LoadThisNS           r0
+  0015  Call4                r0, r2, r4, r1, r0, r3
+  001c  Ret                  r0
+
+function #7 "?anon_0_later"  params=2 frame=1 env=0 flags=nc  @0x00000772 size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f8 "?anon_0_?anon_0_later"
+  0007  Ret                  r0
+
+function #8 "?anon_0_?anon_0_later"  params=2 frame=18 env=0 flags=dbg  @0x0000077b size=186
+  0000  StartGenerator
+  0001  LoadParam            r2, 1
+  0004  ResumeGenerator      r0, r1
+  0007  JmpTrueLong          L6, r1
+  000d  LoadConstUInt8       r8, 1
+  0010  Mov                  r1, r8
+  0013  JmpFalse             L1, r2
+  0016  Mov                  r1, r2
+L1:
+  0019  NewObject            r2
+  001b  PutNewOwnByIdShort   r2, r1, s14 "v"
+  001f  GetGlobalObject      r4
+  0021  TryGetById           r6, r4, #c1, s30 "Math"
+  0027  GetByIdShort         r5, r6, #c2, s41 "min"
+  002c  LoadConstUInt8       r3, 5
+  002f  Call3                r3, r5, r6, r1, r3
+  0035  PutNewOwnByIdShort   r2, r3, s20 "m"
+  0039  SaveGenerator        L2
+  003b  Ret                  r1
+L2:
+  003d  ResumeGenerator      r1, r3
+  0040  JmpTrue              L5, r3
+  0043  CreateEnvironment    r3
+  0045  CreateClosure        r7, r3, f9 "g"
+  004a  GetByIdShort         r6, r7, #c3, s37 "call"
+  004f  GetByIdShort         r3, r2, #c4, s14 "v"
+  0054  LoadConstUndefined   r5
+  0056  Call3                r3, r6, r7, r5, r3
+  005c  Add                  r3, r1, r3
+  0060  TryGetById           r7, r4, #c1, s30 "Math"
+  0066  GetByIdShort         r6, r7, #c5, s21 "max"
+  006b  GetByIdShort         r2, r2, #c6, s20 "m"
+  0070  Call3                r2, r6, r7, r2, r8
+  0076  Add                  r6, r3, r2
+  007a  TryGetById           r3, r4, #c7, s32 "Promise"
+  0080  GetByIdShort         r2, r3, #c8, s13 "resolve"
+  0085  Call2                r2, r2, r3, r6
+  008a  SaveGenerator        L3
+  008c  Ret                  r2
+L3:
+  008e  ResumeGenerator      r2, r3
+  0091  JmpTrue              L4, r3
+  0094  NewObject            r3
+  0096  PutNewOwnByIdShort   r3, r2, s45 "q"
+  009a  TryGetById           r4, r4, #c9, s24 "String"
+  00a0  Call2                r4, r4, r5, r2
+  00a5  GetByIdShort         r4, r4, #c10, s25 "length"
+  00aa  PutNewOwnByIdShort   r3, r4, s33 "s"
+  00ae  CompleteGenerator
+  00af  Ret                  r3
+L4:
+  00b1  CompleteGenerator
+  00b2  Ret                  r2
+L5:
+  00b4  CompleteGenerator
+  00b5  Ret                  r1
+L6:
+  00b7  CompleteGenerator
+  00b8  Ret                  r0
+
+function #9 "g"  params=2 frame=2 env=0 flags=dbg  @0x00000835 size=12
+  0000  LoadParam            r1, 1
+  0003  LoadConstUInt8       r0, 2
+  0006  Mul                  r0, r1, r0
+  000a  Ret                  r0
+
+function #10 ""  params=2 frame=15 env=0 flags=dbg  @0x00000841 size=36
+  0000  LoadParam            r0, 1
+  0003  GetGlobalObject      r1
+  0005  TryGetById           r4, r1, #c1, s43 "print"
+  000b  GetByIdShort         r3, r0, #c2, s45 "q"
+  0010  GetByIdShort         r2, r0, #c3, s33 "s"
+  0015  LoadConstUndefined   r0
+  0017  LoadConstString      r1, s6 "async"
+  001b  Call4                r1, r4, r0, r1, r3, r2
+  0022  Ret                  r0
+
+function #11 ""  params=2 frame=13 env=0 flags=dbg  @0x00000865 size=41
+  0000  GetGlobalObject      r0
+  0002  TryGetById           r3, r0, #c1, s43 "print"
+  0008  TryGetById           r2, r0, #c2, s28 "JSON"
+  000e  GetByIdShort         r1, r2, #c3, s35 "stringify"
+  0013  LoadParam            r0, 1
+  0016  Call2                r2, r1, r2, r0
+  001b  LoadConstUndefined   r0
+  001d  LoadConstString      r1, s7 "async0"
+  0021  Call3                r1, r3, r0, r1, r2
+  0027  Ret                  r0

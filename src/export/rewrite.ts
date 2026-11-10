@@ -92,7 +92,7 @@ function registrationSpecifier(depId: number, opts: Pick<RewriteModuleFileOption
   return relativeExportPath(opts.path, opts.pathOf(depId));
 }
 
-const READABLE_FUNC_DECL_RE = /^function\s+(\w+)\s*\(/m;
+const READABLE_FUNC_DECL_RE = /^function\s+((?!__hbc_)[\w$]+)\s*\(/m; // never a hoisted runtime helper
 
 export interface WrapReadableModuleOptions {
   readonly path: string;
@@ -106,7 +106,11 @@ export interface WrapReadableModuleOptions {
 }
 
 export function wrapReadableModule(code: string, id: number, deps: readonly number[], opts: WrapReadableModuleOptions): { readonly text: string } {
-  const m = READABLE_FUNC_DECL_RE.exec(code);
+  // The factory is `_fn<factoryFunctionIndex>`. The FIRST declaration is not
+  // always it: the scoped render hoists runtime helpers (`__hbc_pnames` for
+  // for-in) above the factory, and registering a helper as the factory ran
+  // the helper instead (spec 33 L1, rn-template module 59).
+  const m = new RegExp(`^function\\s+(_fn${opts.factoryFunctionIndex})\\s*\\(`, "m").exec(code) ?? READABLE_FUNC_DECL_RE.exec(code);
   if (m === null) {
     throw new Error(`export: module ${id}'s readable render has no top-level function declaration to wrap`);
   }

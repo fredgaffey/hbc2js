@@ -100,6 +100,23 @@ function yieldsToAwaits(body: readonly Stmt[]): { readonly body: readonly Stmt[]
   return bad ?? { body: out, awaits };
 }
 
+/** BUGS export-boot L1 (fixture 395): when the body cannot become `await`s
+ *  (R-A4/R-A5: a v>=97 lowered generator, or a refused v<=96 group), the stub
+ *  must still BE an async function -- `Object.getPrototypeOf(f)` is
+ *  `AsyncFunction.prototype` and the call returns a Promise. The shell keeps
+ *  the whole stub (the driver call already ran synchronously at call time,
+ *  which an async function body also does up to its first `await`) and only
+ *  marks it `async` with `return await <driver>`, so the returned promise
+ *  settles with the driver's. Only `__hbc_b_spawnAsync`: an async generator
+ *  (`__hbc_b_makeAsyncIterator`) is not an async function. */
+function asyncShell(stub: FuncStmt, driver: string): Recovered | null {
+  if (driver !== "__hbc_b_spawnAsync") return null;
+  const last = stub.body[stub.body.length - 1];
+  if (last === undefined || last.k !== "return" || last.arg === null) return null;
+  const ret: Stmt = { k: "return", arg: { k: "await", arg: last.arg } };
+  return { ok: true, awaits: 0, fn: { k: "func", name: stub.name, params: stub.params, async: true, body: [...stub.body.slice(0, -1), ret] } };
+}
+
 /**
  * `stub` is the `k:"func"` statement holding the whole async group: the
  * `generator: true` factory `yield-recovery` produced, the pure register moves
@@ -111,7 +128,9 @@ export function recover(stub: FuncStmt): Recovery {
   const factories = body.filter((s): s is FuncStmt => s.k === "func");
   if (factories.length !== 1) return no("no-async-site", "the stub declares no single factory");
   const factory = factories[0]!;
-  const rest = body.filter((s) => s !== factory && s.k !== "decl");
+  // A stub `"use strict"` directive is dropped here: the recovered body is the
+  // factory's, which carries the same source function's directive itself.
+  const rest = body.filter((s) => s !== factory && s.k !== "decl" && s.k !== "directive");
   const ret = rest[rest.length - 1];
   if (ret === undefined || ret.k !== "return" || ret.arg === null) return no("no-async-site", "the stub does not return the driver's result");
   // Resolve register moves: every statement before the `return` must be an
@@ -143,9 +162,9 @@ export function recover(stub: FuncStmt): Recovery {
   // still `__hbc_makeGeneratorLowered(...)` and `yield-recovery` never ran.
   // This is the refusal that makes registering this rung early safe, and it is
   // the dominant reason in the histogram at 98/99.
-  if (factory.generator !== true) return no("inner-not-recovered", "the factory is not a recovered `function*` (R-A4: yield-recovery refused it, or it is still __hbc_makeGeneratorLowered at v>=97)");
+  if (factory.generator !== true) return asyncShell(stub, callee.name) ?? no("inner-not-recovered", "the factory is not a recovered `function*` (R-A4: yield-recovery refused it, or it is still __hbc_makeGeneratorLowered at v>=97)");
   const converted = yieldsToAwaits(factory.body);
-  if ("ok" in converted) return converted;
+  if ("ok" in converted) return asyncShell(stub, callee.name) ?? converted;
   const comments = stub.body.filter((s) => s.k === "comment");
   return { ok: true, awaits: converted.awaits, fn: { k: "func", name: stub.name, params: stub.params, async: true, body: [...comments, ...converted.body] } };
 }

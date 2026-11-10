@@ -284,7 +284,7 @@ for a `+` chain (must not match), a computed chunk, a `concat` whose `this` is
 a register with two writes, a `getTemplateObject` whose result is read twice,
 two calls sharing one id; ≥1 site the `check` refuses.
 
-**Corpus metric** (`tools/passes-metrics.ts`): share of emitted functions
+**Corpus metric** (`tools/passes-metrics.mjs`): share of emitted functions
 containing zero `__hbc_HermesInternal.concat` and zero
 `__hbc_b_getTemplateObject`. Baseline **0 %** free in `43`/`44`; **floor
 ≥ 90 %** over `tests/fixtures/constructs/**` at all five versions ×

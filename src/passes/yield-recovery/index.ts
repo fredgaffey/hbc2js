@@ -17,7 +17,10 @@ import { rewrite } from "./rewrite.ts";
  *
  *  `versions: v <= 96` (§1.7): at v>=97 a generator is
  *  `__hbc_makeGeneratorLowered(<body>)` with no `__state`, no tuple and no
- *  `sameFrame` closure, which is `gen-lowered`'s (catalogue row 18) idiom.
+ *  `sameFrame` closure, which is `gen-lowered`'s (catalogue row 18) idiom;
+ *  until that rung exists this one only marks such a stub `function*` around
+ *  `yield*` (the lowered shell, BUGS export-boot L1), so it runs at every
+ *  version.
  *
  *  Acyclic form only (§1.4, R-Y5): rebuilding a dispatcher whose suspend graph
  *  has a back edge is a structuring algorithm, not a matcher. Such a group is
@@ -35,7 +38,6 @@ export const yieldRecovery: Pass<readonly Stmt[], YieldSite> = {
   catalogue: [17],
   after: ["expr-rebuild", "global-access", "call-shape"],
   before: ["fn-naming", "reg-split", "var-naming"],
-  versions: (hbcVersion) => hbcVersion <= 96,
   match,
   rewrite,
   check,

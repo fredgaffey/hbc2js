@@ -28,7 +28,17 @@ export type Expr =
    * (`(a?.b).c` throws where `a?.b.c` does not).
    */
   | { readonly k: "optmember"; readonly obj: Expr; readonly prop: Expr; readonly computed: boolean }
-  | { readonly k: "call"; readonly callee: Expr; readonly args: readonly Expr[] }
+  | {
+      readonly k: "call";
+      readonly callee: Expr;
+      readonly args: readonly Expr[];
+      /** Set only by `src/emit/lower.ts` on a `Reflect.apply(rF, rO, [...])`
+       *  whose `rF = rO.m` read was NOT fused (spec 05 section 7.4: an
+       *  observable instruction sits between the read and the call): lower has
+       *  proved `rF` dead after this call and neither register written in
+       *  between, so call-shape R3e may fuse once the order allows. */
+      readonly methodRead?: true;
+    }
   /** F18: `callee?.(args)` — the guarded call link. `thisIsBase` records
    *  that the call's receiver (`Reflect.apply`'s second argument in the
    *  bytecode form) was the callee's own base register, per §4 precondition

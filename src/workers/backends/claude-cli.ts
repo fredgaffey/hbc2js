@@ -110,7 +110,9 @@ export class ClaudeCliBackend implements WorkerBackend {
     const skill = loadSkill(skillId, this.config.skillsDir);
     const body = bodyFromContext(req.context);
     const context = canonicaliseContext(req.context);
-    const key = cacheKey({ kind: req.kind, skillId, skillVersion: skill.version, model: this.config.model, body, context });
+    // The key covers everything sent to `claude -p`: argv (system prompt = skill text, model, flags) and the stdin prompt (context, which carries hints + source render).
+    const args = claudeCliArgs(this.config, skill.body);
+    const key = cacheKey({ kind: req.kind, skillId, skillVersion: skill.version, skillText: JSON.stringify(args), model: this.config.model, body, context });
 
     const cached = readCacheEntry(this.config.cacheDir, key);
     if (cached !== undefined) {
@@ -121,8 +123,6 @@ export class ClaudeCliBackend implements WorkerBackend {
     // unlike HaikuBackend's single concatenated user message, the CLI has a
     // dedicated system-prompt channel, so the skill discipline and the
     // per-job data are sent as two separate fields instead of being joined.
-    const args = claudeCliArgs(this.config, skill.body);
-
     // The per-call output cap goes to the CLI through its env var. A reply cut
     // off at the cap (`stop_reason: "max_tokens"`) is retried ONCE with a
     // 4x cap: a function-batch answer is long, and a truncated JSON object

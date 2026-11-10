@@ -1,0 +1,3 @@
+v84: FAILS (no private class fields before v98)
+v94: FAILS (no private class fields before v98)
+v96: FAILS (no private class fields before v98)

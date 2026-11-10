@@ -1,0 +1,3 @@
+{"a":"va2","kb":"vb","g":"G","kc":"vc","x":"never"} va kb vb spread-get g kc vc va2
+{"tk":1,"k2":2} key.toString 1 k2 2
+1 __proto__

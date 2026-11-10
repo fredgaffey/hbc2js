@@ -10,6 +10,21 @@ export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: Pass
   const again = match(before, ctx);
   if (again === null) return { ok: false, reason: "no object-literal-arg site recomputed from before" };
   const want = rewrite(again);
+  if (again.data.kind === "closure-slot") {
+    // Kind D removes the declaration and rewrites the one statement using it.
+    if (after.length !== before.length - 1 || JSON.stringify(after) !== JSON.stringify(want)) return { ok: false, reason: "object-literal-arg closure slot differs from the recomputed one" };
+    if (identUses(after, again.data.reg).reads !== 0) return { ok: false, reason: "object-literal-arg closure slot left a reference to the moved declaration" };
+    return { ok: true };
+  }
+  if (again.data.kind === "slot-fill") {
+    // Kind C rewrites one statement in place; everything else is untouched.
+    if (after.length !== before.length) return { ok: false, reason: "object-literal-arg slot fill changed the list length" };
+    for (let i = 0; i < want.length; i++) {
+      if (i !== again.data.defIndex && after[i] !== before[i]) return { ok: false, reason: "object-literal-arg slot fill touched another statement" };
+    }
+    if (JSON.stringify(after[again.data.defIndex]) !== JSON.stringify(want[again.data.defIndex])) return { ok: false, reason: "object-literal-arg slot fill differs from the recomputed one" };
+    return { ok: true };
+  }
   if (want.length !== after.length || after.length !== before.length - 1) return { ok: false, reason: "object-literal-arg did not remove exactly the definition" };
   for (let i = 0; i < want.length; i++) {
     if (want[i] !== after[i] && JSON.stringify(want[i]) !== JSON.stringify(after[i])) return { ok: false, reason: "object-literal-arg changed a statement other than the use" };

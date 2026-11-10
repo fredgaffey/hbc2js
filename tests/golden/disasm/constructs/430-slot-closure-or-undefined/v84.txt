@@ -1,0 +1,143 @@
+; hbc2js disassembly of 430-slot-closure-or-undefined/v84.hbc
+; version=84 layout=B opcodeTable=hbc84 functions=9 strings=18 globalCodeIndex=0
+function #0 "global"  params=1 frame=9 env=0 flags=dbg  @0x000001c8 size=15
+  0000  CreateEnvironment    r0
+  0002  CreateClosure        r1, r0, f1 ""
+  0007  LoadConstUndefined   r0
+  0009  Call1                r1, r1, r0
+  000d  Ret                  r0
+
+function #1 ""  params=1 frame=13 env=1 flags=strict,dbg  @0x000001d7 size=126
+  0000  CreateEnvironment    r0
+  0002  NewArray             r4, 0
+  0006  StoreToEnvironment   r0, 0, r4
+  000a  CreateClosure        r2, r0, f2 "makeRetryer"
+  000f  LoadConstUndefined   r0
+  0011  LoadConstUInt8       r1, 1
+  0014  Call2                r2, r2, r0, r1
+  0019  GetByIdShort         r1, r2, #c1, s10 "cont"
+  001e  Call1                r1, r1, r2
+  0022  GetByIdShort         r1, r2, #c2, s13 "fail"
+  0027  Call1                r1, r1, r2
+  002b  GetByIdShort         r1, r2, #c1, s10 "cont"
+  0030  Call1                r1, r1, r2
+  0034  GetByIdShort         r1, r2, #c2, s13 "fail"
+  0039  Call1                r1, r1, r2
+  003d  GetByIdShort         r1, r2, #c3, s12 "done"
+  0042  Call1                r1, r1, r2
+  0046  GetByIdShort         r1, r2, #c1, s10 "cont"
+  004b  Call1                r1, r1, r2
+  004f  GetByIdShort         r1, r2, #c4, s11 "reset"
+  0054  Call1                r1, r1, r2
+  0058  GetByIdShort         r1, r2, #c1, s10 "cont"
+  005d  Call1                r1, r1, r2
+  0061  GetGlobalObject      r1
+  0063  TryGetById           r2, r1, #c5, s15 "print"
+  0069  GetByIdShort         r3, r4, #c6, s14 "join"
+  006e  LoadConstString      r1, s1 " "
+  0072  Call2                r1, r3, r4, r1
+  0077  Call2                r1, r2, r0, r1
+  007c  Ret                  r0
+
+function #2 "makeRetryer"  params=2 frame=3 env=5 flags=strict,dbg  @0x00000255 size=78
+  0000  CreateEnvironment    r1
+  0002  LoadConstUInt8       r0, 1
+  0005  StoreNPToEnvironment r1, 4, r0
+  0009  CreateClosure        r0, r1, f3 "pause"
+  000e  StoreToEnvironment   r1, 3, r0
+  0012  LoadConstZero        r0
+  0014  StoreNPToEnvironment r1, 0, r0
+  0018  NewObject            r0
+  001a  LoadConstString      r2, s5 "pending"
+  001e  PutNewOwnByIdShort   r0, r2, s17 "status"
+  0022  StoreToEnvironment   r1, 2, r0
+  0026  NewObject            r0
+  0028  CreateClosure        r2, r1, f6 "fail"
+  002d  PutNewOwnByIdShort   r0, r2, s13 "fail"
+  0031  CreateClosure        r2, r1, f5 "reset"
+  0036  PutNewOwnByIdShort   r0, r2, s11 "reset"
+  003a  CreateClosure        r2, r1, f7 "cont"
+  003f  PutNewOwnByIdShort   r0, r2, s10 "cont"
+  0043  CreateClosure        r1, r1, f8 "done"
+  0048  PutNewOwnByIdShort   r0, r1, s12 "done"
+  004c  Ret                  r0
+
+function #3 "pause"  params=2 frame=3 env=1 flags=strict,dbg  @0x000002a3 size=33
+  0000  CreateEnvironment    r0
+  0002  LoadParam            r2, 1
+  0005  LoadConstString      r1, s2 "!"
+  0009  Add                  r1, r2, r1
+  000d  StoreToEnvironment   r0, 0, r1
+  0011  GetEnvironment       r1, 0
+  0014  CreateClosure        r0, r0, f4 "continueFn"
+  0019  StoreToEnvironment   r1, 1, r0
+  001d  LoadConstUndefined   r0
+  001f  Ret                  r0
+
+function #4 "continueFn"  params=2 frame=13 env=0 flags=strict,dbg  @0x000002c4 size=83
+  0000  GetEnvironment       r0, 1
+  0003  LoadFromEnvironment  r1, r0, 2
+  0007  GetByIdShort         r2, r1, #c1, s17 "status"
+  000c  LoadConstString      r1, s5 "pending"
+  0010  JStrictEqual         L1, r2, r1
+  0014  LoadFromEnvironment  r2, r0, 0
+  0018  LoadFromEnvironment  r1, r0, 4
+  001c  JNotGreater          L2, r2, r1
+L1:
+  0020  GetEnvironment       r1, 2
+  0023  LoadFromEnvironment  r2, r1, 0
+  0027  GetByIdShort         r1, r2, #c2, s16 "push"
+  002c  GetEnvironment       r3, 0
+  002f  LoadFromEnvironment  r4, r3, 0
+  0033  LoadParam            r3, 1
+  0036  Add                  r4, r4, r3
+  003a  LoadFromEnvironment  r3, r0, 0
+  003e  LoadConstString      r0, s3 ":"
+  0042  Add                  r0, r4, r0
+  0046  Add                  r0, r0, r3
+  004a  Call2                r0, r1, r2, r0
+L2:
+  004f  LoadConstUndefined   r0
+  0051  Ret                  r0
+
+function #5 "reset"  params=1 frame=2 env=0 flags=strict  @0x00000317 size=11
+  0000  GetEnvironment       r1, 0
+  0003  LoadConstUndefined   r0
+  0005  StoreNPToEnvironment r1, 1, r0
+  0009  Ret                  r0
+
+function #6 "fail"  params=1 frame=12 env=0 flags=strict,dbg  @0x00000322 size=39
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r2, r0, 0
+  0007  LoadConstUInt8       r1, 1
+  000a  Add                  r3, r2, r1
+  000e  StoreNPToEnvironment r0, 0, r3
+  0012  LoadFromEnvironment  r2, r0, 3
+  0016  LoadConstUndefined   r0
+  0018  LoadConstString      r1, s8 "p"
+  001c  Add                  r1, r1, r3
+  0020  Call2                r1, r2, r0, r1
+  0025  Ret                  r0
+
+function #7 "cont"  params=1 frame=12 env=0 flags=strict,dbg  @0x00000349 size=42
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r3, r0, 1
+  0007  LoadConstNull        r1
+  0009  JEqual               L1, r3, r1
+  000d  LoadFromEnvironment  r2, r0, 0
+  0011  LoadConstUInt8       r1, 10
+  0014  Mul                  r2, r2, r1
+  0018  LoadConstUndefined   r1
+  001a  Call2                r1, r3, r1, r2
+L1:
+  001f  LoadFromEnvironment  r0, r0, 2
+  0023  GetByIdShort         r0, r0, #c1, s17 "status"
+  0028  Ret                  r0
+
+function #8 "done"  params=1 frame=2 env=0 flags=strict,dbg  @0x00000373 size=21
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r1, r0, 2
+  0007  LoadConstString      r0, s12 "done"
+  000b  PutById              r1, r0, #c1, s17 "status"
+  0011  LoadConstUndefined   r0
+  0013  Ret                  r0

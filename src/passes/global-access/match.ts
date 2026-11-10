@@ -10,7 +10,7 @@
 // so unit tests can assert the exact refuse reason without going through the
 // driver — the same split `expr-rebuild/match.ts` uses.
 import type { Expr, Stmt } from "../ast.ts";
-import { identUses, isRegisterName, isSafeIdentifier, walk } from "../ast.ts";
+import { enclosingResumeBody, identUses, isRegisterName, isSafeIdentifier, sameFrameBody, walk } from "../ast.ts";
 import type { Match, PassContext } from "../types.ts";
 
 export interface GlobalAccessSite {
@@ -97,8 +97,13 @@ function registerStoreValues(stmts: readonly Stmt[], reg: string): readonly Expr
         case "switch":
           for (const c of s.cases) visit(c.body);
           break;
+        case "return": {
+          const resume = sameFrameBody(s); // the resume closure is this frame (00-LADDER "Resumable bodies")
+          if (resume !== null) visit(resume);
+          break;
+        }
         default:
-          break; // decl, break, continue, return, throw (no sub-list), func (separate frame)
+          break; // decl, break, continue, throw (no sub-list), func (separate frame)
       }
     }
   };
@@ -242,8 +247,16 @@ function outermostLoopBodyContaining(fnBody: readonly Stmt[], target: readonly S
             if (hit !== null) break;
           }
           break;
+        case "return": {
+          // The `sameFrame` resume closure runs again on every resume, with
+          // the registers the previous resume left: it is a loop body
+          // (00-LADDER "Resumable bodies"), the outermost one.
+          const resume = sameFrameBody(s);
+          if (resume !== null) hit = visit(resume, loop ?? resume);
+          break;
+        }
         default:
-          break; // decl, break, continue, return, throw, expr, func (separate frame)
+          break; // decl, break, continue, throw, expr, func (separate frame)
       }
       if (hit !== null) return hit;
     }
@@ -337,8 +350,12 @@ function prefixWritesIn(s: Stmt, target: readonly Stmt[], reg: string): readonly
       }
       return null;
     }
+    case "return": {
+      const resume = sameFrameBody(s); // the resume closure: this frame (00-LADDER "Resumable bodies")
+      return resume === null ? null : prefixWrites(resume, target, reg);
+    }
     default:
-      return null; // decl, break, continue, return, throw, expr, func, directive, comment, raw
+      return null; // decl, break, continue, throw, expr, func, directive, comment, raw
   }
 }
 
@@ -398,6 +415,11 @@ export function hasPreGuardClobber(fnBody: readonly Stmt[], list: readonly Stmt[
   const writes = [...outer];
   for (let k = 0; k < guardIndex; k++) writes.push(...registerStoreValues([list[k]!], e.name));
   const last = writes[writes.length - 1];
+  // Resume entry (00-LADDER "Resumable bodies"): inside the `sameFrame`
+  // resume closure a register's incoming value was left by an EARLIER
+  // resume (or is still `undefined` on the first), which the textual prefix
+  // cannot see, so "no visible pre-guard write" is a refusal there.
+  if (last === undefined && enclosingResumeBody(fnBody, list) !== null) return true;
   if (last === undefined) return false; // no write to `G` is visible before the guard at all: nothing new to say, the whole-function proof stands (see the doc comment)
   return !(last.k === "ident" && last.name === "globalThis");
 }

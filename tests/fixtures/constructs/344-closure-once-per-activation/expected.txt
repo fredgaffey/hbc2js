@@ -1,0 +1,5 @@
+rec: true true 2,1,0
+per call: true
+switch: 2:true 1:true
+do-while: true
+gen same: true

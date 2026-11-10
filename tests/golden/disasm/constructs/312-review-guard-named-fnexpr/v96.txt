@@ -1,0 +1,97 @@
+; hbc2js disassembly of 312-review-guard-named-fnexpr/v96.hbc
+; version=96 layout=C opcodeTable=hbc96 functions=5 strings=10 globalCodeIndex=0
+function #0 "global"  params=1 frame=22 env=2 flags=dbg  @0x0000015c size=169
+  0000  DeclareGlobalVar     s8 "selfRef"
+  0005  DeclareGlobalVar     s6 "other"
+  000a  DeclareGlobalVar     s1 "useJSON"
+  000f  DeclareGlobalVar     s3 "useMath"
+  0014  CreateEnvironment    r2
+  0016  CreateClosure        r1, r2, f1 "useJSON"
+  001b  GetGlobalObject      r0
+  001d  PutById              r0, r1, #c1, s1 "useJSON"
+  0023  CreateClosure        r1, r2, f2 "useMath"
+  0028  PutById              r0, r1, #c2, s3 "useMath"
+  002e  CreateClosure        r1, r2, f3 "JSON"
+  0033  StoreToEnvironment   r2, 0, r1
+  0037  PutById              r0, r1, #c3, s8 "selfRef"
+  003d  CreateClosure        r1, r2, f4 "Math"
+  0042  StoreToEnvironment   r2, 1, r1
+  0046  PutById              r0, r1, #c4, s6 "other"
+  004c  TryGetById           r7, r0, #c1, s7 "print"
+  0052  GetByIdShort         r2, r0, #c2, s8 "selfRef"
+  0057  LoadConstUndefined   r6
+  0059  LoadConstUInt8       r1, 1
+  005c  Call2                r5, r2, r6, r1
+  0061  GetByIdShort         r2, r0, #c3, s6 "other"
+  0066  LoadConstUInt8       r1, 3
+  0069  Call2                r13, r2, r6, r1
+  006e  GetByIdShort         r1, r0, #c4, s1 "useJSON"
+  0073  LoadConstZero        r8
+  0075  Call2                r12, r1, r6, r8
+  007a  GetByIdShort         r2, r0, #c4, s1 "useJSON"
+  007f  LoadConstUInt8       r1, 4
+  0082  Call2                r11, r2, r6, r1
+  0087  GetByIdShort         r1, r0, #c5, s3 "useMath"
+  008c  Call2                r10, r1, r6, r8
+  0091  GetByIdShort         r8, r0, #c5, s3 "useMath"
+  0096  LoadConstUInt8       r0, 5
+  0099  Call2                r9, r8, r6, r0
+  009e  LoadConstUndefined   r15
+  00a0  Mov                  r14, r5
+  00a3  Call                 r0, r7, 7
+  00a7  Ret                  r0
+
+function #1 "useJSON"  params=2 frame=13 env=0 flags=dbg  @0x00000205 size=42
+  0000  LoadParam            r4, 1
+  0003  LoadConstZero        r0
+  0005  JmpFalse             L1, r4
+  0008  Mov                  r0, r4
+L1:
+  000b  JmpTrue              L2, r0
+  000e  GetGlobalObject      r1
+  0010  TryGetById           r3, r1, #c1, s2 "JSON"
+  0016  GetByIdShort         r2, r3, #c2, s9 "stringify"
+  001b  NewArray             r1, 1
+  001f  PutOwnByIndex        r1, r4, 0
+  0023  Call2                r0, r2, r3, r1
+L2:
+  0028  Ret                  r0
+
+function #2 "useMath"  params=2 frame=14 env=0 flags=dbg  @0x0000022f size=44
+  0000  LoadParam            r4, 1
+  0003  LoadConstUInt8       r1, 1
+  0006  Greater              r0, r4, r1
+  000a  JmpFalse             L1, r0
+  000d  Mov                  r1, r4
+L1:
+  0010  GetGlobalObject      r0
+  0012  TryGetById           r3, r0, #c1, s4 "Math"
+  0018  GetByIdShort         r2, r3, #c2, s5 "max"
+  001d  LoadConstUInt8       r0, 2
+  0020  Call3                r0, r2, r3, r4, r0
+  0026  Add                  r0, r1, r0
+  002a  Ret                  r0
+
+function #3 "JSON"  params=2 frame=2 env=0 flags=none  @0x0000025b size=22
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r0, r0, 0
+  0007  LoadParam            r1, 1
+  000a  TypeOf               r1, r1
+  000d  TypeOf               r0, r0
+  0010  Add                  r0, r1, r0
+  0014  Ret                  r0
+
+function #4 "Math"  params=2 frame=13 env=0 flags=dbg  @0x00000271 size=39
+  0000  LoadParam            r1, 1
+  0003  LoadConstZero        r0
+  0005  Greater              r2, r1, r0
+  0009  JmpFalse             L1, r2
+  000c  GetEnvironment       r2, 0
+  000f  LoadFromEnvironment  r4, r2, 1
+  0013  LoadConstUInt8       r2, 1
+  0016  Sub                  r3, r1, r2
+  001a  LoadConstUndefined   r1
+  001c  Call2                r1, r4, r1, r3
+  0021  Add                  r0, r1, r2
+L1:
+  0025  Ret                  r0
