@@ -1,0 +1,125 @@
+; hbc2js disassembly of 141-define-property-observable-literal/v96.hbc
+; version=96 layout=C opcodeTable=hbc96 functions=7 strings=26 globalCodeIndex=0
+function #0 "global"  params=1 frame=18 env=0 flags=dbg  @0x00000224 size=251
+  0000  DeclareGlobalVar     s11 "log"
+  0005  DeclareGlobalVar     s19 "api"
+  000a  DeclareGlobalVar     s16 "src"
+  000f  DeclareGlobalVar     s6 "target"
+  0014  DeclareGlobalVar     s25 "viaGetter"
+  0019  DeclareGlobalVar     s10 "viaGlobal"
+  001e  CreateEnvironment    r1
+  0020  CreateClosure        r2, r1, f1 "viaGetter"
+  0025  GetGlobalObject      r0
+  0027  PutById              r0, r2, #c1, s25 "viaGetter"
+  002d  CreateClosure        r2, r1, f2 "viaGlobal"
+  0032  PutById              r0, r2, #c2, s10 "viaGlobal"
+  0038  NewArray             r2, 0
+  003c  PutById              r0, r2, #c3, s11 "log"
+  0042  NewObject            r2
+  0044  CreateClosure        r5, r1, f3 "get m"
+  0049  LoadConstUndefined   r4
+  004b  LoadConstString      r3, s9 "m"
+  004f  PutOwnGetterSetterByVal r2, r3, r5, r4, 1
+  0055  PutById              r0, r2, #c4, s19 "api"
+  005b  NewObject            r2
+  005d  CreateClosure        r5, r1, f5 "get v"
+  0062  LoadConstString      r3, s12 "v"
+  0066  PutOwnGetterSetterByVal r2, r3, r5, r4, 1
+  006c  PutById              r0, r2, #c5, s16 "src"
+  0072  TryGetById           r6, r0, #c1, s5 "Object"
+  0078  GetByIdShort         r5, r6, #c2, s21 "defineProperty"
+  007d  TryGetById           r3, r0, #c3, s14 "globalThis"
+  0083  NewObject            r2
+  0085  LoadConstTrue        r7
+  0087  PutNewOwnByIdShort   r2, r7, s17 "configurable"
+  008b  CreateClosure        r1, r1, f6 "get"
+  0090  PutNewOwnByIdShort   r2, r1, s8 "get"
+  0094  LoadConstString      r1, s7 "g"
+  0098  Call4                r1, r5, r6, r3, r1, r2
+  009f  NewObject            r1
+  00a1  PutById              r0, r1, #c6, s6 "target"
+  00a7  GetByIdShort         r2, r0, #c4, s25 "viaGetter"
+  00ac  GetByIdShort         r1, r0, #c5, s6 "target"
+  00b1  Call2                r1, r2, r4, r1
+  00b6  GetByIdShort         r2, r0, #c6, s10 "viaGlobal"
+  00bb  GetByIdShort         r1, r0, #c5, s6 "target"
+  00c0  Call2                r1, r2, r4, r1
+  00c5  TryGetById           r3, r0, #c7, s23 "print"
+  00cb  GetByIdShort         r5, r0, #c8, s11 "log"
+  00d0  GetByIdShort         r2, r5, #c9, s22 "join"
+  00d5  LoadConstString      r1, s1 ","
+  00d9  Call2                r2, r2, r5, r1
+  00de  GetByIdShort         r1, r0, #c5, s6 "target"
+  00e3  GetByIdShort         r1, r1, #c10, s15 "a"
+  00e8  GetByIdShort         r0, r0, #c5, s6 "target"
+  00ed  GetByIdShort         r0, r0, #c11, s20 "b"
+  00f2  Call4                r0, r3, r4, r2, r1, r0
+  00f9  Ret                  r0
+
+function #1 "viaGetter"  params=2 frame=15 env=0 flags=dbg  @0x0000031f size=52
+  0000  NewObject            r4
+  0002  LoadConstTrue        r0
+  0004  PutNewOwnByIdShort   r4, r0, s18 "enumerable"
+  0008  GetGlobalObject      r0
+  000a  GetByIdShort         r1, r0, #c1, s16 "src"
+  000f  GetByIdShort         r1, r1, #c2, s12 "v"
+  0014  PutNewOwnByIdShort   r4, r1, s13 "value"
+  0018  GetByIdShort         r3, r0, #c3, s19 "api"
+  001d  GetByIdShort         r2, r3, #c4, s9 "m"
+  0022  LoadParam            r1, 1
+  0025  LoadConstString      r0, s15 "a"
+  0029  Call4                r0, r2, r3, r1, r0, r4
+  0030  LoadConstUndefined   r0
+  0032  Ret                  r0
+
+function #2 "viaGlobal"  params=2 frame=15 env=0 flags=dbg  @0x00000353 size=48
+  0000  NewObject            r4
+  0002  LoadConstTrue        r0
+  0004  PutNewOwnByIdShort   r4, r0, s18 "enumerable"
+  0008  GetGlobalObject      r0
+  000a  TryGetById           r1, r0, #c1, s7 "g"
+  0010  PutNewOwnByIdShort   r4, r1, s13 "value"
+  0014  GetByIdShort         r3, r0, #c2, s19 "api"
+  0019  GetByIdShort         r2, r3, #c3, s9 "m"
+  001e  LoadParam            r1, 1
+  0021  LoadConstString      r0, s20 "b"
+  0025  Call4                r0, r2, r3, r1, r0, r4
+  002c  LoadConstUndefined   r0
+  002e  Ret                  r0
+
+function #3 "get m"  params=1 frame=11 env=0 flags=dbg  @0x00000383 size=30
+  0000  GetGlobalObject      r0
+  0002  GetByIdShort         r2, r0, #c1, s11 "log"
+  0007  GetByIdShort         r1, r2, #c2, s24 "push"
+  000c  LoadConstString      r0, s9 "m"
+  0010  Call2                r0, r1, r2, r0
+  0015  CreateEnvironment    r0
+  0017  CreateClosure        r0, r0, f4 ""
+  001c  Ret                  r0
+
+function #4 ""  params=4 frame=3 env=0 flags=dbg  @0x000003a1 size=22
+  0000  LoadParam            r0, 3
+  0003  GetByIdShort         r2, r0, #c1, s13 "value"
+  0008  LoadParam            r1, 1
+  000b  LoadParam            r0, 2
+  000e  PutByVal             r1, r0, r2
+  0012  LoadConstUndefined   r0
+  0014  Ret                  r0
+
+function #5 "get v"  params=1 frame=11 env=0 flags=dbg  @0x000003b7 size=26
+  0000  GetGlobalObject      r0
+  0002  GetByIdShort         r2, r0, #c1, s11 "log"
+  0007  GetByIdShort         r1, r2, #c2, s24 "push"
+  000c  LoadConstString      r0, s12 "v"
+  0010  Call2                r0, r1, r2, r0
+  0015  LoadConstUInt8       r0, 1
+  0018  Ret                  r0
+
+function #6 "get"  params=1 frame=11 env=0 flags=dbg  @0x000003d1 size=26
+  0000  GetGlobalObject      r0
+  0002  GetByIdShort         r2, r0, #c1, s11 "log"
+  0007  GetByIdShort         r1, r2, #c2, s24 "push"
+  000c  LoadConstString      r0, s7 "g"
+  0010  Call2                r0, r1, r2, r0
+  0015  LoadConstUInt8       r0, 2
+  0018  Ret                  r0

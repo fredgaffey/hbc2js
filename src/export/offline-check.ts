@@ -3,6 +3,7 @@
 // RN minor the tree names in its own babel.config.js / package.json.
 import { symlinkSync, realpathSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { loadConfig, runBuild } from "metro";
 
@@ -22,7 +23,22 @@ export async function offlineBundle(tree: string, repoRoot: string): Promise<Off
   // Applied AFTER loading: `loadConfig`'s second argument is only a default,
   // which the tree's own metro.config.js (the original toolchain's
   // getDefaultConfig) overrides.
-  const config = { ...loaded, transformer: { ...loaded.transformer, babelTransformerPath: OFFLINE_TRANSFORMER } };
+  // Spec 33 L1: a pre-0.73 tree's metro.config.js is bare `metro-config`,
+  // whose defaults have NO polyfills. The original toolchain never bundles
+  // that way: `react-native bundle` (the RN CLI) layers RN's serializer
+  // defaults on top, so RN's polyfills (error-guard installs
+  // `global.ErrorUtils`, which InitializeCore needs) run before any module.
+  // Mirror the CLI with the installed RN's defaults when the tree's own
+  // config brings none.
+  let serializer = loaded.serializer;
+  if (serializer.getPolyfills({ platform: "android" }).length === 0) {
+    const rnDefaults = (createRequire(join(repoNodeModules, "noop.js"))("@react-native/metro-config") as { getDefaultConfig(root: string): { serializer: Partial<typeof serializer> } }).getDefaultConfig(tree).serializer;
+    serializer = { ...serializer, ...(rnDefaults.getPolyfills !== undefined ? { getPolyfills: rnDefaults.getPolyfills } : {}), ...(rnDefaults.getModulesRunBeforeMainModule !== undefined ? { getModulesRunBeforeMainModule: rnDefaults.getModulesRunBeforeMainModule } : {}) };
+  }
+  // Spec 33 L2: a silent reporter (Metro's banner and progress went to
+  // stdout, corrupting `equiv --boot --json`) and no watchman (a one-shot
+  // build gains nothing from it, and a recrawling watchman cost ~85 s).
+  const config = { ...loaded, serializer, reporter: { update: (): void => {} }, resolver: { ...loaded.resolver, useWatchman: false }, transformer: { ...loaded.transformer, babelTransformerPath: OFFLINE_TRANSFORMER } };
   const bundlePath = join(tree, "android.bundle.js");
   await runBuild(config, { entry: "index.js", platform: "android", dev: false, minify: false, out: bundlePath });
   return { bundlePath };

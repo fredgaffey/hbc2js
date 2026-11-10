@@ -56,8 +56,11 @@ interface NameCandidate {
 const MIN_NAME_CONFIDENCE = 0.6; // spec §2.1 "Confidence floor", default; --min-name-confidence not wired yet (no caller passes a different value)
 
 function detectAppRegistration(text: string): { confidence: number } | null {
-  if (!text.includes("AppRegistry") || !text.includes(".registerComponent(")) return null;
-  const call = /\.registerComponent\(\s*([^,]+),/.exec(text);
+  if (!text.includes("AppRegistry") || !text.includes(".registerComponent")) return null;
+  // Fused `X.registerComponent(arg, ...)`, or the emitter's unfused form when
+  // the argument's work is observable (spec 05 section 7.4):
+  // `rF = rO.registerComponent; ...; Reflect.apply(rF, rO, [arg, ...])`.
+  const call = /\.registerComponent\(\s*([^,]+),/.exec(text) ?? /(\w+) = (\w+)\.registerComponent;[\s\S]*?Reflect\.apply\(\1, \2, \[\s*([^,\]]+),/.exec(text)?.slice(2) ?? null;
   if (call === null) return null;
   const arg = call[1]!.trim();
   if (/^(['"]).*\1$/.test(arg)) return { confidence: 0.95 }; // literal name argument
@@ -70,6 +73,9 @@ function detectAppRegistration(text: string): { confidence: number } | null {
   // implemented this milestone — so verifying the literal buys nothing yet).
   const hopRe = /(\w+)\s*=\s*require\((['"])\.\/module_\d+\.js\2\);\s*\n\s*\1\s*=\s*\1\.name;/;
   if (hopRe.test(text)) return { confidence: 0.8 };
+  // The same hop inline (spec 05 section 7.4 keeps the method read before the
+  // argument's require, so the require now sits in the argument itself).
+  if (/^require\((['"])\.\/module_\d+\.js\1\)\.name$/.test(arg)) return { confidence: 0.8 };
   return null;
 }
 

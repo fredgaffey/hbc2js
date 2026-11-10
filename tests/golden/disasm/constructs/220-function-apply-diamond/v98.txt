@@ -1,0 +1,273 @@
+; hbc2js disassembly of 220-function-apply-diamond/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=10 strings=34 globalCodeIndex=0
+function #0 "global"  params=1 frame=24 env=0 flags=dbg,overflowed  @0x00000294 size=566
+  0000  DeclareGlobalVar     s31 "kind"
+  0005  DeclareGlobalVar     s29 "show"
+  000a  DeclareGlobalVar     s24 "forward"
+  000f  DeclareGlobalVar     s28 "forwardThis"
+  0014  DeclareGlobalVar     s25 "forwardLoose"
+  0019  DeclareGlobalVar     s26 "forwardNoParams"
+  001e  DeclareGlobalVar     s23 "ctx"
+  0023  DeclareGlobalVar     s13 "fake"
+  0028  DeclareGlobalVar     s27 "saved"
+  002d  GetGlobalObject      r6
+  002f  LoadConstUndefined   r5
+  0031  CreateClosure        r7, r5, f1 "kind"
+  0036  PutByIdLoose         r6, r7, #c0, s31 "kind"
+  003c  CreateClosure        r7, r5, f2 "show"
+  0041  PutByIdLoose         r6, r7, #c1, s29 "show"
+  0047  CreateClosure        r7, r5, f3 "forward"
+  004c  PutByIdLoose         r6, r7, #c2, s24 "forward"
+  0052  CreateClosure        r7, r5, f4 "forwardThis"
+  0057  PutByIdLoose         r6, r7, #c3, s28 "forwardThis"
+  005d  CreateClosure        r7, r5, f5 "forwardLoose"
+  0062  PutByIdLoose         r6, r7, #c4, s25 "forwardLoose"
+  0068  CreateClosure        r7, r5, f6 "forwardNoParams"
+  006d  PutByIdLoose         r6, r7, #c5, s26 "forwardNoParams"
+  0073  NewObjectWithBuffer  r7, sh0(numProps=1), lit@0x0000
+  0079  PutByIdLoose         r6, r7, #c6, s23 "ctx"
+  007f  TryGetById           r8, r6, #c0, s32 "print"
+  0085  GetByIdShort         r10, r6, #c1, s24 "forward"
+  008a  GetByIdShort         r15, r6, #c2, s29 "show"
+  008f  GetByIdShort         r14, r6, #c3, s23 "ctx"
+  0094  LoadConstUInt8       r4, 2
+  0097  LoadConstUInt8       r1, 1
+  009a  LoadConstUndefined   r16
+  009c  Mov                  r13, r1
+  009f  Mov                  r12, r4
+  00a2  Call                 r7, r10, 5
+  00a6  Call2                r7, r8, r5, r7
+  00ab  TryGetById           r8, r6, #c0, s32 "print"
+  00b1  GetByIdShort         r11, r6, #c4, s28 "forwardThis"
+  00b6  GetByIdShort         r7, r11, #c5, s20 "call"
+  00bb  GetByIdShort         r10, r6, #c3, s23 "ctx"
+  00c0  GetByIdShort         r9, r6, #c2, s29 "show"
+  00c5  JmpBuiltinIs         L1, 56, r7
+  00c9  LoadConstUInt8       r0, 9
+  00cc  Call4                r7, r7, r11, r10, r9, r0
+  00d3  Jmp                  L2
+L1:
+  00d5  LoadConstUInt8       r0, 9
+  00d8  Call3                r7, r11, r10, r9, r0
+L2:
+  00de  Call2                r7, r8, r5, r7
+  00e3  TryGetById           r8, r6, #c0, s32 "print"
+  00e9  GetByIdShort         r10, r6, #c6, s25 "forwardLoose"
+  00ee  GetByIdShort         r9, r6, #c2, s29 "show"
+  00f3  GetByIdShort         r7, r6, #c3, s23 "ctx"
+  00f8  Call3                r7, r10, r5, r9, r7
+  00fe  Call2                r7, r8, r5, r7
+  0103  TryGetById           r8, r6, #c0, s32 "print"
+  0109  GetByIdShort         r10, r6, #c7, s26 "forwardNoParams"
+  010e  GetByIdShort         r7, r10, #c5, s20 "call"
+  0113  GetByIdShort         r9, r6, #c3, s23 "ctx"
+  0118  JmpBuiltinIs         L3, 56, r7
+  011c  LoadConstUInt8       r12, 7
+  011f  LoadConstUInt8       r13, 6
+  0122  LoadConstUInt8       r14, 5
+  0125  Mov                  r16, r10
+  0128  Mov                  r15, r9
+  012b  Call                 r7, r7, 5
+  012f  Jmp                  L4
+L3:
+  0131  LoadConstUInt8       r2, 7
+  0134  LoadConstUInt8       r3, 6
+  0137  LoadConstUInt8       r0, 5
+  013a  Call4                r7, r10, r9, r0, r3, r2
+L4:
+  0141  Call2                r7, r8, r5, r7
+  0146  CreateClosure        r7, r5, f7 "fake"
+  014b  PutByIdLoose         r6, r7, #c7, s13 "fake"
+  0151  GetByIdShort         r8, r6, #c8, s13 "fake"
+  0156  CreateClosure        r7, r5, f8 ""
+  015b  PutByIdLoose         r8, r7, #c8, s19 "apply"
+  0161  TryGetById           r8, r6, #c0, s32 "print"
+  0167  GetByIdShort         r10, r6, #c1, s24 "forward"
+  016c  GetByIdShort         r9, r6, #c8, s13 "fake"
+  0171  GetByIdShort         r7, r6, #c3, s23 "ctx"
+  0176  LoadConstUInt8       r0, 3
+  0179  Call4                r7, r10, r5, r9, r7, r0
+  0180  Call2                r7, r8, r5, r7
+  0185  TryGetById           r7, r6, #c9, s17 "Function"
+  018b  GetByIdShort         r7, r7, #c10, s33 "prototype"
+  0190  GetByIdShort         r7, r7, #c11, s19 "apply"
+  0195  PutByIdLoose         r6, r7, #c9, s27 "saved"
+  019b  TryGetById           r7, r6, #c9, s17 "Function"
+  01a1  GetByIdShort         r8, r7, #c10, s33 "prototype"
+  01a6  CreateClosure        r7, r5, f9 ""
+  01ab  PutByIdLoose         r8, r7, #c8, s19 "apply"
+  01b1  TryGetById           r8, r6, #c0, s32 "print"
+  01b7  GetByIdShort         r10, r6, #c1, s24 "forward"
+  01bc  GetByIdShort         r9, r6, #c2, s29 "show"
+  01c1  GetByIdShort         r7, r6, #c3, s23 "ctx"
+  01c6  Call4                r7, r10, r5, r9, r7, r1
+  01cd  Call2                r7, r8, r5, r7
+  01d2  TryGetById           r8, r6, #c0, s32 "print"
+  01d8  GetByIdShort         r10, r6, #c6, s25 "forwardLoose"
+  01dd  GetByIdShort         r15, r6, #c2, s29 "show"
+  01e2  GetByIdShort         r14, r6, #c3, s23 "ctx"
+  01e7  LoadConstUndefined   r16
+  01e9  Mov                  r13, r1
+  01ec  Mov                  r12, r4
+  01ef  Call                 r7, r10, 5
+  01f3  Call2                r7, r8, r5, r7
+  01f8  TryGetById           r7, r6, #c9, s17 "Function"
+  01fe  GetByIdShort         r8, r7, #c10, s33 "prototype"
+  0203  GetByIdShort         r7, r6, #c12, s27 "saved"
+  0208  PutByIdLoose         r8, r7, #c8, s19 "apply"
+  020e  TryGetById           r7, r6, #c0, s32 "print"
+  0214  GetByIdShort         r9, r6, #c1, s24 "forward"
+  0219  GetByIdShort         r15, r6, #c2, s29 "show"
+  021e  GetByIdShort         r14, r6, #c3, s23 "ctx"
+  0223  LoadConstUInt8       r12, 4
+  0226  LoadConstUndefined   r16
+  0228  Mov                  r13, r0
+  022b  Call                 r6, r9, 5
+  022f  Call2                r6, r7, r5, r6
+  0234  Ret                  r6
+
+function #1 "kind"  params=2 frame=14 env=0 flags=dbg,overflowed  @0x000004ca size=47
+  0000  LoadParam            r4, 1
+  0003  LoadConstString      r1, s8 "f"
+  0007  JmpTypeOfIs          L2, r4, 128
+  000f  LoadConstString      r2, s1 "o"
+  0013  JmpTypeOfIs          L1, r4, 258
+  001b  GetGlobalObject      r3
+  001d  TryGetById           r3, r3, #c0, s14 "String"
+  0023  LoadConstUndefined   r0
+  0025  Call2                r2, r3, r0, r4
+L1:
+  002a  Mov                  r1, r2
+L2:
+  002d  Ret                  r1
+
+function #2 "show"  params=1 frame=20 env=0 flags=dbg,overflowed  @0x000004f9 size=109
+  0000  LoadConstUndefined   r3
+  0002  LoadConstUndefined   r7
+  0004  NewArray             r8, 0
+  0008  Mov                  r5, r7
+  000b  GetArgumentsLength   r5, r5
+  000e  LoadConstZero        r0
+  0010  Less                 r4, r0, r5
+  0014  GetGlobalObject      r6
+  0016  LoadConstUInt8       r1, 1
+  0019  JmpFalse             L2, r4
+L1:
+  001c  GetByIdShort         r9, r8, #c0, s16 "push"
+  0021  GetByIdShort         r10, r6, #c1, s31 "kind"
+  0026  GetArgumentsPropByValLoose r5, r0, r7
+  002a  Call2                r5, r10, r3, r5
+  002f  Call2                r5, r9, r8, r5
+  0034  AddN                 r0, r0, r1
+  0038  Mov                  r5, r7
+  003b  GetArgumentsLength   r5, r5
+  003e  JLess                L1, r0, r5
+L2:
+  0042  LoadThisNS           r5
+  0044  GetByIdShort         r6, r5, #c2, s22 "tag"
+  0049  LoadConstString      r5, s10 "this="
+  004d  Add                  r7, r5, r6
+  0051  GetByIdShort         r6, r8, #c3, s30 "join"
+  0056  LoadConstString      r5, s6 ","
+  005a  Call2                r6, r6, r8, r5
+  005f  LoadConstString      r5, s4 " args="
+  0063  AddS                 r5, r7, r5
+  0067  Add                  r5, r5, r6
+  006b  Ret                  r5
+
+function #3 "forward"  params=3 frame=15 env=0 flags=strict,dbg,overflowed  @0x00000566 size=39
+  0000  LoadConstUndefined   r1
+  0002  LoadParam            r3, 1
+  0005  LoadParam            r2, 2
+  0008  GetByIdShort         r4, r3, #c0, s19 "apply"
+  000d  JmpBuiltinIs         L1, 55, r4
+  0011  ReifyArgumentsStrict r1
+  0013  Call3                r1, r4, r3, r2, r1
+  0019  Jmp                  L2
+L1:
+  001b  Mov                  r6, r3
+  001e  Mov                  r5, r2
+  0021  CallBuiltin          r1, b50 "applyArguments", 3
+L2:
+  0025  Ret                  r1
+
+function #4 "forwardThis"  params=2 frame=15 env=0 flags=strict,dbg,overflowed  @0x0000058d size=47
+  0000  LoadConstUndefined   r2
+  0002  LoadParam            r3, 0
+  0005  LoadParam            r1, 1
+  0008  GetByIdShort         r4, r1, #c0, s19 "apply"
+  000d  JmpBuiltinIs         L1, 55, r4
+  0011  ReifyArgumentsStrict r2
+  0013  Call3                r2, r4, r1, r3, r2
+  0019  Jmp                  L2
+L1:
+  001b  Mov                  r6, r1
+  001e  Mov                  r5, r3
+  0021  CallBuiltin          r2, b50 "applyArguments", 3
+L2:
+  0025  LoadConstString      r1, s5 "!"
+  0029  Add                  r1, r2, r1
+  002d  Ret                  r1
+
+function #5 "forwardLoose"  params=3 frame=15 env=0 flags=dbg,overflowed  @0x000005bc size=39
+  0000  LoadConstUndefined   r1
+  0002  LoadParam            r3, 1
+  0005  LoadParam            r2, 2
+  0008  GetByIdShort         r4, r3, #c0, s19 "apply"
+  000d  JmpBuiltinIs         L1, 55, r4
+  0011  ReifyArgumentsLoose  r1
+  0013  Call3                r1, r4, r3, r2, r1
+  0019  Jmp                  L2
+L1:
+  001b  Mov                  r6, r3
+  001e  Mov                  r5, r2
+  0021  CallBuiltin          r1, b50 "applyArguments", 3
+L2:
+  0025  Ret                  r1
+
+function #6 "forwardNoParams"  params=1 frame=15 env=0 flags=dbg,overflowed  @0x000005e3 size=42
+  0000  LoadConstUndefined   r1
+  0002  LoadThisNS           r3
+  0004  GetGlobalObject      r2
+  0006  GetByIdShort         r2, r2, #c0, s29 "show"
+  000b  GetByIdShort         r4, r2, #c1, s19 "apply"
+  0010  JmpBuiltinIs         L1, 55, r4
+  0014  ReifyArgumentsLoose  r1
+  0016  Call3                r1, r4, r2, r3, r1
+  001c  Jmp                  L2
+L1:
+  001e  Mov                  r6, r2
+  0021  Mov                  r5, r3
+  0024  CallBuiltin          r1, b50 "applyArguments", 3
+L2:
+  0028  Ret                  r1
+
+function #7 "fake"  params=1 frame=1 env=0 flags=none  @0x0000060d size=6
+  0000  LoadConstString      r0, s11 "real"
+  0004  Ret                  r0
+
+function #8 ""  params=3 frame=3 env=0 flags=dbg,overflowed  @0x00000613 size=38
+  0000  LoadParam            r0, 1
+  0003  GetByIdShort         r1, r0, #c0, s22 "tag"
+  0008  LoadConstString      r0, s12 "shadowed "
+  000c  Add                  r2, r0, r1
+  0010  LoadParam            r0, 2
+  0013  GetByIdShort         r1, r0, #c1, s15 "length"
+  0018  LoadConstString      r0, s3 " "
+  001c  AddS                 r0, r2, r0
+  0020  Add                  r0, r0, r1
+  0024  Ret                  r0
+
+function #9 ""  params=3 frame=14 env=0 flags=dbg,overflowed  @0x00000639 size=47
+  0000  GetGlobalObject      r0
+  0002  TryGetById           r0, r0, #c0, s18 "HermesInternal"
+  0008  GetByIdShort         r3, r0, #c1, s21 "concat"
+  000d  LoadConstString      r2, s3 " "
+  0011  LoadConstString      r1, s2 "overridden "
+  0015  LoadParam            r0, 1
+  0018  TypeOf               r0, r0
+  001b  Call3                r1, r3, r1, r0, r2
+  0021  LoadParam            r0, 2
+  0024  GetByIdShort         r0, r0, #c2, s15 "length"
+  0029  Add                  r0, r1, r0
+  002d  Ret                  r0

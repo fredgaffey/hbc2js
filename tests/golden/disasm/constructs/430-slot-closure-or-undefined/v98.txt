@@ -1,0 +1,138 @@
+; hbc2js disassembly of 430-slot-closure-or-undefined/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=6 strings=16 globalCodeIndex=0
+function #0 "global"  params=1 frame=15 env=0 flags=dbg,overflowed  @0x000001a8 size=179
+  0000  CreateFunctionEnvironment r2, 1
+  0003  NewArray             r5, 0
+  0007  StoreToEnvironment   r2, 0, r5
+  000b  CreateEnvironment    r2, r2, 3
+  0012  LoadConstZero        r0
+  0014  StoreNPToEnvironment r2, 0, r0
+  0018  NewObjectWithBuffer  r3, sh0(numProps=1), lit@0x0000
+  001e  StoreToEnvironment   r2, 2, r3
+  0022  NewObjectWithBuffer  r3, sh1(numProps=4), lit@0x0003
+  0028  CreateClosure        r4, r2, f2 "fail"
+  002d  PutOwnBySlotIdx      r3, r4, 0
+  0031  CreateClosure        r4, r2, f1 "reset"
+  0036  PutOwnBySlotIdx      r3, r4, 1
+  003a  CreateClosure        r4, r2, f3 "cont"
+  003f  PutOwnBySlotIdx      r3, r4, 2
+  0043  CreateClosure        r2, r2, f4 "done"
+  0048  PutOwnBySlotIdx      r3, r2, 3
+  004c  GetByIdShort         r2, r3, #c0, s8 "cont"
+  0051  Call1                r2, r2, r3
+  0055  GetByIdShort         r2, r3, #c1, s10 "fail"
+  005a  Call1                r2, r2, r3
+  005e  GetByIdShort         r2, r3, #c0, s8 "cont"
+  0063  Call1                r2, r2, r3
+  0067  GetByIdShort         r2, r3, #c1, s10 "fail"
+  006c  Call1                r2, r2, r3
+  0070  GetByIdShort         r2, r3, #c2, s9 "done"
+  0075  Call1                r2, r2, r3
+  0079  GetByIdShort         r2, r3, #c0, s8 "cont"
+  007e  Call1                r2, r2, r3
+  0082  GetByIdShort         r2, r3, #c3, s14 "reset"
+  0087  Call1                r2, r2, r3
+  008b  GetByIdShort         r2, r3, #c0, s8 "cont"
+  0090  Call1                r2, r2, r3
+  0094  GetGlobalObject      r2
+  0096  TryGetById           r3, r2, #c4, s12 "print"
+  009c  GetByIdShort         r4, r5, #c5, s11 "join"
+  00a1  LoadConstString      r2, s0 " "
+  00a5  Call2                r2, r4, r5, r2
+  00aa  LoadConstUndefined   r1
+  00ac  Call2                r2, r3, r1, r2
+  00b1  Ret                  r1
+
+function #1 "reset"  params=1 frame=2 env=0 flags=strict  @0x0000025b size=11
+  0000  LoadConstUndefined   r0
+  0002  GetParentEnvironment r1, 0
+  0005  StoreNPToEnvironment r1, 1, r0
+  0009  Ret                  r0
+
+function #2 "fail"  params=1 frame=7 env=0 flags=strict  @0x00000266 size=54
+  0000  GetParentEnvironment r4, 0
+  0003  LoadFromEnvironment  r1, r4, 0
+  0007  LoadConstUInt8       r0, 1
+  000a  AddN                 r0, r1, r0
+  000e  StoreNPToEnvironment r4, 0, r0
+  0012  CreateFunctionEnvironment r3, 1
+  0015  LoadConstString      r6, s1 "!"
+  0019  LoadConstString      r5, s5 "p"
+  001d  Add                  r5, r5, r0
+  0021  AddS                 r5, r5, r6
+  0025  StoreToEnvironment   r3, 0, r5
+  0029  CreateClosure        r3, r3, f5 "continueFn"
+  002e  StoreToEnvironment   r4, 1, r3
+  0032  LoadConstUndefined   r2
+  0034  Ret                  r2
+
+function #3 "cont"  params=1 frame=18 env=0 flags=strict,dbg,overflowed  @0x0000029c size=128
+  0000  GetParentEnvironment r4, 0
+  0003  LoadFromEnvironment  r5, r4, 1
+  0007  LoadConstNull        r3
+  0009  JEqual               L3, r5, r3
+  000d  LoadFromEnvironment  r1, r4, 0
+  0011  JmpTypeOfIs          L1, r5, 128
+  0019  LoadConstString      r9, s3 "Trying to call a non-function"
+  001d  CallBuiltin          r6, b44 "throwTypeError", 2
+L1:
+  0021  GetClosureEnvironment r5, r5
+  0024  GetEnvironment       r8, r5, 1
+  0028  LoadFromEnvironment  r6, r8, 2
+  002c  GetByIdShort         r7, r6, #c0, s15 "status"
+  0031  LoadConstString      r6, s6 "pending"
+  0035  JStrictEqual         L2, r7, r6
+  0039  LoadFromEnvironment  r2, r8, 0
+  003d  LoadConstUInt8       r0, 1
+  0040  JNotLessN            L3, r0, r2
+L2:
+  0044  LoadConstUInt8       r0, 10
+  0047  MulN                 r1, r1, r0
+  004b  GetEnvironment       r6, r5, 2
+  004f  LoadFromEnvironment  r7, r6, 0
+  0053  GetByIdShort         r6, r7, #c1, s13 "push"
+  0058  LoadFromEnvironment  r5, r5, 0
+  005c  LoadFromEnvironment  r0, r8, 0
+  0060  LoadConstString      r8, s2 ":"
+  0064  Add                  r5, r5, r1
+  0068  AddS                 r5, r5, r8
+  006c  Add                  r5, r5, r0
+  0070  Call2                r5, r6, r7, r5
+L3:
+  0075  LoadFromEnvironment  r4, r4, 2
+  0079  GetByIdShort         r4, r4, #c0, s15 "status"
+  007e  Ret                  r4
+
+function #4 "done"  params=1 frame=3 env=0 flags=strict,dbg,overflowed  @0x0000031c size=21
+  0000  GetParentEnvironment r1, 0
+  0003  LoadFromEnvironment  r2, r1, 2
+  0007  LoadConstString      r1, s9 "done"
+  000b  PutByIdStrict        r2, r1, #c0, s15 "status"
+  0011  LoadConstUndefined   r0
+  0013  Ret                  r0
+
+function #5 "continueFn"  params=2 frame=17 env=0 flags=strict,dbg,overflowed  @0x00000331 size=82
+  0000  GetParentEnvironment r3, 1
+  0003  LoadFromEnvironment  r4, r3, 2
+  0007  GetByIdShort         r5, r4, #c0, s15 "status"
+  000c  LoadConstString      r4, s6 "pending"
+  0010  JStrictEqual         L1, r5, r4
+  0014  LoadFromEnvironment  r1, r3, 0
+  0018  LoadConstUInt8       r0, 1
+  001b  JNotLessN            L2, r0, r1
+L1:
+  001f  GetParentEnvironment r6, 0
+  0022  LoadParam            r7, 1
+  0025  GetParentEnvironment r4, 2
+  0028  LoadFromEnvironment  r5, r4, 0
+  002c  GetByIdShort         r4, r5, #c1, s13 "push"
+  0031  LoadFromEnvironment  r6, r6, 0
+  0035  Add                  r6, r6, r7
+  0039  LoadFromEnvironment  r0, r3, 0
+  003d  LoadConstString      r3, s2 ":"
+  0041  AddS                 r3, r6, r3
+  0045  Add                  r3, r3, r0
+  0049  Call2                r3, r4, r5, r3
+L2:
+  004e  LoadConstUndefined   r2
+  0050  Ret                  r2

@@ -15,6 +15,9 @@ import { buildReport } from "../../../src/deps/report.ts";
 import type { ModuleInventory } from "../../../src/deps/inventory.ts";
 import type { SigDbFile } from "../../../src/deps/sigdb-types.ts";
 
+// Hermetic: the user-cache sigdb layer (~/.cache/hbc2js/sigdb) must not leak a developer machine's own signatures into this test.
+process.env.XDG_CACHE_HOME = (await import("node:fs")).mkdtempSync((await import("node:path")).join((await import("node:os")).tmpdir(), "hbc2js-xdg-"));
+
 const RN_TEMPLATE = join(repoRoot(), "tests", "fixtures", "bundles", "rn-template-0.72", "index.android.hbc");
 
 function matchRnTemplate() {

@@ -6,7 +6,7 @@ import { match } from "./match.ts";
 import { rewrite } from "./rewrite.ts";
 
 /**
- * Stage B, expression-only deleting rung (docs/LOWERING-CATALOGUE.md R17,
+ * Stage B, expression-only deleting rung (docs/LOWERING-CATALOGUE.md R18,
  * docs/specs/passes/14-template-literal.md section 9): deletes the dead
  * `rN = __hbc_HermesInternal.concat` callee spill (and its namespace pair)
  * that `template-literal` leaves behind once every call it fed has become a
@@ -20,7 +20,7 @@ export const hermesInternalDeadStore: Pass<readonly Stmt[], Analysis> = {
   name: "hermes-internal-dead-store",
   stage: "B",
   targets: ["290-template-concat-dead-spill"],
-  catalogue: ["R17"],
+  catalogue: ["R18"],
   after: ["expr-rebuild", "global-access", "template-literal"],
   before: ["fn-naming", "reg-split", "var-naming"],
   match,

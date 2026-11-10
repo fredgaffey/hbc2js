@@ -1,4 +1,4 @@
-// hermes-internal-dead-store (docs/LOWERING-CATALOGUE.md R17): roundtrip
+// hermes-internal-dead-store (docs/LOWERING-CATALOGUE.md R18): roundtrip
 // review `diff:TryGetById(reg)` bucket, 2026-11-10 -- after `template-literal`
 // folds `Reflect.apply(concat, "", [...])` into a template literal, the callee
 // spill `concat = __hbc_HermesInternal.concat` (or the namespace pair

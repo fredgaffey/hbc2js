@@ -112,6 +112,60 @@ buckets. Fixture `160-receiverless-member-call` (with the plain method call
 `tests/gate/passes/call-shape-receiverless.test.ts`. The checker additionally
 asserts the callee is exactly `(0, F)` over the source's own `F` node.
 
+**R3h — every write `undefined`** (added 2026-11-09, round-trip review
+`passes-roundtrip-this`). R3a/R3f's register proof is widened from "exactly
+one write, `undefined`" to "at least one write, and every write anywhere in
+the frame is the literal `undefined`". hermesc loads `undefined` into the
+`this` register once per path that reaches a call (two branches each ending
+in `return fn(e, n)`), so the decompiled function writes it two or three
+times. The write census is a generic walk of every field: `r = v` at any
+expression depth and `let r = v` contribute `v`, a bare `let r;` is a write
+of `undefined`, and the register as a for-in/for-of target, a catch
+parameter, a destructuring target (or any other string field naming it)
+refuses outright. That walk also closes a gap in the old proof, which counted
+only statement-level stores and so accepted a register whose second write was
+a for-in target. A nested `func` is a separate register frame (unchanged).
+
+**R3i — local reaching write.** A register reused for scratch elsewhere is
+still proven at one call when, in the call's own statement list, the nearest
+earlier statement that writes it at all is exactly `r = undefined`, no
+statement between writes it at any depth, and the call statement writes it
+nowhere except as its own top-level assignment target (`r = Reflect.apply(f,
+r, …)`, whose store happens after the call). Sound because a statement list
+is entered only at its head and runs in order — JS has no goto; `break`
+leaves a whole labelled statement, `continue` re-enters a loop at its head —
+so reaching statement *i* means completing statements *k…i−1*. No such write
+in the call's own list → refuse (the enclosing list is not consulted). The
+two proofs feed R3a and R3f alike; `check` re-derives them from `before` with
+the same site position. Fixture `190-undefined-receiver-rewritten` (negative
+twin `mixed`: a method call on one path keeps its receiver), test
+`tests/gate/passes/call-shape-undefined-receiver.test.ts`.
+
+**Cost of the R3h/R3i write proofs** (2026-11-10). Both proofs read only
+three facts per register — written some non-value way (for-in/for-of target,
+catch parameter, any other string field naming it), the number of plain
+writes, and how many of those are not `undefined` — and those facts add up
+over a statement list. So they are summarised once per stage-B node for
+every register at once (memoised on node identity: the trees are immutable,
+a rewrite rebuilds only the spine) and folded per list identity, instead of
+re-walking the function body per call site (Θ(sites × body) before). The one
+register-dependent branch of the walk, an `init` naming the register (only
+its `value` is visited), is reproduced by walking the other fields with that
+name excluded. The original walk stays as the test oracle;
+`tests/gate/passes/call-shape-register-writes.test.ts` checks the facts and
+both verdicts against it on every construct fixture (rn-template on the
+sweep tier) and bounds the walk's node visits linearly in the site count.
+
+**Not done — `this` is the literal `0`.** hermesc v98 passes `LoadConstZero`
+as `this` when it knows the callee closure and that it never reads `this`
+(react-navigation-example: 242 sites, all over env-slot or register
+callees). `F(a…)` would change that `this` from `0` to `undefined`, which is
+sound only when the callee provably ignores `this`, which needs a bytecode
+resolution of the callee closure through env-slot stores. And it would not
+round-trip anyway: recompiling the decompiled `F(a…)` gives
+`LoadConstUndefined`, because hermesc cannot see that the env-slot callee is
+constant. Left as `Reflect.apply(F, 0, […])`, which is exact.
+
 ## 5. Writer
 
 Replace exactly that one `call` node in place; the enclosing statement and every
@@ -129,8 +183,9 @@ asserts that plus what `rewrite` assumed:
    deep-equal, in particular the member read of `O.P` in R3b appears in both;
 2. the rewritten node's argument count equals the source array's length;
 3. the callee is still `impure`-free (recompute, do not trust match data);
-4. R3a: `T` is the literal `undefined`, or its register still has exactly one
-   `undefined` write in `before` and `nested === 0`;
+4. R3a: `T` is the literal `undefined`, or its register passes R3h (every
+   write in `before` is `undefined`) or R3i (the write reaching the call in
+   its own list is `undefined`);
 5. R3b: `O` and `R` are the same identifier name in `before`;
 6. R3c: no third argument, or the third is syntactically identical to `C` and
    `C` is an `ident` (recomputed via `classifyNode`, same as `match`);
@@ -176,6 +231,8 @@ the histogram in the project status is the deliverable, not just the percentage.
 
 **Estimated size:** ~150 lines across `match/rewrite/check`, ~200 lines of
 tests.
+
+*(There is no section 8: it was never written, and the numbering is kept so that the `section 9`/`section 10` anchors cited from code comments and other docs stay valid.)*
 
 ## 9. R3e -- the method read separated from its call by the arguments
 
@@ -296,12 +353,52 @@ register-renamed constant loads and the outgoing-register `Mov`s are already
 gone, and every printer change would move its matcher. Deleting the fast arm
 from the IR outright: the stage-A driver's P1 edge check rejects it.
 
+**The `apply` form.** hermesc's LowerBuiltinCalls also splits
+`F.apply(T, arguments)` -- only when the `arguments` object has that call as
+its one user -- into `JmpBuiltinIs Lfast, <functionPrototypeApply>, C`, a
+generic arm `ReifyArguments* A; Call3 Y, C, F, T, A` and a fast arm
+`CallBuiltin X, <applyArguments>, 3` with F and T in the outgoing registers
+(the VM passes `this` = undefined itself). `applyArguments` calls F with
+`this` = T and a copy of the caller frame's actual arguments (TypeError for a
+non-callable F). With C the builtin, ES2024 20.2.3.1 does IsCallable(F)
+(TypeError), CreateListFromArrayLike(A) -- A's own `length` and indices --
+and `Call(F, T, list)`: the same call exactly when A still holds the actual
+arguments. So the rung adds, for this form: the fast callee is the module's
+`applyArguments` builtin with (F, T), the generic callee is the tested
+register, `this` = F, then T, then the value of `ReifyArguments*` in that arm
+(reify is modelled only here); and a whole-function CFG walk from every
+`ReifyArguments* A` reaches no read of A, until A is overwritten, other than
+another reify of A and this generic call (no long-form call's implicit
+outgoing window covers A either). The object therefore never reaches code
+that could write it, and Hermes never writes a frame's argument slots
+(`LoadParam` copies them out), so its array-like view is the actual
+arguments. `f.apply(t, args)` with any other array-like has no diamond (no
+fast path; a null/undefined `args` is plain Function.prototype.apply). The
+printed generic arm is `apply = F.apply; A = arguments; Reflect.apply(apply,
+F, [T, A])`; R3e sinks the reified `arguments` (or the loose
+`__hbc_arguments(arguments)` copy) into its argument position when the
+arguments it moves past are pure and A is read only there and dies at the
+call, giving `F.apply(T, arguments)`, which recompiles to the same diamond.
+In a loose function with simple parameters `arguments-form` keeps the copy
+helper (R-A3: the object escapes into a call), so that form prints
+`F.apply(T, __hbc_arguments(arguments))`; the helper now captures
+`Reflect.apply` at load, so a program overriding `Function.prototype.apply`
+no longer reaches it.
+
 **Known gaps.** `fcall-diamond` labels: the `break L` inside the hidden fast
 arm still counts as a use, so `label-clean` keeps the wrapper (`L0: { ...;
-break L0; }`, compiles identically). A long-form generic `Call` collapses but
-`expr-rebuild` does not yet sink `C = F.call` past the outgoing `Mov`s, so it
-prints as `Reflect.apply(C, F', [...])`. The `functionPrototypeApply`
-(builtin 55) diamond has a `CallBuiltin` fast arm and is not matched.
+break L0; }`, compiles identically). A long-form generic `Call` used to keep printing as
+`Reflect.apply(C, F', [...])` when its block read a register before
+reassigning it (fixture 170's `o.n.call(t, 1, 2, 3)`: `r4 = r3.n; r3 =
+r4.call`), because `expressionOnlyCheck` refused every fold in such a list.
+**Resolved (rt-fcall4):** the check now refuses only read-before-def
+violations a rewrite introduces (spec 02 section 6, "Carried live-in
+reads"), so it prints `F.call(T, 1, 2, 3)` and recompiles to the same call
+shape at v98/v99; derived-constructor frames keep the strict form, so the
+shapes super-call, inline-new and private-fields match are unchanged.
+The loose `F.apply(T, arguments)` with simple parameters
+prints `F.apply(T, __hbc_arguments(arguments))` (arguments-form R-A3), which
+recompiles without the diamond.
 
 **Tests.** `tests/gate/passes/fcall-diamond.test.ts`: fixture
 `170-function-call-diamond` (two-argument, zero-argument, constant-argument,
@@ -309,3 +406,27 @@ five-argument, shadowed `.call`, overridden `Function.prototype.call`) is T2
 PASS on the real VMs at 84/94/96/98/99 and has no shim left at 98/99;
 hand-built arms pin the accepted shapes and the refusals (wrong callee, wrong
 `this`, different argument/constant, arity, unmodelled instruction).
+`tests/gate/passes/fapply-diamond.test.ts`: fixture `220-function-apply-diamond`
+(strict, `this`-forwarding, loose, parameterless; negative twins: shadowed
+own `.apply`, overridden `Function.prototype.apply`) is T2 PASS at
+84/94/96/98/99 with no shim at 98/99; hand-built arms pin the apply proof
+and its refusals (other builtin, other `this`, other function, non-arguments
+array, untested callee, reify outside the apply form).
+
+**Review 1110** (`tests/gate/passes/review-1110-diamonds.test.ts`). Fixture
+`320-review-diamonds-probes` is a negative control, T2 PASS at
+84/94/96/98/99 with all 26 v99 diamonds collapsed: bound, Proxy and
+non-callable callees; `Function.prototype.call/apply` deleted, overridden
+and restored mid-function and mid-loop; a getter on the callee read and on
+`.call`; the receiver register reassigned inside the argument list; nested
+diamonds; throws between the read and the call (long-form call in `try`);
+parameters reassigned before a loose/strict/default-param `apply`;
+`arguments` written (`[0]`, `length`), escaping through an arrow or an
+alias, or used twice (hermesc emits no diamond then: the
+`CreateArgumentsInst` has another user). One bug, outside the diamond
+proof: the `__hbc_arguments` copy was a strict arguments object, so a loose
+function's forwarded/escaping `arguments` lost `callee` (reading it threw
+instead of giving the function); the copy is now made by a loose,
+parameterless function (still unmapped) and takes the source object's own
+`callee` descriptor (fixture `321-review-diamonds-arguments-callee`,
+DIVERGENT at every version before).

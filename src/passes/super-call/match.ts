@@ -232,6 +232,14 @@ export function classBindingSlots(module: readonly Stmt[], cls: ClassExpr): Read
 function isSuperTwiceGuard(store: Stmt, guard: Stmt | undefined): string | null {
   const st = simpleStore(store);
   if (st === null || !isIdentNamed(st.value, "__hbc_empty")) return null;
+  const test = superTwiceTest(guard);
+  if (test === null || !isIdentNamed(test.left, st.name)) return null;
+  return st.name;
+}
+
+/** The guard's `X !== __hbc_empty` test, when `guard` is the
+ *  `if (...) { throw new ReferenceError("super() called twice"); }` shape. */
+function superTwiceTest(guard: Stmt | undefined): Extract<Expr, { k: "bin" }> | null {
   if (guard === undefined || guard.k !== "if") return null;
   if (guard.else.length !== 0 || guard.then.length !== 1) return null;
   const thrown = guard.then[0]!;
@@ -240,8 +248,17 @@ function isSuperTwiceGuard(store: Stmt, guard: Stmt | undefined): string | null 
   if (thrown.arg.args.length !== 1 || thrown.arg.args[0]!.k !== "lit" || thrown.arg.args[0]!.text !== '"super() called twice"') return null;
   const test = guard.test;
   if (test.k !== "bin" || test.op !== "!==") return null;
-  if (!isIdentNamed(test.left, st.name) || !isIdentNamed(test.right, "__hbc_empty")) return null;
-  return st.name;
+  if (!isIdentNamed(test.right, "__hbc_empty")) return null;
+  return test;
+}
+
+/** The same guard after `expr-rebuild` R1a folded its pure `T = __hbc_empty`
+ *  store into the one read: `if (__hbc_empty !== __hbc_empty) { throw ... }`
+ *  -- a sentinel compared with itself, never true (fix-jsx-read-order
+ *  regression, derived-ctor 88). */
+function isFoldedSuperTwiceGuard(guard: Stmt | undefined): boolean {
+  const test = superTwiceTest(guard);
+  return test !== null && isIdentNamed(test.left, "__hbc_empty");
 }
 
 /** The emitter's own spelling of the `applyArguments` intrinsic
@@ -678,7 +695,16 @@ export function foldSuperBody(module: readonly Stmt[], cls: ClassExpr, body: rea
   // Delete the dead "super() called twice" guard, and its `T = <empty>` store
   // when nothing can read `T` before the next write to it.
   let guardName: string | null = null;
+  // A dead store that is also `T`'s own declaration (`let T = __hbc_empty;`)
+  // leaves a bare `let T;` behind when `T` is still mentioned after it:
+  // deleting it outright left the next `T = ...` undeclared, a ReferenceError
+  // in a (strict) class body (rt-fcall4, fixture 110's FocusManager).
+  const replaced = new Map<number, Stmt>();
   for (let i = at + 1; i + 1 < body.length; i++) {
+    if (isFoldedSuperTwiceGuard(body[i])) {
+      consumed.add(i);
+      break;
+    }
     const name = isSuperTwiceGuard(body[i]!, body[i + 1]);
     if (name === null) continue;
     consumed.add(i + 1);
@@ -686,13 +712,18 @@ export function foldSuperBody(module: readonly Stmt[], cls: ClassExpr, body: rea
     const after = simpleStore(rest[0] ?? { k: "comment", text: "" });
     const deadStore = (after !== null && after.name === name && identUses([{ k: "expr", expr: after.value }], name).reads === 0)
       || (identUses(rest, name).reads + identUses(rest, name).writes === 0 && !mentionedInNestedFunction(rest, name));
-    if (deadStore) consumed.add(i);
+    if (deadStore) {
+      const decl = body[i]!;
+      const stillNamed = identUses(rest, name).reads + identUses(rest, name).writes > 0 || mentionedInNestedFunction(rest, name);
+      if (decl.k === "init" && stillNamed) replaced.set(i, { k: "decl", kind: decl.kind, names: [name], ...(decl.origin !== undefined ? { origin: decl.origin } : {}) });
+      else consumed.add(i);
+    }
     guardName = name;
     break;
   }
   void guardName;
 
-  const tailStmts = body.filter((_s, i) => i > at && !consumed.has(i));
+  const tailStmts = body.map((s, i) => replaced.get(i) ?? s).filter((_s, i) => i > at && !consumed.has(i));
   for (const name of standins) {
     if (mentionedInNestedFunction(body, name)) return { code: "R-SC5", reason: `the stand-in register ${name} also occurs inside a nested closure, where it is a different frame's local` };
     // A store whose value is a call and whose very next statement is an

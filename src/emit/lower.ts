@@ -131,6 +131,9 @@ export interface BlockPlan {
   readonly selectObjects: ReadonlyMap<number, number>;
   /** Index of a `Call*` -> the method-call fast path it should use. */
   readonly methodCalls: ReadonlyMap<number, { readonly objReg: number; readonly name: string }>;
+  /** Index of a `Call*` whose method read stays a statement because an
+   *  observable instruction sits in between (§7.4 evaluation order). */
+  readonly unfusedReads: ReadonlySet<number>;
   /** The block's own instructions, so a lowering can look back within the
    *  block (`isLiteralUndefinedReg`). */
   readonly instructions: readonly Instruction[];
@@ -143,6 +146,16 @@ const CONSTRUCT = new Set(["Construct", "ConstructLong"]);
 // `Construct` (measured on 33-class-inheritance-super v99, functions #0 and #4).
 const CONSTRUCT_WITH_NEW_TARGET = new Set(["CallWithNewTarget", "CallWithNewTargetLong"]);
 const CALL_N = new Set(["Call1", "Call2", "Call3", "Call4"]);
+// Instructions that neither read nor write state a getter could observe or
+// change: registers, constants, environments being created, fresh allocations.
+const FRAME_LOCAL = /^(Mov|MovLong|LoadConst\w*|LoadParam|LoadParamLong|GetGlobalObject|GetEnvironment|GetParentEnvironment|GetClosureEnvironment|Create(Function|Inner)?Environment\w*|CreateClosure\w*|CreateGeneratorClosure\w*|CreateAsyncClosure\w*|GetNewTarget|GetArgumentsLength|ReifyArguments\w*|CreateRegExp|GetBuiltinClosure)$/;
+// Closure-variable reads run no code; like global-object property reads below
+// they are treated as unobservable (modelled assumption, spec 05 section 7.4:
+// a getter on the method that writes a binding read in between is not tracked).
+const BINDING_READ = /^LoadFromEnvironment\w*$/;
+// A fresh object, and own-property definitions on it before it escapes.
+const FRESH_OBJECT = /^(NewObject|NewObjectWithBuffer\w*|NewArray|NewArrayWithBuffer\w*|NewFastArray)$/;
+const FRESH_OBJECT_INIT = /^(PutOwnBySlotIdx\w*|PutNewOwnById\w*|PutNewOwnNEById\w*|PutOwnByIndex\w*|DefineOwnInDenseArray\w*)$/;
 
 /**
  * §7.5 — recognise the `new` triple, and §7.4's method-call fast path, before
@@ -155,6 +168,26 @@ export function planBlock(block: BasicBlock, functionInstructions: readonly Inst
   const newSites = new Map<number, NewSite>();
   const selectObjects = new Map<number, number>();
   const methodCalls = new Map<number, { objReg: number; name: string }>();
+  const unfusedReads = new Set<number>();
+  // A register every write of which, function-wide, is `GetGlobalObject`
+  // (Hermes hoists the global object into one register at entry).
+  const globalOnlyMemo = new Map<number, boolean>();
+  const globalOnly = (r: number): boolean => {
+    let v = globalOnlyMemo.get(r);
+    if (v === undefined) {
+      v = false;
+      for (const c of functionInstructions) {
+        if (!writtenRegisters(c).includes(r)) continue;
+        if (c.name !== "GetGlobalObject") {
+          v = false;
+          break;
+        }
+        v = true;
+      }
+      globalOnlyMemo.set(r, v);
+    }
+    return v;
+  };
   const ins = block.instructions;
 
   // The `new` triple is matched over the *whole function*, not one block: in
@@ -240,6 +273,47 @@ export function planBlock(block: BasicBlock, functionInstructions: readonly Inst
       if (c.operands.some((o, k) => o.role === "reg" && o.value === calleeReg && k > 0)) break;
     }
     if (getIdx < 0 || consumed.has(getIdx)) continue;
+    // Evaluation order (docs/BUGS.md 2026-11-09 "method read moved past an
+    // intervening getter"): the fused `rO.m(…)` reads `.m` at the call, so
+    // every instruction between the read and the call must be unobservable to
+    // it. Otherwise the read stays a statement and the call a `methodRead`
+    // `Reflect.apply(rF, rO, […])`, which call-shape R3e fuses on the final
+    // statement shape by moving the intervening work into the first argument,
+    // after the read, in order.
+    //
+    // Unobservable: frame-local instructions (FRAME_LOCAL), a fresh object or
+    // array and its own-property initialisation before it escapes, and reads
+    // of the global object's properties. The last is a modelled assumption: a
+    // getter on the method's receiver that redefines a global binding read
+    // between the two is not tracked (spec 05 section 7.4).
+    let observable = false;
+    const fresh = new Set<number>();
+    const globals = new Set<number>();
+    for (let j = 0; j < getIdx; j++) {
+      const c = ins[j]!;
+      for (const w of writtenRegisters(c)) globals.delete(w);
+      if (c.name === "GetGlobalObject") globals.add(V(c, 0));
+    }
+    for (let j = getIdx + 1; j < i && !observable; j++) {
+      const c = ins[j]!;
+      const ok =
+        FRAME_LOCAL.test(c.name) ||
+        BINDING_READ.test(c.name) ||
+        FRESH_OBJECT.test(c.name) ||
+        (FRESH_OBJECT_INIT.test(c.name) && fresh.has(V(c, 0))) ||
+        (GETBYID.test(c.name) && (globals.has(V(c, 1)) || globalOnly(V(c, 1))));
+      if (!ok) {
+        observable = true;
+        break;
+      }
+      const isFresh = FRESH_OBJECT.test(c.name);
+      for (const w of writtenRegisters(c)) {
+        fresh.delete(w);
+        globals.delete(w);
+      }
+      if (isFresh) fresh.add(V(c, 0));
+      if (c.name === "GetGlobalObject") globals.add(V(c, 0));
+    }
     let readLater = false;
     for (let j = i + 1; j < ins.length; j++) {
       const later = ins[j]!;
@@ -250,6 +324,10 @@ export function planBlock(block: BasicBlock, functionInstructions: readonly Inst
       }
     }
     if (readLater) continue;
+    if (observable) {
+      unfusedReads.add(i);
+      continue;
+    }
     consumed.add(getIdx);
     // The property *name* is a string id; the string table is only available at
     // lowering time, so the id travels through and is resolved there.
@@ -257,7 +335,7 @@ export function planBlock(block: BasicBlock, functionInstructions: readonly Inst
   }
 
   void fnIndexOf;
-  return { consumed, newSites, methodCalls, selectObjects, instructions: ins };
+  return { consumed, newSites, methodCalls, unfusedReads, selectObjects, instructions: ins };
 }
 
 /** Registers holding the arguments of a frame-based call, `arg[0]` = `this`. */
@@ -265,6 +343,52 @@ export function frameArgs(f: FunctionEmitter, argCount: number): Expr[] {
   const out: Expr[] = [];
   for (let i = 0; i < argCount; i++) out.push(R(f.argBase - i));
   return out;
+}
+
+/**
+ * A bare `Construct` whose frame `this` is the optimiser's own allocation:
+ * `GetById rP, callee, "prototype"; NewObjectWithParent rT, rP; Mov…` into the
+ * `this` slot, all in this block, the stand-in read by nothing but those `Mov`s
+ * and the callee unchanged since its prototype was read. Returns the registers
+ * that hold the stand-in at the `Construct` (the `this` slot first), else null.
+ */
+function prebuiltThisAliases(f: FunctionEmitter, ins: readonly Instruction[], index: number, calleeReg: number): number[] | null {
+  const writtenSince = new Set<number>();
+  const chain = new Set<number>();
+  const holders: number[] = [];
+  let want = f.argBase;
+  let proto: number | null = null;
+  for (let j = index - 1; j >= 0; j--) {
+    const c = ins[j]!;
+    const w = writtenRegisters(c);
+    if (proto !== null) {
+      if (w.includes(proto)) {
+        if (!GETBYID.test(c.name) || c.name.startsWith("Try") || V(c, 0) !== proto || V(c, 1) !== calleeReg) return null;
+        if (writtenSince.has(calleeReg) || f.mod.strings.get(V(c, 3)) !== "prototype") return null;
+        return holders;
+      }
+      if (c.operands.some((o, k) => o.role === "reg" && k > 0 && chain.has(o.value))) return null;
+      for (const r of w) writtenSince.add(r);
+      continue;
+    }
+    if (w.includes(want)) {
+      if (!writtenSince.has(want)) holders.push(want);
+      chain.add(want);
+      if ((c.name === "Mov" || c.name === "MovLong") && V(c, 0) === want) {
+        want = V(c, 1);
+      } else if (c.name === "NewObjectWithParent" && V(c, 0) === want) {
+        proto = V(c, 1);
+      } else {
+        return null;
+      }
+      for (const r of w) writtenSince.add(r);
+      continue;
+    }
+    // The stand-in must not escape before the constructor runs on it.
+    if (c.operands.some((o, k) => o.role === "reg" && k > 0 && (chain.has(o.value) || o.value === want))) return null;
+    for (const r of w) writtenSince.add(r);
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -477,7 +601,8 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
       return;
     case "PutNewOwnNEById":
     case "PutNewOwnNEByIdLong":
-      out.push(defineProperty(RG(insn, 0), lit(quote(f.mod.strings.get(V(insn, 2)))), [{ key: "value", value: RG(insn, 1) }], false));
+      // Writable, like the VM's non-enumerable new own property (fixture 396).
+      out.push(defineProperty(RG(insn, 0), lit(quote(f.mod.strings.get(V(insn, 2)))), [{ key: "value", value: RG(insn, 1) }, { key: "writable", value: lit("true") }], false));
       return;
     case "PutOwnByIndex":
     case "PutOwnByIndexL":
@@ -490,11 +615,24 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
     case "PutOwnByVal":
     case "DefineOwnByVal": {
       const enumerable = V(insn, 3) !== 0;
+      // `o[k] = v` is a [[Set]]; PutOwnByVal is a define. They differ for a
+      // computed `["__proto__"]: v` key, where the assignment would run the
+      // Object.prototype.__proto__ setter instead of creating an own property
+      // (adversarial-1110, constructs/351). Statically-known key only; a
+      // dynamic key that evaluates to "__proto__" is still lowered as a Set
+      // (docs/BUGS.md).
+      if (enumerable && isLiteralStringReg(f, plan, index, V(insn, 2), "__proto__")) {
+        out.push(defineProperty(RG(insn, 0), RG(insn, 2), [{ key: "value", value: RG(insn, 1) }, { key: "writable", value: lit("true") }], true));
+        return;
+      }
       if (enumerable) {
         out.push(assign(member(RG(insn, 0), RG(insn, 2), true), RG(insn, 1)));
         return;
       }
-      out.push(defineProperty(RG(insn, 0), RG(insn, 2), [{ key: "value", value: RG(insn, 1) }], false));
+      // The VM defines with getDefaultNewPropertyFlags() minus enumerable:
+      // writable and configurable stay true (a class method can be
+      // re-assigned; export-boot L4, fixture 396).
+      out.push(defineProperty(RG(insn, 0), RG(insn, 2), [{ key: "value", value: RG(insn, 1) }, { key: "writable", value: lit("true") }], false));
       return;
     }
     case "PutOwnGetterSetterByVal":
@@ -549,11 +687,16 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
       return;
     case "PutOwnPrivateBySym":
       // "Arg1[Arg4] = Arg2" (Arg3 is a cache index).
-      out.push(assign(member(RG(insn, 0), RG(insn, 3), true), RG(insn, 1)));
+      // Own-only and throwing when absent (review-1110, fixture 342): a
+      // helper, not `obj[sym] = v`, which would create the field.
+      f.useHelper("__hbc_privSet");
+      out.push({ k: "expr", expr: call(id("__hbc_privSet"), [RG(insn, 0), RG(insn, 3), RG(insn, 1)]) });
       return;
     case "GetOwnPrivateBySym":
-      // "Arg1 = Arg2[Arg4]" (Arg3 is a cache index).
-      return set(V(insn, 0), member(RG(insn, 1), RG(insn, 3), true));
+      // "Arg1 = Arg2[Arg4]" (Arg3 is a cache index). Own-only, throws when
+      // absent or on a primitive base (review-1110, fixture 342).
+      f.useHelper("__hbc_privGet");
+      return set(V(insn, 0), call(id("__hbc_privGet"), [RG(insn, 1), RG(insn, 3)]));
     case "PrivateIsIn":
       // Own-property check only: no prototype chain. A non-object right
       // operand throws a TypeError ("right operand of 'in' is not an object",
@@ -604,6 +747,12 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
       if (shape === undefined) return fail(`shape index ${V(insn, 2)} out of range`);
       const keys = objectKeys(f.mod, shape.keyBufferOffset, shape.numProps, f.fn.index, insn.offset);
       const literalObj = objectFromBuffers(f.mod, keys, V(insn, 3), f.fn.index, insn.offset);
+      // Object.assign is a [[Set]] per key: an own "__proto__" key would run
+      // the inherited setter. Then print the literal with the parent as a
+      // plain `__proto__:` entry instead (adversarial-1110, constructs/351).
+      if (keys.includes("__proto__") && literalObj.k === "object") {
+        return set(V(insn, 0), { k: "object", props: [{ key: "__proto__", computed: false, value: RG(insn, 1) }, ...literalObj.props] });
+      }
       return set(V(insn, 0), call(prop(id("Object"), "assign"), [call(prop(id("Object"), "create"), [RG(insn, 1)]), literalObj]));
     }
     case "CreateRegExp":
@@ -621,6 +770,11 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
   switch (name) {
     case "LoadFromEnvironment":
     case "LoadFromEnvironmentL": {
+      const view = f.envViewOp(insn);
+      if (view !== undefined) {
+        f.useHelper("__hbc_env_load");
+        return set(V(insn, 0), call(id("__hbc_env_load"), [RG(insn, 1), num(V(insn, 2))]));
+      }
       const env = f.resolveEnv(insn);
       return set(V(insn, 0), env === null ? unresolvedEnvMarker("load", V(insn, 2)) : id(envSlot(env, V(insn, 2))));
     }
@@ -630,6 +784,12 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
     case "StoreNPToEnvironmentL": {
       // `StoreNPToEnvironment` is `StoreToEnvironment`: the NP is a GC
       // write-barrier hint, and emitting anything different is a bug.
+      if (f.paramSlotStores.has(insn.offset)) return; // spec 27 section 13: the parameter is the slot
+      if (f.envViewOp(insn) !== undefined) {
+        f.useHelper("__hbc_env_store");
+        out.push({ k: "expr", expr: call(id("__hbc_env_store"), [RG(insn, 0), num(V(insn, 1)), RG(insn, 2)]) });
+        return;
+      }
       const env = f.resolveEnv(insn);
       if (env === null) out.push({ k: "expr", expr: unresolvedEnvMarker("store", V(insn, 1)) });
       else out.push(assign(id(envSlot(env, V(insn, 1))), RG(insn, 2)));
@@ -637,11 +797,22 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
     }
     case "GetEnvironment":
     case "GetParentEnvironment":
-    case "GetClosureEnvironment":
+    case "GetClosureEnvironment": {
+      // §6.2 closure environment views: the handle is a runtime object.
+      const view = f.envViewOp(insn);
+      if (view?.k === "closure-env") {
+        f.useHelper("__hbc_closure_env");
+        return set(V(insn, 0), call(id("__hbc_closure_env"), [RG(insn, 1)]));
+      }
+      if (view?.k === "up") {
+        f.useHelper("__hbc_env_up");
+        return set(V(insn, 0), call(id("__hbc_env_up"), [RG(insn, 1), num(view.levels)]));
+      }
       // An environment handle has no runtime representation: every access
       // through it was resolved statically by spec 03 §6. The register is still
       // written so nothing reads an undeclared name.
       return set(V(insn, 0), UNDEF);
+    }
   }
 
 // --- closures and generators ---------------------------------------------
@@ -659,7 +830,16 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
         // Captures a loop-local environment, so the closure has to be created
         // *here* to see this iteration's bindings rather than being hoisted to
         // the top of the enclosing function.
-        return set(V(insn, 0), { k: "func", name: inline.name, params: inline.params, body: inline.body });
+        const fnExpr: Expr = { k: "func", name: inline.name, params: inline.params, body: inline.body };
+        const boundInline = f.closureEnvView(V(insn, 2), insn.offset);
+        if (boundInline === undefined) return set(V(insn, 0), fnExpr);
+        f.useHelper("__hbc_bind_env");
+        return set(V(insn, 0), call(id("__hbc_bind_env"), [fnExpr, boundInline]));
+      }
+      const bound = f.closureEnvView(V(insn, 2), insn.offset);
+      if (bound !== undefined) {
+        f.useHelper("__hbc_bind_env");
+        return set(V(insn, 0), call(id("__hbc_bind_env"), [id(f.closureName(V(insn, 2), insn.offset)), bound]));
       }
       return set(V(insn, 0), id(f.closureName(V(insn, 2), insn.offset)));
     }
@@ -747,7 +927,8 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
       const method = f.mod.strings.get(Number(fast.name));
       return set(dst, call(prop(R(fast.objReg), method), args.slice(1)));
     }
-    return set(dst, applyCall(RG(insn, 1), args));
+    const general = applyCall(RG(insn, 1), args);
+    return set(dst, plan.unfusedReads.has(index) && general.k === "call" ? { ...general, methodRead: true } : general);
   }
   switch (name) {
     case "Call":
@@ -765,6 +946,23 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
       // A bare `Construct` outside a recognised triple: hermesc does not emit
       // one today, but hand-written or obfuscated bytecode might (§7.5).
       const args = frameArgs(f, V(insn, 2)).slice(1);
+      const prebuilt = prebuiltThisAliases(f, plan.instructions, index, V(insn, 1));
+      if (prebuilt !== null) {
+        // v98's optimiser allocates `this` itself (`NewObjectWithParent` of
+        // the known callee's prototype) and, having proved the constructor
+        // returns no object, keeps that register with no `SelectObject`.
+        // `Construct` runs the callee ON that object, so `Reflect.construct`
+        // (a fresh allocation) would leave the caller an empty object --
+        // export-boot L4 B2, React's FiberRootNode (fixture
+        // 410-construct-prebuilt-this). `new` is the same object here: it
+        // allocates from the same prototype and, the constructor returning no
+        // object, yields it; every register still holding the stand-in takes it.
+        const [first, ...rest] = prebuilt;
+        out.push(assign(R(first!), { k: "new", callee: RG(insn, 1), args }));
+        for (const r of rest) out.push(assign(R(r), R(first!)));
+        if (!prebuilt.includes(V(insn, 0))) out.push(assign(R(V(insn, 0)), UNDEF));
+        return;
+      }
       return set(V(insn, 0), call(prop(id("Reflect"), "construct"), [RG(insn, 1), { k: "array", elements: args }]));
     }
     case "CallWithNewTarget":
@@ -1009,6 +1207,27 @@ function isLiteralUndefinedReg(f: FunctionEmitter, plan: BlockPlan, index: numbe
   for (const ins of f.fn.instructions) {
     if (!writtenRegisters(ins).includes(r)) continue;
     if (ins.name !== "LoadConstUndefined") return false;
+    writes++;
+  }
+  return writes > 0;
+}
+
+/**
+ * True when register `r`, read by the instruction at `index`, statically holds
+ * the string literal `want`: the nearest preceding in-block write is a
+ * `LoadConstString*` of it, or (no in-block write) every write in the function
+ * is. Anything else answers false.
+ */
+function isLiteralStringReg(f: FunctionEmitter, plan: BlockPlan, index: number, r: number, want: string): boolean {
+  const isWant = (ins: Instruction): boolean => (ins.name === "LoadConstString" || ins.name === "LoadConstStringLongIndex") && f.mod.strings.get(V(ins, 1)) === want;
+  for (let i = index - 1; i >= 0; i--) {
+    const prev = plan.instructions[i]!;
+    if (writtenRegisters(prev).includes(r)) return isWant(prev);
+  }
+  let writes = 0;
+  for (const ins of f.fn.instructions) {
+    if (!writtenRegisters(ins).includes(r)) continue;
+    if (!isWant(ins)) return false;
     writes++;
   }
   return writes > 0;

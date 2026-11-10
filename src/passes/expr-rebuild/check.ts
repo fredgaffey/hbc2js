@@ -90,8 +90,27 @@ function verifyExpectedShape(before: readonly Stmt[], after: readonly Stmt[], ru
   return true;
 }
 
+/** A frame that runs `ThrowIfThisInitialized` (a derived constructor, or a
+ *  frame hermesc inlined a derived `new` into). Its lowering keeps the
+ *  strict read-before-def check: super-call, inline-new (a lock-step
+ *  comparison of the inlined copy against the constructor body) and
+ *  private-fields match the unfolded statements, and these frames always
+ *  have a live-in register (the uninitialised `this` slot's dead `Mov`), so
+ *  the strict form never folded them (rt-fcall4). */
+const derivedCtorFrame = new WeakMap<object, boolean>();
+function isDerivedCtorFrame(ctx: PassContext): boolean {
+  const cfg = ctx.cfg;
+  if (cfg === undefined || cfg === null) return false;
+  let v = derivedCtorFrame.get(cfg);
+  if (v === undefined) {
+    v = (cfg.blocks ?? []).some((b) => (b.instructions ?? []).some((insn) => insn.name === "ThrowIfThisInitialized")); // hand-built test contexts carry a stub cfg
+    derivedCtorFrame.set(cfg, v);
+  }
+  return v;
+}
+
 export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: PassContext): CheckResult {
-  const eff = expressionOnlyCheck(before, after);
+  const eff = expressionOnlyCheck(before, after, { carryLiveIn: !isDerivedCtorFrame(ctx) });
   if (!eff.ok) return eff;
 
   if (after.length !== before.length && after.length !== before.length - 1) {

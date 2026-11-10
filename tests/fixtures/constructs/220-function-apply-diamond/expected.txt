@@ -1,0 +1,8 @@
+this=T args=f,o,1,2
+this=T args=f,9!
+this=T args=f,o
+this=T args=5,6,7
+shadowed T 3
+overridden object 3
+overridden object 4
+this=T args=f,o,3,4

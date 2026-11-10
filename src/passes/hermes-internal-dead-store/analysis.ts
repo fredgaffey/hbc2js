@@ -1,4 +1,4 @@
-// hermes-internal-dead-store analysis — docs/LOWERING-CATALOGUE.md R17,
+// hermes-internal-dead-store analysis — docs/LOWERING-CATALOGUE.md R18,
 // docs/specs/passes/14-template-literal.md section 9 (roundtrip review
 // `diff:TryGetById(reg)` bucket, 2026-11-10).
 //

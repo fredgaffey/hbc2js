@@ -1,0 +1,3 @@
+after2 try0 fin0 try1 fin1 try2 fin2
+none f-inner
+end f00 f10 tail1

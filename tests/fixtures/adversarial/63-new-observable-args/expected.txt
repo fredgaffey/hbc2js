@@ -1,0 +1,5 @@
+3 get C arg 1 arg 2 ctor 1,2
+7 pick arg 3 arg 4 ctor 3,4
+11 get C arg 5 arg 6 ctor 5,6
+true arg 7 arg 8
+NaN get C ctor undefined,undefined

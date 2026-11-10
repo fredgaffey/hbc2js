@@ -284,7 +284,7 @@ for a `+` chain (must not match), a computed chunk, a `concat` whose `this` is
 a register with two writes, a `getTemplateObject` whose result is read twice,
 two calls sharing one id; ≥1 site the `check` refuses.
 
-**Corpus metric** (`tools/passes-metrics.ts`): share of emitted functions
+**Corpus metric** (`tools/passes-metrics.mjs`): share of emitted functions
 containing zero `__hbc_HermesInternal.concat` and zero
 `__hbc_b_getTemplateObject`. Baseline **0 %** free in `43`/`44`; **floor
 ≥ 90 %** over `tests/fixtures/constructs/**` at all five versions ×
@@ -312,7 +312,7 @@ the project status is part of the deliverable.
 3. `String.raw` is itself a tagged template; nothing here special-cases it and
    nothing should.
 
-## 9. Residual callee spill (R17, `hermes-internal-dead-store`)
+## 9. Residual callee spill (R18, `hermes-internal-dead-store`)
 
 **Problem.** When `hermesc` hoists the `HermesInternal.concat` read into a
 register (a template in a branch, or two templates in sibling branches sharing

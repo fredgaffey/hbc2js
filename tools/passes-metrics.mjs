@@ -824,6 +824,7 @@ export function measureIfChain(versions = ALL_VERSIONS) {
     const nestedAfterDepths = [];
     let elseIfAnnotated = 0;
     let elseIfPrintable = 0;
+    const perFixture = {};
     for (const dir of dirs) {
       const file = join(CORPUS_DIR, dir, `v${version}.hbc`);
       if (!existsSync(file)) continue;
@@ -846,6 +847,11 @@ export function measureIfChain(versions = ALL_VERSIONS) {
           nestedAfterDepths.push(da);
         }
       }
+      perFixture[dir] = {
+        functions: beforeBodies.length,
+        beforeDepthSum: sumOf(beforeBodies.map((b) => maxStmtDepth(b))),
+        afterDepthSum: sumOf(afterBodies.map((b) => maxStmtDepth(b))),
+      };
       for (const b of afterBodies) {
         const [a, p] = elseIfSites(b);
         elseIfAnnotated += a;
@@ -859,6 +865,7 @@ export function measureIfChain(versions = ALL_VERSIONS) {
       meanMaxDepth: { before: beforeDepths.length === 0 ? 0 : sumOf(beforeDepths) / beforeDepths.length, after: afterDepths.length === 0 ? 0 : sumOf(afterDepths) / afterDepths.length },
       elseIfAnnotated,
       elseIfPrintable,
+      perFixture,
     };
   }
   return { perVersion };
@@ -913,6 +920,8 @@ export function measureSwitchRaise(versions = [94]) {
       afterLabels += blockLabelDecls(after.code);
       const blocks = switchBlockTexts(after.code);
       perFixture[dir] = {
+        beforeLabels: blockLabelDecls(before.code),
+        afterLabels: blockLabelDecls(after.code),
         switchCount: blocks.length,
         labelledBreaksInSwitch: blocks.reduce((a, b) => a + (b.match(/break L\d+;/g) ?? []).length, 0),
         doubledBreaks: blocks.reduce((a, b) => a + (b.match(/break(?: L\d+)?;\n\s*break;/g) ?? []).length, 0),

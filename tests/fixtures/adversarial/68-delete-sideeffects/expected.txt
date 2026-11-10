@@ -1,0 +1,6 @@
+true false key a | delete a
+false true delete b
+false true key y
+true 3 false key 1
+true side
+2 side | lhs | rhs

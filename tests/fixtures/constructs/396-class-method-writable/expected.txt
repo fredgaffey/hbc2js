@@ -1,0 +1,5 @@
+count 2 size 2 make 7
+proto flush writable=true enumerable=false configurable=true
+static make writable=true enumerable=false configurable=true
+reassigned -1
+own keys 0

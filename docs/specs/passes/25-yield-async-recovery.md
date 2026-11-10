@@ -832,3 +832,28 @@ rows. The per-refusal histogram §5 asks for is *not* emitted as a diagnostic:
 record when `check` fails, so a refusal is currently silent. Adding a
 `W_PASS_REFUSED` info diagnostic through `PassContext.diagnostic` is the
 obvious follow-up and is the only part of §5's metric list not produced here.
+
+## 8. Zero-suspend groups and the v>=97 shells — 2026-11-10
+
+A generator with no `yield` and an async function with no `await` are still a
+`function*` / `async function`: the prototype chain (`GeneratorFunction`,
+`AsyncFunction`), `new` throwing, and the call returning a generator object or a
+Promise are observable, and RN's polyfills probe them at module-eval time
+(docs/BUGS.md export-boot L1, fixture `395-generator-no-yield`). At v<=96 the
+group recovers normally: a zero-suspend step closure has its continuation
+printed after the returning forced-return `if` rather than in an `else`, which
+`stripPrologue` now accepts, and a strict stub's `"use strict"` directive
+travels with the comments instead of refusing the group. At v>=97, where the
+lowered state machine is not recovered (`gen-lowered`, row 18), the rung runs
+anyway and makes the stub a *shell*: `function* f() { <pure prologue>; return
+yield* __hbc_makeGeneratorLowered(body); }`. `yield*` forwards
+`next`/`throw`/`return` and passes the result objects through, and the native
+wrapper's suspended-start and completed states answer as the lowered body
+would. A stub whose prologue is observable (a calling default parameter) is
+left a plain function, since the shell would defer it to the first `next()`.
+`async-recovery`'s R-A4/R-A5 refusals on a `__hbc_b_spawnAsync` stub likewise
+become `async function f() { ...; return await <driver>; }`; the driver still
+runs synchronously at the call, and the result settles one microtask after the
+driver's promise. Rejected alternative: setting a plain function's prototype to
+`GeneratorFunction.prototype` by hand, which leaves `fn()`'s object, its
+`instanceof` and `new` wrong.

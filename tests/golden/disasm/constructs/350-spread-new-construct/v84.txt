@@ -1,0 +1,152 @@
+; hbc2js disassembly of 350-spread-new-construct/v84.hbc
+; version=84 layout=B opcodeTable=hbc84 functions=5 strings=19 globalCodeIndex=0
+function #0 "global"  params=1 frame=17 env=0 flags=dbg  @0x00000190 size=468
+  0000  DeclareGlobalVar     s7 "log"
+  0005  DeclareGlobalVar     s10 "ns"
+  000a  DeclareGlobalVar     s12 "o1"
+  000f  DeclareGlobalVar     s13 "o2"
+  0014  DeclareGlobalVar     s14 "o3"
+  0019  DeclareGlobalVar     s8 "C"
+  001e  DeclareGlobalVar     s6 "a"
+  0023  DeclareGlobalVar     s15 "pick"
+  0028  CreateEnvironment    r2
+  002a  CreateClosure        r0, r2, f1 "C"
+  002f  GetGlobalObject      r1
+  0031  PutById              r1, r0, #c1, s8 "C"
+  0037  CreateClosure        r0, r2, f2 "a"
+  003c  PutById              r1, r0, #c2, s6 "a"
+  0042  CreateClosure        r0, r2, f3 "pick"
+  0047  PutById              r1, r0, #c3, s15 "pick"
+  004d  NewArray             r0, 0
+  0051  PutById              r1, r0, #c4, s7 "log"
+  0057  NewObject            r0
+  0059  CreateClosure        r3, r2, f4 "get C"
+  005e  LoadConstUndefined   r4
+  0060  LoadConstString      r2, s8 "C"
+  0064  PutOwnGetterSetterByVal r0, r2, r3, r4, 1
+  006a  PutById              r1, r0, #c5, s10 "ns"
+  0070  GetByIdShort         r0, r1, #c1, s10 "ns"
+  0075  GetByIdShort         r5, r0, #c2, s8 "C"
+  007a  GetByIdShort         r2, r1, #c3, s6 "a"
+  007f  LoadConstUInt8       r0, 1
+  0082  Call2                r3, r2, r4, r0
+  0087  GetByIdShort         r2, r1, #c3, s6 "a"
+  008c  LoadConstUInt8       r0, 2
+  008f  Call2                r8, r2, r4, r0
+  0094  GetByIdShort         r2, r5, #c4, s17 "prototype"
+  0099  CreateThis           r2, r2, r5
+  009d  Mov                  r10, r2
+  00a0  Mov                  r9, r3
+  00a3  Construct            r0, r5, 3
+  00a7  SelectObject         r0, r2, r0
+  00ab  PutById              r1, r0, #c6, s12 "o1"
+  00b1  TryGetById           r3, r1, #c5, s16 "print"
+  00b7  GetByIdShort         r0, r1, #c6, s12 "o1"
+  00bc  GetByIdShort         r2, r0, #c7, s11 "s"
+  00c1  GetByIdShort         r5, r1, #c8, s7 "log"
+  00c6  GetByIdShort         r0, r5, #c9, s9 "join"
+  00cb  LoadConstString      r6, s1 " "
+  00cf  Call2                r0, r0, r5, r6
+  00d4  Call3                r0, r3, r4, r2, r0
+  00da  NewArray             r0, 0
+  00de  PutById              r1, r0, #c4, s7 "log"
+  00e4  GetByIdShort         r0, r1, #c10, s15 "pick"
+  00e9  Call1                r5, r0, r4
+  00ed  GetByIdShort         r2, r1, #c3, s6 "a"
+  00f2  LoadConstUInt8       r0, 3
+  00f5  Call2                r3, r2, r4, r0
+  00fa  GetByIdShort         r2, r1, #c3, s6 "a"
+  00ff  LoadConstUInt8       r0, 4
+  0102  Call2                r8, r2, r4, r0
+  0107  GetByIdShort         r2, r5, #c4, s17 "prototype"
+  010c  CreateThis           r2, r2, r5
+  0110  Mov                  r10, r2
+  0113  Mov                  r9, r3
+  0116  Construct            r0, r5, 3
+  011a  SelectObject         r0, r2, r0
+  011e  PutById              r1, r0, #c7, s13 "o2"
+  0124  TryGetById           r3, r1, #c5, s16 "print"
+  012a  GetByIdShort         r0, r1, #c11, s13 "o2"
+  012f  GetByIdShort         r2, r0, #c7, s11 "s"
+  0134  GetByIdShort         r5, r1, #c8, s7 "log"
+  0139  GetByIdShort         r0, r5, #c9, s9 "join"
+  013e  Call2                r0, r0, r5, r6
+  0143  Call3                r0, r3, r4, r2, r0
+  0149  NewArray             r0, 0
+  014d  PutById              r1, r0, #c4, s7 "log"
+  0153  GetByIdShort         r0, r1, #c1, s10 "ns"
+  0158  GetByIdShort         r2, r0, #c2, s8 "C"
+  015d  GetByIdShort         r3, r1, #c3, s6 "a"
+  0162  LoadConstUInt8       r0, 5
+  0165  Call2                r0, r3, r4, r0
+  016a  NewArray             r5, 2
+  016e  PutOwnByIndex        r5, r0, 0
+  0172  GetByIdShort         r3, r1, #c3, s6 "a"
+  0177  LoadConstUInt8       r0, 6
+  017a  Call2                r0, r3, r4, r0
+  017f  PutOwnByIndex        r5, r0, 1
+  0183  NewArray             r0, 0
+  0187  LoadConstZero        r7
+  0189  Mov                  r9, r0
+  018c  Mov                  r8, r5
+  018f  CallBuiltin          r3, b49 "arraySpread", 4
+  0193  Mov                  r9, r2
+  0196  Mov                  r8, r0
+  0199  CallBuiltin          r0, b50 "apply", 3
+  019d  PutById              r1, r0, #c8, s14 "o3"
+  01a3  TryGetById           r3, r1, #c5, s16 "print"
+  01a9  GetByIdShort         r0, r1, #c12, s14 "o3"
+  01ae  GetByIdShort         r2, r0, #c7, s11 "s"
+  01b3  GetByIdShort         r5, r1, #c8, s7 "log"
+  01b8  GetByIdShort         r0, r5, #c9, s9 "join"
+  01bd  Call2                r0, r0, r5, r6
+  01c2  Call3                r0, r3, r4, r2, r0
+  01c8  NewArray             r0, 0
+  01cc  PutById              r1, r0, #c4, s7 "log"
+  01d2  Ret                  r0
+
+function #1 "C"  params=3 frame=14 env=0 flags=dbg  @0x00000364 size=59
+  0000  LoadParam            r1, 1
+  0003  LoadParam            r0, 2
+  0006  GetGlobalObject      r2
+  0008  GetByIdShort         r4, r2, #c1, s7 "log"
+  000d  GetByIdShort         r3, r4, #c2, s18 "push"
+  0012  LoadConstString      r2, s3 "ctor "
+  0016  Add                  r5, r2, r1
+  001a  LoadConstString      r2, s2 ","
+  001e  Add                  r2, r5, r2
+  0022  Add                  r2, r2, r0
+  0026  Call2                r2, r3, r4, r2
+  002b  Add                  r1, r1, r0
+  002f  LoadThisNS           r0
+  0031  PutById              r0, r1, #c1, s11 "s"
+  0037  LoadConstUndefined   r0
+  0039  Ret                  r0
+
+function #2 "a"  params=2 frame=12 env=0 flags=dbg  @0x0000039f size=30
+  0000  LoadParam            r0, 1
+  0003  GetGlobalObject      r1
+  0005  GetByIdShort         r3, r1, #c1, s7 "log"
+  000a  GetByIdShort         r2, r3, #c2, s18 "push"
+  000f  LoadConstString      r1, s0 "arg "
+  0013  Add                  r1, r1, r0
+  0017  Call2                r1, r2, r3, r1
+  001c  Ret                  r0
+
+function #3 "pick"  params=1 frame=12 env=0 flags=dbg  @0x000003bd size=28
+  0000  GetGlobalObject      r0
+  0002  GetByIdShort         r3, r0, #c1, s7 "log"
+  0007  GetByIdShort         r2, r3, #c2, s18 "push"
+  000c  LoadConstString      r1, s15 "pick"
+  0010  Call2                r1, r2, r3, r1
+  0015  GetByIdShort         r0, r0, #c3, s8 "C"
+  001a  Ret                  r0
+
+function #4 "get C"  params=1 frame=12 env=0 flags=dbg  @0x000003d9 size=28
+  0000  GetGlobalObject      r0
+  0002  GetByIdShort         r3, r0, #c1, s7 "log"
+  0007  GetByIdShort         r2, r3, #c2, s18 "push"
+  000c  LoadConstString      r1, s5 "get C"
+  0010  Call2                r1, r2, r3, r1
+  0015  GetByIdShort         r0, r0, #c3, s8 "C"
+  001a  Ret                  r0

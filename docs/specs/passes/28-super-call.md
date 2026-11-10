@@ -111,6 +111,10 @@ Three deletions, each justified:
    (it is dead by inspection of the two adjacent statements) and the
    `rT = __hbc_empty` store only when the next statement in the same list
    overwrites `rT` without reading it, or `rT` is never mentioned again.
+   When expr-rebuild R1a has already folded the pure store into its one
+   read, the guard arrives as `if (__hbc_empty !== __hbc_empty) {...}` --
+   a sentinel compared with itself -- and is deleted the same way
+   (fix-jsx-read-order regression, derived-ctor 88).
    The language re-creates this guard from `super(...)`: one super call
    dominating the body is exactly the case in which BindThisValue can never
    see an initialised `this`.

@@ -90,7 +90,7 @@ for (const version of VERSIONS) {
     assert.equal(closureTree(recompile(version, decompiled(original)), "makeParser"), closureTree(original, "makeParser"), `v${version}: closure tree differs after the round trip`);
   });
 
-  test(`151-closure-created-in-two-fns v${version}: a callback created in two functions is not moved into either`, (t) => {
+  test(`151-closure-created-in-two-fns v${version}: a callback created in two functions is an expression in each (fix-closure-identity-2)`, (t) => {
     if (!existsSync(join(NEGATIVE, `v${version}.hbc`)) || !needHermesc(version, t)) return;
     const original = new Uint8Array(readFileSync(join(NEGATIVE, `v${version}.hbc`)));
     const code = decompiled(original);
@@ -103,6 +103,15 @@ for (const version of VERSIONS) {
       assert.ok(line !== undefined, `v${version}: no line matching ${re}`);
       return line.length - line.trimStart().length;
     };
-    assert.equal(indent(/^\s+function _fn[1-9]\d*\(/), indent(/^\s+function left\(/), `v${version}: the shared callback must stay beside left/right:\n${code}`);
+    // fix-closure-identity-2 (spec 27 section 12): the callback is created in
+    // two functions, so it is a function expression inside each of them (one
+    // object per call, as in the VM), not one declaration beside them.
+    const decls = code.split("\n").filter((l) => /^\s+function _fn[1-9]\d*\(/.test(l));
+    assert.deepEqual(decls, [], `v${version}: no shared callback declaration:\n${code}`);
+    // `left`/`right` may themselves be function expressions in makeTwo's
+    // returned array (closure-inline, spec 32): the line that starts `left`
+    // (a declaration or `arr = [function left(`) is the outer bound either way.
+    const outer = indent(/function left\(/);
+    assert.ok((code.match(/function _fn[1-9]\d*\(/g) ?? []).length >= 2 && indent(/function _fn[1-9]\d*\(/) > outer, `v${version}: one callback instance per creator:\n${code}`);
   });
 }

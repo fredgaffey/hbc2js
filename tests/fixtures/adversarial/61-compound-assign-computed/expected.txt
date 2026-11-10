@@ -1,0 +1,5 @@
+key p | get p | val 5 | set p=15
+key q | get q | val 1 | val 2 | set q=s3
+45 key p | get p | key p | val 3 | set p=3 | set p=45
+44 get p | val 1 | set p=44
+176 key p | get p | val 2 | set p=176
