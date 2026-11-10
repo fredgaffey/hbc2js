@@ -1,0 +1,37 @@
+; hbc2js disassembly of 450-hermesinternal-own-property/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=2 strings=12 globalCodeIndex=0
+function #0 "global"  params=1 frame=21 env=0 flags=dbg,overflowed  @0x00000160 size=105
+  0000  NewObjectWithBuffer  r4, sh0(numProps=2), lit@0x0000
+  0006  LoadConstUndefined   r0
+  0008  CreateClosure        r1, r0, f1 "enablePromiseRejectionTracker"
+  000d  PutOwnBySlotIdx      r4, r1, 1
+  0011  NewObject            r1
+  0013  GetByIdShort         r3, r1, #c0, s9 "HermesInternal"
+  0018  GetByIdShort         r5, r4, #c1, s10 "enablePromiseRejectionTracker"
+  001d  GetGlobalObject      r1
+  001f  TryGetById           r2, r1, #c2, s11 "print"
+  0025  GetByIdShort         r7, r4, #c3, s7 "tag"
+  002a  LoadConstString      r6, s4 "untracked"
+  002e  JmpFalse             L1, r5
+  0031  NewObjectWithBuffer  r4, sh1(numProps=1), lit@0x0004
+  0037  Call2                r6, r5, r0, r4
+L1:
+  003c  TypeOf               r10, r3
+  003f  TryGetById           r1, r1, #c0, s9 "HermesInternal"
+  0045  GetByIdShort         r4, r1, #c4, s6 "concat"
+  004a  LoadConstString      r3, s1 " "
+  004e  LoadConstString      r13, s0 ""
+  0052  Mov                  r12, r7
+  0055  Mov                  r11, r3
+  0058  Mov                  r9, r3
+  005b  Mov                  r8, r6
+  005e  Call                 r1, r4, 6
+  0062  Call2                r1, r2, r0, r1
+  0067  Ret                  r0
+
+function #1 "enablePromiseRejectionTracker"  params=2 frame=2 env=0 flags=strict,dbg,overflowed  @0x000001c9 size=18
+  0000  LoadParam            r0, 1
+  0003  GetByIdShort         r1, r0, #c0, s8 "allRejections"
+  0008  LoadConstString      r0, s5 "tracked:"
+  000c  Add                  r0, r0, r1
+  0010  Ret                  r0
