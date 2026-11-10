@@ -68,6 +68,45 @@ var __hbc_HermesInternal = {
   // "the one currently stepping".
   h("__hbc_delegated", `var __hbc_delegated = false;`),
 
+  // Spec 03 §6.2 closure environment views: hermesc inlined a call to a known
+  // closure somewhere its captured scope is not lexically visible and reads
+  // the callee's captures through GetClosureEnvironment. Every creation site
+  // of that function binds a view (getter/setter per exposed slot, closing
+  // over the real bindings) under a registry symbol, so the reader reaches
+  // the very same variables at runtime.
+  h(
+    "__hbc_bind_env",
+    `
+function __hbc_bind_env(fn, view) {
+  Object.defineProperty(fn, Symbol.for("hbc2js.env"), { value: view, configurable: true });
+  return fn;
+}
+`,
+  ),
+  h(
+    "__hbc_env_view",
+    `
+function __hbc_env_view(parent) {
+  var cells = {};
+  for (var i = 1; i < arguments.length; i += 3) cells[arguments[i]] = [arguments[i + 1], arguments[i + 2]];
+  return { p: parent, c: cells };
+}
+`,
+  ),
+  h(
+    "__hbc_closure_env",
+    `
+function __hbc_closure_env(fn) {
+  var view = fn[Symbol.for("hbc2js.env")];
+  if (view === undefined) throw new TypeError("hbc2js: closure has no bound environment view");
+  return view;
+}
+`,
+  ),
+  h("__hbc_env_up", `function __hbc_env_up(view, levels) { while (levels-- > 0) view = view.p; return view; }`),
+  h("__hbc_env_load", `function __hbc_env_load(view, slot) { return view.c[slot][0](); }`),
+  h("__hbc_env_store", `function __hbc_env_store(view, slot, value) { view.c[slot][1](value); }`),
+
   h(
     "__hbc_unresolved_env",
     `

@@ -671,6 +671,11 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
   switch (name) {
     case "LoadFromEnvironment":
     case "LoadFromEnvironmentL": {
+      const view = f.envViewOp(insn);
+      if (view !== undefined) {
+        f.useHelper("__hbc_env_load");
+        return set(V(insn, 0), call(id("__hbc_env_load"), [RG(insn, 1), num(V(insn, 2))]));
+      }
       const env = f.resolveEnv(insn);
       return set(V(insn, 0), env === null ? unresolvedEnvMarker("load", V(insn, 2)) : id(envSlot(env, V(insn, 2))));
     }
@@ -680,6 +685,11 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
     case "StoreNPToEnvironmentL": {
       // `StoreNPToEnvironment` is `StoreToEnvironment`: the NP is a GC
       // write-barrier hint, and emitting anything different is a bug.
+      if (f.envViewOp(insn) !== undefined) {
+        f.useHelper("__hbc_env_store");
+        out.push({ k: "expr", expr: call(id("__hbc_env_store"), [RG(insn, 0), num(V(insn, 1)), RG(insn, 2)]) });
+        return;
+      }
       const env = f.resolveEnv(insn);
       if (env === null) out.push({ k: "expr", expr: unresolvedEnvMarker("store", V(insn, 1)) });
       else out.push(assign(id(envSlot(env, V(insn, 1))), RG(insn, 2)));
@@ -687,11 +697,22 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
     }
     case "GetEnvironment":
     case "GetParentEnvironment":
-    case "GetClosureEnvironment":
+    case "GetClosureEnvironment": {
+      // §6.2 closure environment views: the handle is a runtime object.
+      const view = f.envViewOp(insn);
+      if (view?.k === "closure-env") {
+        f.useHelper("__hbc_closure_env");
+        return set(V(insn, 0), call(id("__hbc_closure_env"), [RG(insn, 1)]));
+      }
+      if (view?.k === "up") {
+        f.useHelper("__hbc_env_up");
+        return set(V(insn, 0), call(id("__hbc_env_up"), [RG(insn, 1), num(view.levels)]));
+      }
       // An environment handle has no runtime representation: every access
       // through it was resolved statically by spec 03 §6. The register is still
       // written so nothing reads an undeclared name.
       return set(V(insn, 0), UNDEF);
+    }
   }
 
 // --- closures and generators ---------------------------------------------
@@ -709,7 +730,16 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
         // Captures a loop-local environment, so the closure has to be created
         // *here* to see this iteration's bindings rather than being hoisted to
         // the top of the enclosing function.
-        return set(V(insn, 0), { k: "func", name: inline.name, params: inline.params, body: inline.body });
+        const fnExpr: Expr = { k: "func", name: inline.name, params: inline.params, body: inline.body };
+        const boundInline = f.closureEnvView(V(insn, 2), insn.offset);
+        if (boundInline === undefined) return set(V(insn, 0), fnExpr);
+        f.useHelper("__hbc_bind_env");
+        return set(V(insn, 0), call(id("__hbc_bind_env"), [fnExpr, boundInline]));
+      }
+      const bound = f.closureEnvView(V(insn, 2), insn.offset);
+      if (bound !== undefined) {
+        f.useHelper("__hbc_bind_env");
+        return set(V(insn, 0), call(id("__hbc_bind_env"), [id(f.closureName(V(insn, 2), insn.offset)), bound]));
       }
       return set(V(insn, 0), id(f.closureName(V(insn, 2), insn.offset)));
     }
