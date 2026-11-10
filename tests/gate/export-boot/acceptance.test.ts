@@ -21,7 +21,6 @@ import { cleanup, exportTo, readManifest } from "../export/support.ts";
 
 const MODULE = join(repoRoot(), "src", "harness", "export-boot.ts");
 const IMPLEMENTED = existsSync(MODULE);
-const TODO = { todo: "docs/specs/33-export-boot.md not implemented yet" };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function load(): Promise<any> {
@@ -214,16 +213,25 @@ test("spec 33 test 9: rn-template B2 — runApplication with the same key render
   }
 });
 
-test("spec 33 test 10: held-out app (v98, bridgeless) boots like the original, B1 and B2 (sweep)", TODO, async (t) => {
+// Test 10 went real after export-boot L4 B2: `--lenient-env` because the
+// held-out app still has unresolved environment reads (markers that throw
+// when reached; none is reached at boot), and the last B2 divergence was a
+// bare v98 `Construct` on a prebuilt `this` (fixture 410-construct-prebuilt-this).
+test("spec 33 test 10: held-out app (v98, bridgeless) boots like the original, B1 and B2 (sweep)", async (t) => {
   if (!IMPLEMENTED) return;
   if (!requireSweep(t)) return;
   if (!existsSync(HO_BUNDLE) || !existsSync(HO_HBC)) { t.skip("run the fixture's fetch.sh"); return; }
   const { exportBootProof } = await load();
-  const { out, run } = exportTo(HO_HBC, [...GATE_EXPORT, "--tier", "flat"]);
+  const { out, run } = exportTo(HO_HBC, [...GATE_EXPORT, "--tier", "flat", "--lenient-env"]);
   try {
     assert.equal(run.status, 0, run.stderr);
-    const r = await exportBootProof(HO_BUNDLE, out, { phase: "run", horizonMs: 1000 });
+    const b1 = await exportBootProof(HO_BUNDLE, out, { phase: "register", timeoutMs: 180000 });
+    assert.equal(b1.verdict, "EQUIVALENT", b1.reason ?? JSON.stringify(b1.divergence));
+    assert.deepEqual(b1.appKeys.b, b1.appKeys.a);
+    const r = await exportBootProof(HO_BUNDLE, out, { phase: "run", horizonMs: 1000, timeoutMs: 180000 });
     assert.equal(r.verdict, "EQUIVALENT", r.reason ?? JSON.stringify(r.divergence));
+    assert.equal(r.runApplication.b, r.runApplication.a, "same app key");
+    assert.ok(r.commits.a > 0 && r.commits.b > 0, "at least one commit each side");
   } finally {
     cleanup(out);
   }
