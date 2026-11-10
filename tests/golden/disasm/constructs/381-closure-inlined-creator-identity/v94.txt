@@ -1,0 +1,147 @@
+; hbc2js disassembly of 381-closure-inlined-creator-identity/v94.hbc
+; version=94 layout=C opcodeTable=hbc94 functions=8 strings=21 globalCodeIndex=0
+function #0 "global"  params=1 frame=22 env=0 flags=dbg  @0x000001ec size=401
+  0000  DeclareGlobalVar     s16 "h"
+  0005  DeclareGlobalVar     s11 "a1"
+  000a  DeclareGlobalVar     s12 "a2"
+  000f  DeclareGlobalVar     s14 "b1"
+  0014  DeclareGlobalVar     s18 "seen"
+  0019  DeclareGlobalVar     s8 "H"
+  001e  CreateEnvironment    r1
+  0020  CreateClosure        r2, r1, f1 "H"
+  0025  GetGlobalObject      r0
+  0027  PutById              r0, r2, #c1, s8 "H"
+  002d  GetByIdShort         r3, r0, #c1, s8 "H"
+  0032  LoadConstUndefined   r5
+  0034  LoadConstUInt8       r2, 1
+  0037  Call2                r2, r3, r5, r2
+  003c  PutById              r0, r2, #c2, s16 "h"
+  0042  GetByIdShort         r3, r0, #c2, s16 "h"
+  0047  GetByIdShort         r2, r3, #c3, s6 "a"
+  004c  Call1                r2, r2, r3
+  0050  PutById              r0, r2, #c3, s11 "a1"
+  0056  GetByIdShort         r3, r0, #c2, s16 "h"
+  005b  GetByIdShort         r2, r3, #c3, s6 "a"
+  0060  Call1                r2, r2, r3
+  0064  PutById              r0, r2, #c4, s12 "a2"
+  006a  GetByIdShort         r3, r0, #c2, s16 "h"
+  006f  GetByIdShort         r2, r3, #c4, s13 "b"
+  0074  Call1                r2, r2, r3
+  0078  PutById              r0, r2, #c5, s14 "b1"
+  007e  TryGetById           r7, r0, #c5, s7 "print"
+  0084  GetByIdShort         r10, r0, #c6, s11 "a1"
+  0089  GetByIdShort         r4, r0, #c7, s12 "a2"
+  008e  GetByIdShort         r9, r0, #c6, s11 "a1"
+  0093  GetByIdShort         r3, r0, #c8, s14 "b1"
+  0098  GetByIdShort         r8, r0, #c7, s12 "a2"
+  009d  GetByIdShort         r2, r0, #c8, s14 "b1"
+  00a2  LoadConstString      r14, s1 "distinct:"
+  00a6  StrictNeq            r13, r10, r4
+  00aa  StrictNeq            r12, r9, r3
+  00ae  StrictNeq            r11, r8, r2
+  00b2  LoadConstUndefined   r15
+  00b4  Call                 r2, r7, 5
+  00b8  GetByIdShort         r4, r0, #c2, s16 "h"
+  00bd  GetByIdShort         r3, r4, #c9, s20 "setT"
+  00c2  LoadConstUInt8       r2, 7
+  00c5  Call2                r2, r3, r4, r2
+  00ca  TryGetById           r7, r0, #c5, s7 "print"
+  00d0  GetByIdShort         r2, r0, #c6, s11 "a1"
+  00d5  Call1                r13, r2, r5
+  00d9  GetByIdShort         r2, r0, #c7, s12 "a2"
+  00de  Call1                r12, r2, r5
+  00e2  GetByIdShort         r2, r0, #c8, s14 "b1"
+  00e7  Call1                r11, r2, r5
+  00eb  LoadConstString      r14, s3 "shared:"
+  00ef  LoadConstUndefined   r15
+  00f1  Call                 r2, r7, 5
+  00f5  TryGetById           r2, r0, #c10, s9 "WeakMap"
+  00fb  GetByIdShort         r3, r2, #c11, s10 "prototype"
+  0100  CreateThis           r3, r3, r2
+  0104  Mov                  r15, r3
+  0107  Construct            r2, r2, 1
+  010b  SelectObject         r2, r3, r2
+  010f  PutById              r0, r2, #c6, s18 "seen"
+  0115  GetByIdShort         r2, r0, #c6, s11 "a1"
+  011a  NewArray             r3, 3
+  011e  PutOwnByIndex        r3, r2, 0
+  0122  GetByIdShort         r2, r0, #c7, s12 "a2"
+  0127  PutOwnByIndex        r3, r2, 1
+  012b  GetByIdShort         r2, r0, #c8, s14 "b1"
+  0130  PutOwnByIndex        r3, r2, 2
+  0134  GetByIdShort         r2, r3, #c12, s15 "forEach"
+  0139  CreateClosure        r1, r1, f7 ""
+  013e  Call2                r1, r2, r3, r1
+  0143  TryGetById           r4, r0, #c5, s7 "print"
+  0149  GetByIdShort         r3, r0, #c13, s18 "seen"
+  014e  GetByIdShort         r2, r3, #c14, s17 "get"
+  0153  GetByIdShort         r1, r0, #c6, s11 "a1"
+  0158  Call2                r13, r2, r3, r1
+  015d  GetByIdShort         r6, r0, #c13, s18 "seen"
+  0162  GetByIdShort         r2, r6, #c14, s17 "get"
+  0167  GetByIdShort         r1, r0, #c7, s12 "a2"
+  016c  Call2                r12, r2, r6, r1
+  0171  GetByIdShort         r6, r0, #c13, s18 "seen"
+  0176  GetByIdShort         r1, r6, #c14, s17 "get"
+  017b  GetByIdShort         r0, r0, #c8, s14 "b1"
+  0180  Call2                r11, r1, r6, r0
+  0185  LoadConstString      r14, s4 "weakmap:"
+  0189  LoadConstUndefined   r15
+  018b  Call                 r0, r4, 5
+  018f  Ret                  r0
+
+function #1 "H"  params=2 frame=3 env=2 flags=dbg  @0x0000037d size=49
+  0000  CreateEnvironment    r1
+  0002  LoadParam            r0, 1
+  0005  StoreToEnvironment   r1, 0, r0
+  0009  CreateClosure        r0, r1, f2 "wrap"
+  000e  StoreToEnvironment   r1, 1, r0
+  0012  NewObject            r0
+  0014  CreateClosure        r2, r1, f4 "a"
+  0019  PutNewOwnByIdShort   r0, r2, s6 "a"
+  001d  CreateClosure        r2, r1, f5 "b"
+  0022  PutNewOwnByIdShort   r0, r2, s13 "b"
+  0026  CreateClosure        r1, r1, f6 "setT"
+  002b  PutNewOwnByIdShort   r0, r1, s20 "setT"
+  002f  Ret                  r0
+
+function #2 "wrap"  params=1 frame=1 env=0 flags=none  @0x000003ae size=9
+  0000  CreateEnvironment    r0
+  0002  CreateClosure        r0, r0, f3 ""
+  0007  Ret                  r0
+
+function #3 ""  params=1 frame=1 env=0 flags=none  @0x000003b7 size=9
+  0000  GetEnvironment       r0, 1
+  0003  LoadFromEnvironment  r0, r0, 0
+  0007  Ret                  r0
+
+function #4 "a"  params=1 frame=9 env=0 flags=dbg  @0x000003c0 size=15
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r1, r0, 1
+  0007  LoadConstUndefined   r0
+  0009  Call1                r0, r1, r0
+  000d  Ret                  r0
+
+function #5 "b"  params=1 frame=9 env=0 flags=dbg  @0x000003c0 size=15
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r1, r0, 1
+  0007  LoadConstUndefined   r0
+  0009  Call1                r0, r1, r0
+  000d  Ret                  r0
+
+function #6 "setT"  params=2 frame=2 env=0 flags=none  @0x000003cf size=14
+  0000  GetEnvironment       r1, 0
+  0003  LoadParam            r0, 1
+  0006  StoreToEnvironment   r1, 0, r0
+  000a  LoadConstUndefined   r0
+  000c  Ret                  r0
+
+function #7 ""  params=3 frame=13 env=0 flags=dbg  @0x000003dd size=28
+  0000  GetGlobalObject      r0
+  0002  GetByIdShort         r3, r0, #c1, s18 "seen"
+  0007  GetByIdShort         r2, r3, #c2, s19 "set"
+  000c  LoadParam            r1, 1
+  000f  LoadParam            r0, 2
+  0012  Call3                r0, r2, r3, r1, r0
+  0018  LoadConstUndefined   r0
+  001a  Ret                  r0
