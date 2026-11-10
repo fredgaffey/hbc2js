@@ -491,3 +491,41 @@ with `loop distinct: false`). Negative control: fixture
 creation sites lie in two functions (hermesc inlined its creator into both)
 stays one declaration at their common host, so each creator call returns the
 same object.
+
+## 13. A captured parameter is its environment slot
+
+**Problem.** Round-trip bucket `diff:StoreToEnvironment/LoadParam` (#1 on the
+second app, 6,229 functions; #12 on react-navigation). hermesc puts a
+parameter that a closure captures straight into the function's environment:
+`LoadParam rX, k; StoreToEnvironment env, s, rX` at entry, in parameter order,
+interleaved with the uncaptured parameters' loads. The emitter printed it as a
+separate variable, `let _eN_s; ... _eN_s = ak;`, and the recompile schedules
+that store after the NEXT parameter's `LoadParam`.
+
+**Choice** (`src/emit/function.ts`, emit-side for the same reason as section 3:
+the env graph knows every write to the slot). Scan the entry block's prefix of
+pure instructions (`LoadParam`, `Mov`, `LoadConst*`, the offset-0
+`CreateFunctionEnvironment`/`CreateEnvironment`, environment stores). A store
+of parameter `k` into a slot of the function's own environment is folded when
+that store is the slot's ONLY write in the whole module and the function
+creates exactly one environment: parameter `k` is printed under the slot's name
+(`function f(a1, _e3_0)`), the store prints nothing and the slot leaves the
+`let` prologue. Sound because from that store on, slot and parameter hold the
+same value for the rest of the activation (nothing writes either: the emitter
+never assigns a parameter), and nothing in the pure prefix can read the slot
+before it; with no write, sloppy-mode `arguments` aliasing cannot differ
+either. A defaulted parameter is not a raw `LoadParam` at the store, so it is
+never folded.
+
+**Rejected.** Folding when the function also owns sibling environments: at
+v98+ an offset-0 environment can be an inlined IIFE's (fixture 79, section 10),
+and binding its slot as a parameter wins against wrapping the IIFE back, which
+the fixture-79 gate test caught. Such functions keep the flat `let`.
+
+**Tests.** `tests/gate/emit/captured-param-entry-store.test.ts`: fixture 270
+(positive: a module-factory shape and a sloppy function reading `arguments`)
+recompiles `factory`/`sloppy` IDENTICAL at v94/v96/v98/v99 (v84's recompile
+adds unrelated `let` TDZ checks) and prints slot-named parameters at every
+version; fixture 271 (negative twins: slot rewritten in the body, in a
+closure, by a default initialiser, before the capture, and a sloppy alias)
+keeps every parameter `aK`; both are T2 PASS at 84/94/96/98/99.

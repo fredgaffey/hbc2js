@@ -729,6 +729,7 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
     case "StoreNPToEnvironmentL": {
       // `StoreNPToEnvironment` is `StoreToEnvironment`: the NP is a GC
       // write-barrier hint, and emitting anything different is a bug.
+      if (f.paramSlotStores.has(insn.offset)) return; // spec 27 section 13: the parameter is the slot
       const env = f.resolveEnv(insn);
       if (env === null) out.push({ k: "expr", expr: unresolvedEnvMarker("store", V(insn, 1)) });
       else out.push(assign(id(envSlot(env, V(insn, 1))), RG(insn, 2)));
