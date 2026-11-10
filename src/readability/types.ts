@@ -218,6 +218,10 @@ export interface CacheKeyInput {
   readonly skillId: SkillId;
   /** Bump a skill and every answer it produced is stale, by construction. */
   readonly skillVersion: number;
+  /** The skill text actually sent. When given, its hash joins the key so a same-version
+   *  edit misses (the live claude-cli cache passes it). Omitted by replay recordings,
+   *  whose committed keys are version-only. */
+  readonly skillText?: string;
   readonly model: string;
   /** The rendered function/module body the job is about. */
   readonly body: string;
@@ -232,6 +236,7 @@ export function cacheKey(input: CacheKeyInput): string {
   const parts = [
     `kind=${input.kind}`,
     `skill=${input.skillId}@${String(input.skillVersion)}`,
+    ...(input.skillText === undefined ? [] : [`skillSha=${createHash("sha256").update(input.skillText, "utf8").digest("hex")}`]),
     `model=${input.model}`,
     `bodyLen=${String(input.body.length)}`,
     `body=${input.body}`,
