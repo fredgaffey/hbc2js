@@ -165,7 +165,13 @@ test("export-boot apps: the stub host provides an Intl namespace for module-eval
   // `Intl.getCanonicalLocales`: "undefined is not a function".
   const src = `Object.defineProperty(Intl, "Locale", { value: function () {}, writable: true, enumerable: false, configurable: true });
     var c = Intl.getCanonicalLocales("en");
-    if (c.length !== 1 || c[0] !== "en") throw new Error("getCanonicalLocales");`;
+    if (c.length !== 1 || c[0] !== "en") throw new Error("getCanonicalLocales");
+    // B2: render constructed Intl.DateTimeFormat ("undefined cannot be used
+    // as a constructor", reported, no UI commit).
+    var tz = new Intl.DateTimeFormat("en-US").resolvedOptions().timeZone;
+    if (tz !== "UTC") throw new Error("DateTimeFormat");
+    if (typeof Intl.NumberFormat("en").format(1) !== "string") throw new Error("NumberFormat");
+    if (new Intl.Collator().compare("a", "b") !== -1) throw new Error("Collator");`;
   const r = bootTrace(src, { seed: 0, natives: deriveNativeManifest("") });
   assert.equal(r.reachedEnd, true, JSON.stringify(r.bootError));
 });

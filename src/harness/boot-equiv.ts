@@ -155,8 +155,33 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
   // \`getCanonicalLocales\` is the one primitive those polyfills build on
   // (a structurally valid tag comes back as itself).
   if (typeof globalThis.Intl === "undefined") {
+    // Hermes's own Intl (Android) also has Collator, DateTimeFormat and
+    // NumberFormat, which apps construct at render time; deterministic
+    // en-US/UTC stand-ins, identical on both sides.
+    var canon = function (l) { return l === undefined ? [] : (Array.isArray(l) ? l : [l]).map(String); };
+    var intlClass = function (resolved, methods) {
+      var C = function (locales, options) {
+        if (!(this instanceof C)) return new C(locales, options);
+        this.__o = options || {};
+      };
+      C.supportedLocalesOf = function (l) { return canon(l); };
+      C.prototype.resolvedOptions = function () { var r = {}; for (var k in this.__o) r[k] = this.__o[k]; for (var j in resolved) r[j] = resolved[j]; return r; };
+      for (var m in methods) C.prototype[m] = methods[m];
+      return C;
+    };
+    var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+    var fmtDate = function (d) { var t = d === undefined ? new Date(0) : new Date(d); return isNaN(t.getTime()) ? "Invalid Date" : (t.getUTCMonth() + 1) + "/" + t.getUTCDate() + "/" + t.getUTCFullYear() + ", " + pad(t.getUTCHours()) + ":" + pad(t.getUTCMinutes()); };
     globalThis.Intl = {
-      getCanonicalLocales: function (l) { return l === undefined ? [] : (Array.isArray(l) ? l : [l]).map(String); },
+      getCanonicalLocales: canon,
+      Collator: intlClass({ locale: "en-US", usage: "sort", sensitivity: "variant" }, { compare: function (a, b) { a = String(a); b = String(b); return a < b ? -1 : a > b ? 1 : 0; } }),
+      NumberFormat: intlClass({ locale: "en-US", numberingSystem: "latn" }, {
+        format: function (n) { return String(n); },
+        formatToParts: function (n) { return [{ type: "integer", value: String(n) }]; },
+      }),
+      DateTimeFormat: intlClass({ locale: "en-US", calendar: "gregory", numberingSystem: "latn", timeZone: "UTC" }, {
+        format: fmtDate,
+        formatToParts: function (d) { return [{ type: "literal", value: fmtDate(d) }]; },
+      }),
     };
   }
   var __hbcPromises = ${JSON.stringify(PROMISE_METHODS)};
