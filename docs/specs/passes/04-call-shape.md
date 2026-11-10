@@ -141,6 +141,21 @@ the same site position. Fixture `190-undefined-receiver-rewritten` (negative
 twin `mixed`: a method call on one path keeps its receiver), test
 `tests/gate/passes/call-shape-undefined-receiver.test.ts`.
 
+**Cost of the R3h/R3i write proofs** (2026-11-10). Both proofs read only
+three facts per register — written some non-value way (for-in/for-of target,
+catch parameter, any other string field naming it), the number of plain
+writes, and how many of those are not `undefined` — and those facts add up
+over a statement list. So they are summarised once per stage-B node for
+every register at once (memoised on node identity: the trees are immutable,
+a rewrite rebuilds only the spine) and folded per list identity, instead of
+re-walking the function body per call site (Θ(sites × body) before). The one
+register-dependent branch of the walk, an `init` naming the register (only
+its `value` is visited), is reproduced by walking the other fields with that
+name excluded. The original walk stays as the test oracle;
+`tests/gate/passes/call-shape-register-writes.test.ts` checks the facts and
+both verdicts against it on every construct fixture (rn-template on the
+sweep tier) and bounds the walk's node visits linearly in the site count.
+
 **Not done — `this` is the literal `0`.** hermesc v98 passes `LoadConstZero`
 as `this` when it knows the callee closure and that it never reads `this`
 (react-navigation-example: 242 sites, all over env-slot or register
