@@ -23,7 +23,7 @@ import type { HermesRunResult, HermesVm } from "./hermes-vm.ts";
 import { TRACE_VERDICT, compareTraces } from "./compare.ts";
 import type { TraceComparison, TraceVerdict } from "./compare.ts";
 import type { ErrRecord, Trace, TraceRecord } from "./trace.ts";
-import type { NativeManifest } from "./native-manifest.ts";
+import { PROMISE_METHODS, type NativeManifest } from "./native-manifest.ts";
 
 /** §3, §5: default cap on recorded native-module interactions per side. */
 export const DEFAULT_FIRST_NATIVE = 64;
@@ -147,6 +147,13 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
   // the open host (every name present).
   var __hbcNatives = ${JSON.stringify(natives === null ? null : natives.present)};
   function present(n) { return __hbcNatives === null || Object.prototype.hasOwnProperty.call(__hbcNatives, n); }
+  // Spec 33 apps stub-host addition (spec 31 §4.2): Android's Hermes ships
+  // \`Intl\`; the host VMs here are built without it. An empty namespace lets
+  // an app's formatjs polyfills (\`defineProperty(Intl, 'Locale', …)\`)
+  // install themselves at module eval, as they would on a device that
+  // lacks the piece they polyfill.
+  if (typeof globalThis.Intl === "undefined") globalThis.Intl = {};
+  var __hbcPromises = ${JSON.stringify(PROMISE_METHODS)};
   function consts(n) { return __hbcNatives !== null && Object.prototype.hasOwnProperty.call(__hbcNatives, n) ? __hbcNatives[n] : null; }
   // Spec 33 §3 B2 / §4(c): null in B1 (schedules are only recorded, as in
   // spec 31); in B2 the host keeps callbacks and drains them on the virtual
@@ -280,6 +287,10 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
           // Spec 33 L1 stub-host addition (spec 31 §4.2): getConstants()
           // returns an object (see hostConstants), not undefined.
           if (p === "getConstants") return cs ? JSON.parse(JSON.stringify(cs)) : hostConstants(name);
+          // Spec 33 apps stub-host addition (spec 31 §4.2): a device's
+          // promise methods (PROMISE_METHODS) resolve, on both sides.
+          var pmod = __hbcPromises[name.slice(name.lastIndexOf(".") + 1)];
+          if (pmod && Object.prototype.hasOwnProperty.call(pmod, p)) return Promise.resolve(pmod[p]);
           // Spec 33 stub-host addition (spec 31 §4.2): a JSI library's
           // \`<X>TurboModule.installTurboModule()\` (worklets, reanimated)
           // natively installs \`globalThis.__<x>ModuleProxy\`, which the
@@ -296,6 +307,10 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
           // extendable base classes (EventEmitter, NativeModule, SharedObject,
           // ...) with no-op listener methods; the rest are JSI host stubs.
           if (p === "installModules" && /ExpoModulesCore$/.test(name) && globalThis.expo === undefined) globalThis.expo = expoStub();
+          // react-native-nitro-modules: \`NitroModules.install()\` installs the
+          // JSI \`globalThis.NitroModulesProxy\` (createHybridObject, box, ...),
+          // which the library reads back at once (spec 33 apps).
+          if (p === "install" && /\.NitroModules$/.test(name) && globalThis.NitroModulesProxy === undefined) globalThis.NitroModulesProxy = hostStub("NitroModulesProxy", true);
           if (jsi === true) return hostStub(name + "." + String(p) + "()", true);
           return undefined;
         };

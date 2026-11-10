@@ -18,6 +18,12 @@
  *      (\`get('ExpoModulesCore')?.installModules()\`), or the last
  *      alternative of a lookup chain \`get(A) || get(B) || get(C)\` (the
  *      library's canonical module; the earlier ones are probes).
+ *      Also a module whose absent fallback is a throwing `new Proxy`
+ *      (`NativeModules.X ? NativeModules.X : new Proxy(...)`, the
+ *      library template's linking error), or one bound to a variable and
+ *      dereferenced with no guard anywhere in its factory, or whose factory
+ *      throws when it is missing, or named in a library's
+ *      "NativeModule.X is null. To fix this issue" error.
  *   4. Bundle evidence of a library's *own* native spec: a lookup call
  *      (`get` / `requireOptionalNativeModule` / `requireNativeModule`) that
  *      is the last expression of its Metro factory, i.e. a codegen-style
@@ -71,6 +77,14 @@ export const RN_CORE_ABSENT: readonly string[] = [
   "LinkingManager", "DevLoadingView", "RedBox", "LogBox", "BugReporting", "HMRClient",
 ];
 
+/** Methods a device answers with a Promise, and the value it resolves to
+ *  on a cold start (no deep link). A recording stub otherwise returns
+ *  undefined, and module-eval code like `Linking.getInitialURL().then(…)`
+ *  (Expensify) throws on both sides. Keyed by module, then method. */
+export const PROMISE_METHODS: Readonly<Record<string, Readonly<Record<string, unknown>>>> = {
+  IntentAndroid: { getInitialURL: null, canOpenURL: false, openURL: null },
+  LinkingManager: { getInitialURL: null, canOpenURL: false, openURL: null },
+};
 /** Constants for well-known third-party modules once they are present. */
 const KNOWN_CONSTANTS: Readonly<Record<string, NativeConstants>> = {
   // expo-constants, bare workflow, no embedded manifest (the app.config is
@@ -111,8 +125,37 @@ export function bundleEvidence(source: string): { required: Set<string>; spec: S
     // `...('X')}` end of a factory body without Metro's trailer.
     if (!inTry && /^\s*\}\s*(?:,\s*\d+\s*,\s*\[|\)|$)/.test(after) && !/(?:\|\||&&|\?\?|!=|==)\s*[^,;=]*$/.test(before)) spec.add(name);
   }
+  // A library that falls back to a throwing Proxy when its module is
+  // missing (create-react-native-library's LINKING_ERROR template:
+  // `NativeModules.X ? NativeModules.X : new Proxy({}, {get(){throw …}})`)
+  // cannot work without it; a shipping app links it.
+  LINKED_OR_THROW.lastIndex = 0;
+  while ((m = LINKED_OR_THROW.exec(source)) !== null) required.add(m[1]!);
+  // The library's own "NativeModule.X is null. To fix this issue…" message
+  // (netinfo, device-info, async-storage…): it throws without X.
+  IS_NULL_MSG.lastIndex = 0;
+  while ((m = IS_NULL_MSG.exec(source)) !== null) required.add(m[1]!);
+  // An app's own module bound once and dereferenced with no guard anywhere
+  // in its factory (`n=r(d[2]).NativeModules.BootSplash; … n.logoSizeRatio`
+  // at module-eval time): without it the factory throws on a device too.
+  UNGUARDED_BIND.lastIndex = 0;
+  while ((m = UNGUARDED_BIND.exec(source)) !== null) {
+    const v = m[1]!;
+    const end = source.indexOf("__d(", m.index);
+    const body = source.slice(m.index + m[0].length, end < 0 ? undefined : end);
+    const e = v.replace(/\$/g, "\\$");
+    const deref = new RegExp(`(?<![\\w$.])${e}\\.[A-Za-z_$]`).test(body);
+    const guard = new RegExp(`(?<![\\w$.])${e}\\s*(?:\\?|&&|\\|\\||[!=]=)|(?:!|[!=]=\\s*|&&\\s*|\\?\\s*|if\\s*\\(\\s*)${e}(?![\\w$])`).test(body);
+    // …or guarded only to throw when it is missing (`!t&&(…)throw new
+    // Error("… is null")`, react-native-device-info).
+    const throwsIfMissing = new RegExp(`!\\s*${e}(?![\\w$])[^;]{0,300}?\\bthrow\\b`).test(body);
+    if ((deref && !guard) || throwsIfMissing) required.add(m[2]!);
+  }
   return { required, spec };
 }
+const UNGUARDED_BIND = /(?<![\w$.])([\w$]+)\s*=\s*[\w$.()[\]]*\.NativeModules\.([A-Z][\w$]*)\s*[;,]/g;
+const IS_NULL_MSG = /NativeModule\.([A-Z][\w$]*) is null\. To fix/g;
+const LINKED_OR_THROW = /\.([A-Z][\w$]*)\s*\?\s*[\w$.]*\.\1\s*:\s*new\s+Proxy\s*\(/g;
 
 function readOverride(path: string | undefined): NativeOverride {
   if (path === undefined || !existsSync(path)) return {};
