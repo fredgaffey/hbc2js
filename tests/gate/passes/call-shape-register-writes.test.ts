@@ -21,7 +21,7 @@ import { isRegisterName, stmtLists } from "../../../src/passes/ast.ts";
 import type { Expr, Stmt } from "../../../src/emit/ast.ts";
 import { id, lit } from "../../../src/emit/ast.ts";
 import { applyAstPasses } from "../../../src/passes/ast.ts";
-import type { RegisterWriteFacts, RegisterWriteOracle } from "../../../src/passes/call-shape/match.ts";
+import type { RegisterWriteFacts } from "../../../src/passes/call-shape/match.ts";
 import { REFERENCE_ORACLE, SUMMARY_ORACLE, collectCandidates, isLocallyUndefinedThis, isProvenUndefinedThis } from "../../../src/passes/call-shape/match.ts";
 import { callShape } from "../../../src/passes/call-shape/index.ts";
 import { registerWriteWalkStats } from "../../../src/passes/call-shape/match.ts";
