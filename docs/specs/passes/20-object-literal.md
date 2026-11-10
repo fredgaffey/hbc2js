@@ -335,3 +335,53 @@ src.v})` logs `v,m` after decompilation, `m,v` originally) — docs/BUGS.md
 2026-11-09 "method read moved past an intervening getter", reproducer
 `tests/fixtures/adversarial/49-method-read-before-getter-arg` (a `todo` test in
 `tests/gate/passes/object-literal-arg.test.ts`).
+
+### 9.1 Amendment 2026-11-10 — kinds C and D (round-trip buckets `diff:NewObjectWithBuffer/CreateClosure`, `diff:PutOwnBySlotIdx/PutById*`)
+
+**Problem.** In a value-context branch — `Object.defineProperty(t, k, d.get ?
+d : {enumerable: true, get: function () {...}})`, the `export *` loop Babel
+emits, and Metro's asset factories `registerAsset({..., scales: [1], ...})`
+— the literal decompiles as a sequence `(rN = {..., get: null}, rN.get =
+_fnN, rN)`: hermesc v97+ builds a non-constant key as a NewObjectWithBuffer
+placeholder plus `PutOwnBySlotIdx`, and the emitter prints that fill as an
+assignment (recompiles to `PutById*`). `object-literal` cannot fold it: it
+works on statement lists, and a sequence element has no bytecode origin.
+Separately, the getter stays a hoisted declaration, whose closure hermesc
+creates *before* the literal in that branch (inline: after).
+
+**Choice.** Two more kinds in `object-literal-arg`. **C (slot fill):**
+inside a sequence, `rN = {inert literal}` immediately followed by `rN.k = v`
+(`v` inert, `k` a plain data key the literal already owns exactly once)
+becomes `rN = {..., k: v, ...}`; then a trailing `(..., rN = L, rN)` with
+`rN` dead afterwards (D-b, or D-a local to the list) becomes `(..., L)`. Sound
+for *any* store opcode: `[[Set]]` on an own writable data property of an
+ordinary object is a plain value update (OrdinarySetWithOwnDescriptor) — no
+prototype walk, no setter, position kept — and the adjacent fresh literal
+(no accessor/spread/computed/`__proto__` key) cannot have changed in
+between. A store to a key the literal does *not* own is refused (that one
+does walk the prototype chain; fixture `261-literal-slot-fill-observable-store`
+covers an accessor key). Before v97 there are no placeholders, so kind C
+does not fire there. **D (closure slot):** a top-level `function _fnN` whose
+only mention in the whole function (own body included) is a literal's `k:`
+value, with bytecode name `k`, inside a `seq`/`cond`/`logical` of a
+top-level statement, moves into the slot as `k: function () {...}`.
+Closure creation is unobservable, nothing else can name it, it captures the
+same function scope (top-level list, no block in between), and an anonymous
+function as property `k`'s value is named `k`. Straight-line literals keep
+the declaration form (they round-trip either way).
+
+**Rejected.** Teaching the emitter to print `PutOwnBySlotIdx` into the
+literal while building the sequence: it would duplicate `object-literal`'s
+fold inside `src/emit` and, with passes off, change output nobody asked to
+change.
+
+**Measured** (fixture `260-literal-slot-fill-in-sequence`): both functions
+round-trip IDENTICAL at v98/v99. React-navigation v98 passes-on, strong
+normalisation: 7695 -> 8177 IDENTICAL of 14437 (53.30% -> 56.64%), no
+function lost IDENTICAL; `diff:NewObjectWithBuffer/CreateClosure` 312 -> 7,
+`diff:PutOwnBySlotIdx/PutByIdLoose` 172 -> 2 (`.../PutByIdStrict` 257 -> 248
+is a different shape, untouched).
+
+**Found on the way, not fixed here.** `object-literal`'s `PutById` fold is
+unsound against an inherited setter installed *before* the object existed —
+docs/BUGS.md 2026-11-10, adversarial fixture 50 (`todo`).
