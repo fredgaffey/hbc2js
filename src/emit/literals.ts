@@ -155,7 +155,10 @@ export function objectFromBuffers(mod: HbcModule, keys: readonly string[], value
   const values = readValuesTolerant(buffer, valueOffset, keys.length, mod.header.version);
   const props: ObjectProp[] = keys.map((key, i) => {
     const value = literalExpr(mod, values[i]!);
-    return isSafePropertyName(key) ? { key, computed: false, value } : { key: quote(key), computed: true, value };
+    // A plain `__proto__: v` in a literal sets the prototype; the buffer means
+    // an own data property, so that key is always printed computed
+    // (adversarial-1110, constructs/351).
+    return isSafePropertyName(key) && key !== "__proto__" ? { key, computed: false, value } : { key: quote(key), computed: true, value };
   });
   void functionIndex;
   void insnOffset;

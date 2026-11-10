@@ -178,3 +178,12 @@ must fail).
 The segregation warm-up test is now a state claim: it waits up to 60 s x
 `HBC2JS_TIME_SCALE` for `segregationCached()` (load only delays it) and the
 "<1000 ms warmed answer" bound is enforced only when not busy.
+
+## Running a subset: `npm test -- <paths>`
+
+`npm test` runs `tools/run-tests.mjs`. With no arguments it is the full gate
+(typecheck, the gate globs, then the deferred UI e2e smoke file). With path or
+glob arguments it runs **only those files** under `node --test` (no typecheck, no
+e2e smoke); `-`-prefixed flags pass through to `node --test`. Before this, npm
+appended the arguments to the last `node --test` in an `&&` chain, so the full
+gate still ran. Covered by `tests/gate/docs/run-tests-script.test.ts`.

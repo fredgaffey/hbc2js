@@ -173,20 +173,25 @@ structure-recovery block.
 **Resolved, under a condition** (docs/BUGS.md `object-literal-putbyid`,
 `object-literal-interleaved`, `object-literal-computed-key`):
 
-* **`PutById`/`PutByIdLoose`/`PutByIdStrict`/`TryPutById` on a fresh object**
-  now folds like an own-define for a plain data key, **unless** the key is
-  `__proto__` (still a `[[Set]]` that hits `Object.prototype`'s own
-  accessor, never a define) **or** anything in the run so far — including
-  the store's own value — has an `effectSequence` (a call, `new`, a member
-  read, …): `OrdinarySet` on a fresh object with an unmodified prototype
-  chain falls through to `CreateDataProperty`, exactly `[[DefineOwnProperty]]`'s
-  outcome, but only while nothing has had a chance to have put an accessor
-  or non-writable data property on `Object.prototype` first. See
-  `src/passes/object-literal/match.ts`'s `PUT_BY_ID` doc comment for the
-  full argument. Scope: this is a *local* proof over the run being folded,
-  not a whole-program one — code that mutates `Object.prototype` earlier in
-  the same function, before the object is even created, is out of scope the
-  same way it always has been.
+* **`PutById`/`PutByIdLoose`/`PutByIdStrict`/`TryPutById`** — *superseded
+  2026-11-10 by docs/DECISIONS.md D27a.* The 2026-09-05 resolution folded
+  such a store on a fresh object while nothing in the run had an effect; that
+  is unsound against an accessor or non-writable property put on
+  `Object.prototype` by code that ran *before* the object existed (construct
+  fixture `390-putbyid-fold-inherited-setter`). A `PutById`-family store into
+  a key the object does not own yet now ends the run, as §4 precondition 4
+  originally said. One case still folds: a `PutById` into a key the literal
+  already owns as a plain data property (a v84–v96 `NewObjectWithBuffer`
+  placeholder fill, or an earlier fold) — a value update of an own writable
+  data property, no prototype walk (the §9.1 kind C argument). A literal with
+  no prototype chain (`__proto__: null`) would also be sound; the rung does
+  not build those.
+  Measured 2026-11-10 (passes-on, strong normalisation): react-navigation v98
+  8177 -> 8186 IDENTICAL of 14437 (`diff:NewObject/NewObjectWithBuffer`
+  10 -> 0: the old fold made hermesc recompile `{}` + stores as a buffer
+  literal); rn-template v94 2101 -> 2101, decompiled output byte-identical.
+  Readability cost: 24 literals in 19 react-navigation modules now print as
+  `{}`/a shorter literal followed by `o.k = v;` statements.
 * **An interleaved statement inside the run** (v98/v99 `NewObjectWithBuffer`
   computing a value *between* two stores, `63-object-literal` fn `table`) no
   longer ends the run outright: a **pure register def** (`rX = <expr>` with
@@ -252,7 +257,7 @@ structure-recovery block.
 
 | Shape | Why refused | Ledger |
 |---|---|---|
-| `PutById`-family key `__proto__`, or a run that has already had an effect | still a full `[[Set]]` on `Object.prototype`, or the prototype chain may have changed since the object was created | `docs/BUGS.md` `object-literal-putbyid` |
+| a `PutById`-family store into a key the object does not own yet (D27a) | a full `[[Set]]`: an inherited setter or non-writable property installed before the object existed would observe it | docs/DECISIONS.md D27a; fixture `390-putbyid-fold-inherited-setter` |
 | an interleaved statement that is not a *pure register def*, or one `canHoist` refuses (reads the object being built, or redefines a register an earlier fold already read) | commuting it above the run is not proven safe | `docs/BUGS.md` `object-literal-interleaved` |
 | a computed-key store whose key or value reads/writes the object's own register | precondition 6, same as every other store | `docs/BUGS.md` `object-literal-computed-key` |
 | a plain-key store that follows an already-folded computed-key store in the same run | the computed key might alias it at runtime; folding both risks the wrong write winning (see above) | same row |
@@ -268,6 +273,8 @@ hazard). All five HBC versions.
 
 **Metrics.** rn-template `diff:PutNewOwnById/PutById`
 bucket counts, before/after — reported in the landing report.
+
+*(There is no section 8: it was never written, and the numbering is kept so that the `section 9`/`section 10` anchors cited from code comments and other docs stay valid.)*
 
 ## 9. Amendment 2026-11-09 — `object-literal-arg` (round-trip bucket `diff:GetById/NewObjectWithBuffer`)
 
@@ -302,7 +309,10 @@ renaming rung. Two site kinds, both inside one straight-line list:
   (fixture `141-define-property-observable-literal`).
 * **B — callee base.** `rC = E` with `E` a global identifier or a
   non-computed member chain over one (it reads no register), then only
-  `isPureStmt` statements that never mention `rC`, then a call whose callee is
+  statements that cannot observe or be observed by `E`'s getters (no value,
+  or `rX = <literal or register>`; review-1110 objlit/fold: `isPureStmt` let a
+  global getter read or a `valueOf`-calling `+` run before `E`, fixture 330)
+  that never mention `rC`, then a call whose callee is
   `rC.m`, `rC` dead after it. The callee's base is the first thing the call
   evaluates, so `E` runs at the same point of the effect sequence; this is
   expr-rebuild's R1a, which could not fire while kind A's literal still stood
@@ -330,3 +340,54 @@ src.v})` logs `v,m` after decompilation, `m,v` originally) — docs/BUGS.md
 2026-11-09 "method read moved past an intervening getter", reproducer
 `tests/fixtures/adversarial/49-method-read-before-getter-arg` (a `todo` test in
 `tests/gate/passes/object-literal-arg.test.ts`).
+
+### 9.1 Amendment 2026-11-10 — kinds C and D (round-trip buckets `diff:NewObjectWithBuffer/CreateClosure`, `diff:PutOwnBySlotIdx/PutById*`)
+
+**Problem.** In a value-context branch — `Object.defineProperty(t, k, d.get ?
+d : {enumerable: true, get: function () {...}})`, the `export *` loop Babel
+emits, and Metro's asset factories `registerAsset({..., scales: [1], ...})`
+— the literal decompiles as a sequence `(rN = {..., get: null}, rN.get =
+_fnN, rN)`: hermesc v97+ builds a non-constant key as a NewObjectWithBuffer
+placeholder plus `PutOwnBySlotIdx`, and the emitter prints that fill as an
+assignment (recompiles to `PutById*`). `object-literal` cannot fold it: it
+works on statement lists, and a sequence element has no bytecode origin.
+Separately, the getter stays a hoisted declaration, whose closure hermesc
+creates *before* the literal in that branch (inline: after).
+
+**Choice.** Two more kinds in `object-literal-arg`. **C (slot fill):**
+inside a sequence, `rN = {inert literal}` immediately followed by `rN.k = v`
+(`v` inert, `k` a plain data key the literal already owns exactly once)
+becomes `rN = {..., k: v, ...}`; then a trailing `(..., rN = L, rN)` with
+`rN` dead afterwards (D-b, or D-a local to the list) becomes `(..., L)`. Sound
+for *any* store opcode: `[[Set]]` on an own writable data property of an
+ordinary object is a plain value update (OrdinarySetWithOwnDescriptor) — no
+prototype walk, no setter, position kept — and the adjacent fresh literal
+(no accessor/spread/computed/`__proto__` key) cannot have changed in
+between. A store to a key the literal does *not* own is refused (that one
+does walk the prototype chain; fixture `261-literal-slot-fill-observable-store`
+covers an accessor key). Before v97 there are no placeholders, so kind C
+does not fire there. **D (closure slot):** a top-level `function _fnN` whose
+only mention in the whole function (own body included) is a literal's `k:`
+value, with bytecode name `k`, inside a `seq`/`cond`/`logical` of a
+top-level statement, moves into the slot as `k: function () {...}`.
+Closure creation is unobservable, nothing else can name it, it captures the
+same function scope (top-level list, no block in between), and an anonymous
+function as property `k`'s value is named `k`. Straight-line literals keep
+the declaration form (they round-trip either way).
+
+**Rejected.** Teaching the emitter to print `PutOwnBySlotIdx` into the
+literal while building the sequence: it would duplicate `object-literal`'s
+fold inside `src/emit` and, with passes off, change output nobody asked to
+change.
+
+**Measured** (fixture `260-literal-slot-fill-in-sequence`): both functions
+round-trip IDENTICAL at v98/v99. React-navigation v98 passes-on, strong
+normalisation: 7695 -> 8177 IDENTICAL of 14437 (53.30% -> 56.64%), no
+function lost IDENTICAL; `diff:NewObjectWithBuffer/CreateClosure` 312 -> 7,
+`diff:PutOwnBySlotIdx/PutByIdLoose` 172 -> 2 (`.../PutByIdStrict` 257 -> 248
+is a different shape, untouched).
+
+**Found on the way, fixed separately.** `object-literal`'s `PutById` fold was
+unsound against an inherited setter installed *before* the object existed —
+docs/BUGS.md 2026-11-10; the fold is gone (docs/DECISIONS.md D27a), the
+reproducer is construct fixture `390-putbyid-fold-inherited-setter`.

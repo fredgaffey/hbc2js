@@ -106,10 +106,12 @@ function isObjectCall(e: Expr, name: string, arity: number): e is Extract<Expr, 
  *  null/primitive-guarded `cond` of `NewObjectWithParent`. Returns the seed
  *  object literal, or null when this is not that shape (a computed or
  *  non-literal second argument keeps the refusal). */
-function seededAllocation(e: Expr): Expr | null {
+function seededAllocation(e: Expr, protoReg?: string): Expr | null {
   if (!isObjectCall(e, "assign", 2)) return null;
   const base = e.args[0]!;
-  if (!isObjectCall(base, "create", 1) || !isNewTargetPrototype(base.args[0]!)) return null;
+  if (!isObjectCall(base, "create", 1)) return null;
+  const inner = base.args[0]!;
+  if (!(protoReg === undefined ? isNewTargetPrototype(inner) : isIdentNamed(inner, protoReg))) return null;
   const seed = e.args[1]!;
   return seed.k === "object" ? seed : null;
 }
@@ -180,7 +182,7 @@ export function foldCtorBody(cls: ClassExpr, body: readonly Stmt[]): { readonly 
   // rO = Object.create(rP === null ? ...)` -- one register at v98, two at v99.
   // SEEDED: `rO = Object.assign(Object.create(new.target.prototype), {...})`,
   // the field-initialiser form; a single statement, one register.
-  const seed = seededAllocation(first.value);
+  let seed = seededAllocation(first.value);
   let reg: string;
   let protoReg: string;
   let span: number;
@@ -195,7 +197,16 @@ export function foldCtorBody(cls: ClassExpr, body: readonly Stmt[]): { readonly 
   } else if (isNewTargetPrototype(first.value)) {
     protoReg = first.name;
     const second = at + 1 < body.length ? simpleStore(body[at + 1]!) : null;
-    if (second === null || !isNewObjectWithParent(second.value, protoReg)) return { code: "R-CT0", reason: "constructor does not open with the new.target.prototype stand-in" };
+    // SEEDED-SPLIT: `rP = new.target.prototype; rO = Object.assign(Object.
+    // create(rP), {...})` -- the seeded form with its prototype read left a
+    // statement of its own, because folding it into the call would move it
+    // after the `Object`/`.assign`/`.create` reads (spec 02 R1a
+    // evaluation-order rule, fix-jsx-read-order). Same allocation, same fold.
+    const splitSeed = second === null ? null : seededAllocation(second.value, protoReg);
+    if (second !== null && splitSeed !== null) {
+      seed = splitSeed;
+      if (identUses([{ k: "expr", expr: splitSeed }], second.name).reads > 0 || identUses([{ k: "expr", expr: splitSeed }], protoReg).reads > 0) return { code: "R-CT2", reason: "the seed literal reads the stand-in register it is about to become" };
+    } else if (second === null || !isNewObjectWithParent(second.value, protoReg)) return { code: "R-CT0", reason: "constructor does not open with the new.target.prototype stand-in" };
     reg = second.name;
     span = 2;
   } else {
@@ -230,7 +241,7 @@ export function foldCtorBody(cls: ClassExpr, body: readonly Stmt[]): { readonly 
   // `this`, so the whole statement becomes `Object.assign(this, {...});` --
   // the same call on the same arguments, one statement in place of one.
   const seededReplacement: Stmt = { k: "expr", expr: { k: "call", callee: { k: "member", obj: { k: "ident", name: "Object" }, prop: { k: "lit", text: "assign" }, computed: false }, args: [THIS, seed ?? THIS] } };
-  const kept = seed !== null ? body.map((s, i) => (i === at ? seededReplacement : s)) : body.filter((_s, i) => i !== at && i !== at + 1);
+  const kept = seed !== null && span === 1 ? body.map((s, i) => (i === at ? seededReplacement : s)) : seed !== null ? body.flatMap((s, i) => (i === at ? [] : i === at + 1 ? [seededReplacement] : [s])) : body.filter((_s, i) => i !== at && i !== at + 1);
   // The prototype temporary, when it is a register of its own, must die with
   // the allocation: anything still reading or writing it after the two
   // statements go is a use this rung has not accounted for.

@@ -1,0 +1,5 @@
+true false L R hasInstance 4 L2 R2 hasInstance 3
+true false key obj has yes key2 has no
+true 2 G.get Symbol(Symbol.hasInstance) G.get prototype
+TE true l r
+TE true l r

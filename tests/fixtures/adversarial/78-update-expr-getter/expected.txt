@@ -1,0 +1,6 @@
+4 5 key p | get p | valueOf | set p=5
+6 number get q | set q=6
+13 8 get q | set q=7 | get q | set q=8
+number 5 6
+11
+NaN

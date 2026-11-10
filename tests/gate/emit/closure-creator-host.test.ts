@@ -108,6 +108,10 @@ for (const version of VERSIONS) {
     // object per call, as in the VM), not one declaration beside them.
     const decls = code.split("\n").filter((l) => /^\s+function _fn[1-9]\d*\(/.test(l));
     assert.deepEqual(decls, [], `v${version}: no shared callback declaration:\n${code}`);
-    assert.ok((code.match(/function _fn[1-9]\d*\(/g) ?? []).length >= 2 && indent(/function _fn[1-9]\d*\(/) > indent(/^\s+function left\(/), `v${version}: one callback instance inside each creator:\n${code}`);
+    // `left`/`right` may themselves be function expressions in makeTwo's
+    // returned array (closure-inline, spec 32): the line that starts `left`
+    // (a declaration or `arr = [function left(`) is the outer bound either way.
+    const outer = indent(/function left\(/);
+    assert.ok((code.match(/function _fn[1-9]\d*\(/g) ?? []).length >= 2 && indent(/function _fn[1-9]\d*\(/) > outer, `v${version}: one callback instance per creator:\n${code}`);
   });
 }

@@ -4,7 +4,7 @@
 // `NewObjectWithBuffer`) followed by a contiguous run of own-property
 // defines into `rN`, and folds the run back into one object literal at the
 // definition.
-import { effectSequence, identUses, isPure, isRegisterName, opcodeAt, originOf, renderComputedKey } from "../ast.ts";
+import { identUses, isPure, isRegisterName, opcodeAt, originOf, renderComputedKey } from "../ast.ts";
 import type { Expr, ObjectProp, Stmt } from "../ast.ts";
 import type { Match, PassContext } from "../types.ts";
 
@@ -74,40 +74,26 @@ const OWN_DEFINE: ReadonlySet<string> = new Set([
 const OWN_DEFINE_COMPUTED: ReadonlySet<string> = new Set(["PutOwnByVal", "DefineOwnByVal"]);
 
 /**
- * docs/BUGS.md `object-literal-putbyid`. A `PutById`/`PutByIdLoose`/
- * `PutByIdStrict`/`TryPutById` store is a full `[[Set]]` — it is *not*
- * unconditionally an own-property define, because `[[Set]]` walks the
- * prototype chain and would run an inherited accessor (or throw on an
- * inherited non-writable data property) where a literal never would.
+ * docs/DECISIONS.md D27a (supersedes the 2026-09-05 `object-literal-putbyid`
+ * resolution). A `PutById`/`PutByIdLoose`/`PutByIdStrict`/`TryPutById` store
+ * is a full `[[Set]]`. Into a key the object does NOT own yet it never folds,
+ * fresh object or not: whether that `[[Set]]` is observably a define depends
+ * on `Object.prototype` carrying no accessor / non-writable property for the
+ * key, which code that ran *before* the object existed can break and this
+ * rung cannot rule out (fixture 390-putbyid-fold-inherited-setter). The
+ * printed assignment is the faithful form; it recompiles to the same
+ * `PutById`.
  *
- * But on a *fresh* object with nothing yet able to have changed
- * `Object.prototype` since that object was created, `[[Set]]` on a plain
- * data key **is** observably a define: `OrdinarySet` (ECMA-262 10.1.9.2)
- * finds no own property (the object is fresh), walks to the prototype,
- * finds neither an accessor nor a non-writable data property named `key`
- * there (nothing has run that could have put one there — see below), and
- * falls through to `CreateDataProperty` on the receiver — exactly
- * `[[DefineOwnProperty]]`'s own outcome. The one case that is never a
- * define regardless is `key === "__proto__"` (`isProtoKey`, checked as for
- * every other store) — `Object.prototype`'s own `__proto__` **is** an
- * accessor by spec, so `o.__proto__ = v` always calls it and never
- * defines an own `__proto__` data property, fresh object or not.
- *
- * "Nothing has run that could have changed `Object.prototype`" is checked
- * *locally*, over the run being folded, not over the whole program: the
- * matcher already restricts everything between the definition and a store
- * to either (a) an own-property store into this same object (`storeOf`) or
- * (b) a hoistable pure register def (`freshRegisterDef` — no calls, no
- * member reads, by construction of `isPure`), so the only way the run
- * itself could run arbitrary code is a **call inside a store's own value
- * expression** (`o.a = f()`) — `effectSequence` catches that, and any
- * other effect (`new`, a member read that could be a getter, etc.) besides.
- * `runHasEffect` in `match` below is true from the first such value onward,
- * and a `PutById`-family store folds only while it is still false — for
- * every earlier value in the run *and* for its own. A call from *before*
- * the object was even created is out of scope for this rung the same way
- * it always has been: nothing here claims a fresh `{}` proves anything
- * about code that ran before it existed.
+ * Into a key the literal already owns as a plain data property (a
+ * `NewObjectWithBuffer` placeholder -- hermesc before v97 fills those with
+ * `PutById`, not `PutOwnBySlotIdx` -- or an earlier fold of this run) it
+ * does fold: `OrdinarySet` finds the own writable data property first and
+ * only updates its value (OrdinarySetWithOwnDescriptor), no prototype walk,
+ * no setter, position kept -- the same argument as `object-literal-arg` kind
+ * C (spec 20 §9.1). Nothing can have reconfigured the property in between:
+ * the object has not escaped (precondition 6). The other provably sound
+ * case D27a allows, a literal with no prototype (`__proto__: null`), is not
+ * built by `FRESH_OBJECT` opcodes, so there is nothing to fold there.
  */
 const PUT_BY_ID: ReadonlySet<string> = new Set(["PutById", "PutByIdLoose", "PutByIdStrict", "TryPutById"]);
 
@@ -198,7 +184,7 @@ function storeOf(s: Stmt, reg: string): { readonly key: string; readonly compute
  * for anything but `PutOwnByVal`/`DefineOwnByVal` (`OWN_DEFINE_COMPUTED`),
  * both exactly `CreateDataPropertyOrThrow` when enumerable (`OWN_DEFINE`'s
  * doc comment) — there is no `__proto__`/prototype-chain concern here the
- * way there is for `PUT_BY_ID`, because a computed key is never the
+ * way there is for a `[[Set]]` store, because a computed key is never the
  * seven-character *identifier* `__proto__` at the syntax level (it would
  * have to evaluate to the *string* `"__proto__"` at runtime, which
  * `Object.defineProperty`-equivalent `[[DefineOwnProperty]]` semantics
@@ -356,10 +342,6 @@ export function match(list: readonly Stmt[], ctx: PassContext): ObjectLiteralMat
     // expression, never a plain register, so the only statement in here
     // that ever counts as *writing* a register is the definition itself.
     const consumed: Stmt[] = [list[i]!];
-    // docs/BUGS.md `object-literal-putbyid`: true once any value in the run
-    // (including the candidate store's own) has run something that could
-    // reach `Object.prototype` — see `PUT_BY_ID`'s doc comment.
-    let runHasEffect = false;
     // docs/BUGS.md `object-literal-computed-key` (§7 (c)): true once a
     // *computed*-key store has been folded into `props`. A computed key can
     // alias an earlier literal key at runtime, and this rung cannot tell —
@@ -392,17 +374,15 @@ export function match(list: readonly Stmt[], ctx: PassContext): ObjectLiteralMat
       const op = opcodeOf(list[j]!, ctx);
       const st = storeOf(list[j]!, def.reg);
       const isOwnDefine = op !== null && OWN_DEFINE.has(op);
+      // D27a: a `PutById`-family store folds only into a key the literal
+      // already owns (a placeholder or an earlier fold) -- see `PUT_BY_ID`.
+      const ownsKey = st !== null && props.some((p) => !("k" in p) && keyIdentity(p.key, p.computed) === keyIdentity(st.key, st.computed));
       const isPutById = op !== null && PUT_BY_ID.has(op);
-      if (st !== null && !sawComputedKey && (isOwnDefine || isPutById) && !isProtoKey(st.key, st.computed)) {
+      if (st !== null && !sawComputedKey && (isOwnDefine || (isPutById && ownsKey)) && !isProtoKey(st.key, st.computed)) {
         // §4 precondition 6: a value that reads (or writes) the half-built
         // object observes it — `r3.b = r3.a + 1` is not a literal.
         const u = identUses([{ k: "expr", expr: st.value }], def.reg);
-        const valueHasEffect = effectSequence([{ k: "expr", expr: st.value }]).length > 0;
-        // `object-literal-putbyid`: a `PutById`-family store folds only
-        // while nothing in the run — including its own value — has had a
-        // chance to reach `Object.prototype` yet.
-        const putByIdOk = isOwnDefine || (!runHasEffect && !valueHasEffect);
-        if (u.reads + u.writes === 0 && putByIdOk) {
+        if (u.reads + u.writes === 0) {
           const at = props.findIndex((p) => keyIdentity(p.key, p.computed) === keyIdentity(st.key, st.computed));
           if (at >= 0) {
             // `NewObjectWithBuffer` (v>=97) pre-declares every key with a
@@ -417,7 +397,6 @@ export function match(list: readonly Stmt[], ctx: PassContext): ObjectLiteralMat
           }
           n++;
           consumed.push(list[j]!);
-          runHasEffect = runHasEffect || valueHasEffect;
           continue;
         }
       }

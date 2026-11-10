@@ -588,11 +588,19 @@ function mapStmtChildren(s: Stmt, fs: (s: Stmt) => Stmt, fx: (e: Expr) => Expr):
  * recurses child-first). Lists compare by object identity, so the driver's
  * `refused` set works exactly as in stage A.
  */
-export function stmtLists(body: readonly Stmt[]): readonly (readonly Stmt[])[] {
+export function stmtLists(body: readonly Stmt[], opts?: { readonly sameFrame?: boolean }): readonly (readonly Stmt[])[] {
   const out: (readonly Stmt[])[] = [];
+  const intoSameFrame = opts?.sameFrame === true;
   const visit = (list: readonly Stmt[]): void => {
     for (const s of list) {
       switch (s.k) {
+        case "return": {
+          // `opts.sameFrame` (Pass.sameFrame): the generator/async resume
+          // closure is this frame's own body, re-entered per resume.
+          const resume = intoSameFrame ? sameFrameBody(s) : null;
+          if (resume !== null) visit(resume);
+          break;
+        }
         case "if":
           visit(s.then);
           visit(s.else);
@@ -622,6 +630,26 @@ export function stmtLists(body: readonly Stmt[]): readonly (readonly Stmt[])[] {
   };
   visit(body);
   return out;
+}
+
+/** The body of the `sameFrame` resume closure when `s` is the emitter's
+ *  `return function (__sent, __isReturn, __isThrow) { ... }` (v84/94/96
+ *  generator and async lowering, `src/emit/function.ts`), else `null`. That
+ *  closure is not a second Hermes function: it shares this frame's registers
+ *  and is re-entered at its top on every resume. */
+export function sameFrameBody(s: Stmt): readonly Stmt[] | null {
+  return s.k === "return" && s.arg !== null && s.arg.k === "func" && s.arg.sameFrame === true ? s.arg.body : null;
+}
+
+/** The `sameFrame` resume-closure body (see `sameFrameBody`) among
+ *  `fnBody`'s top-level statements that contains `target` (by identity, at
+ *  any depth short of a nested `func`), or `null`. */
+export function enclosingResumeBody(fnBody: readonly Stmt[], target: readonly Stmt[]): readonly Stmt[] | null {
+  for (const s of fnBody) {
+    const resume = sameFrameBody(s);
+    if (resume !== null && stmtLists(resume, { sameFrame: true }).includes(target)) return resume;
+  }
+  return null;
 }
 
 /** Replace `target` (by identity) with `repl`, rebuilding only the spine —
@@ -669,6 +697,13 @@ function spliceInStmt(s: Stmt, target: readonly Stmt[], repl: readonly Stmt[]): 
         return cbody === c.body ? c : { ...c, body: cbody };
       });
       return changed ? { ...s, cases } : s;
+    }
+    case "return": {
+      // A `sameFrame` resume closure is this frame's own body (`sameFrameBody`).
+      const resume = sameFrameBody(s);
+      if (resume === null || s.arg === null || s.arg.k !== "func") return s;
+      const body = spliceList(resume, target, repl);
+      return body === resume ? s : { ...s, arg: { ...s.arg, body } };
     }
     default:
       return s; // "func": a separate site, never spliced through its parent's list
@@ -1352,6 +1387,85 @@ export function isPure(e: Expr): boolean {
 export function isPureStmt(s: Stmt): boolean {
   if (s.k === "comment" || s.k === "decl") return true;
   return s.k === "expr" && s.expr.k === "assign" && s.expr.target.k === "ident" && isPure(s.expr.value);
+}
+
+/** Where evaluating `e` (ECMAScript order: member object before key before
+ *  the get; callee before arguments before the call; left before right)
+ *  first meets an unconditional read of `reg`. `"found"` when everything
+ *  evaluated before that read is unobservable — literals, non-global
+ *  binding reads (collected in `names`), closure creation, and the
+ *  operators `isPure` models as pure; `"pure"` when all of `e` is such and
+ *  it never reads `reg`; otherwise `"impure"` (an effect comes first, or the
+ *  read sits under a `&&`/`||`/`?:` branch). The predicate a rung uses
+ *  before moving an impure `rX = E` into the one read of `rX` (spec 05
+ *  section 7.4 evaluation-order rule; fix-jsx-read-order). */
+export function firstReadOrder(e: Expr, reg: string, names: string[]): "found" | "pure" | "impure" {
+  const seq = (parts: readonly Expr[]): "found" | "pure" | "impure" => {
+    for (const p of parts) {
+      const r = firstReadOrder(p, reg, names);
+      if (r !== "pure") return r;
+    }
+    return "pure";
+  };
+  // `parts` evaluated in order, then an observable operation.
+  const thenEffect = (parts: readonly Expr[]): "found" | "impure" => (seq(parts) === "found" ? "found" : "impure");
+  switch (e.k) {
+    case "lit":
+    case "this":
+    case "func":
+      return "pure";
+    case "ident":
+      if (e.name === reg) return "found";
+      if (e.global === true) return "impure";
+      names.push(e.name);
+      return "pure";
+    case "member":
+      return thenEffect(e.computed ? [e.obj, e.prop] : [e.obj]);
+    case "call":
+    case "new":
+      // The emitter's own `Reflect.apply(F, T, [A…])` stands for the call
+      // `F` with `this` `T`: the original evaluates no `Reflect.apply` read.
+      if (e.k === "call" && e.callee.k === "member" && !e.callee.computed && e.callee.obj.k === "ident" && e.callee.obj.name === "Reflect" && e.callee.prop.k === "lit" && e.callee.prop.text === "apply" && e.args.length === 3 && e.args[2]!.k === "array" && !e.args[2]!.elements.some((x) => x.k === "spread")) {
+        return thenEffect([e.args[0]!, e.args[1]!, ...e.args[2]!.elements]);
+      }
+      if (e.args.some((a) => a.k === "spread")) return thenEffect([e.callee]);
+      return thenEffect([e.callee, ...e.args]);
+    case "unary":
+      return e.op === "delete " ? thenEffect([e.arg]) : firstReadOrder(e.arg, reg, names);
+    case "bin": {
+      const r = seq([e.left, e.right]);
+      return r === "pure" && (e.op === "in" || e.op === "instanceof") ? "impure" : r;
+    }
+    case "logical": {
+      const l = firstReadOrder(e.left, reg, names);
+      if (l !== "pure") return l;
+      return firstReadOrder(e.right, reg, names) === "pure" ? "pure" : "impure";
+    }
+    case "cond": {
+      const t = firstReadOrder(e.test, reg, names);
+      if (t !== "pure") return t;
+      return firstReadOrder(e.then, reg, names) === "pure" && firstReadOrder(e.else, reg, names) === "pure" ? "pure" : "impure";
+    }
+    case "seq":
+      return seq(e.exprs);
+    case "array":
+      if (e.elements.some((x) => x.k === "spread")) return "impure";
+      return seq(e.elements);
+    case "object": {
+      const parts: Expr[] = [];
+      for (const p of e.props) {
+        if ("k" in p || p.computed || p.key === "__proto__") return "impure";
+        parts.push(p.value);
+      }
+      return seq(parts);
+    }
+    case "assign":
+      if (e.target.k === "ident" && isRegisterName(e.target.name)) return firstReadOrder(e.value, reg, names);
+      if (e.target.k === "member") return thenEffect(e.target.computed ? [e.target.obj, e.target.prop, e.value] : [e.target.obj, e.value]);
+      return thenEffect([e.value]);
+    default:
+      return "impure";
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2140,7 +2254,7 @@ export function applyAstPasses(fnBody: readonly Stmt[], passes: readonly StmtLis
 }
 
 function firstAstMatch(fnBody: readonly Stmt[], pass: StmtListPass, ctx: PassContext, refused: ReadonlySet<readonly Stmt[]>): { list: readonly Stmt[]; match: NonNullable<ReturnType<StmtListPass["match"]>> } | null {
-  for (const list of stmtLists(fnBody)) {
+  for (const list of stmtLists(fnBody, { sameFrame: pass.sameFrame === true })) {
     if (refused.has(list)) continue;
     let m: ReturnType<StmtListPass["match"]>;
     try {

@@ -1,0 +1,212 @@
+; hbc2js disassembly of 321-review-diamonds-arguments-callee/v96.hbc
+; version=96 layout=C opcodeTable=hbc96 functions=9 strings=41 globalCodeIndex=0
+function #0 "global"  params=1 frame=17 env=0 flags=dbg  @0x000002ec size=308
+  0000  DeclareGlobalVar     s39 "probe"
+  0005  DeclareGlobalVar     s35 "describe"
+  000a  DeclareGlobalVar     s22 "looseForward"
+  000f  DeclareGlobalVar     s28 "strictForward"
+  0014  DeclareGlobalVar     s21 "looseEscape"
+  0019  DeclareGlobalVar     s24 "looseStore"
+  001e  DeclareGlobalVar     s27 "strictEscape"
+  0023  CreateEnvironment    r1
+  0025  CreateClosure        r2, r1, f1 "describe"
+  002a  GetGlobalObject      r0
+  002c  PutById              r0, r2, #c1, s35 "describe"
+  0032  CreateClosure        r2, r1, f2 "looseForward"
+  0037  PutById              r0, r2, #c2, s22 "looseForward"
+  003d  CreateClosure        r2, r1, f3 "strictForward"
+  0042  PutById              r0, r2, #c3, s28 "strictForward"
+  0048  CreateClosure        r2, r1, f4 "looseEscape"
+  004d  PutById              r0, r2, #c4, s21 "looseEscape"
+  0053  CreateClosure        r2, r1, f5 "looseStore"
+  0058  PutById              r0, r2, #c5, s24 "looseStore"
+  005e  CreateClosure        r2, r1, f6 "strictEscape"
+  0063  PutById              r0, r2, #c6, s27 "strictEscape"
+  0069  CreateClosure        r2, r1, f7 "probe"
+  006e  PutById              r0, r2, #c7, s39 "probe"
+  0074  GetByIdShort         r2, r0, #c1, s39 "probe"
+  0079  CreateClosure        r1, r1, f8 ""
+  007e  PutById              r2, r1, #c8, s32 "apply"
+  0084  TryGetById           r3, r0, #c2, s38 "print"
+  008a  GetByIdShort         r4, r0, #c3, s22 "looseForward"
+  008f  GetByIdShort         r1, r0, #c1, s39 "probe"
+  0094  LoadConstUndefined   r2
+  0096  LoadConstUInt8       r6, 1
+  0099  LoadConstUInt8       r5, 2
+  009c  Call4                r4, r4, r2, r1, r6, r5
+  00a3  LoadConstString      r1, s5 "looseForward "
+  00a7  Add                  r1, r1, r4
+  00ab  Call2                r1, r3, r2, r1
+  00b0  TryGetById           r3, r0, #c2, s38 "print"
+  00b6  GetByIdShort         r4, r0, #c4, s28 "strictForward"
+  00bb  GetByIdShort         r1, r0, #c1, s39 "probe"
+  00c0  Call4                r4, r4, r2, r1, r6, r5
+  00c7  LoadConstString      r1, s16 "strictForward "
+  00cb  Add                  r1, r1, r4
+  00cf  Call2                r1, r3, r2, r1
+  00d4  TryGetById           r4, r0, #c2, s38 "print"
+  00da  GetByIdShort         r1, r0, #c5, s21 "looseEscape"
+  00df  LoadConstUInt8       r3, 7
+  00e2  Call2                r5, r1, r2, r3
+  00e7  LoadConstString      r1, s2 "looseEscape "
+  00eb  Add                  r1, r1, r5
+  00ef  Call2                r1, r4, r2, r1
+  00f4  TryGetById           r4, r0, #c2, s38 "print"
+  00fa  GetByIdShort         r5, r0, #c6, s24 "looseStore"
+  00ff  LoadConstUInt8       r1, 8
+  0102  Call3                r5, r5, r2, r3, r1
+  0108  LoadConstString      r1, s13 "looseStore "
+  010c  Add                  r1, r1, r5
+  0110  Call2                r1, r4, r2, r1
+  0115  TryGetById           r1, r0, #c2, s38 "print"
+  011b  GetByIdShort         r0, r0, #c7, s27 "strictEscape"
+  0120  Call2                r3, r0, r2, r3
+  0125  LoadConstString      r0, s15 "strictEscape "
+  0129  Add                  r0, r0, r3
+  012d  Call2                r0, r1, r2, r0
+  0132  Ret                  r0
+
+function #1 "describe"  params=3 frame=18 env=0 flags=exc,dbg  @0x00000420 size=269
+  .try T1..T2 -> L1 ; handler 0
+  0000  LoadParam            r3, 1
+  0003  LoadParam            r0, 2
+  0006  LoadConstUndefined   r2
+  0008  LoadConstUndefined   r7
+T1:
+  000a  Mov                  r4, r3
+  000d  GetByIdShort         r1, r4, #c1, s34 "callee"
+  0012  GetByIdShort         r4, r4, #c1, s34 "callee"
+  0017  TypeOf               r5, r1
+  001a  LoadConstString      r1, s8 ":"
+  001e  Add                  r1, r5, r1
+  0022  StrictEq             r0, r4, r0
+  0026  Add                  r2, r1, r0
+T2:
+  002a  Jmp                  L2
+L1:
+  002c  Catch                r0
+  002e  GetByIdShort         r1, r0, #c2, s37 "name"
+  0033  LoadConstString      r0, s17 "threw "
+  0037  Add                  r2, r0, r1
+L2:
+  003b  GetGlobalObject      r0
+  003d  TryGetById           r6, r0, #c3, s19 "Object"
+  0043  GetByIdShort         r5, r6, #c4, s36 "getOwnPropertyDescriptor"
+  0048  Mov                  r4, r3
+  004b  LoadConstString      r1, s34 "callee"
+  004f  Call3                r1, r5, r6, r4, r1
+  0055  Mov                  r7, r1
+  0058  Mov                  r5, r2
+  005b  LoadConstString      r4, s14 "none"
+  005f  JmpFalse             L6, r1
+  0062  Mov                  r2, r7
+  0065  LoadConstString      r1, s18 "value"
+  0069  IsIn                 r1, r1, r2
+  006d  LoadConstString      r6, s12 "accessor"
+  0071  JmpFalse             L3, r1
+  0074  LoadConstString      r6, s11 "data"
+L3:
+  0078  Mov                  r1, r7
+  007b  GetByIdShort         r8, r1, #c5, s26 "enumerable"
+  0080  LoadConstString      r2, s0 ""
+  0084  Mov                  r1, r2
+  0087  JmpFalse             L4, r8
+  008a  LoadConstString      r1, s10 "E"
+L4:
+  008e  GetByIdShort         r7, r7, #c6, s29 "configurable"
+  0093  JmpFalse             L5, r7
+  0096  LoadConstString      r2, s9 "C"
+L5:
+  009a  Add                  r1, r6, r1
+  009e  Add                  r4, r1, r2
+L6:
+  00a2  TryGetById           r1, r0, #c3, s19 "Object"
+  00a8  GetByIdShort         r1, r1, #c7, s40 "prototype"
+  00ad  GetByIdShort         r2, r1, #c8, s20 "toString"
+  00b2  GetByIdShort         r1, r2, #c9, s33 "call"
+  00b7  Call2                r2, r1, r2, r3
+  00bc  LoadConstString      r1, s4 " desc="
+  00c0  Add                  r1, r5, r1
+  00c4  Add                  r1, r1, r4
+  00c8  LoadConstString      r4, s3 " "
+  00cc  Add                  r1, r1, r4
+  00d0  Add                  r1, r1, r2
+  00d4  GetByIdShort         r2, r3, #c10, s30 "length"
+  00d9  Add                  r1, r1, r4
+  00dd  Add                  r2, r1, r2
+  00e1  TryGetById           r1, r0, #c3, s19 "Object"
+  00e7  GetByIdShort         r0, r1, #c11, s23 "keys"
+  00ec  Call2                r3, r0, r1, r3
+  00f1  GetByIdShort         r1, r3, #c12, s25 "join"
+  00f6  LoadConstString      r0, s7 ","
+  00fa  Call2                r1, r1, r3, r0
+  00ff  LoadConstString      r0, s6 " keys="
+  0103  Add                  r0, r2, r0
+  0107  Add                  r0, r0, r1
+  010b  Ret                  r0
+
+function #2 "looseForward"  params=3 frame=14 env=0 flags=dbg  @0x0000052d size=27
+  0000  LoadParam            r3, 1
+  0003  LoadConstUndefined   r0
+  0005  GetByIdShort         r2, r3, #c1, s32 "apply"
+  000a  GetGlobalObject      r1
+  000c  GetByIdShort         r1, r1, #c2, s22 "looseForward"
+  0011  ReifyArguments       r0
+  0013  Call3                r0, r2, r3, r1, r0
+  0019  Ret                  r0
+
+function #3 "strictForward"  params=3 frame=14 env=0 flags=strict,dbg  @0x00000548 size=27
+  0000  LoadParam            r3, 1
+  0003  LoadConstUndefined   r0
+  0005  GetByIdShort         r2, r3, #c1, s32 "apply"
+  000a  GetGlobalObject      r1
+  000c  GetByIdShort         r1, r1, #c2, s28 "strictForward"
+  0011  ReifyArguments       r0
+  0013  Call3                r0, r2, r3, r1, r0
+  0019  Ret                  r0
+
+function #4 "looseEscape"  params=2 frame=14 env=0 flags=dbg  @0x00000563 size=26
+  0000  LoadConstUndefined   r3
+  0002  LoadConstUndefined   r0
+  0004  GetGlobalObject      r1
+  0006  GetByIdShort         r2, r1, #c1, s35 "describe"
+  000b  GetByIdShort         r1, r1, #c2, s21 "looseEscape"
+  0010  ReifyArguments       r0
+  0012  Call3                r0, r2, r3, r0, r1
+  0018  Ret                  r0
+
+function #5 "looseStore"  params=2 frame=13 env=0 flags=dbg  @0x0000057d size=38
+  0000  LoadConstUndefined   r3
+  0002  LoadConstUndefined   r0
+  0004  ReifyArguments       r0
+  0006  Mov                  r2, r0
+  0009  LoadConstUInt8       r1, 1
+  000c  PutById              r2, r1, #c1, s31 "extra"
+  0012  GetGlobalObject      r1
+  0014  GetByIdShort         r2, r1, #c1, s35 "describe"
+  0019  GetByIdShort         r1, r1, #c2, s24 "looseStore"
+  001e  Call3                r0, r2, r3, r0, r1
+  0024  Ret                  r0
+
+function #6 "strictEscape"  params=2 frame=14 env=0 flags=strict,dbg  @0x000005a3 size=26
+  0000  LoadConstUndefined   r3
+  0002  LoadConstUndefined   r0
+  0004  GetGlobalObject      r1
+  0006  GetByIdShort         r2, r1, #c1, s35 "describe"
+  000b  GetByIdShort         r1, r1, #c2, s27 "strictEscape"
+  0010  ReifyArguments       r0
+  0012  Call3                r0, r2, r3, r0, r1
+  0018  Ret                  r0
+
+function #7 "probe"  params=1 frame=1 env=0 flags=none  @0x000005bd size=4
+  0000  LoadConstUndefined   r0
+  0002  Ret                  r0
+
+function #8 ""  params=3 frame=13 env=0 flags=dbg  @0x000005c1 size=23
+  0000  GetGlobalObject      r0
+  0002  GetByIdShort         r3, r0, #c1, s35 "describe"
+  0007  LoadConstUndefined   r2
+  0009  LoadParam            r1, 2
+  000c  LoadParam            r0, 1
+  000f  Call3                r0, r3, r2, r1, r0
+  0015  Ret                  r0

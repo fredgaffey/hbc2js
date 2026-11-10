@@ -1,0 +1,222 @@
+; hbc2js disassembly of 332-derived-ctor-carried-live-in/v99.hbc
+; version=99 layout=E opcodeTable=hbc99-mar2026 functions=5 strings=10 globalCodeIndex=0
+function #0 "global"  params=1 frame=31 env=0 flags=dbg,overflowed  @0x0000015c size=338
+  0000  CreateFunctionEnvironment r12, 3
+  0003  LoadConstUndefined   r11
+  0005  CreateBaseClass      r16, r13, r11, 1
+  000b  CreateDerivedClass   r14, r13, r12, r16, 2
+  0012  StoreToEnvironment   r12, 0, r14
+  0016  LoadConstUInt8       r4, 1
+  0019  LoadConstUInt8       r5, 3
+  001c  LoadConstZero        r0
+  001e  LoadConstZero        r7
+  0020  LoadConstUndefined   r8
+L1:
+  0022  Mov                  r1, r0
+  0025  Mov                  r10, r7
+  0028  Mov                  r9, r8
+  002b  Mov                  r6, r4
+  002e  JStrictEqual         L2, r9, r11
+  0032  Mov                  r6, r9
+L2:
+  0035  Add                  r3, r1, r10
+  0039  AddN                 r0, r1, r4
+  003d  Mov                  r7, r6
+  0040  Mov                  r8, r3
+  0043  JLessN               L1, r0, r5
+  0047  LoadParentNoTraps    r13, r14
+  004a  CreateThisForSuper   r17, r13, r14, 0
+  004f  Add                  r22, r3, r6
+  0053  Mov                  r23, r17
+  0056  CallWithNewTarget    r14, r13, r14, 2
+  005b  LoadConstEmpty       r15
+  005d  ThrowIfThisInitialized r15
+  005f  GetGlobalObject      r13
+  0061  TryGetById           r18, r13, #c1, s7 "print"
+  0067  SelectObject         r14, r17, r14
+  006b  GetByIdShort         r17, r14, #c2, s9 "x"
+  0070  LoadConstString      r14, s1 "B"
+  0074  Call3                r14, r18, r11, r14, r17
+  007a  CreateDerivedClass   r18, r14, r12, r16, 3
+  0081  StoreToEnvironment   r12, 1, r18
+  0085  LoadConstUInt8       r5, 2
+  0088  LoadConstUInt8       r0, 7
+  008b  LoadConstZero        r2
+  008d  Mov                  r7, r4
+  0090  LoadConstUndefined   r8
+L3:
+  0092  Mov                  r1, r2
+  0095  Mov                  r10, r7
+  0098  Mov                  r9, r8
+  009b  Mov                  r6, r0
+  009e  JStrictEqual         L4, r9, r11
+  00a2  Mov                  r6, r9
+L4:
+  00a5  Add                  r3, r10, r1
+  00a9  AddN                 r2, r1, r4
+  00ad  Mov                  r7, r6
+  00b0  Mov                  r8, r3
+  00b3  JLessN               L3, r2, r5
+  00b7  LoadParentNoTraps    r14, r18
+  00ba  CreateThisForSuper   r17, r14, r18, 0
+  00bf  LoadConstUInt8       r22, 8
+  00c2  Mov                  r23, r17
+  00c5  CallWithNewTarget    r14, r14, r18, 2
+  00ca  ThrowIfThisInitialized r15
+  00cc  TryGetById           r18, r13, #c1, s7 "print"
+  00d2  SelectObject         r14, r17, r14
+  00d6  GetByIdShort         r21, r14, #c2, s9 "x"
+  00db  LoadConstString      r22, s2 "C"
+  00df  LoadConstUndefined   r23
+  00e1  Mov                  r20, r3
+  00e4  Mov                  r19, r6
+  00e7  Call                 r14, r18, 5
+  00eb  CreateDerivedClass   r17, r14, r12, r16, 4
+  00f2  StoreToEnvironment   r12, 2, r17
+  00f6  TryGetById           r14, r13, #c1, s7 "print"
+  00fc  LoadParentNoTraps    r12, r17
+  00ff  CreateThisForSuper   r16, r12, r17, 0
+  0104  LoadConstUInt8       r22, 5
+  0107  Mov                  r23, r16
+  010a  CallWithNewTarget    r12, r12, r17, 2
+  010f  SelectObject         r12, r16, r12
+  0113  ThrowIfThisInitialized r15
+  0115  TryGetById           r16, r13, #c1, s7 "print"
+  011b  GetByIdShort         r15, r12, #c2, s9 "x"
+  0120  LoadConstString      r13, s3 "D"
+  0124  Call3                r13, r16, r11, r13, r15
+  012a  GetByIdShort         r13, r12, #c2, s9 "x"
+  012f  NewObjectWithBuffer  r12, sh0(numProps=1), lit@0x0000
+  0135  JmpTypeOfIs          L5, r12, 130
+  013d  LoadConstString      r22, s4 "Derived constructors may only re…"
+  0141  CallBuiltin          r15, b44 "throwTypeError", 2
+L5:
+  0145  GetByIdShort         r12, r12, #c2, s9 "x"
+  014a  Call3                r12, r14, r11, r13, r12
+  0150  Ret                  r12
+
+function #1 "A"  params=2 frame=2 env=0 flags=strict,dbg,overflowed,ctor  @0x000002ae size=21
+  0000  GetNewTarget         r0
+  0002  GetByIdShort         r0, r0, #c0, s8 "prototype"
+  0007  NewObjectWithParent  r0, r0
+  000a  LoadParam            r1, 1
+  000d  PutByIdStrict        r0, r1, #c0, s9 "x"
+  0013  Ret                  r0
+
+function #2 "B"  params=2 frame=26 env=0 flags=strict,dbg,overflowed,ctor  @0x000002c3 size=129
+  0000  LoadParam            r12, 1
+  0003  LoadConstZero        r1
+  0005  Less                 r6, r1, r12
+  0009  LoadConstUndefined   r11
+  000b  LoadConstUInt8       r2, 1
+  000e  LoadConstZero        r0
+  0010  LoadConstZero        r4
+  0012  LoadConstUndefined   r5
+  0014  LoadConstZero        r9
+  0016  LoadConstUndefined   r10
+  0018  JmpFalse             L3, r6
+L1:
+  001b  Mov                  r1, r0
+  001e  Mov                  r8, r4
+  0021  Mov                  r7, r5
+  0024  Mov                  r6, r2
+  0027  JStrictEqual         L2, r7, r11
+  002b  Mov                  r6, r7
+L2:
+  002e  Add                  r5, r1, r8
+  0032  AddN                 r0, r1, r2
+  0036  Mov                  r4, r6
+  0039  Mov                  r9, r4
+  003c  Mov                  r10, r5
+  003f  JLess                L1, r0, r12
+L3:
+  0043  GetParentEnvironment r12, 0
+  0046  GetNewTarget         r14
+  0048  LoadFromEnvironment  r12, r12, 0
+  004c  LoadParentNoTraps    r12, r12
+  004f  CreateThisForSuper   r13, r12, r14, 0
+  0054  Add                  r17, r10, r9
+  0058  Mov                  r18, r13
+  005b  CallWithNewTarget    r12, r12, r14, 2
+  0060  SelectObject         r12, r13, r12
+  0064  LoadConstEmpty       r13
+  0066  ThrowIfThisInitialized r13
+  0068  GetGlobalObject      r13
+  006a  TryGetById           r15, r13, #c1, s7 "print"
+  0070  GetByIdShort         r14, r12, #c2, s9 "x"
+  0075  LoadConstString      r13, s1 "B"
+  0079  Call3                r13, r15, r11, r13, r14
+  007f  Ret                  r12
+
+function #3 "C"  params=2 frame=28 env=0 flags=strict,dbg,overflowed,ctor  @0x00000344 size=126
+  0000  LoadConstUInt8       r3, 1
+  0003  LoadConstUndefined   r11
+  0005  LoadConstUInt8       r5, 2
+  0008  LoadConstUInt8       r4, 7
+  000b  LoadConstZero        r0
+  000d  Mov                  r7, r3
+  0010  LoadConstUndefined   r8
+L1:
+  0012  Mov                  r1, r0
+  0015  Mov                  r10, r7
+  0018  Mov                  r9, r8
+  001b  Mov                  r6, r4
+  001e  JStrictEqual         L2, r9, r11
+  0022  Mov                  r6, r9
+L2:
+  0025  Add                  r2, r10, r1
+  0029  AddN                 r0, r1, r3
+  002d  Mov                  r7, r6
+  0030  Mov                  r8, r2
+  0033  JLessN               L1, r0, r5
+  0037  GetParentEnvironment r12, 0
+  003a  GetNewTarget         r14
+  003c  LoadParam            r13, 1
+  003f  LoadFromEnvironment  r12, r12, 1
+  0043  LoadParentNoTraps    r12, r12
+  0046  Mul                  r19, r13, r5
+  004a  CreateThisForSuper   r13, r12, r14, 0
+  004f  Mov                  r20, r13
+  0052  CallWithNewTarget    r12, r12, r14, 2
+  0057  SelectObject         r12, r13, r12
+  005b  LoadConstEmpty       r13
+  005d  ThrowIfThisInitialized r13
+  005f  GetGlobalObject      r13
+  0061  TryGetById           r15, r13, #c1, s7 "print"
+  0067  GetByIdShort         r18, r12, #c2, s9 "x"
+  006c  LoadConstString      r19, s2 "C"
+  0070  LoadConstUndefined   r20
+  0072  Mov                  r17, r2
+  0075  Mov                  r16, r6
+  0078  Call                 r13, r15, 5
+  007c  Ret                  r12
+
+function #4 "D"  params=2 frame=16 env=0 flags=strict,dbg,overflowed,ctor  @0x000003c2 size=97
+  0000  LoadParam            r5, 1
+  0003  LoadConstUInt8       r0, 1
+  0006  JGreater             L2, r5, r0
+  000a  NewObjectWithBuffer  r2, sh0(numProps=1), lit@0x0000
+  0010  JmpTypeOfIs          L1, r2, 130
+  0018  LoadConstString      r7, s4 "Derived constructors may only re…"
+  001c  CallBuiltin          r3, b44 "throwTypeError", 2
+L1:
+  0020  Ret                  r2
+L2:
+  0022  GetParentEnvironment r2, 0
+  0025  GetNewTarget         r4
+  0027  LoadFromEnvironment  r2, r2, 2
+  002b  LoadParentNoTraps    r2, r2
+  002e  CreateThisForSuper   r3, r2, r4, 0
+  0033  Mov                  r8, r3
+  0036  Mov                  r7, r5
+  0039  CallWithNewTarget    r2, r2, r4, 2
+  003e  SelectObject         r2, r3, r2
+  0042  LoadConstEmpty       r3
+  0044  ThrowIfThisInitialized r3
+  0046  GetGlobalObject      r3
+  0048  TryGetById           r5, r3, #c1, s7 "print"
+  004e  GetByIdShort         r4, r2, #c2, s9 "x"
+  0053  LoadConstString      r3, s3 "D"
+  0057  LoadConstUndefined   r1
+  0059  Call3                r3, r5, r1, r3, r4
+  005f  Ret                  r2

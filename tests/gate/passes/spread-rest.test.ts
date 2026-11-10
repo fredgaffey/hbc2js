@@ -373,3 +373,30 @@ for (const version of [84, 94, 96, 99]) {
     }
   });
 }
+
+// ---------------------------------------------------------------------------
+// Regression: adversarial-1110 (adversarial 63-new-observable-args).
+//
+// `new C(...xs)` lowers to the two-argument construct form of
+// `HermesBuiltin.apply` (`__hbc_b_apply(fn, args)`, no `this` operand). The S2
+// matcher destructured a third argument unconditionally and `subst.resolve`d
+// the missing operand, so the pass threw (E_PASS_CRASH) and the whole
+// enclosing function was stubbed. Behavioural assertion, every version.
+for (const version of [84, 94, 96, 98, 99]) {
+  test(`adversarial-1110: spread-rest leaves a spread \`new\` (construct-form apply) alone, v${version}`, async () => {
+    const dir = join(repoRoot(), "tests", "fixtures", "constructs", "350-spread-new-construct");
+    const bytes = new Uint8Array(readFileSync(join(dir, `v${version}.hbc`)));
+    const js = decompile(bytes, { resolveV98Ambiguity: true, moduleName: "350-spread-new-construct" }).code;
+    assert.doesNotMatch(js, /E_PASS_CRASH/, "spread-rest crashed on the construct-form apply");
+    const tmp = mkdtempSync(join(tmpdir(), "hbc2js-spread-rest-"));
+    try {
+      const candidatePath = join(tmp, "candidate.js");
+      writeFileSync(candidatePath, js);
+      const run = await runProgram(candidatePath, { timeout: 10000 });
+      const expected = readFileSync(join(dir, "expected.txt"), "utf8").trimEnd().split("\n");
+      assert.deepEqual(printLines(run.records), expected);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+}

@@ -639,3 +639,17 @@ test("rt-fcall4: deleting a guard store that is T's own declaration keeps T decl
   assert.ok(declared, `r7 lost its declaration: ${JSON.stringify(out.body)}`);
   assert.ok(!JSON.stringify(out.body).includes("__hbc_empty"), "the dead guard and its store are still deleted");
 });
+
+test("super-call (fix-jsx-read-order regression, derived-ctor 88): the twice-guard with its `T = __hbc_empty` store folded away is deleted", () => {
+  const { module, cls } = moduleWith(OK_BODY);
+  const guard: Stmt = {
+    k: "if",
+    test: { k: "bin", op: "!==", left: ident("__hbc_empty"), right: ident("__hbc_empty") },
+    then: [{ k: "throw", arg: { k: "new", callee: ident("ReferenceError"), args: [lit('"super() called twice"')] } }],
+    else: [],
+  } as unknown as Stmt;
+  const body = [...OK_BODY.slice(0, 5), guard, ...OK_BODY.slice(5)];
+  const out = foldSuperBody(module, cls, body);
+  assert.ok(!("code" in out), `expected a fold, got ${JSON.stringify(out)}`);
+  assert.doesNotMatch(JSON.stringify(out), /called twice/);
+});

@@ -52,7 +52,11 @@ test("T1: every function of every gate binary structures and round-trips isomorp
   // Recorded, not asserted at zero: `16-finally-with-break-continue` at
   // v84/v94/v96 is genuinely irreducible once exception flow is modelled (see
   // the targeted test below), so `auto` resolves it with a dispatch variable.
-  assert.ok(dispatched <= 6, `${dispatched} functions needed dispatch mode; the status notes lists the expected six`);
+  // Plus, same cause (a try/catch inside a loop body at the pre-v98 handler
+  // layout): `320-review-diamonds-probes` fn13 (`callInLoop`) and
+  // `331-objlit-fold-controls` fn11 (`t8`) at v84/v94/v96, non-min only --
+  // twelve in all (re-checked 2026-11-10, integrate-1110b).
+  assert.ok(dispatched <= 12, `${dispatched} functions needed dispatch mode; the status notes lists the expected twelve`);
 });
 
 // ---------------------------------------------------------------------------

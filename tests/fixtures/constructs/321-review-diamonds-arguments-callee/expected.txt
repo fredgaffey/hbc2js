@@ -1,0 +1,5 @@
+looseForward function:true desc=dataC [object Arguments] 3 keys=0,1,2
+strictForward threw TypeError desc=accessor [object Arguments] 3 keys=0,1,2
+looseEscape function:true desc=dataC [object Arguments] 1 keys=0
+looseStore function:true desc=dataC [object Arguments] 2 keys=0,1,extra
+strictEscape threw TypeError desc=accessor [object Arguments] 1 keys=0

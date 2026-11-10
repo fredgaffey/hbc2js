@@ -5,8 +5,10 @@ import type { ArgInlineMatch } from "./match.ts";
 
 export function rewrite(m: ArgInlineMatch): readonly Stmt[] {
   const { root: list, data: site } = m;
+  if (site.kind === "slot-fill") return [...list.slice(0, site.defIndex), site.stmt!, ...list.slice(site.defIndex + 1)];
+  if (site.kind === "closure-slot") return list.flatMap((s, i) => (i === site.defIndex ? [] : i === site.useIndex ? [site.stmt!] : [s]));
   const use = list[site.useIndex]!;
-  const call = callOf(use)!;
+  const call = callOf(use, site.kind === "callee-base")!;
   const isReg = (e: Expr): boolean => e.k === "ident" && e.name === site.reg;
   const next: Expr =
     site.kind === "literal-arg"

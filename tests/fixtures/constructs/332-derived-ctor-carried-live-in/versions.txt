@@ -1,0 +1,5 @@
+v84: FAILS - hermesc rejects the `class` keyword (same root cause as 32-class-basic/versions.txt).
+v94: FAILS - same.
+v96: FAILS - same.
+v98: OK.
+v99: OK.

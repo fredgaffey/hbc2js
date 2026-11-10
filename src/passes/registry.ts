@@ -16,6 +16,7 @@ import { spreadRest } from "./spread-rest/index.ts";
 import { optionalChain } from "./optional-chain/index.ts";
 import { objectLiteral } from "./object-literal/index.ts";
 import { objectLiteralArg } from "./object-literal-arg/index.ts";
+import { methodRead } from "./method-read/index.ts";
 import { privateFields } from "./private-fields/index.ts";
 import { inlineNew } from "./inline-new/index.ts";
 import { exprRebuild } from "./expr-rebuild/index.ts";
@@ -25,6 +26,7 @@ import { forIn } from "./for-in/index.ts";
 import { forOf } from "./for-of/index.ts";
 import { globalAccess } from "./global-access/index.ts";
 import { globalthisDeadStore } from "./globalthis-dead-store/index.ts";
+import { closureInline } from "./closure-inline/index.ts";
 import { ifChain } from "./if-chain/index.ts";
 import { labelClean } from "./label-clean/index.ts";
 import { loopCond } from "./loop-cond/index.ts";
@@ -171,12 +173,19 @@ export const REGISTRY: readonly Pass[] = [
   // needs the `class` node `classRecover` just built, and the same register
   // identity, so it sits immediately after it and before every renaming rung.
   privateFields as Pass,
+  // Spec 05 section 7.4: re-fuses a method call the emitter left unfused for
+  // evaluation order, once the work in between is folded into literals.
+  methodRead as Pass,
   jsxRecover as Pass,
   // docs/specs/passes/20-object-literal.md section 9: an inert literal (and
   // then the callee base) inlined into the adjacent call, after every rung
   // that reads a `rN = {...}` props/descriptor statement as evidence.
   objectLiteralArg as Pass,
   fnNaming as Pass,
+  // R17 (docs/specs/passes/32-closure-inline.md): after every rung that may
+  // still look for a hoisted declaration and after `fn-naming` (the moved
+  // function keeps its recovered name), before the register renaming rungs.
+  closureInline as Pass,
   regSplit as Pass,
   varNaming as Pass,
 ];

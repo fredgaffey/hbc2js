@@ -555,7 +555,7 @@ plain reads, a nested object default, object rest; negatives for a 2-arg
 containing a `__pc` write, a broken done-flag thread, a plain-reads-only
 object run; ≥1 site the `check` refuses.
 
-**Corpus metric** (`tools/passes-metrics.ts`): count of `__hbc_iterBegin`
+**Corpus metric** (`tools/passes-metrics.mjs`): count of `__hbc_iterBegin`
 calls *outside a `for`-of loop form* plus 3-arg `copyDataProperties` calls
 remaining in printed output. **Floor: every function-body destructuring in
 37/38/39 rewritten at all five versions × base/`.min`/`.obf`** (the

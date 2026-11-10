@@ -4,7 +4,7 @@ Deliberately hard-to-decompile JavaScript code designed to stress-test and find 
 
 ## Test status summary
 
-- **Total fixtures**: 48
+- **Total fixtures**: 75 (48 in this summary; 49 below; 60-85 in the "adversarial-1110" section at the end)
 - **PASS through decompiler**: 41 at every compiled version (PASS-vs-VM, per D14/D22a — see the two triage notes below); `02-proxy-trap-counting`, once the one confirmed real bug, now PASSes at v94/v96/v99
 - **DIVERGE (harness verdict)**: 2, all v99-only — `21-class-private-fields` (**confirmed real bug**, `src/emit`, reproducer `constructs/58-class-accessor-pair-split`) and `43-fuzz-async-guard-shared-range` (**confirmed real bug, not yet root-caused**: candidate genuinely disagrees with the v99 Hermes VM's own trace — see docs/BUGS.md 2026-09-02, construct-fuzzer seed-base 777000 row). `20-symbol-keyed-properties` (**toolchain artefact**: npm-hermesc-v99 vs source-built-VM-v99 builtin-table mismatch; decompiler agrees with the VM) is now **PASS-with-caveat**, not DIVERGE — as of 2026-09-02 `src/harness/ladder.ts`'s D14 VM-agrees-with-candidate override is evidence-based (fires whenever `candidatePrint === hermesPrint`, not only for a curated fixture name), so this fixture's own VM-agrees evidence now overrules the Node-vs-candidate divergence directly; the underlying toolchain builtin-table gap itself is unfixed (see docs/BUGS.md's toolchain row). See "CONSOLIDATION 26 triage" below and the fuzz row above for `43`.
 - **ERROR (decompiler threw)**: 0
@@ -134,7 +134,7 @@ Computed properties, for-in, optional chaining, nullish coalescing.
 | 39 | getter-callee-position | Getter in function call callee position | PASS | v94, v96, v99 |
 | 41 | nullish-coalescing-edge | Nullish coalescing ?? edge cases | PASS | v94, v96, v99 |
 | 42 | destructuring-params-defaults | Destructuring in function params with defaults | PASS | v94, v96, v99 |
-| 49 | method-read-before-getter-arg | Method read vs a getter read inside its own argument literal | **DIVERGE** (all versions) | **confirmed real bug, `src/emit/lower.ts` method-call fusion** (2026-11-09, passes-roundtrip-objlit): `api.m` is read after `src.v` in the decompiled output (`v,m` vs the VM's `m,v`). docs/BUGS.md 2026-11-09 "method read moved past an intervening getter"; `todo` test in `tests/gate/passes/object-literal-arg.test.ts` |
+| 49 | method-read-before-getter-arg | Method read vs a getter read inside its own argument literal | **PASS** (fixed 2026-11-10) | was a confirmed real bug in `src/emit/lower.ts` method-call fusion (2026-11-09, passes-roundtrip-objlit): `api.m` was read after `src.v`. Fixed by the spec 05 section 7.4 evaluation-order rule and the `method-read` rung; graduated to `constructs/250-method-read-before-getter-arg`, pinned by `tests/gate/emit/method-read-fusion-order.test.ts`. docs/BUGS.md 2026-11-09 "method read moved past an intervening getter" (fixed) |
 
 ## Regression test status
 
@@ -262,3 +262,40 @@ ever report INCONCLUSIVE on.
 ## Compilation note
 
 Classes are unsupported by v84/v94/v96 (`hermesc` IRGen limitation, fixed in v98/v99's Static Hermes). Fixtures 21-24 (class-*) compile only on v99. All other fixtures compile on v94, v96, v99.
+
+### 60-85 — adversarial-1110 evaluation-order batch (added 2026-11-10)
+
+26 small programs that log an observable trace of every read/write/call, each
+compiled at v94/v96/v98/v99 and decompiled with passes on and with
+`--passes=none`, the candidate's output compared byte-for-byte with the
+Hermes VM's (D14). `expected.txt` is Node's, per the recipe above; where
+Hermes itself differs from Node the row says so and the VM is the reference.
+
+| # | Name | Pattern | Status |
+|---|---|---|---|
+| 60 | member-call-chain-reads | `a.b.c(d.e)`, `a.b["c"](d.e, a.b.ok)` through tracing Proxies | PASS after fix-method-read-fusion (was DIVERGE: method-call fusion; verified v94-v99, passes on+off) |
+| 61 | compound-assign-computed | `o[k()] += v()`, `*=`, `-=`, `<<=` on a Proxy | PASS |
+| 62 | optional-chain-sideeffects | `?.` short-circuiting whole chains incl. argument evaluation | PASS |
+| 63 | new-observable-args | `new ns.C(a(), b())`, `new (pick())(…)`, spread `new`, `new` of a non-constructor | PASS after fix (was E_PASS_CRASH in spread-rest with passes on, every version; `constructs/350-spread-new-construct`) |
+| 64 | template-tostring-valueof | template literals (ToString) vs `+` (valueOf) | PASS |
+| 65 | spread-observable-iterator | call/array spread and array destructuring driving a logging iterator | PASS |
+| 66 | destructuring-defaults-order | computed keys, defaults, rest (ownKeys) from a Proxy; param defaults | PASS |
+| 67 | comma-logical-ternary-nest | nested `,` `&&` `\|\|` `??` `?:` with effects at every node | PASS |
+| 68 | delete-sideeffects | `delete` with computed keys, `deleteProperty` trap, frozen objects | PASS |
+| 69 | in-instanceof-hasinstance | operand order, `Symbol.hasInstance`, Proxy `has` trap, TypeErrors | PASS |
+| 70 | tagged-template-order | tag read vs substitutions, per-site strings identity | PASS-vs-VM: Hermes evaluates the substitutions before reading the tag (`s1 s2 get tag`; Node `get tag s1 s2`); the candidate matches the VM |
+| 71 | throw-mid-args | exception thrown mid-argument-list / mid-literal / mid-assignment | PASS after fix-method-read-fusion (was DIVERGE: method-call fusion; verified v94-v99, passes on+off) |
+| 72 | labeled-break-in-finally | labeled `break`/`continue` in `finally` overriding `return`/`throw` | PASS |
+| 73 | global-getter-reads | accessor globals: reads, `=`, `+=`, `++`, `typeof` | PASS |
+| 74 | prototype-getter-chain | methods and setters found through prototype accessors | PASS |
+| 75 | assign-target-before-rhs | target object/key evaluated before the RHS; chained assignment | PASS |
+| 76 | call-args-mutate-receiver | arguments that reassign the callee/receiver | PASS after fix-method-read-fusion (was DIVERGE: method-call fusion; verified v94-v99, passes on+off) |
+| 77 | compound-assign-var-mutated-in-rhs | `x += (x = 10, 5)` on locals, captured, globals, members | PASS |
+| 78 | update-expr-getter | `++`/`--` on Proxy members, ToNumeric via valueOf, BigInt | PASS |
+| 79 | object-literal-order | computed key vs value order, spread getters, computed `["__proto__"]` | PASS after fix (computed `"__proto__"` set the prototype, every version; `constructs/351-computed-proto-key`). Line 2 is PASS-vs-VM: Hermes evaluates a computed key's value before the key's `toString` |
+| 80 | switch-case-lazy-order | discriminant once, case tests lazily in order, default in the middle | PASS |
+| 81 | for-of-head-target-order | member-expression `for-of`/`for-in` targets, iterator `return` on break/throw | PASS |
+| 82 | closures-in-loop-identity | closure identity per iteration, per-closure prototypes and state | PASS |
+| 83 | logical-assign-accessors | `\|\|=` `&&=` `??=`: get always, set only when taken | PASS |
+| 84 | binary-toprimitive-order | left-before-right conversion for every binary/relational operator | PASS |
+| 85 | getter-args-and-receivers | getters on receivers and in arguments; nested method calls | PASS after fix-method-read-fusion (was DIVERGE: method-call fusion; verified v94-v99, passes on+off) |

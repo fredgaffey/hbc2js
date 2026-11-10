@@ -1,0 +1,99 @@
+; hbc2js disassembly of 270-captured-param-entry-store/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=6 strings=13 globalCodeIndex=0
+function #0 "global"  params=1 frame=24 env=0 flags=dbg,overflowed  @0x0000015c size=179
+  0000  DeclareGlobalVar     s8 "factory"
+  0005  DeclareGlobalVar     s7 "e"
+  000a  DeclareGlobalVar     s12 "sloppy"
+  000f  GetGlobalObject      r4
+  0011  LoadConstUndefined   r3
+  0013  CreateClosure        r5, r3, f1 "factory"
+  0018  PutByIdLoose         r4, r5, #c0, s8 "factory"
+  001e  CreateClosure        r5, r3, f2 "sloppy"
+  0023  PutByIdLoose         r4, r5, #c1, s12 "sloppy"
+  0029  NewObject            r5
+  002b  PutByIdLoose         r4, r5, #c2, s7 "e"
+  0031  GetByIdShort         r8, r4, #c0, s8 "factory"
+  0036  GetByIdShort         r11, r4, #c1, s7 "e"
+  003b  LoadConstUInt8       r15, 10
+  003e  NewArrayWithBuffer   r10, 2, 2, lit@0x0000
+  0046  CreateClosure        r14, r3, f3 ""
+  004b  LoadConstUndefined   r16
+  004d  LoadConstZero        r13
+  004f  LoadConstZero        r12
+  0051  Call                 r5, r8, 7
+  0055  TryGetById           r9, r4, #c2, s11 "print"
+  005b  GetByIdShort         r6, r4, #c1, s7 "e"
+  0060  GetByIdShort         r5, r6, #c3, s6 "get"
+  0065  Call1                r15, r5, r6
+  0069  GetByIdShort         r6, r4, #c1, s7 "e"
+  006e  GetByIdShort         r5, r6, #c4, s9 "first"
+  0073  Call1                r14, r5, r6
+  0077  GetByIdShort         r5, r4, #c1, s7 "e"
+  007c  GetByIdShort         r13, r5, #c5, s10 "plain"
+  0081  GetByIdShort         r5, r4, #c1, s7 "e"
+  0086  GetByIdShort         r12, r5, #c6, s5 "direct"
+  008b  LoadConstUndefined   r16
+  008d  Call                 r5, r9, 5
+  0091  TryGetById           r5, r4, #c2, s11 "print"
+  0097  GetByIdShort         r4, r4, #c7, s12 "sloppy"
+  009c  LoadConstUInt8       r2, 3
+  009f  LoadConstUInt8       r0, 2
+  00a2  LoadConstUInt8       r1, 1
+  00a5  Call4                r4, r4, r3, r1, r0, r2
+  00ac  Call2                r4, r5, r3, r4
+  00b1  Ret                  r4
+
+function #1 "factory"  params=7 frame=15 env=0 flags=strict,dbg,overflowed  @0x0000020f size=70
+  0000  CreateFunctionEnvironment r4, 2
+  0003  LoadParam            r3, 2
+  0006  StoreToEnvironment   r4, 0, r3
+  000a  LoadParam            r2, 5
+  000d  LoadParam            r1, 6
+  0010  StoreToEnvironment   r4, 1, r1
+  0014  CreateClosure        r5, r4, f4 ""
+  0019  PutByIdStrict        r2, r5, #c0, s6 "get"
+  001f  CreateClosure        r4, r4, f5 ""
+  0024  PutByIdStrict        r2, r4, #c1, s9 "first"
+  002a  LoadParam            r4, 1
+  002d  PutByIdStrict        r2, r4, #c2, s10 "plain"
+  0033  GetByIndex           r1, r1, 1
+  0037  LoadConstUndefined   r0
+  0039  Call2                r1, r3, r0, r1
+  003e  PutByIdStrict        r2, r1, #c3, s5 "direct"
+  0044  Ret                  r0
+
+function #2 "sloppy"  params=4 frame=5 env=0 flags=dbg,overflowed  @0x00000255 size=41
+  0000  LoadConstUndefined   r2
+  0002  LoadParam            r4, 3
+  0005  LoadParam            r3, 1
+  0008  Add                  r4, r3, r4
+  000c  LoadParam            r3, 2
+  000f  Add                  r4, r4, r3
+  0013  Mov                  r3, r2
+  0016  GetArgumentsLength   r3, r3
+  0019  Add                  r3, r4, r3
+  001d  LoadConstZero        r0
+  001f  GetArgumentsPropByValLoose r2, r0, r2
+  0023  Add                  r2, r3, r2
+  0027  Ret                  r2
+
+function #3 ""  params=2 frame=2 env=0 flags=dbg,overflowed  @0x0000027e size=13
+  0000  LoadConstString      r1, s4 "req:"
+  0004  LoadParam            r0, 1
+  0007  Add                  r0, r1, r0
+  000b  Ret                  r0
+
+function #4 ""  params=1 frame=12 env=0 flags=strict,dbg,overflowed  @0x0000028b size=24
+  0000  GetParentEnvironment r1, 0
+  0003  LoadFromEnvironment  r2, r1, 0
+  0007  LoadFromEnvironment  r1, r1, 1
+  000b  GetByIndex           r1, r1, 0
+  000f  LoadConstUndefined   r0
+  0011  Call2                r1, r2, r0, r1
+  0016  Ret                  r1
+
+function #5 ""  params=1 frame=1 env=0 flags=strict,dbg,overflowed  @0x000002a3 size=13
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r0, r0, 1
+  0007  GetByIndex           r0, r0, 1
+  000b  Ret                  r0

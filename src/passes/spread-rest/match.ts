@@ -225,6 +225,9 @@ function matchCall(list: readonly Stmt[], seedIndex: number): SpreadRestSite | n
     }
     const call = assignTarget(s);
     if (call !== null && isHelperCallExpr(call.value, "__hbc_b_apply")) {
+      // Two-argument form = `new fn(...arr)` (construct, no `this` operand;
+      // adversarial-1110, constructs/350). S2 rewrites calls only — refuse.
+      if (call.value.args.length !== 3) return null;
       const [fn, arr, thisV] = call.value.args as readonly [Expr, Expr, Expr];
       if (!subst.sameIdent(arr, { k: "ident", name: targetName })) return null;
       const resolvedThis = subst.resolve(thisV);

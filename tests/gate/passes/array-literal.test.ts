@@ -271,7 +271,8 @@ for (const version of ["v84", "v94", "v96", "v98", "v99"]) {
     // interleaved copy commutes above it and the run completes.
     const hoistableOn = on.match(/function hoistable[\s\S]*?\n {4}\}/)?.[0] ?? "";
     assert.doesNotMatch(hoistableOn, /new Array\(2\)/);
-    assert.match(hoistableOn, /= \[\w+, \w+\];/);
+    // (closure-inline, spec 32, may put the closure itself in the literal)
+    assert.match(hoistableOn, /= \[(?:\w+, \w+\];|\w+, function \w+\(|function \w+\()/);
   });
 
   test(`array-literal still refuses the fixture's register-reuse hazard at ${version}`, () => {

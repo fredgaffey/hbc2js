@@ -218,12 +218,25 @@ function __hbc_makeGeneratorLowered(body) {
     "__hbc_arguments",
     `
 var __hbc_arguments = (function () {
-  "use strict";
+  // \`make\` is loose with no formal parameters: its arguments object maps no
+  // index (so the copy is unmapped) and has a data \`callee\` that is
+  // replaced below by the source object's own \`callee\` -- the function
+  // itself for a loose original, the throwing accessor for a strict one
+  // (review-1110 diamonds, fixture 321).
   var make = function () { return arguments; };
   // Captured once, before any user code: a program that overrides
-  // Function.prototype.apply must not reach this copy (fixture 220).
+  // Function.prototype.apply or Object.* must not reach this copy (fixture 220).
   var apply = Reflect.apply;
-  return function (a) { return apply(make, undefined, a); };
+  var own = Object.getOwnPropertyDescriptor;
+  var define = Object.defineProperty;
+  return function (a) {
+    var c = apply(make, undefined, a);
+    var d = own(a, "callee");
+    // (In a strict host scope \`make\` is strict and its own \`callee\` is
+    // the non-configurable thrower: keep it rather than throw.)
+    if (d !== undefined && own(c, "callee").configurable) define(c, "callee", d);
+    return c;
+  };
 })();
 `,
   ),
