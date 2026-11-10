@@ -179,7 +179,9 @@ test("deps-land-1110: a version that depends on nothing keeps the code an older 
   const target = buildInventory(compile(h.path, bundle([APP, DEB, THR_APP]))).inventory;
   const deb = { ...signature(h.path, "debounce", [DEB], []), dependencyClosure: [] };
   const old = { ...signature(h.path, "throttle", [THR], ["debounce"]), version: "1.0.0", dependencyClosure: ["debounce"] };
-  const cur = { ...signature(h.path, "throttle", [THR], []), version: "2.0.0", dependencyClosure: [] };
+  // No closure-sidecar entry for 2.0.0 (the farm records only non-empty
+  // closures); its own subtractedDependencies say it depends on nothing.
+  const cur = { ...signature(h.path, "throttle", [THR], []), version: "2.0.0" };
   const r = matchInventory(target, loaded([deb, old, cur]));
   const thr = r.packages.filter((s) => s.package === "throttle").sort((a, b) => b.exactHits - a.exactHits)[0];
   assert.ok((thr?.exactHits ?? 0) >= 7, "throttle@2 keeps its inlined helpers: " + JSON.stringify(r.packages.filter((s) => s.package === "throttle")));

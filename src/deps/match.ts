@@ -1105,8 +1105,11 @@ export function matchInventory(inventory: ModuleInventory, dbs: readonly LoadedS
     // deps-land-1110: the file's own version's closure when it records one
     // (lodash.throttle 4.1.1 depends on nothing and inlines debounce, while
     // 4.0.x depends on lodash.debounce); the union over loaded versions only
-    // for a file without one.
-    for (const d of file.dependencyClosure ?? closureOf.get(file.package) ?? []) {
+    // for a file that records neither.
+    // A file with no closure-sidecar entry (the farm records only non-empty
+    // closures) but its own recorded dependencies uses those.
+    const own = file.dependencyClosure ?? (file.subtractedDependencies !== undefined ? file.subtractedDependencies.map(dependencyName) : undefined);
+    for (const d of own ?? closureOf.get(file.package) ?? []) {
       if (d === file.package) continue;
       const keys = ownTargetKeys.get(d);
       if (keys !== undefined && keys.size > 0 && closureOf.get(d)?.has(file.package) !== true) out.push(keys);
