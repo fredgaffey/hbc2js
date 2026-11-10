@@ -109,9 +109,9 @@ for (const version of VERSIONS) {
     const decls = code.split("\n").filter((l) => /^\s+function _fn[1-9]\d*\(/.test(l));
     assert.deepEqual(decls, [], `v${version}: no shared callback declaration:\n${code}`);
     // `left`/`right` may themselves be function expressions in makeTwo's
-    // returned array (closure-inline, spec 32): then compare with makeTwo's
-    // own env-slot line.
-    const outer = /^\s+function left\(/.test(code) ? indent(/^\s+function left\(/) : indent(/^\s+let _e\d+_\d+;/);
+    // returned array (closure-inline, spec 32): the line that starts `left`
+    // (a declaration or `arr = [function left(`) is the outer bound either way.
+    const outer = indent(/function left\(/);
     assert.ok((code.match(/function _fn[1-9]\d*\(/g) ?? []).length >= 2 && indent(/function _fn[1-9]\d*\(/) > outer, `v${version}: one callback instance per creator:\n${code}`);
   });
 }

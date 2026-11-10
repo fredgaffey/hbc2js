@@ -92,7 +92,7 @@ Checked mechanically by `tests/gate/docs/pass-order.test.ts`; update both when a
 <!-- registry-order:start -->
 ```
 finally-dedup fcall-diamond loop-cond for-header for-in for-of switch-raise if-chain try-shape label-clean
-expr-rebuild global-access globalthis-dead-store call-shape default-params destructure spread-rest template-literal optional-chain object-literal array-literal yield-recovery yield-loop async-recovery arguments-form literal-forms try-clean class-recover super-call ctor-this inline-new private-fields method-read jsx-recover object-literal-arg fn-naming reg-split var-naming
+expr-rebuild global-access globalthis-dead-store call-shape default-params destructure spread-rest template-literal optional-chain object-literal array-literal yield-recovery yield-loop async-recovery arguments-form literal-forms try-clean class-recover super-call ctor-this inline-new private-fields method-read jsx-recover object-literal-arg fn-naming closure-inline reg-split var-naming
 ```
 <!-- registry-order:end -->
 
