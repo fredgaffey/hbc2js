@@ -1,0 +1,153 @@
+; hbc2js disassembly of 396-class-method-writable/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=6 strings=31 globalCodeIndex=0
+function #0 "global"  params=1 frame=20 env=0 flags=strict,dbg,overflowed  @0x0000023c size=556
+  0000  DeclareGlobalVar     s29 "q"
+  0005  DeclareGlobalVar     s20 "f"
+  000a  DeclareGlobalVar     s24 "d"
+  000f  DeclareGlobalVar     s13 "s"
+  0014  DeclareGlobalVar     s30 "q2"
+  0019  LoadConstUndefined   r1
+  001b  CreateBaseClass      r2, r3, r1, 1
+  0021  Mov                  r5, r3
+  0024  LoadConstString      r8, s21 "flush"
+  0028  CreateClosure        r3, r1, f2 "flush"
+  002d  DefineOwnByVal       r5, r3, r8, 0
+  0032  LoadConstString      r6, s18 "make"
+  0036  CreateClosure        r3, r1, f3 "make"
+  003b  DefineOwnByVal       r2, r3, r6, 0
+  0040  LoadConstString      r4, s14 "size"
+  0044  CreateClosure        r3, r1, f4 "size"
+  0049  DefineOwnGetterSetterByVal r5, r4, r3, r1, 0
+  004f  GetByIdShort         r3, r2, #c0, s28 "prototype"
+  0054  NewObjectWithParent  r3, r3
+  0057  GetByIdShort         r5, r3, #c1, s21 "flush"
+  005c  GetByIdShort         r4, r5, #c2, s26 "bind"
+  0061  Call2                r4, r4, r5, r3
+  0066  PutByIdStrict        r3, r4, #c0, s21 "flush"
+  006c  LoadConstZero        r0
+  006e  PutByIdStrict        r3, r0, #c1, s16 "count"
+  0074  GetGlobalObject      r4
+  0076  PutByIdStrict        r4, r3, #c2, s29 "q"
+  007c  GetByIdShort         r3, r4, #c3, s29 "q"
+  0081  GetByIdShort         r3, r3, #c1, s21 "flush"
+  0086  PutByIdStrict        r4, r3, #c3, s20 "f"
+  008c  GetByIdShort         r3, r4, #c4, s20 "f"
+  0091  Call1                r3, r3, r1
+  0095  GetByIdShort         r3, r4, #c4, s20 "f"
+  009a  Call1                r3, r3, r1
+  009e  TryGetById           r5, r4, #c5, s27 "print"
+  00a4  GetByIdShort         r3, r4, #c3, s29 "q"
+  00a9  GetByIdShort         r7, r3, #c6, s16 "count"
+  00ae  LoadConstString      r3, s4 "count "
+  00b2  Add                  r9, r3, r7
+  00b6  GetByIdShort         r3, r4, #c3, s29 "q"
+  00bb  GetByIdShort         r7, r3, #c7, s14 "size"
+  00c0  LoadConstString      r3, s2 " size "
+  00c4  AddS                 r3, r9, r3
+  00c8  Add                  r9, r3, r7
+  00cc  GetByIdShort         r3, r2, #c8, s18 "make"
+  00d1  Call1                r7, r3, r2
+  00d5  LoadConstString      r3, s7 " make "
+  00d9  AddS                 r3, r9, r3
+  00dd  Add                  r3, r3, r7
+  00e1  Call2                r3, r5, r1, r3
+  00e6  TryGetById           r7, r4, #c9, s25 "Object"
+  00ec  GetByIdShort         r5, r7, #c10, s23 "getOwnPropertyDescriptor"
+  00f1  GetByIdShort         r3, r2, #c0, s28 "prototype"
+  00f6  Call3                r3, r5, r7, r3, r8
+  00fc  PutByIdStrict        r4, r3, #c4, s24 "d"
+  0102  TryGetById           r5, r4, #c5, s27 "print"
+  0108  GetByIdShort         r3, r4, #c11, s24 "d"
+  010d  GetByIdShort         r7, r3, #c12, s22 "writable"
+  0112  LoadConstString      r3, s10 "proto flush writable="
+  0116  Add                  r3, r3, r7
+  011a  GetByIdShort         r7, r4, #c11, s24 "d"
+  011f  GetByIdShort         r7, r7, #c13, s17 "enumerable"
+  0124  LoadConstString      r8, s5 " enumerable="
+  0128  AddS                 r3, r3, r8
+  012c  Add                  r3, r3, r7
+  0130  GetByIdShort         r7, r4, #c11, s24 "d"
+  0135  GetByIdShort         r9, r7, #c14, s15 "configurable"
+  013a  LoadConstString      r7, s3 " configurable="
+  013e  AddS                 r3, r3, r7
+  0142  Add                  r3, r3, r9
+  0146  Call2                r3, r5, r1, r3
+  014b  TryGetById           r5, r4, #c9, s25 "Object"
+  0151  GetByIdShort         r3, r5, #c10, s23 "getOwnPropertyDescriptor"
+  0156  Call3                r3, r3, r5, r2, r6
+  015c  PutByIdStrict        r4, r3, #c5, s13 "s"
+  0162  TryGetById           r5, r4, #c5, s27 "print"
+  0168  GetByIdShort         r3, r4, #c15, s13 "s"
+  016d  GetByIdShort         r6, r3, #c12, s22 "writable"
+  0172  LoadConstString      r3, s6 "static make writable="
+  0176  Add                  r3, r3, r6
+  017a  GetByIdShort         r6, r4, #c15, s13 "s"
+  017f  GetByIdShort         r6, r6, #c13, s17 "enumerable"
+  0184  AddS                 r3, r3, r8
+  0188  Add                  r3, r3, r6
+  018c  GetByIdShort         r6, r4, #c15, s13 "s"
+  0191  GetByIdShort         r6, r6, #c14, s15 "configurable"
+  0196  AddS                 r3, r3, r7
+  019a  Add                  r3, r3, r6
+  019e  Call2                r3, r5, r1, r3
+  01a3  GetByIdShort         r5, r2, #c0, s28 "prototype"
+  01a8  CreateClosure        r3, r1, f5 ""
+  01ad  PutByIdStrict        r5, r3, #c0, s21 "flush"
+  01b3  GetByIdShort         r3, r2, #c0, s28 "prototype"
+  01b8  NewObjectWithParent  r3, r3
+  01bb  GetByIdShort         r6, r3, #c1, s21 "flush"
+  01c0  GetByIdShort         r5, r6, #c2, s26 "bind"
+  01c5  Call2                r5, r5, r6, r3
+  01ca  PutByIdStrict        r3, r5, #c0, s21 "flush"
+  01d0  PutByIdStrict        r3, r0, #c1, s16 "count"
+  01d6  PutByIdStrict        r4, r3, #c6, s30 "q2"
+  01dc  TryGetById           r5, r4, #c5, s27 "print"
+  01e2  GetByIdShort         r6, r4, #c16, s30 "q2"
+  01e7  GetByIdShort         r3, r6, #c1, s21 "flush"
+  01ec  Call1                r6, r3, r6
+  01f0  LoadConstString      r3, s11 "reassigned "
+  01f4  Add                  r3, r3, r6
+  01f8  Call2                r3, r5, r1, r3
+  01fd  TryGetById           r3, r4, #c5, s27 "print"
+  0203  TryGetById           r5, r4, #c9, s25 "Object"
+  0209  GetByIdShort         r4, r5, #c17, s12 "keys"
+  020e  GetByIdShort         r2, r2, #c0, s28 "prototype"
+  0213  Call2                r2, r4, r5, r2
+  0218  GetByIdShort         r4, r2, #c18, s19 "length"
+  021d  LoadConstString      r2, s1 "own keys "
+  0221  Add                  r2, r2, r4
+  0225  Call2                r2, r3, r1, r2
+  022a  Ret                  r2
+
+function #1 "Queue"  params=1 frame=13 env=0 flags=strict,dbg,overflowed,ctor  @0x00000468 size=41
+  0000  GetNewTarget         r1
+  0002  GetByIdShort         r1, r1, #c0, s28 "prototype"
+  0007  NewObjectWithParent  r1, r1
+  000a  GetByIdShort         r3, r1, #c1, s21 "flush"
+  000f  GetByIdShort         r2, r3, #c2, s26 "bind"
+  0014  Call2                r2, r2, r3, r1
+  0019  PutByIdStrict        r1, r2, #c0, s21 "flush"
+  001f  LoadConstZero        r0
+  0021  PutByIdStrict        r1, r0, #c1, s16 "count"
+  0027  Ret                  r1
+
+function #2 "flush"  params=1 frame=2 env=0 flags=strict,dbg,overflowed,nc  @0x00000491 size=24
+  0000  LoadParam            r0, 0
+  0003  GetByIdShort         r1, r0, #c0, s16 "count"
+  0008  Inc                  r1, r1
+  000b  PutByIdStrict        r0, r1, #c0, s16 "count"
+  0011  GetByIdShort         r0, r0, #c0, s16 "count"
+  0016  Ret                  r0
+
+function #3 "make"  params=1 frame=1 env=0 flags=strict,nc  @0x000004a9 size=5
+  0000  LoadConstUInt8       r0, 7
+  0003  Ret                  r0
+
+function #4 "size"  params=1 frame=1 env=0 flags=strict,dbg,overflowed,nc  @0x000004ae size=10
+  0000  LoadParam            r0, 0
+  0003  GetByIdShort         r0, r0, #c0, s16 "count"
+  0008  Ret                  r0
+
+function #5 ""  params=1 frame=1 env=0 flags=strict  @0x000004b8 size=8
+  0000  LoadConstInt         r0, -1
+  0006  Ret                  r0

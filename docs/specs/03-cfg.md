@@ -642,6 +642,53 @@ environment created with an undefined parent has no parent.
   with a static `levels` → walk `parent` that many times (`unknown` if it runs
   off the top); `GetClosureEnvironment r, c` → the closure's env if `c` is a
   tracked `closure`, else `unknown`; `Mov` copies; every other write → `unknown`.
+* **A closure held in an environment slot** is tracked like an environment held
+  in one: if every store to `(env, slot)` is the same function closed over the
+  same environment node, a load of that slot yields that `closure`. hermesc
+  v>=98 needs it: with a single call site it inlines a helper that receives a
+  closure, then inlines the call to that closure inside the helper's inner
+  function, loading it back out of the slot and reading the callee's captures
+  through `GetClosureEnvironment` (export-boot L4, react-navigation module 991
+  fn#11865; construct `400-inlined-closure-env`). The load resolves only when
+  the captured environment is visible wherever the holder is — it is on the
+  holder's static chain, or that chain passes through an environment created by
+  the same function (the inlined helper's environment is a sibling of the block
+  scope the closure captured). Any other store to the slot makes it `conflict`.
+* **Closure environment views** (export-boot env markers). The load above can
+  fail the visibility test: hermesc also inlines the call where the closure's
+  captured scope is *not* lexically visible — the react-query retryer's
+  `continueFn` is created inside `pause()` and called (inlined) from the
+  sibling `continue()`; react-navigation module 1565 fn#13120/13121/13126, 24
+  sites; and a closure exported by one Metro module, copied into another
+  module's slot and inlined there (fn#15018-15021, #13837, #15118, #14065).
+  No `_e<env>_<slot>` name is right there, so the load yields an *opaque*
+  closure, `GetClosureEnvironment` on it a `view` value (closure function,
+  captured node, chain level), `GetEnvironment` from a view stays a view, and
+  loads/stores through one are recorded in `envViewOps` (not in `accesses`)
+  with the exposed `(level, slot)`s in `closureEnvExposed`. The emitter binds a
+  view at *every* creation site of that function (`__hbc_bind_env(fn,
+  __hbc_env_view(parent, slot, get, set, ...))`, getters/setters closing over
+  the real bindings, which are visible at the creation site by construction)
+  and lowers the reader to `__hbc_closure_env` / `__hbc_env_up` /
+  `__hbc_env_load` / `__hbc_env_store`. This is exact: the reader touches the
+  same variables of the same closure instance the VM does. The one observable
+  is a non-enumerable `Symbol.for("hbc2js.env")` own property on that closure.
+  Stores of `undefined` or a `LoadConst*` primitive into the slot do not make
+  it `conflict` for this purpose (`prim` lattice value): `GetClosureEnvironment`
+  runs only behind the optional-call guard, i.e. on a function, and the one
+  function ever stored is the one named (construct
+  `430-slot-closure-or-undefined`).
+* **Not resolved: a function whose own environment is ambiguous.** The 18
+  remaining sites on react-navigation (fn#12754 and the mutually-creating
+  fn#14983/14984/14986, created again by fn#15401) read through
+  `GetParentEnvironment` of a function with several creation environments whose
+  chains do not align (each site's environment is created by another member of
+  the group, so the chains are unrooted). `selfEnv` is `unknown`, so these stay
+  `E_ENV_UNRESOLVED` / `__hbc_unresolved_env`. A view would need the *running*
+  closure object inside its own body, which strict-mode JS does not expose (no
+  `arguments.callee`) and a hoisted `_fn<n>` binding does not name when one body
+  serves several creation contexts; the fix is per-instance bodies (spec 05 §6),
+  not the tracker.
 * `Create*Closure d, rE, fn` with `rE` = `none` records `closureEnvOf(fn) =
   null` — *known* to capture nothing, which is what makes it not an orphan. If
   another site creates the same `fn` with a real environment, that is a genuine

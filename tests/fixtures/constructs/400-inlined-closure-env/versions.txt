@@ -1,0 +1,6 @@
+v84: OK - compiles; no GetClosureEnvironment (no inlining of the closure call).
+v94: OK - same.
+v96: OK - same.
+v98: OK - the getter inlines the call to the closure it loads from its
+     environment slot and reads the callee's captures via GetClosureEnvironment.
+v99: OK - same.

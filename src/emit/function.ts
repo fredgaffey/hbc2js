@@ -2,7 +2,7 @@
 import { ErrorCode, Hbc2jsError } from "../errors.ts";
 import type { Diagnostic } from "../errors.ts";
 import type { DecodedFunction, Instruction } from "../disasm/decode.ts";
-import type { BlockId, EnvGraph, FunctionCfg, ModuleAnalysis } from "../cfg/types.ts";
+import type { BlockId, EnvGraph, EnvViewOp, FunctionCfg, ModuleAnalysis } from "../cfg/types.ts";
 import { siteKey } from "../cfg/types.ts";
 import type { HbcModule } from "../parse/types.ts";
 import type { BuiltinTable, TypeOfIsTable } from "../tables/types.ts";
@@ -41,6 +41,11 @@ export interface FunctionEmitter {
   /** The env node an environment access resolves to, or `null` under
    *  `--lenient-env` when spec 03 §6 could not resolve it (strict aborts). */
   resolveEnv(insn: Instruction): number | null;
+  /** Spec 03 §6.2 closure environment view lowering for this site, if any. */
+  envViewOp(insn: Instruction): EnvViewOp | undefined;
+  /** The `__hbc_env_view(...)` expression to bind on the closure of
+   *  `functionIndex` created at `offset`, when some reader needs it. */
+  closureEnvView(functionIndex: number, offset: number): Expr | undefined;
   /** The binding name a `Create*Closure`/`Create*Class` at `offset` must use for
    *  function `functionIndex`: `_fn<n>` normally, `_fn<n>__c<i>` when that
    *  function has per-creation-context copies and this site captured copy i's
@@ -309,6 +314,38 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
         return null;
       }
       return input.envRemap?.get(env) ?? env;
+    },
+    envViewOp(insn: Instruction): EnvViewOp | undefined {
+      return envGraph.envViewOps.get(siteKey(fn.index, insn.offset));
+    },
+    closureEnvView(functionIndex: number, offset: number): Expr | undefined {
+      const exposed = envGraph.closureEnvExposed.get(functionIndex);
+      if (exposed === undefined) return undefined;
+      const captured = envGraph.closureCreationSites.get(functionIndex)?.get(siteKey(fn.index, offset));
+      if (captured === undefined || captured === null) return undefined;
+      const chain: number[] = [];
+      const maxLevel = Math.max(...exposed.keys());
+      for (let e: number | null = captured; chain.length <= maxLevel; e = envGraph.nodes[e]!.parent) {
+        if (e === null) return undefined;
+        chain.push(e);
+      }
+      let view: Expr = lit("null");
+      for (let level = maxLevel; level >= 0; level--) {
+        const node = input.envRemap?.get(chain[level]!) ?? chain[level]!;
+        const args: Expr[] = [view];
+        for (const slot of [...(exposed.get(level) ?? [])].sort((a, b) => a - b)) {
+          const name = envSlot(node, slot);
+          args.push(
+            num(slot),
+            { k: "func", name: null, params: [], body: [{ k: "return", arg: id(name) }] },
+            { k: "func", name: null, params: [{ name: "v" }], body: [{ k: "expr", expr: { k: "assign", target: id(name), value: id("v") } }] },
+          );
+        }
+        view = call(id("__hbc_env_view"), args);
+      }
+      usedHelpers.add("__hbc_env_view");
+      input.useHelper("__hbc_env_view");
+      return view;
     },
     closureName(functionIndex: number, offset: number): string {
       return input.closureNameAt?.get(siteKey(fn.index, offset)) ?? fnName(functionIndex);

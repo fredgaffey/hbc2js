@@ -56,6 +56,25 @@ test("review-M4-H3: __hbc_unresolved_env throws, naming the site", () => {
   );
 });
 
+test("review-M4-H3: __hbc_bind_env / __hbc_env_view / __hbc_closure_env / __hbc_env_up / __hbc_env_load / __hbc_env_store reach the closure's real bindings (spec 03 §6.2 closure environment views)", () => {
+  const h = load("__hbc_bind_env", "__hbc_env_view", "__hbc_closure_env", "__hbc_env_up", "__hbc_env_load", "__hbc_env_store");
+  let outer = "o";
+  let inner = 1;
+  const fn = (): number => inner;
+  const view = h["__hbc_env_view"](h["__hbc_env_view"](null, 0, () => outer, (v: string) => { outer = v; }), 2, () => inner, (v: number) => { inner = v; });
+  assert.equal(h["__hbc_bind_env"](fn, view), fn, "binding returns the closure itself");
+  assert.deepEqual(Object.keys(fn), [], "the view is not enumerable");
+  const env = h["__hbc_closure_env"](fn);
+  assert.equal(h["__hbc_env_load"](env, 2), 1);
+  h["__hbc_env_store"](env, 2, 5);
+  assert.equal(fn(), 5, "a store through the view is a store to the captured binding");
+  const up = h["__hbc_env_up"](env, 1);
+  assert.equal(h["__hbc_env_load"](up, 0), "o");
+  h["__hbc_env_store"](up, 0, "x");
+  assert.equal(outer, "x");
+  assert.throws(() => h["__hbc_closure_env"](() => 0), TypeError, "an unbound closure fails loudly, never reads undefined");
+});
+
 // --- generator protocol ------------------------------------------------------
 
 /** A v≤96 frame factory: `step(sent, isReturn, isThrow) -> [value, done]`. */

@@ -213,11 +213,43 @@ test("yield-recovery is a stage-B rung on catalogue row 17, in the structure blo
   assert.doesNotThrow(() => enabledPasses({}));
 });
 
-test("yield-recovery's versions predicate accepts 84/94/96 and rejects 98/99", async () => {
+test("yield-recovery runs at every version (v>=97: the lowered shell, BUGS export-boot L1)", async () => {
   const { yieldRecovery } = await rung();
-  const v = yieldRecovery.versions as (n: number, layout: string) => boolean;
-  for (const n of [84, 94, 96]) assert.equal(v(n, "C"), true, `v${n}`);
-  for (const n of [98, 99]) assert.equal(v(n, "E"), false, `v${n}`);
+  // No versions predicate: at v>=97 the rung only marks the stub `function*`
+  // around `yield* __hbc_makeGeneratorLowered(...)`; the v<=96 shim shape and
+  // the v>=97 shell shape never occur at the other era.
+  assert.equal(yieldRecovery.versions, undefined);
+});
+
+// docs/BUGS.md export-boot L1 (spec 33 acceptance test 1, rn-template B1): a
+// generator with no `yield` and an async function with no `await` were emitted
+// as plain functions, so `Object.getPrototypeOf(f).constructor.name` was
+// `Function`, `f()` was not a generator object / Promise, and `new f()` did not
+// throw. Fixture 395 observes all of it; it was DIVERGENT at all five versions.
+test("export-boot L1: a zero-yield generator and an await-less async function stay function* / async function at every version (fixture 395)", async () => {
+  const { runTier, hbc2jsDecompiler } = await import("../../../src/harness/tiers.ts");
+  const { VERDICT } = await import("../../../src/harness/ladder.ts");
+  for (const version of [...OPCODE_ERA, ...LOWERED_ERA]) {
+    const out = js("395-generator-no-yield", version);
+    // v<=96 recovers the body (the stub keeps its own name); v>=97 keeps the
+    // lowered state machine inside a `function*` shell.
+    assert.equal(count(out, /function\* /g), version.startsWith("v9") && Number(version.slice(1)) >= 98 ? 5 + 4 : 5, `${version}: five source generators (+ four async factories at v>=97)`);
+    assert.equal(count(out, /async function /g), 4, `${version}: four source async functions`);
+    if ((OPCODE_ERA as readonly string[]).includes(version)) {
+      assert.equal(count(out, /__hbc_makeGenerator\(_fn/g), 0, `${version}: no __hbc_makeGenerator call survives`);
+      assert.match(out, /function\* empty\(\)/);
+      assert.match(out, /async function asyncEmpty\(\)/);
+      // rn-template module 87: a strict stub's "use strict" directive no longer blocks recovery.
+      assert.match(out, /function\* strictGen\(\) \{\s*(\/\/[^\n]*\s*)*"use strict";/);
+      assert.match(out, /async function strictAsync\(\)/);
+    } else {
+      assert.equal(count(out, /return yield\* __hbc_makeGeneratorLowered\(/g), count(out, LOWERED) - 1, `${version}: every lowered generator (all but the prelude helper declaration) is behind a yield* shell`);
+      assert.equal(count(out, /return await /g), 4, `${version}: the async shells return await <driver>`);
+    }
+  }
+  const report = await runTier({ tier: "gate", decompiler: hbc2jsDecompiler, versions: [84, 94, 96, 98, 99], only: ["395-generator-no-yield"] });
+  assert.equal(report.results.length, 5);
+  for (const r of report.results) assert.equal(r.verdict, VERDICT.PASS, `${r.fixture.name}: ${r.oracles.map((o) => `${o.oracle}=${o.verdict} ${o.detail ?? ""}`).join(" ")}`);
 });
 
 test("yield-recovery: a body with no generator group is a fixed point without consulting the context (PL-08)", async () => {
