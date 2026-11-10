@@ -234,7 +234,9 @@ function nodeWriteSummary(node: object): WriteSummary {
     }
     registerWriteWalkStats.nodes++;
     const n = v as { readonly k?: unknown } & Record<string, unknown>;
-    if (n.k === "func") return;
+    // A `sameFrame` resume closure is this frame's own body: its writes count
+    // (00-LADDER "Resumable bodies"), as in the reference walk below.
+    if (n.k === "func" && n.sameFrame !== true) return;
     if (n.k === "ident") return; // a read (writes are caught at their parent)
     if (n.k === "assign" && (n.target as Expr).k === "ident") {
       const t = (n.target as Expr & { k: "ident" }).name;
