@@ -1,8 +1,8 @@
 {
   "normalisation": 2,
-  "rn-template-0.72|passes-off": { "functions": 4125, "identical": 983, "identicalPct": 23.83 },
-  "rn-template-0.72|passes-on": { "functions": 4125, "identical": 2501, "identicalPct": 60.63 },
-  "react-navigation-example-0.85.3|passes-off": { "functions": 14437, "identical": 5368, "identicalPct": 37.18 },
-  "react-navigation-example-0.85.3|passes-on": { "functions": 14437, "identical": 8935, "identicalPct": 61.89 },
+  "rn-template-0.72|passes-off": { "functions": 4125, "identical": 984, "identicalPct": 23.85 },
+  "rn-template-0.72|passes-on": { "functions": 4125, "identical": 2524, "identicalPct": 61.19 },
+  "react-navigation-example-0.85.3|passes-off": { "functions": 14437, "identical": 5369, "identicalPct": 37.19 },
+  "react-navigation-example-0.85.3|passes-on": { "functions": 14437, "identical": 8997, "identicalPct": 62.32 },
   "expensify-app-0.86.0|passes-on": { "functions": 98680, "identical": 45460, "identicalPct": 46.07 }
 }
