@@ -143,30 +143,39 @@ function stubFunctionsByName(program: readonly Stmt[], targets: ReadonlyMap<stri
   return found;
 }
 
-/** True when `block` lies on a cycle of the normal graph. */
+/** Normal successors plus the handler blocks an exception raised in `block`
+ *  can reach. review-1110 iife: a retry loop whose only back edge runs through
+ *  a `catch` (`for (;;) { try { fs.push(function () {}); mayThrow(); break; }
+ *  catch (e) {} }`) has no cycle in the normal graph, yet its closure site runs
+ *  once per retry. */
+function succsWithExceptional(cfg: import("../cfg/types.ts").FunctionCfg, block: number): number[] {
+  return [...cfg.blocks[block]!.succs.map((e) => e.to), ...(cfg.exceptionSuccs.get(block) ?? [])];
+}
+
+/** True when `block` lies on a cycle of the normal + exceptional graph. */
 function inCycle(cfg: import("../cfg/types.ts").FunctionCfg, block: number): boolean {
   const seen = new Set<number>();
-  const stack = [...cfg.blocks[block]!.succs.map((e) => e.to)];
+  const stack = [...succsWithExceptional(cfg, block)];
   while (stack.length > 0) {
     const b = stack.pop()!;
     if (b === block) return true;
     if (seen.has(b)) continue;
     seen.add(b);
-    for (const e of cfg.blocks[b]!.succs) stack.push(e.to);
+    stack.push(...succsWithExceptional(cfg, b));
   }
   return false;
 }
 
-/** True when `to` is reachable from `from` along at least one normal edge. */
+/** True when `to` is reachable from `from` along normal or exceptional edges. */
 function reaches(cfg: import("../cfg/types.ts").FunctionCfg, from: number, to: number): boolean {
   const seen = new Set<number>();
-  const stack = [...cfg.blocks[from]!.succs.map((e) => e.to)];
+  const stack = [...succsWithExceptional(cfg, from)];
   while (stack.length > 0) {
     const b = stack.pop()!;
     if (b === to) return true;
     if (seen.has(b)) continue;
     seen.add(b);
-    for (const e of cfg.blocks[b]!.succs) stack.push(e.to);
+    stack.push(...succsWithExceptional(cfg, b));
   }
   return false;
 }
@@ -743,11 +752,61 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
       if (here === undefined || here.length === 0 || !here.every((s) => s.plain)) continue;
       const all = envGraph.closureCreationSites.get(child);
       if (all !== undefined && [...all.keys()].some((k) => Number(k.slice(0, k.indexOf(":"))) !== host)) continue;
+      // review-1110 iife: a lowered generator body (pre-v97) is emitted as a
+      // step function the factory calls once per `next()`, so a site reachable
+      // from a resume point runs once per resumption, not once per activation
+      // (`while (true) yield function () {}` yields distinct objects).
+      const resumes = cfg.generator.suspendPoints.map((p) => p.resumeBlock);
       const repeats =
+        here.some((s) => resumes.some((r) => r === s.block || reaches(cfg, r, s.block))) ||
         here.some((s) => inCycle(cfg, s.block)) ||
         here.some((a, i) => here.some((b, j) => i !== j && (a.block === b.block ? a.offset < b.offset : reaches(cfg, a.block, b.block))));
       if (!repeats) continue;
       inlineFunctions.add(child);
+    }
+  }
+
+  // Spec 27 §12, fix-closure-identity-2: a closure whose creation sites lie in
+  // TWO OR MORE functions (hermesc inlined its creator `wrap` into both `a`
+  // and `b`) has no single creator, so section 11 leaves it one declaration
+  // at its home `h` -- one object per activation of `h`, while every
+  // execution of every site makes a new one in the VM (`a() !== a()`). Such a
+  // function is emitted as a function expression at every site instead: one
+  // instance per creator, inlined there. The copies are the SAME function
+  // index under the same remap, so they read the very environment bindings
+  // the declaration did (declared at `h` or above, all ancestors of every
+  // creator; the functions in between declare only their own `_e<id>_<slot>`
+  // names -- section 11's argument), and share every captured variable.
+  // Refused (the declaration stays) unless every site is a plain
+  // `Create*Closure` in a function at or below `h`, outside the closure's own
+  // subtree, and neither the closure nor any creator has creation-context
+  // copies (the "closure copies" machinery owns those).
+  const perCreatorInline = new Map<number, number[]>();
+  const perCreatorFns = new Set<number>();
+  for (const [host, kids] of childrenOf) {
+    for (const child of kids) {
+      if (inlineFunctions.has(child) || envGraph.closureCopies.has(child)) continue;
+      const all = envGraph.closureCreationSites.get(child);
+      if (all === undefined) continue;
+      const creators = new Set([...all.keys()].map((k) => Number(k.slice(0, k.indexOf(":")))));
+      if (creators.size < 2) continue;
+      const ok = [...creators].every((c) => {
+        if (!Number.isInteger(c) || c === child || !isAncestor(host, c) || isAncestor(child, c) || envGraph.closureCopies.has(c)) return false;
+        let ccfg: FunctionCfg;
+        try {
+          ccfg = analysis.cfg(c);
+        } catch {
+          return false;
+        }
+        return ccfg.blocks.every((b) => b.instructions.every((insn) => closureFunctionId(insn) !== child || CREATE_CLOSURE_OPS.has(insn.name)));
+      });
+      if (!ok) continue;
+      perCreatorFns.add(child);
+      for (const c of creators) {
+        const list = perCreatorInline.get(c);
+        if (list === undefined) perCreatorInline.set(c, [child]);
+        else list.push(child);
+      }
     }
   }
 
@@ -851,8 +910,16 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
       const hoisted: Stmt[] = [];
       const inlined = new Map<number, Stmt>();
       for (const child of kids) {
+        if (perCreatorFns.has(child)) continue; // emitted in each creator, below
         const body = emitOne(child, childCtx);
         if (inlineFunctions.has(child) && body.k === "func") inlined.set(child, body);
+        else hoisted.push(body);
+      }
+      // fix-closure-identity-2: this function's own instance of a closure
+      // several functions create (see `perCreatorInline`).
+      for (const g of perCreatorInline.get(index) ?? []) {
+        const body = emitOne(g, { ...childCtx, path: `${ctx.path}/${index}m` });
+        if (body.k === "func") inlined.set(g, body);
         else hoisted.push(body);
       }
       // They travel with their whole lexical subtree, under the composed
@@ -899,6 +966,7 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
         for (const site of createdIn.get(index) ?? []) {
           const g = site.fn;
           if (g === index || active.has(g)) continue;
+          if (perCreatorFns.has(g)) continue; // inlined at this site already
           const home = parentOf.get(g) ?? null;
           if (home === null) continue; // module level: in scope from everywhere
           if (isAncestor(index, home)) continue; // already emitted in this subtree

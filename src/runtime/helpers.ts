@@ -68,6 +68,45 @@ var __hbc_HermesInternal = {
   // "the one currently stepping".
   h("__hbc_delegated", `var __hbc_delegated = false;`),
 
+  // Spec 03 §6.2 closure environment views: hermesc inlined a call to a known
+  // closure somewhere its captured scope is not lexically visible and reads
+  // the callee's captures through GetClosureEnvironment. Every creation site
+  // of that function binds a view (getter/setter per exposed slot, closing
+  // over the real bindings) under a registry symbol, so the reader reaches
+  // the very same variables at runtime.
+  h(
+    "__hbc_bind_env",
+    `
+function __hbc_bind_env(fn, view) {
+  Object.defineProperty(fn, Symbol.for("hbc2js.env"), { value: view, configurable: true });
+  return fn;
+}
+`,
+  ),
+  h(
+    "__hbc_env_view",
+    `
+function __hbc_env_view(parent) {
+  var cells = {};
+  for (var i = 1; i < arguments.length; i += 3) cells[arguments[i]] = [arguments[i + 1], arguments[i + 2]];
+  return { p: parent, c: cells };
+}
+`,
+  ),
+  h(
+    "__hbc_closure_env",
+    `
+function __hbc_closure_env(fn) {
+  var view = fn[Symbol.for("hbc2js.env")];
+  if (view === undefined) throw new TypeError("hbc2js: closure has no bound environment view");
+  return view;
+}
+`,
+  ),
+  h("__hbc_env_up", `function __hbc_env_up(view, levels) { while (levels-- > 0) view = view.p; return view; }`),
+  h("__hbc_env_load", `function __hbc_env_load(view, slot) { return view.c[slot][0](); }`),
+  h("__hbc_env_store", `function __hbc_env_store(view, slot, value) { view.c[slot][1](value); }`),
+
   h(
     "__hbc_unresolved_env",
     `
@@ -179,12 +218,25 @@ function __hbc_makeGeneratorLowered(body) {
     "__hbc_arguments",
     `
 var __hbc_arguments = (function () {
-  "use strict";
+  // \`make\` is loose with no formal parameters: its arguments object maps no
+  // index (so the copy is unmapped) and has a data \`callee\` that is
+  // replaced below by the source object's own \`callee\` -- the function
+  // itself for a loose original, the throwing accessor for a strict one
+  // (review-1110 diamonds, fixture 321).
   var make = function () { return arguments; };
   // Captured once, before any user code: a program that overrides
-  // Function.prototype.apply must not reach this copy (fixture 220).
+  // Function.prototype.apply or Object.* must not reach this copy (fixture 220).
   var apply = Reflect.apply;
-  return function (a) { return apply(make, undefined, a); };
+  var own = Object.getOwnPropertyDescriptor;
+  var define = Object.defineProperty;
+  return function (a) {
+    var c = apply(make, undefined, a);
+    var d = own(a, "callee");
+    // (In a strict host scope \`make\` is strict and its own \`callee\` is
+    // the non-configurable thrower: keep it rather than throw.)
+    if (d !== undefined && own(c, "callee").configurable) define(c, "callee", d);
+    return c;
+  };
 })();
 `,
   ),
@@ -437,6 +489,34 @@ function __hbc_b_initRegexNamedGroups(re) {
     `
 function __hbc_b_throwTypeError(message) {
   throw new TypeError(message);
+}
+`,
+  ),
+  // review-1110 iife/private: `GetOwnPrivateBySym` / `PutOwnPrivateBySym`.
+  // Hermes JSObject::getPrivateField / setPrivateField look the private name
+  // up on the object's OWN properties only and throw a TypeError when it is
+  // absent; the interpreter throws for a non-object base first. A bare
+  // `obj[sym]` read undefined (or a prototype's field) and a bare
+  // `obj[sym] = v` created the field on a foreign object.
+  h(
+    "__hbc_privGet",
+    `
+function __hbc_privGet(obj, sym) {
+  if (obj === null || (typeof obj !== "object" && typeof obj !== "function")) throw new TypeError("cannot read private property of a non-object");
+  var d = Reflect.getOwnPropertyDescriptor(obj, sym);
+  if (d === undefined) throw new TypeError("Private property does not exist: " + String(sym.description));
+  return d.value;
+}
+`,
+  ),
+  h(
+    "__hbc_privSet",
+    `
+function __hbc_privSet(obj, sym, value) {
+  if (obj === null || (typeof obj !== "object" && typeof obj !== "function")) throw new TypeError("cannot write private property of a non-object");
+  if (Reflect.getOwnPropertyDescriptor(obj, sym) === undefined) throw new TypeError("Private property does not exist: " + String(sym.description));
+  obj[sym] = value;
+  return value;
 }
 `,
   ),

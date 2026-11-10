@@ -2,7 +2,7 @@
 import { ErrorCode, Hbc2jsError } from "../errors.ts";
 import type { Diagnostic } from "../errors.ts";
 import type { DecodedFunction, Instruction } from "../disasm/decode.ts";
-import type { BlockId, EnvGraph, FunctionCfg, ModuleAnalysis } from "../cfg/types.ts";
+import type { BlockId, EnvGraph, EnvViewOp, FunctionCfg, ModuleAnalysis } from "../cfg/types.ts";
 import { siteKey } from "../cfg/types.ts";
 import type { HbcModule } from "../parse/types.ts";
 import type { BuiltinTable, TypeOfIsTable } from "../tables/types.ts";
@@ -41,6 +41,11 @@ export interface FunctionEmitter {
   /** The env node an environment access resolves to, or `null` under
    *  `--lenient-env` when spec 03 §6 could not resolve it (strict aborts). */
   resolveEnv(insn: Instruction): number | null;
+  /** Spec 03 §6.2 closure environment view lowering for this site, if any. */
+  envViewOp(insn: Instruction): EnvViewOp | undefined;
+  /** The `__hbc_env_view(...)` expression to bind on the closure of
+   *  `functionIndex` created at `offset`, when some reader needs it. */
+  closureEnvView(functionIndex: number, offset: number): Expr | undefined;
   /** The binding name a `Create*Closure`/`Create*Class` at `offset` must use for
    *  function `functionIndex`: `_fn<n>` normally, `_fn<n>__c<i>` when that
    *  function has per-creation-context copies and this site captured copy i's
@@ -54,6 +59,9 @@ export interface FunctionEmitter {
   suspendStateFor(offset: number): number;
   diagnostic(d: Diagnostic): void;
   paramExpr(index: number): Expr;
+  /** Spec 27 section 13: offsets of the entry `StoreToEnvironment`s a
+   *  slot-named parameter replaces (lowered to nothing). */
+  readonly paramSlotStores: ReadonlySet<number>;
 }
 
 export interface EmitFunctionInput {
@@ -193,8 +201,66 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
   // `params=2` at v99, and JS reports `length === 1` for both).
   const hasRestParam = version <= 96 && fn.instructions.some((i) => (i.name === "CallBuiltin" || i.name === "CallBuiltinLong") && builtins.builtins[i.operands[1]!.value]?.name === "copyRestArgs");
   const namedParams = Math.max(0, paramCount - (hasRestParam ? 2 : 1));
+  // Spec 27 section 13 (roundtrip-paramenv, `diff:StoreToEnvironment/LoadParam`):
+  // a captured parameter IS its environment slot -- hermesc stores it there at
+  // entry, right after its LoadParam. When that entry store is the slot's only
+  // write anywhere, slot and parameter hold the same value for the whole
+  // activation, so the parameter is named by the slot (`function f(a1, _e3_0)`)
+  // and the store and the `let` disappear; any other read of the parameter
+  // reads the slot, which is the same value. Only a straight entry prefix of
+  // pure instructions is scanned, so nothing can observe the slot before it.
+  const paramSlot = new Map<number, string>();
+  const paramSlotStores = new Set<number>();
+  // A function that creates more than one environment may be spec 27's
+  // fixture-79 case (no own scope; offset 0 is an inlined IIFE's): leave it to
+  // the IIFE reconstruction rather than bind an inlined callee's slot here.
+  if (!isOpcodeGeneratorBody && input.envRemap === undefined && (input.envGraph.envsCreatedIn.get(fn.index)?.length ?? 0) === 1) {
+    // v<=96 opens the function's own scope with `CreateEnvironment` at offset 0.
+    const own = ownEnvOf(input.envGraph, fn.index) ?? input.envGraph.nodes.find((e) => e.ownerFunction === fn.index && e.createOffset === 0 && e.createOpcode === "CreateEnvironment")?.id;
+    const owned = new Set(input.ownedEnvSlots);
+    const entryBlock = cfg.blocks[cfg.entry];
+    if (own !== undefined && entryBlock !== undefined) {
+      const paramIn = new Map<number, number>();
+      for (const insn of entryBlock.instructions) {
+        const n = insn.name;
+        const op = (i: number): number => insn.operands[i]!.value;
+        if (n === "LoadParam" || n === "LoadParamLong") {
+          if (op(1) >= 1 && op(1) <= namedParams) paramIn.set(op(0), op(1));
+          else paramIn.delete(op(0));
+        } else if (n === "Mov" || n === "MovLong") {
+          const from = paramIn.get(op(1));
+          if (from === undefined) paramIn.delete(op(0));
+          else paramIn.set(op(0), from);
+        } else if (n.startsWith("LoadConst") || ((n === "CreateFunctionEnvironment" || n === "CreateEnvironment") && insn.offset === 0)) {
+          paramIn.delete(op(0));
+        } else if (/^Store(NP)?ToEnvironmentL?$/.test(n)) {
+          const index = paramIn.get(op(2));
+          const name = envSlot(own, op(1));
+          const slot = input.envGraph.slot(own, op(1));
+          const stores = slot?.accesses.filter((a) => a.kind === "store") ?? [];
+          if (
+            index !== undefined &&
+            !paramSlot.has(index) &&
+            input.envGraph.resolvedAt.get(siteKey(fn.index, insn.offset)) === own &&
+            owned.has(name) &&
+            slot?.strategy === "lexical" &&
+            stores.length === 1 &&
+            stores[0]!.functionIndex === fn.index &&
+            stores[0]!.offset === insn.offset
+          ) {
+            paramSlot.set(index, name);
+            paramSlotStores.add(insn.offset);
+          }
+        } else {
+          break;
+        }
+      }
+    }
+  }
+  const paramSlotNames = new Set(paramSlot.values());
+  const declaredEnvSlots = input.ownedEnvSlots.filter((name) => !paramSlotNames.has(name));
   const params: Param[] = [];
-  for (let i = 1; i <= namedParams; i++) params.push(p(`a${i}`));
+  for (let i = 1; i <= namedParams; i++) params.push(p(paramSlot.get(i) ?? `a${i}`));
 
   const thisExpr: Expr = isOpcodeGeneratorBody ? id("__this") : { k: "this" };
   const argsExpr: Expr = isOpcodeGeneratorBody ? id("__args") : { k: "argumentsObject" };
@@ -229,6 +295,7 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
     thisExpr,
     argsExpr,
     argumentsReified,
+    paramSlotStores,
     newTargetExpr: lit("new.target"),
     useHelper(name: string): void {
       usedHelpers.add(name);
@@ -247,6 +314,38 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
         return null;
       }
       return input.envRemap?.get(env) ?? env;
+    },
+    envViewOp(insn: Instruction): EnvViewOp | undefined {
+      return envGraph.envViewOps.get(siteKey(fn.index, insn.offset));
+    },
+    closureEnvView(functionIndex: number, offset: number): Expr | undefined {
+      const exposed = envGraph.closureEnvExposed.get(functionIndex);
+      if (exposed === undefined) return undefined;
+      const captured = envGraph.closureCreationSites.get(functionIndex)?.get(siteKey(fn.index, offset));
+      if (captured === undefined || captured === null) return undefined;
+      const chain: number[] = [];
+      const maxLevel = Math.max(...exposed.keys());
+      for (let e: number | null = captured; chain.length <= maxLevel; e = envGraph.nodes[e]!.parent) {
+        if (e === null) return undefined;
+        chain.push(e);
+      }
+      let view: Expr = lit("null");
+      for (let level = maxLevel; level >= 0; level--) {
+        const node = input.envRemap?.get(chain[level]!) ?? chain[level]!;
+        const args: Expr[] = [view];
+        for (const slot of [...(exposed.get(level) ?? [])].sort((a, b) => a - b)) {
+          const name = envSlot(node, slot);
+          args.push(
+            num(slot),
+            { k: "func", name: null, params: [], body: [{ k: "return", arg: id(name) }] },
+            { k: "func", name: null, params: [{ name: "v" }], body: [{ k: "expr", expr: { k: "assign", target: id(name), value: id("v") } }] },
+          );
+        }
+        view = call(id("__hbc_env_view"), args);
+      }
+      usedHelpers.add("__hbc_env_view");
+      input.useHelper("__hbc_env_view");
+      return view;
     },
     closureName(functionIndex: number, offset: number): string {
       return input.closureNameAt?.get(siteKey(fn.index, offset)) ?? fnName(functionIndex);
@@ -280,7 +379,7 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
     },
     paramExpr(index: number): Expr {
       if (index === 0) return thisExpr;
-      if (index <= namedParams) return id(`a${index}`);
+      if (index <= namedParams) return id(paramSlot.get(index) ?? `a${index}`);
       return { k: "member", obj: argsExpr, prop: num(index - 1), computed: true };
     },
   };
@@ -868,7 +967,7 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
   const registers: string[] = [];
   for (let i = 0; i < frameSize; i++) registers.push(reg(i));
   if (registers.length > 0) prologue.push({ k: "decl", kind: "let", names: registers });
-  if (input.ownedEnvSlots.length > 0) prologue.push({ k: "decl", kind: "let", names: [...input.ownedEnvSlots] });
+  if (declaredEnvSlots.length > 0) prologue.push({ k: "decl", kind: "let", names: [...declaredEnvSlots] });
   if (needScratch) prologue.push({ k: "decl", kind: "let", names: [SCRATCH] });
   if (cfg.regions.length > 0) prologue.push({ k: "decl", kind: "let", names: [EXC_VALUE] });
   if (tryPlan.needsPc) prologue.push({ k: "init", kind: "let", name: PC_VAR, value: num(-1) });
@@ -899,7 +998,7 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
   const iifeInput = {
     header: [...headerStmts, ...prologue],
     body,
-    ownedEnvSlots: input.ownedEnvSlots,
+    ownedEnvSlots: declaredEnvSlots,
     envParent: envParentMap(input.envGraph),
     movableChild: (childName: string) => movableChild(input.envGraph, fn.index, childName),
   };
@@ -909,7 +1008,7 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
   // the own-scope reading only when it reconstructs strictly more wrappers.
   let rebuilt = reconstructIifes(iifeInput);
   const ownEnv = ownEnvOf(input.envGraph, fn.index);
-  if (ownEnv !== undefined && input.ownedEnvSlots.length > 0) {
+  if (ownEnv !== undefined && declaredEnvSlots.length > 0) {
     const asOwn = reconstructIifes({ ...iifeInput, ownEnv });
     if (asOwn.wrapped.length > rebuilt.wrapped.length) rebuilt = asOwn;
   }

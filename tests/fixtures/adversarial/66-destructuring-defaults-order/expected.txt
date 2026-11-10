@@ -1,0 +1,6 @@
+A 2 Z 3
+get a | default A | key b | get b | key z | get z | default Z | get c
+2 {"c":3,"d":4}
+get b | ownKeys | get a | get c | get d
+6
+default [object Object] | default 1 | default 2 | default 3

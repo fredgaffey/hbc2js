@@ -56,6 +56,25 @@ test("review-M4-H3: __hbc_unresolved_env throws, naming the site", () => {
   );
 });
 
+test("review-M4-H3: __hbc_bind_env / __hbc_env_view / __hbc_closure_env / __hbc_env_up / __hbc_env_load / __hbc_env_store reach the closure's real bindings (spec 03 §6.2 closure environment views)", () => {
+  const h = load("__hbc_bind_env", "__hbc_env_view", "__hbc_closure_env", "__hbc_env_up", "__hbc_env_load", "__hbc_env_store");
+  let outer = "o";
+  let inner = 1;
+  const fn = (): number => inner;
+  const view = h["__hbc_env_view"](h["__hbc_env_view"](null, 0, () => outer, (v: string) => { outer = v; }), 2, () => inner, (v: number) => { inner = v; });
+  assert.equal(h["__hbc_bind_env"](fn, view), fn, "binding returns the closure itself");
+  assert.deepEqual(Object.keys(fn), [], "the view is not enumerable");
+  const env = h["__hbc_closure_env"](fn);
+  assert.equal(h["__hbc_env_load"](env, 2), 1);
+  h["__hbc_env_store"](env, 2, 5);
+  assert.equal(fn(), 5, "a store through the view is a store to the captured binding");
+  const up = h["__hbc_env_up"](env, 1);
+  assert.equal(h["__hbc_env_load"](up, 0), "o");
+  h["__hbc_env_store"](up, 0, "x");
+  assert.equal(outer, "x");
+  assert.throws(() => h["__hbc_closure_env"](() => 0), TypeError, "an unbound closure fails loudly, never reads undefined");
+});
+
 // --- generator protocol ------------------------------------------------------
 
 /** A v≤96 frame factory: `step(sent, isReturn, isThrow) -> [value, done]`. */
@@ -392,6 +411,23 @@ test("review-M4-H3: __hbc_b_throwTypeError / __hbc_b_throwReferenceError throw t
   const h = load("__hbc_b_throwTypeError", "__hbc_b_throwReferenceError");
   assert.throws(() => h["__hbc_b_throwTypeError"]("nope"), (e: unknown) => e instanceof TypeError && e.message === "nope");
   assert.throws(() => h["__hbc_b_throwReferenceError"]("gone"), (e: unknown) => e instanceof ReferenceError && e.message === "gone");
+});
+
+test("review-M4-H3: __hbc_privGet / __hbc_privSet are own-only and throw on a missing field or primitive (review-1110 iife/private)", () => {
+  const h = load("__hbc_privGet", "__hbc_privSet");
+  const sym = Symbol("#x");
+  const o: Record<symbol, unknown> = {};
+  Object.defineProperty(o, sym, { value: 1, writable: true, enumerable: false, configurable: false });
+  assert.equal(h["__hbc_privGet"](o, sym), 1);
+  assert.equal(h["__hbc_privSet"](o, sym, 2), 2);
+  assert.equal(h["__hbc_privGet"](o, sym), 2);
+  const child = Object.create(o);
+  assert.throws(() => h["__hbc_privGet"](child, sym), TypeError);
+  assert.throws(() => h["__hbc_privSet"](child, sym, 3), TypeError);
+  assert.equal(Object.getOwnPropertySymbols(child).length, 0);
+  assert.throws(() => h["__hbc_privGet"](3, sym), TypeError);
+  assert.throws(() => h["__hbc_privSet"]("s", sym, 1), TypeError);
+  assert.throws(() => h["__hbc_privGet"](null, sym), TypeError);
 });
 
 test("review-M4-H3: __hbc_b_silentSetPrototypeOf sets, and swallows a failure", () => {

@@ -1,0 +1,6 @@
+12 get G=1 s10 get G=1
+6 s5 get G=1 set G=6
+7 get G=6 s1 set G=7
+8 get G=7 set G=8
+number undefined get G=8
+108 get G=8 get G=100

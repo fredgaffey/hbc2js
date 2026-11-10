@@ -45,3 +45,28 @@ test("binding-hints: a live range targets rN_W and a binding with no use gets an
   assert.equal(h[1]!.def, "");
   assert.deepEqual(h[1]!.uses, []);
 });
+
+// readability-v9 (docs/READABILITY.md "Skill v9"): a parameter copy printed as
+// a declaration-with-initialiser (`let r3 = a1;`) was skipped as a `let` line,
+// so the hint had no def and the model never saw that the binding IS the
+// parameter (react-navigation fn 12947: `listener` named `item`).
+test("readability-v9: a `let rN = aK` initialiser is the def, and parameter copies are listed in params", () => {
+  const src = [
+    "function _fn5(a1, a2) {",
+    "  let r0, r4;",
+    "  let r3 = a1;",
+    "  r4 = r3.length;",
+    "  r0 = r4 + 1;",
+    "  r4 = a2;",
+    "  r0 = arguments[3];",
+    "  set.add(r3);",
+    "  return r4;",
+    "}",
+  ].join("\n");
+  const [h3, h4, h0] = bindingHints(src, 5, [{ fn: 5, reg: 3 }, { fn: 5, reg: 4 }, { fn: 5, reg: 0 }]);
+  assert.equal(h3!.def, "L3: let r3 = a1;");
+  assert.deepEqual(h3!.params, ["a1"]);
+  assert.deepEqual(h4!.params, ["a2 (L6)"], "a later parameter copy into a reused register is listed with its line");
+  assert.deepEqual(h0!.params, ["arguments[3] (L7)"]);
+  assert.deepEqual(bindingHints(SRC, 7, [{ fn: 7, reg: 1 }])[0]!.params, []);
+});

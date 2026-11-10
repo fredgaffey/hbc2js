@@ -1,0 +1,11 @@
+own get: ok 1
+own set: ok 2
+foreign get: threw true
+foreign set: threw true
+after foreign set: ok false
+primitive get: threw true
+primitive set: threw true
+proto get: threw true
+proto set: threw true
+same-name nested: threw true
+nested own: outer,inner

@@ -310,3 +310,29 @@ test("readability-v8: v6 vs v8 on the same 120 labelled functions (v6 stays defa
     assert.ok(a.high.lenient / a.high.n >= 0.75, `${n} high-tier lenient accuracy`);
   }
 });
+
+// readability-v9 (docs/READABILITY.md "Skill v9: parameters first"): v9b on
+// the same 120 labelled functions. v9 fails the decision rule (high-tier
+// lenient accuracy 26/32 vs v6 24/28; Expensify coverage -4.2 points), so v6
+// stays default and this pins the measured comparison.
+test("readability-v9: v6 vs v9b on the same 120 labelled functions (v6 stays default)", () => {
+  const dir = join(repoRoot(), "tests", "fixtures", "llm-readability");
+  const base = "react-navigation-example-0.85.3";
+  const s: LabelledSample = sample();
+  const nameable = JSON.parse(readFileSync(join(dir, `${base}.nameable.idmatch.v8.json`), "utf8")) as NameableMap;
+  const arm = (name: string) => {
+    const rec = JSON.parse(readFileSync(join(dir, `${base}.recording.idmatch.${name}.json`), "utf8")) as Recording;
+    const props = proposalsForLabels(s, recordedNames(rec));
+    const tier = (c: Confidence) => rateHighConfidence(s, new Map([...props].filter(([, p]) => p.confidence === c))).all;
+    const mix = { high: 0, med: 0, low: 0 };
+    for (const n of recordedNames(rec).values()) mix[n.confidence] += 1;
+    return { stats: recordingStats(rec, nameable), mix, high: tier("high"), low: tier("low") };
+  };
+  const v6 = arm("v6.120");
+  const v9 = arm("v9b");
+  assert.equal(v9.stats.unparseable, 0);
+  assert.deepEqual([v6.stats.named, v9.stats.named], [1244, 1332], "coverage 89.9% vs 96.2%");
+  assert.deepEqual([v6.mix.high, v9.mix.high], [247, 212], "v9 high volume is 86% of v6");
+  assert.deepEqual([v6.high.lenient, v6.high.n, v9.high.lenient, v9.high.n], [24, 28, 26, 32], "high tier lenient 86% vs 81% (the failing leg)");
+  assert.deepEqual([v6.low.lenient, v6.low.n, v9.low.lenient, v9.low.n], [10, 43, 12, 39], "low tier lenient 23% vs 31%");
+});

@@ -12,3 +12,4 @@ export function planPopulation(opts: {
   cap?: number;
 }): Promise<{ selected: PopulationRow[]; total: number; unresolved: string[] }>;
 export function family(name: string): string;
+export function registryFetcher(cachePath: string | null, concurrency: number): { get: (name: string) => Promise<Packument | null>; save: () => void };

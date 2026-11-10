@@ -366,7 +366,15 @@ function printStmtInner(s: Stmt, depth: number, out: string[], opts: PrintOption
         out.push(`${p}(${render(s.expr)});`);
         return;
       }
-      out.push(`${p}${expr(s.expr, 0)};`);
+      {
+        // A statement whose text STARTS with `function`/`async function`/`{`
+        // (a function expression as a callee or member object, e.g.
+        // `(function _fn3() {...})(a, b)` once closure-inline, spec 32, put
+        // it there) would parse as a declaration or a block, silently
+        // dropping the call: parenthesise the whole expression.
+        const text = expr(s.expr, 0);
+        out.push(/^(?:async\s+)?function\b|^\{/.test(text) ? `${p}(${text});` : `${p}${text};`);
+      }
       return;
     case "decl":
       if (s.names.length === 0) return;

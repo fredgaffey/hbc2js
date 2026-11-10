@@ -24,6 +24,7 @@ export const objectLiteral: Pass<readonly Stmt[], ObjectLiteralSite> = {
   stage: "B",
   targets: ["63-object-literal"],
   catalogue: [28],
+  sameFrame: true, // audited for the resume closure: 00-LADDER "Resumable bodies"
   after: ["expr-rebuild", "global-access", "call-shape"],
   before: ["jsx-recover", "var-naming"],
   match,

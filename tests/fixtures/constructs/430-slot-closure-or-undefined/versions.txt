@@ -1,0 +1,7 @@
+v84: OK - compiles; no GetClosureEnvironment (the optional call is not inlined).
+v94: OK - same.
+v96: OK - same.
+v98: OK - `cont` inlines the call to the closure it loads from the captured
+     `continueFn` slot (also stored undefined by `reset`) and reads its
+     captures via GetClosureEnvironment.
+v99: OK - same.

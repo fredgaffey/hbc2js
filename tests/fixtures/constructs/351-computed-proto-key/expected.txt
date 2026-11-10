@@ -1,0 +1,2 @@
+1 __proto__ 5
+true undefined {"value":{"fake":true},"writable":true,"enumerable":true,"configurable":true}

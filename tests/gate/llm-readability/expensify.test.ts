@@ -51,3 +51,24 @@ test("expensify v6: coverage and accuracy floors over the 60-function id-match r
   assert.ok(both.all.n >= FLOOR_N && both.all.lenient / both.all.n >= FLOOR_LENIENT, `lenient ${String(both.all.lenient)}/${String(both.all.n)}`);
   assert.ok(both.high.n >= FLOOR_HIGH_N && both.high.lenient / both.high.n >= FLOOR_HIGH_LENIENT, `high lenient ${String(both.high.lenient)}/${String(both.high.n)}`);
 });
+
+// readability-v9 (docs/READABILITY.md "Skill v9: parameters first"): the same
+// 60 functions under v9b. Coverage falls 4.2 points (silent omissions), the
+// high tier is less accurate; low rises 3/25 -> 6/25. v6 stays default.
+test("readability-v9: Expensify v6 vs v9b on the same 60 functions (v6 stays default)", (t) => {
+  const V9 = join(DIR, "expensify-app-0.86.0.recording.idmatch.v9b.json");
+  if (!existsSync(LABELS) || !existsSync(RECORDING) || !existsSync(NAMEABLE) || !existsSync(V9)) return t.skip("needs the expensify labels, recordings and nameable map");
+  const s = JSON.parse(readFileSync(LABELS, "utf8")) as LabelledSample;
+  const nameable = JSON.parse(readFileSync(NAMEABLE, "utf8")) as NameableMap;
+  const arm = (path: string) => {
+    const rec = JSON.parse(readFileSync(path, "utf8")) as Recording;
+    const props = proposalsForLabels(s, recordedNames(rec));
+    const tier = (c: string) => rateHighConfidence(s, new Map([...props].filter(([, p]) => p.confidence === c))).all;
+    return { named: recordingStats(rec, nameable).named, high: tier("high"), low: tier("low") };
+  };
+  const v6 = arm(RECORDING);
+  const v9 = arm(V9);
+  assert.deepEqual([v6.named, v9.named], [411, 393], "coverage 96.9% vs 92.7% of 424 (the failing leg)");
+  assert.deepEqual([v6.high.lenient, v6.high.n, v9.high.lenient, v9.high.n], [14, 15, 14, 18]);
+  assert.deepEqual([v6.low.lenient, v6.low.n, v9.low.lenient, v9.low.n], [3, 25, 6, 25]);
+});

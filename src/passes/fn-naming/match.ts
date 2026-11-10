@@ -247,6 +247,29 @@ function classifyAll(list: readonly Stmt[], fnBody: readonly Stmt[], module: Mod
     const m = FN_RE.exec(s.name);
     if (m !== null) candidates.push({ stmtIndex, n: Number(m[1]) });
   });
+  // fix-closure-identity-2 (spec 27 section 12): a closure that can be created
+  // twice per activation is emitted as a named function EXPRESSION
+  // `function _fnN() {...}` at each creation site, at any depth. Its name is
+  // its `.name`, so it is a candidate too, once per `N` however many sites
+  // carry it. Renaming the expression's own name is sound under the same
+  // conditions 4-5 as a declaration: the new name binds only inside the
+  // expression's body, and conditions 4-5 (computed over the whole
+  // `fnBody`, which contains the expression) guarantee no reference in it
+  // resolves to another binding of that name.
+  const seen = new Set(candidates.map((c) => c.n));
+  list.forEach((s, stmtIndex) => {
+    walk([s], {
+      expr: (e) => {
+        if (e.k !== "func" || e.name === null) return;
+        const m = FN_RE.exec(e.name);
+        if (m === null) return;
+        const n = Number(m[1]);
+        if (seen.has(n)) return;
+        seen.add(n);
+        candidates.push({ stmtIndex, n });
+      },
+    });
+  });
   const anonymous = candidates.filter((c) => !module.isGlobalFunction(c.n) && module.functionName(c.n) === "").map((c) => `_fn${c.n}`);
   const facts = new BodyFacts(list, fnBody, anonymous);
   const raw = candidates.map((c) => {

@@ -1145,3 +1145,152 @@ families. It writes `worker.sh` jobs, so `build-one.mjs` and `dep-subtract.mjs`
 are unchanged. Planner logic has an offline test against a canned registry:
 `tests/gate/deps/deps-population-widen.test.ts`. Results: docs/DEPS.md
 "Population widening".
+
+## 9. App-blind population (sigdb-honest-population)
+
+**Problem.** Recall is 21–35% and 1,235 of the 1,393 misses in the
+2026-11-10 triage (docs/deps-triage-1110.md) are DB coverage. The triage's
+wishlist is read off the five apps' truth files, so building it would
+measure the rule "build what the test apps contain". Recall is only honest
+if the population is chosen without the measured apps.
+
+**Rule** (`tools/pkgsig/bulk/population-honest.mjs`, offline test
+`tests/gate/deps/deps-population-honest.test.ts`). Three pinned, public
+sources, nothing else:
+
+1. *declared*: what the SDKs say an app ships with. `bundledNativeModules.json`
+   plus `dependencies` of `expo` at `dist-tags.latest` and the two highest
+   `sdk-N` tags below it (2026-11-10: 58.0.23, 57.0.32, 56.0.24), and
+   `template/package.json` `dependencies` of `@react-native-community/template`
+   at `latest` and the two highest `N-stable` tags below it (0.88.1, 0.86.3,
+   0.83.10). 143 names.
+2. *top*: the first `--top` names of `npm-high-impact@1.13.0`'s `topDownload`
+   list (npm packages ranked by weekly downloads; a published npm package, so
+   the list is reproducible). Not filtered for "RN relevance" beyond
+   `skipName()`: any such filter we could write (keyword, peer dep) drops
+   `semver`/`buffer`-style plain JS, which is what apps bundle; node-only
+   packages cost a failed build, not a false match.
+3. `skipName()` (shared with `population-closure.mjs`): `@types/*`, react,
+   react-native, build toolchain.
+
+Versions: a declared name builds every stable version an SDK range resolves
+to; a top name builds `dist-tags.latest` plus the newest release of each of
+`--prior-majors` (1) majors below it. Jobs are (name, version, hbc) for
+hbc 96 and 98 (the measured apps' versions, also the two current scaffold
+families), skipped when the exact file exists in `--exclude-db` (the v4
+farm `deps-rm/f-v4` and the earlier honest overlays `db-overlay-pop{,2}`).
+Order: phase 1 = the primary version of names with no file at that hbc,
+phase 2 = everything else; declared before top; by download rank inside
+each. A batch is a prefix of that order, so the cut is set by build cost
+only. The full plan at `--top 5000` is 12,841 jobs (4,079 names); phase 1
+is 5,746.
+
+**Rejected:** ranking by "dependents of react-native/expo" (the registry
+has no dependents query; the keyword search of round 2b already covers RN
+libraries), and any tuning of `--top`/order against the triage misses.
+
+**Overlap with the triage's 1,235 coverage misses** (read after the rule
+was fixed; it measures the rule, it chose nothing). A miss counts as
+covered when the plan has the name at the app's hbc (for `version-missing`:
+the exact version):
+
+| population | jobs | covered of 1,235 | exact version |
+|---|---|---|---|
+| `db-overlay-pop{,2}` (built, hbc98 only, not in f-v4) | 2,152 files | 148 | 41 |
+| declared only | 643 | 87 | 5 |
+| phase 1, top 500 / 1,000 / 2,000 / 5,000 | 514 / 905 / 1,865 / 5,746 | 121 / 132 / 179 / 318 | 33 / 36 / 48 / 101 |
+| both phases, top 500 / 2,000 / 5,000 | 1,728 / 4,992 / 12,841 | 182 / 263 / 429 | 60 / 92 / 168 |
+| full plan + pop overlays | | 499 | 209 |
+| batch 1 (first 480 jobs, 345 package-versions) | 480 | 119 | |
+
+So an app-blind population reaches at most about 40% of the misses: the
+rest is each app's long tail (wallet SDKs, `@metamask/*`, app-specific
+forks), which no download- or SDK-ranked list reaches. The truth-chosen
+wishlist would cover all 1,235 by construction; that number would say
+nothing about a new app.
+
+**Batch 1** (deb, 2026-11-10): the first 480 jobs of the `--top 5000`
+plan (declared names, then the top-download names to about rank 250, all
+phase 1, 345 package-versions; 345 jobs at hbc96 and 135 at hbc98, because
+`db-overlay-pop{,2}` already hold most top names at hbc98). Built with
+`worker.sh` (6 jobs, 3 slots per family, `nice 10`), `dep-subtract.mjs`
+against the v4 farm's hbc96/98 files, into `~/_hbc2js/db-v4-honest`
+(348 files, 47 MB). Built 348 of 480 (hbc96 238 of 345, hbc98 110 of 135; the
+first attempt lost 752 jobs to poisoned scaffold slots, docs/BUGS.md
+2026-11-10, and was re-run with a per-job slot reset). Failed 132:
+`Unable to resolve module` 70 (mostly SDK-56..58 Expo modules on the RN
+0.72 scaffold that serves hbc96), `@expo/require-utils` dynamic `import()` 16
+(node-only Expo tooling), other bundle errors 43, platform-only binaries 2,
+hermesc 1. Measured offline (`meas2.mjs`, branch code, sha pins matched).
+"+ honest" = `cp -al` of `deps-rm/f-v4` plus the batch; "+ pop" also
+links `db-overlay-pop{,2}` (an earlier app-blind population, never in
+f-v4). Confirmed / TP / FP, precision, recall:
+
+| app | f-v4 | + honest | + honest + pop |
+|---|---|---|---|
+| Expensify (hbc98) | 107 / 102 / 5, 95.3%, 35.4% | 115 / 109 / 6, 94.8%, 37.8% | 150 / 137 / 13, 91.3%, 47.6% |
+| react-navigation (hbc98) | 22 / 22 / 0, 100%, 28.9% | 22 / 22 / 0, 100%, 28.9% | 25 / 25 / 0, 100%, 32.9% |
+| bluesky (hbc98) | 47 / 46 / 1, 97.9%, 23.2% | 52 / 49 / 3, 94.2%, 24.7% | 60 / 56 / 4, 93.3%, 28.3% |
+| rainbow (hbc96) | 116 / 109 / 7, 94.0%, 21.0% | 123 / 115 / 8, 93.5%, 22.2% | 130 / 119 / 11, 91.5%, 23.0% |
+| MetaMask (hbc96) | 179 / 165 / 14, 92.2%, 22.0% | 196 / 181 / 15, 92.3%, 24.2% | 202 / 184 / 18, 91.1%, 24.6% |
+
+Batch 1: +32 TPs, no TP lost, 6 new FPs, 1 gone (`p-map` on MetaMask).
+New FPs (not traced to hit owners): `source-map-js` (Expensify, MetaMask;
+a fork of `source-map`, the twin class), `esquery` (rainbow, MetaMask; ships
+a prebuilt dist that embeds `estraverse`, the bundled-dist class),
+`expo-router` and `sentry-expo` (bluesky; wrappers whose code is mostly
+the `@react-navigation/*` and `@sentry/*` packages the app also has, the
+copies class). The pop overlays add another +28 TPs and +12 FPs; those
+FPs are the ones docs/DEPS.md "Population widening" lists, plus the
+`@sentry/*` subpackages.
+Next by cost: the hbc96 Expo failures need a newer hbc96 scaffold, not
+more jobs; phase 1 has 5,266 jobs left.
+
+**Batch 2** (deb, 2026-11-10): jobs 481-1,280 of the same plan (800 jobs: 530
+at hbc96, 270 at hbc98; names from about download rank 250 to 600), built
+with the fixed `worker.sh` (per-job slot reset, `slot-reset.sh`; 4 jobs, 2
+slots per family) in about 50 minutes, then `dep-subtract.mjs`, into the same
+`~/_hbc2js/db-v4-honest` (additive: 348 -> 966 files). Built 618 of 800
+(hbc96 399 of 530, hbc98 219 of 270); no job was lost to slot poisoning
+(batch 1's 752 lost jobs were that bug). Failed 182: module or `main` not
+resolvable 99 (73 of them node-only CLIs such as `pnpm` whose `main` does not
+exist, the rest SDK-era modules on the RN 0.72 scaffold), other bundle
+errors 67 (node-only syntax and dynamic `import()`), hermesc 9, platform-only
+binaries 6, npm install 1. Measured the same way as batch 1 (table in
+docs/METRICS.md): batch 2 adds 6 TPs across the five apps (Expensify +3,
+MetaMask +3, rainbow 0), react-navigation and bluesky unchanged, 2 new FPs
+(`ejs` on rainbow, `@testing-library/user-event` on MetaMask; both the
+bundled-dist/copies classes) and no TP lost. Marginal return fell sharply
+(batch 1 +32 TPs for 480 jobs, batch 2 +6 for 800): ranking by downloads
+runs out of names the apps actually ship by about rank 250, which is the
+overlap table's ceiling showing up in the measurement.
+
+## 10. Supplementary population (sigdb-supplement, 2026-11-10)
+
+**Truth-chosen overlay: not an honest recall figure.** The package list in
+`tools/pkgsig/bulk/supplement-packages.json` was taken from the packages the
+react-navigation recall analysis found missing (docs/DEPS.md, DB coverage), plus
+seven dependencies (`call-bind`, `call-bound`, `function-bind`, `get-intrinsic`,
+`pako`, `@xmldom/xmldom`, `@wagmi/core`) chosen to remove MetaMask false
+positives under transitive subtraction. Both lists came from truth files, so
+recall gained on react-navigation is not a recall estimate. The other four apps
+and every FP change are the informative signal.
+
+Policy (`supplement-jobs.mjs`): the version pinned in the example app's lockfile
+(only 8 workspace packages carry one in its truth file, all alphas) plus the
+latest 3 stable releases from the npm registry, for hbc 94/96/98/99. 644 jobs
+(46 packages): 525 built, 119 failed (hbc94 41, hbc96 39, hbc98 21, hbc99 18).
+Failures: Metro 0.72 cannot bundle the alpha/new releases (hbc94/96); the four
+`@expo-google-fonts/*` and `@react-native/assets-registry` have no build at any
+version (`expo-asset` imports `expo/internal/bundle-origin`, a peer that is not
+installed; asset-only modules).
+
+Procedure (deb, own bulk dir, 4 slots so a concurrent build keeps its cores):
+copy the two scaffolds, `run.sh setup` and `run.sh baselines` with
+`HBC2JS_BULK_DIR` pointing at the new dir, run `worker.sh` over the job list with
+`xargs -P 4`, then `dep-subtract.mjs` (two passes, dependencies resolved against
+db-v3-clean) into `db-v4-supp`. Layering for measurement: `cp -al` of the v4 farm
+into a new dir, new files linked only where the name is absent (476 added), the
+copied `candidate-hash-index__*` files deleted (they are hard links: rebuilding
+in place would rewrite the shared farm) and rebuilt. Nothing was confirmed
+against a shared DB.

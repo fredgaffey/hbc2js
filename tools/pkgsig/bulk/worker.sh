@@ -59,27 +59,18 @@ fi
 
 SCAFFOLD="$BULK_DIR/slots/${FAMILY}-${SLOT}"
 
-# Periodic slot hygiene: build-one.mjs's `npm uninstall --legacy-peer-deps`
-# after each job is best-effort, not guaranteed to fully prune every
-# transitive dependency a package uniquely pulled in - over many thousands
-# of jobs sharing 16 long-lived slots, that residue could accumulate.
-# Every 200 uses of a given slot (a per-slot counter file, safe to
-# read-increment-write with no lock of its own since we already hold this
-# slot's exclusive flock), wipe it back to a pristine copy of its scaffold
-# before running this job.
-COUNT_FILE="$BULK_DIR/locks/${FAMILY}-${SLOT}.count"
-USE_COUNT=0
-[ -f "$COUNT_FILE" ] && USE_COUNT="$(cat "$COUNT_FILE" 2>/dev/null || echo 0)"
-USE_COUNT=$((USE_COUNT + 1))
-echo "$USE_COUNT" > "$COUNT_FILE"
-if (( USE_COUNT % 200 == 0 )); then
-  PRISTINE="$BULK_DIR/ScaffoldRN${FAMILY}"
-  if [ -d "$PRISTINE" ]; then
-    rm -rf "$SCAFFOLD"
-    cp -r "$PRISTINE" "$SCAFFOLD"
-    echo "$(date -u +%FT%TZ) reset slot ${FAMILY}-${SLOT} after $USE_COUNT uses" >> "$BULK_DIR/log/run.log"
-  fi
+# Per-job slot reset (docs/BUGS.md 2026-11-10 "slot poisoning"): a package
+# install can delete scaffold dependencies, and every later job on the slot
+# would fail. So each job starts from a hard-link copy of a private pristine
+# scaffold ($BULK_DIR/Pristine<family>, made once from ScaffoldRN<family>).
+# This replaces the old every-200-uses wipe.
+# shellcheck source=slot-reset.sh
+. "$(dirname "${BASH_SOURCE[0]}")/slot-reset.sh"
+PRISTINE="$BULK_DIR/Pristine${FAMILY}"
+if [ ! -d "$PRISTINE" ] && [ -d "$BULK_DIR/ScaffoldRN${FAMILY}" ]; then
+  cp -R "$BULK_DIR/ScaffoldRN${FAMILY}" "$PRISTINE.tmp.$$" && mv "$PRISTINE.tmp.$$" "$PRISTINE" 2>/dev/null || rm -rf "$PRISTINE.tmp.$$"
 fi
+reset_slot "$PRISTINE" "$SCAFFOLD" || echo "$(date -u +%FT%TZ) slot reset FAILED ${FAMILY}-${SLOT}" >> "$BULK_DIR/log/run.log"
 
 OUT="$(node "$REPO_DIR/tools/pkgsig/bulk/build-one.mjs" "$PKG" "$VER" "$HBC" "$SCAFFOLD" "$HERMESC" "$BULK_DIR/db" 2>>"$BULK_DIR/log/${FAMILY}-${SLOT}.err")"
 RC=$?

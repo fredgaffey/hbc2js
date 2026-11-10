@@ -226,16 +226,18 @@ test("a joined function is emitted where every one of its creation sites can see
   );
   assert.equal(result.stubbedFunctions, 0);
 
-  // Still ONE body — the join is not duplication.
-  assert.equal((code.match(/function _fn3\(/g) ?? []).length, 1, "a joined function is emitted once, not once per site");
+  // fix-closure-identity-2 (spec 27 section 12): the join is still not a
+  // per-creation-context copy (no `__c` name), but the sites lie in two
+  // functions, so the one hoisted declaration at their common ancestor made
+  // one object per activation of THAT function where each site makes one per
+  // execution. Each creating function now carries its own instance, inline at
+  // its site, under the same names (the join's own soundness argument: both
+  // sites read the same `_e<id>_<slot>` names, visible from either creator).
+  assert.equal((code.match(/function _fn3\(/g) ?? []).length, 2, "one instance per creating function");
   assert.doesNotMatch(code, /_fn3__c/, "…and it has no per-creation-context copies to name");
-
-  // …hosted at the lowest common ancestor of the two creating functions, which
-  // here is the global function, and referenced from both sites.
-  assert.doesNotMatch(bodyOf(code, "_fn1"), /function _fn3\(/, "fn#1 is only one of the two sites; its body is not a home both can see");
-  assert.doesNotMatch(bodyOf(code, "_fn2"), /function _fn3\(/);
-  assert.match(bodyOf(code, "_fn1"), /=\s*_fn3;/, "fn#1's creation site still references it");
-  assert.match(bodyOf(code, "_fn2"), /=\s*_fn3;/, "and so does fn#2's");
+  assert.match(bodyOf(code, "_fn1"), /=\s*function _fn3\(/, "fn#1's creation site is the function expression");
+  assert.match(bodyOf(code, "_fn2"), /=\s*function _fn3\(/, "and so is fn#2's");
+  assert.doesNotMatch(code, /=\s*_fn3;/, "no site reads a shared declaration");
   assert.equal(
     result.diagnostics.filter((d) => d.code === "W_JOINED_REHOSTED").length,
     1,
@@ -263,7 +265,10 @@ test("a child a joined function creates travels with it when its own names allow
     "exactly the child whose every creation site is inside the moved function travels with it",
   );
   assert.match(bodyOf(result.code, "_fn3"), /function _fn4\(/, "…and it is emitted inside its creator, where the reference is");
-  assert.doesNotMatch(bodyOf(result.code, "_fn1"), /function _fn4\(/, "…not at the home `closureEnvOf` gave it");
+  // fix-closure-identity-2: fn#3 is created in two functions, so it is
+  // emitted once per creator (inline at the site, spec 27 section 12); fn#4
+  // travels inside every instance, never at the home `closureEnvOf` gave it.
+  assert.equal((result.code.match(/function _fn4\(/g) ?? []).length, (result.code.match(/function _fn3\(/g) ?? []).length, "…once inside each instance of its creator");
 });
 
 test("a child that reads the environment its creator's sites disagree about is duplicated with it, not pinned", (t) => {

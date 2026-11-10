@@ -1,0 +1,5 @@
+0,A1,A2,1,B1
+s0 A.iter A.next1 A.next2 A.next3 s1 B.iter B.next1 B.next2
+2,C1,C2,3
+s2 C.iter C.next1 C.next2 C.next3 s3
+D1 D2 D.iter D.next1 D.next2
