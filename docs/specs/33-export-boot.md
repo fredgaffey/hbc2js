@@ -282,3 +282,30 @@ two call sites; v99 emits a different call there). Result, flat tier with
 factories, 1 view, 1 commit each side). Test 10 is real (sweep tier). It
 exports with `--lenient-env`: 43 `__hbc_unresolved_env` markers remain in
 the held-out export (6 module files), and none is reached by boot.
+
+**L5: more apps (2026-11-10, in progress).** Expensify (0.86.0, v98,
+12451 modules) and a public social app shipped as HBC only. Expensify's
+original needed six stub-host/manifest additions, all on both sides and all
+by rule, no per-app `boot-native.json`: the native manifest's bundle
+evidence now also counts a library's linking-error fallback
+(`NativeModules.X ? NativeModules.X : new Proxy(...)`), a module bound once
+and dereferenced unguarded in its factory, one whose factory throws when it
+is missing, and the "NativeModule.X is null. To fix this issue" message; the
+host resolves device promise methods (`Linking.getInitialURL`), installs
+`globalThis.NitroModulesProxy` on `NitroModules.install()`, and provides an
+`Intl` namespace (`getCanonicalLocales`, deterministic en-US/UTC
+`Collator`/`DateTimeFormat`/`NumberFormat`), because the host VMs are built
+without Intl and Android's Hermes has it. The original then boots clean (B1
+3007 factories, keys `LogBox`, `NewExpensify`; B2 reaches
+`runApplication("NewExpensify")`, 8 views, 2 commits). Two export bugs:
+Metro registers react-native-worklets' runtime under id `-2`, which the
+export's rewrite did not match (`tests/gate/export/negative-module-id.test.ts`),
+and hermesc reused the register holding the entry id (`65535`, then `0`), so
+the startup scan dropped `__r(0)` (`entry-nested-const.test.ts`). With those,
+B1 is DIVERGENT at projection entry 5613 (original `enter 712`, export
+`enter 1290`; 3007 vs 2983 factories), not yet diagnosed. The export takes
+11 min and 10.5 GB RSS. The HBC-only app has no Metro text, so its control
+is a whole-file decompile: that took 19.6 min (the split export, 6 min) and
+fn#0 failed with `E_PASS_CRASH`, so it is INCONCLUSIVE before the export is
+looked at. `acquireBootSource` now decompiles an `.hbc` original with
+`--lenient-env` markers for the proof.
