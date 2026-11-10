@@ -108,7 +108,7 @@ test("corpus-db-growth: a dist file inlining packages the DB's paths attribute e
   assert.notEqual(tierOf(slim, "dist-carrier")?.tier, "high", "slim carrier: " + JSON.stringify(tierOf(slim, "dist-carrier")));
 });
 
-test("corpus-db-growth: without path evidence for the inlined code nothing changes", (t) => {
+test("corpus-db-growth: without path evidence, a dist carrier whose module the target lacks takes nothing from present modules (deps-land-1110)", (t) => {
   const h = requireHermesc(t, 96);
   if (h === null) return;
   // No file names x/y by path: the carrier's own dist is all the DB knows.
