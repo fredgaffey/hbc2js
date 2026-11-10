@@ -38,7 +38,7 @@ function req(fn: number, reg: number): WorkerJobRequest {
   return { kind: "suggest-name", prompt: "", context: { target: `{${String(fn)},${String(reg)}}`, fn, reg, source } };
 }
 
-function withEnv(vars: Record<string, string | undefined>, fn: () => Promise<void>): Promise<void> {
+function withEnv<T>(vars: Record<string, string | undefined>, fn: () => Promise<T>): Promise<T> {
   const prior: Record<string, string | undefined> = {};
   for (const k of Object.keys(vars)) prior[k] = process.env[k];
   for (const [k, v] of Object.entries(vars)) {
