@@ -267,6 +267,52 @@ export function frameArgs(f: FunctionEmitter, argCount: number): Expr[] {
   return out;
 }
 
+/**
+ * A bare `Construct` whose frame `this` is the optimiser's own allocation:
+ * `GetById rP, callee, "prototype"; NewObjectWithParent rT, rP; Mov…` into the
+ * `this` slot, all in this block, the stand-in read by nothing but those `Mov`s
+ * and the callee unchanged since its prototype was read. Returns the registers
+ * that hold the stand-in at the `Construct` (the `this` slot first), else null.
+ */
+function prebuiltThisAliases(f: FunctionEmitter, ins: readonly Instruction[], index: number, calleeReg: number): number[] | null {
+  const writtenSince = new Set<number>();
+  const chain = new Set<number>();
+  const holders: number[] = [];
+  let want = f.argBase;
+  let proto: number | null = null;
+  for (let j = index - 1; j >= 0; j--) {
+    const c = ins[j]!;
+    const w = writtenRegisters(c);
+    if (proto !== null) {
+      if (w.includes(proto)) {
+        if (!GETBYID.test(c.name) || c.name.startsWith("Try") || V(c, 0) !== proto || V(c, 1) !== calleeReg) return null;
+        if (writtenSince.has(calleeReg) || f.mod.strings.get(V(c, 3)) !== "prototype") return null;
+        return holders;
+      }
+      if (c.operands.some((o, k) => o.role === "reg" && k > 0 && chain.has(o.value))) return null;
+      for (const r of w) writtenSince.add(r);
+      continue;
+    }
+    if (w.includes(want)) {
+      if (!writtenSince.has(want)) holders.push(want);
+      chain.add(want);
+      if ((c.name === "Mov" || c.name === "MovLong") && V(c, 0) === want) {
+        want = V(c, 1);
+      } else if (c.name === "NewObjectWithParent" && V(c, 0) === want) {
+        proto = V(c, 1);
+      } else {
+        return null;
+      }
+      for (const r of w) writtenSince.add(r);
+      continue;
+    }
+    // The stand-in must not escape before the constructor runs on it.
+    if (c.operands.some((o, k) => o.role === "reg" && k > 0 && (chain.has(o.value) || o.value === want))) return null;
+    for (const r of w) writtenSince.add(r);
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 
 /**
@@ -769,6 +815,23 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
       // A bare `Construct` outside a recognised triple: hermesc does not emit
       // one today, but hand-written or obfuscated bytecode might (§7.5).
       const args = frameArgs(f, V(insn, 2)).slice(1);
+      const prebuilt = prebuiltThisAliases(f, plan.instructions, index, V(insn, 1));
+      if (prebuilt !== null) {
+        // v98's optimiser allocates `this` itself (`NewObjectWithParent` of
+        // the known callee's prototype) and, having proved the constructor
+        // returns no object, keeps that register with no `SelectObject`.
+        // `Construct` runs the callee ON that object, so `Reflect.construct`
+        // (a fresh allocation) would leave the caller an empty object --
+        // export-boot L4 B2, React's FiberRootNode (fixture
+        // 410-construct-prebuilt-this). `new` is the same object here: it
+        // allocates from the same prototype and, the constructor returning no
+        // object, yields it; every register still holding the stand-in takes it.
+        const [first, ...rest] = prebuilt;
+        out.push(assign(R(first!), { k: "new", callee: RG(insn, 1), args }));
+        for (const r of rest) out.push(assign(R(r), R(first!)));
+        if (!prebuilt.includes(V(insn, 0))) out.push(assign(R(V(insn, 0)), UNDEF));
+        return;
+      }
       return set(V(insn, 0), call(prop(id("Reflect"), "construct"), [RG(insn, 1), { k: "array", elements: args }]));
     }
     case "CallWithNewTarget":
