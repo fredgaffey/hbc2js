@@ -234,6 +234,10 @@ export interface EnvGraph {
   /** functionIndex -> chain level (0 = captured env) -> slots read or written
    *  through a view; every creation site of the function binds a view exposing them. */
   readonly closureEnvExposed: ReadonlyMap<number, ReadonlyMap<number, ReadonlySet<number>>>;
+  /** `${node}:${slot}` of every environment slot written through a view
+   *  (`envViewOps` store). Such writes are not in `accesses`/`EnvSlot.accesses`,
+   *  so any "this slot has exactly one store" reasoning must consult this too. */
+  readonly envViewStores: ReadonlySet<string>;
   readonly diagnostics: readonly Diagnostic[];
 }
 

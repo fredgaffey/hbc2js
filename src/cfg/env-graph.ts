@@ -194,6 +194,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
   const viaSlotClosure = new Set<string>();
   const envViewOps = new Map<string, EnvViewOp>();
   const closureEnvExposed = new Map<number, Map<number, Set<number>>>();
+  const envViewStores = new Set<string>();
   const expose = (fnId: number, level: number, slot: number): void => {
     let byLevel = closureEnvExposed.get(fnId);
     if (byLevel === undefined) closureEnvExposed.set(fnId, (byLevel = new Map()));
@@ -411,6 +412,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
         if (ev.t === "view") {
           if (collect !== null) {
             envViewOps.set(siteKey(f, insn.offset), { k: "store", slot });
+            envViewStores.add(`${ev.node}:${slot}`);
             expose(ev.fn, ev.level, slot);
           }
           if (slot + 1 > drafts[ev.node]!.size) drafts[ev.node]!.size = slot + 1;
@@ -835,6 +837,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
     unresolved,
     envViewOps,
     closureEnvExposed,
+    envViewStores,
     diagnostics,
   };
 }

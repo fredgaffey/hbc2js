@@ -236,17 +236,12 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
         } else if (/^Store(NP)?ToEnvironmentL?$/.test(n)) {
           const index = paramIn.get(op(2));
           const name = envSlot(own, op(1));
-          const slot = input.envGraph.slot(own, op(1));
-          const stores = slot?.accesses.filter((a) => a.kind === "store") ?? [];
           if (
             index !== undefined &&
             !paramSlot.has(index) &&
             input.envGraph.resolvedAt.get(siteKey(fn.index, insn.offset)) === own &&
             owned.has(name) &&
-            slot?.strategy === "lexical" &&
-            stores.length === 1 &&
-            stores[0]!.functionIndex === fn.index &&
-            stores[0]!.offset === insn.offset
+            paramSlotFoldAllowed(input.envGraph, fn.index, own, op(1), insn.offset)
           ) {
             paramSlot.set(index, name);
             paramSlotStores.add(insn.offset);
@@ -1122,3 +1117,18 @@ export function ownedEnvSlots(envGraph: EnvGraph, functionIndex: number, declari
 
 /** Unused, but kept so the module's public surface matches spec 05 §2. */
 export const _unusedHelpers = { call, prop };
+
+/**
+ * Spec 27 section 13 paramenv fold precondition: the entry store at
+ * `(fnIndex, storeOffset)` is the ONLY write to `(own, slot)` anywhere, so the
+ * parameter can be named by the slot. Writes through a closure environment view
+ * (spec 03 section 6.2) are not in the slot's `accesses`; one of those makes the
+ * slot diverge from the parameter, so it refuses the fold.
+ */
+export function paramSlotFoldAllowed(graph: Pick<EnvGraph, "slot" | "envViewStores">, fnIndex: number, own: number, slot: number, storeOffset: number): boolean {
+  const s = graph.slot(own, slot);
+  if (s === undefined || s.strategy !== "lexical") return false;
+  if (graph.envViewStores.has(`${own}:${slot}`)) return false;
+  const stores = s.accesses.filter((a) => a.kind === "store");
+  return stores.length === 1 && stores[0]!.functionIndex === fnIndex && stores[0]!.offset === storeOffset;
+}
