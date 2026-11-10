@@ -1,0 +1,223 @@
+; hbc2js disassembly of 280-value-join-logical/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=8 strings=21 globalCodeIndex=0
+function #0 "global"  params=1 frame=25 env=0 flags=dbg,overflowed  @0x0000022c size=581
+  0000  DeclareGlobalVar     s17 "orInElse"
+  0005  DeclareGlobalVar     s5 "andInElse"
+  000a  DeclareGlobalVar     s9 "condInElse"
+  000f  DeclareGlobalVar     s10 "condNegated"
+  0014  DeclareGlobalVar     s14 "strip"
+  0019  DeclareGlobalVar     s12 "ifOr"
+  001e  DeclareGlobalVar     s11 "ifAnd"
+  0023  DeclareGlobalVar     s8 "P"
+  0028  DeclareGlobalVar     s7 "E"
+  002d  GetGlobalObject      r5
+  002f  LoadConstUndefined   r4
+  0031  CreateClosure        r6, r4, f1 "orInElse"
+  0036  PutByIdLoose         r5, r6, #c0, s17 "orInElse"
+  003c  CreateClosure        r6, r4, f2 "andInElse"
+  0041  PutByIdLoose         r5, r6, #c1, s5 "andInElse"
+  0047  CreateClosure        r6, r4, f3 "condInElse"
+  004c  PutByIdLoose         r5, r6, #c2, s9 "condInElse"
+  0052  CreateClosure        r6, r4, f4 "condNegated"
+  0057  PutByIdLoose         r5, r6, #c3, s10 "condNegated"
+  005d  CreateClosure        r6, r4, f5 "strip"
+  0062  PutByIdLoose         r5, r6, #c4, s14 "strip"
+  0068  CreateClosure        r6, r4, f6 "ifOr"
+  006d  PutByIdLoose         r5, r6, #c5, s12 "ifOr"
+  0073  CreateClosure        r6, r4, f7 "ifAnd"
+  0078  PutByIdLoose         r5, r6, #c6, s11 "ifAnd"
+  007e  NewObjectWithBuffer  r6, sh0(numProps=2), lit@0x0000
+  0084  PutByIdLoose         r5, r6, #c7, s8 "P"
+  008a  NewObjectWithBuffer  r6, sh0(numProps=2), lit@0x0005
+  0090  PutByIdLoose         r5, r6, #c8, s7 "E"
+  0096  TryGetById           r8, r5, #c0, s18 "print"
+  009c  GetByIdShort         r7, r5, #c1, s17 "orInElse"
+  00a1  GetByIdShort         r6, r5, #c2, s8 "P"
+  00a6  LoadConstUInt8       r1, 1
+  00a9  LoadConstZero        r0
+  00ab  Call4                r7, r7, r4, r0, r6, r1
+  00b2  GetByIdShort         r9, r5, #c1, s17 "orInElse"
+  00b7  GetByIdShort         r6, r5, #c3, s7 "E"
+  00bc  Call4                r6, r9, r4, r0, r6, r1
+  00c3  Call3                r6, r8, r4, r7, r6
+  00c9  TryGetById           r8, r5, #c0, s18 "print"
+  00cf  GetByIdShort         r7, r5, #c4, s5 "andInElse"
+  00d4  GetByIdShort         r6, r5, #c2, s8 "P"
+  00d9  Call4                r7, r7, r4, r0, r6, r1
+  00e0  GetByIdShort         r9, r5, #c4, s5 "andInElse"
+  00e5  GetByIdShort         r6, r5, #c3, s7 "E"
+  00ea  Call4                r6, r9, r4, r0, r6, r1
+  00f1  Call3                r6, r8, r4, r7, r6
+  00f7  TryGetById           r10, r5, #c0, s18 "print"
+  00fd  GetByIdShort         r7, r5, #c5, s9 "condInElse"
+  0102  LoadConstUInt8       r2, 7
+  0105  LoadConstUInt8       r16, 5
+  0108  NewObjectWithBuffer  r15, sh1(numProps=1), lit@0x000a
+  010e  LoadConstUndefined   r17
+  0110  Mov                  r14, r2
+  0113  LoadConstZero        r13
+  0115  Mov                  r12, r1
+  0118  Call                 r9, r7, 6
+  011c  GetByIdShort         r7, r5, #c5, s9 "condInElse"
+  0121  NewObjectWithBuffer  r15, sh1(numProps=1), lit@0x000a
+  0127  Mov                  r16, r1
+  012a  Call                 r8, r7, 6
+  012e  GetByIdShort         r7, r5, #c5, s9 "condInElse"
+  0133  NewObject            r15
+  0135  Mov                  r13, r1
+  0138  LoadConstZero        r12
+  013a  Call                 r7, r7, 6
+  013e  GetByIdShort         r11, r5, #c5, s9 "condInElse"
+  0143  NewObject            r15
+  0145  LoadConstZero        r13
+  0147  Call                 r13, r11, 6
+  014b  Mov                  r16, r9
+  014e  Mov                  r15, r8
+  0151  Mov                  r14, r7
+  0154  Call                 r6, r10, 5
+  0158  TryGetById           r10, r5, #c0, s18 "print"
+  015e  GetByIdShort         r7, r5, #c6, s10 "condNegated"
+  0163  NewObjectWithBuffer  r6, sh2(numProps=1), lit@0x000f
+  0169  Call4                r9, r7, r4, r1, r6, r0
+  0170  GetByIdShort         r7, r5, #c6, s10 "condNegated"
+  0175  LoadConstUInt8       r2, 2
+  0178  NewObjectWithBuffer  r6, sh3(numProps=1), lit@0x0014
+  017e  Call4                r8, r7, r4, r0, r6, r2
+  0185  GetByIdShort         r7, r5, #c6, s10 "condNegated"
+  018a  NewObjectWithBuffer  r6, sh3(numProps=1), lit@0x0019
+  0190  Call4                r7, r7, r4, r0, r6, r2
+  0197  GetByIdShort         r11, r5, #c6, s10 "condNegated"
+  019c  NewObjectWithBuffer  r6, sh3(numProps=1), lit@0x001e
+  01a2  Call4                r13, r11, r4, r0, r6, r2
+  01a9  LoadConstUndefined   r17
+  01ab  Mov                  r16, r9
+  01ae  Mov                  r15, r8
+  01b1  Mov                  r14, r7
+  01b4  Call                 r6, r10, 5
+  01b8  TryGetById           r10, r5, #c0, s18 "print"
+  01be  GetByIdShort         r7, r5, #c7, s12 "ifOr"
+  01c3  GetByIdShort         r6, r5, #c2, s8 "P"
+  01c8  Call2                r9, r7, r4, r6
+  01cd  GetByIdShort         r7, r5, #c7, s12 "ifOr"
+  01d2  GetByIdShort         r6, r5, #c3, s7 "E"
+  01d7  Call2                r8, r7, r4, r6
+  01dc  GetByIdShort         r7, r5, #c8, s11 "ifAnd"
+  01e1  GetByIdShort         r6, r5, #c2, s8 "P"
+  01e6  LoadConstUInt8       r0, 4
+  01e9  Call3                r14, r7, r4, r6, r0
+  01ef  GetByIdShort         r11, r5, #c8, s11 "ifAnd"
+  01f4  GetByIdShort         r6, r5, #c3, s7 "E"
+  01f9  Call3                r13, r11, r4, r6, r0
+  01ff  LoadConstUndefined   r17
+  0201  Mov                  r16, r9
+  0204  Mov                  r15, r8
+  0207  Call                 r6, r10, 5
+  020b  TryGetById           r7, r5, #c0, s18 "print"
+  0211  GetByIdShort         r9, r5, #c1, s17 "orInElse"
+  0216  GetByIdShort         r8, r5, #c9, s14 "strip"
+  021b  GetByIdShort         r6, r5, #c2, s8 "P"
+  0220  Call4                r6, r9, r4, r8, r6, r1
+  0227  GetByIdShort         r9, r5, #c4, s5 "andInElse"
+  022c  GetByIdShort         r8, r5, #c9, s14 "strip"
+  0231  GetByIdShort         r5, r5, #c3, s7 "E"
+  0236  Call4                r5, r9, r4, r8, r5, r2
+  023d  Call3                r5, r7, r4, r6, r5
+  0243  Ret                  r5
+
+function #1 "orInElse"  params=4 frame=15 env=0 flags=dbg,overflowed  @0x00000471 size=39
+  0000  LoadParam            r4, 1
+  0003  LoadParam            r1, 2
+  0006  GetByIdShort         r3, r1, #c0, s15 "pathname"
+  000b  JmpTrue              L2, r4
+  000e  Mov                  r1, r3
+  0011  JmpTrue              L1, r1
+  0014  LoadConstString      r1, s0 ""
+L1:
+  0018  Jmp                  L3
+L2:
+  001a  LoadParam            r2, 3
+  001d  LoadConstUndefined   r0
+  001f  Call3                r1, r4, r0, r3, r2
+L3:
+  0025  Ret                  r1
+
+function #2 "andInElse"  params=4 frame=15 env=0 flags=dbg,overflowed  @0x00000498 size=45
+  0000  LoadParam            r4, 1
+  0003  LoadParam            r2, 2
+  0006  GetByIdShort         r3, r2, #c0, s16 "name"
+  000b  JmpTrue              L2, r4
+  000e  Mov                  r1, r3
+  0011  JmpFalse             L1, r1
+  0014  GetByIdShort         r2, r2, #c0, s16 "name"
+  0019  GetByIdShort         r1, r2, #c1, s13 "length"
+L1:
+  001e  Jmp                  L3
+L2:
+  0020  LoadParam            r2, 3
+  0023  LoadConstUndefined   r0
+  0025  Call3                r1, r4, r0, r3, r2
+L3:
+  002b  Ret                  r1
+
+function #3 "condInElse"  params=6 frame=6 env=0 flags=dbg,overflowed  @0x000004c5 size=58
+  0000  LoadParam            r4, 1
+  0003  LoadParam            r1, 5
+  0006  JmpTrue              L2, r1
+  0009  LoadParam            r1, 3
+  000c  LoadParam            r2, 4
+  000f  JmpFalse             L1, r2
+  0012  Mov                  r1, r4
+L1:
+  0015  Jmp                  L4
+L2:
+  0017  LoadParam            r3, 2
+  001a  GetByIdShort         r2, r3, #c0, s6 "left"
+  001f  Sub                  r5, r4, r2
+  0023  LoadConstZero        r0
+  0025  Mov                  r2, r4
+  0028  JNotGreaterEqual     L3, r5, r0
+  002c  GetByIdShort         r3, r3, #c0, s6 "left"
+  0031  Sub                  r2, r4, r3
+L3:
+  0035  Mov                  r1, r2
+L4:
+  0038  Ret                  r1
+
+function #4 "condNegated"  params=4 frame=3 env=0 flags=dbg,overflowed  @0x000004ff size=35
+  0000  LoadParam            r1, 2
+  0003  LoadParam            r0, 1
+  0006  JmpTrue              L2, r0
+  0009  LoadParam            r0, 3
+  000c  GetByIdShort         r2, r1, #c0, s20 "y"
+  0011  JNotLess             L1, r2, r0
+  0015  GetByIdShort         r0, r1, #c0, s20 "y"
+L1:
+  001a  Jmp                  L3
+L2:
+  001c  GetByIdShort         r0, r1, #c1, s19 "x"
+L3:
+  0021  Ret                  r0
+
+function #5 "strip"  params=3 frame=2 env=0 flags=dbg,overflowed  @0x00000522 size=20
+  0000  LoadConstString      r1, s1 "/"
+  0004  LoadParam            r0, 1
+  0007  Add                  r1, r0, r1
+  000b  LoadParam            r0, 2
+  000e  Add                  r0, r1, r0
+  0012  Ret                  r0
+
+function #6 "ifOr"  params=2 frame=2 env=0 flags=dbg,overflowed  @0x00000536 size=17
+  0000  LoadParam            r0, 1
+  0003  GetByIdShort         r0, r0, #c0, s15 "pathname"
+  0008  JmpTrue              L1, r0
+  000b  LoadConstString      r0, s0 ""
+L1:
+  000f  Ret                  r0
+
+function #7 "ifAnd"  params=3 frame=2 env=0 flags=dbg,overflowed  @0x00000547 size=16
+  0000  LoadParam            r0, 1
+  0003  GetByIdShort         r0, r0, #c0, s16 "name"
+  0008  JmpFalse             L1, r0
+  000b  LoadParam            r0, 2
+L1:
+  000e  Ret                  r0

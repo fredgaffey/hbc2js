@@ -350,7 +350,7 @@ export function firstDiffBucket(a: string, b: string): string {
 
 /** Side-by-side normalised texts of one (original fn, recompiled fn) pair, for
  *  `--show`: the first `context` lines around the first difference. */
-export function diffExcerpt(a: string, b: string, context = 6): string {
+export function diffExcerpt(a: string, b: string, context = Number(process.env["HBC2JS_SHOW_CONTEXT"] ?? 6)): string {
   const al = a.split("\n");
   const bl = b.split("\n");
   let i = 0;
@@ -406,7 +406,7 @@ function compileModule(hermesc: string, flags: readonly string[], source: string
   });
 }
 
-interface WorkerInit {
+export interface WorkerInit {
   readonly bundlePath: string;
   readonly hermesc: string;
   readonly hermescFlags: readonly string[];
@@ -434,7 +434,7 @@ interface TaskResult {
 }
 
 /** Compare one module: original factory subtree vs the recompiled file. */
-async function compareModule(init: WorkerInit, orig: Decoder, task: Task): Promise<TaskResult> {
+export async function compareModule(init: WorkerInit, orig: Decoder, task: Task): Promise<TaskResult> {
   const results: FnResult[] = [];
   const tree = subtree(orig, task.factoryFunctionIndex, new Set());
   const push = (fn: number, verdict: Verdict, bucket: string, rfn?: number): void => {
@@ -491,7 +491,14 @@ async function compareModule(init: WorkerInit, orig: Decoder, task: Task): Promi
       const a = foldWidthVariants(normaliseFunction(orig.mod, od, { strong: init.strong }));
       const b = foldWidthVariants(normaliseFunction(rec.mod, rd, { strong: init.strong }));
       if (a === b) push(oi, "IDENTICAL", "", ri);
-      else push(oi, "DIFFERENT", firstDiffBucket(a, b), ri);
+      else {
+        push(oi, "DIFFERENT", firstDiffBucket(a, b), ri);
+        const dumpDir = process.env["HBC2JS_DUMP_DIFF"];
+        if (dumpDir !== undefined) {
+          writeFileSync(join(dumpDir, `${task.module}_${oi}.orig`), a);
+          writeFileSync(join(dumpDir, `${task.module}_${oi}.rec`), b);
+        }
+      }
       if (oi === task.showFn) excerpt = `original fn#${oi} <-> recompiled fn#${ri}\n${diffExcerpt(a, b)}`;
     }
     if (od instanceof Error || rd instanceof Error) {
