@@ -1,0 +1,235 @@
+; hbc2js disassembly of 220-function-apply-diamond/v84.hbc
+; version=84 layout=B opcodeTable=hbc84 functions=10 strings=34 globalCodeIndex=0
+function #0 "global"  params=1 frame=23 env=0 flags=dbg  @0x0000029c size=532
+  0000  DeclareGlobalVar     s17 "ctx"
+  0005  DeclareGlobalVar     s22 "fake"
+  000a  DeclareGlobalVar     s26 "saved"
+  000f  DeclareGlobalVar     s30 "kind"
+  0014  DeclareGlobalVar     s28 "show"
+  0019  DeclareGlobalVar     s23 "forward"
+  001e  DeclareGlobalVar     s27 "forwardThis"
+  0023  DeclareGlobalVar     s24 "forwardLoose"
+  0028  DeclareGlobalVar     s25 "forwardNoParams"
+  002d  CreateEnvironment    r1
+  002f  CreateClosure        r2, r1, f1 "kind"
+  0034  GetGlobalObject      r0
+  0036  PutById              r0, r2, #c1, s30 "kind"
+  003c  CreateClosure        r2, r1, f2 "show"
+  0041  PutById              r0, r2, #c2, s28 "show"
+  0047  CreateClosure        r2, r1, f3 "forward"
+  004c  PutById              r0, r2, #c3, s23 "forward"
+  0052  CreateClosure        r2, r1, f4 "forwardThis"
+  0057  PutById              r0, r2, #c4, s27 "forwardThis"
+  005d  CreateClosure        r2, r1, f5 "forwardLoose"
+  0062  PutById              r0, r2, #c5, s24 "forwardLoose"
+  0068  CreateClosure        r2, r1, f6 "forwardNoParams"
+  006d  PutById              r0, r2, #c6, s25 "forwardNoParams"
+  0073  NewObject            r2
+  0075  LoadConstString      r3, s6 "T"
+  0079  PutNewOwnByIdShort   r2, r3, s32 "tag"
+  007d  PutById              r0, r2, #c7, s17 "ctx"
+  0083  TryGetById           r4, r0, #c1, s31 "print"
+  0089  GetByIdShort         r6, r0, #c2, s23 "forward"
+  008e  GetByIdShort         r15, r0, #c3, s28 "show"
+  0093  GetByIdShort         r14, r0, #c4, s17 "ctx"
+  0098  LoadConstUndefined   r2
+  009a  LoadConstUInt8       r8, 1
+  009d  LoadConstUInt8       r7, 2
+  00a0  LoadConstUndefined   r16
+  00a2  Mov                  r13, r8
+  00a5  Mov                  r12, r7
+  00a8  Call                 r3, r6, 5
+  00ac  Call2                r3, r4, r2, r3
+  00b1  TryGetById           r4, r0, #c1, s31 "print"
+  00b7  GetByIdShort         r10, r0, #c5, s27 "forwardThis"
+  00bc  GetByIdShort         r9, r10, #c6, s21 "call"
+  00c1  GetByIdShort         r6, r0, #c4, s17 "ctx"
+  00c6  GetByIdShort         r5, r0, #c3, s28 "show"
+  00cb  LoadConstUInt8       r3, 9
+  00ce  Call4                r3, r9, r10, r6, r5, r3
+  00d5  Call2                r3, r4, r2, r3
+  00da  TryGetById           r4, r0, #c1, s31 "print"
+  00e0  GetByIdShort         r6, r0, #c7, s24 "forwardLoose"
+  00e5  GetByIdShort         r5, r0, #c3, s28 "show"
+  00ea  GetByIdShort         r3, r0, #c4, s17 "ctx"
+  00ef  Call3                r3, r6, r2, r5, r3
+  00f5  Call2                r3, r4, r2, r3
+  00fa  TryGetById           r4, r0, #c1, s31 "print"
+  0100  GetByIdShort         r11, r0, #c8, s25 "forwardNoParams"
+  0105  GetByIdShort         r10, r11, #c6, s21 "call"
+  010a  GetByIdShort         r15, r0, #c4, s17 "ctx"
+  010f  LoadConstUInt8       r14, 5
+  0112  LoadConstUInt8       r13, 6
+  0115  LoadConstUInt8       r12, 7
+  0118  Mov                  r16, r11
+  011b  Call                 r3, r10, 5
+  011f  Call2                r3, r4, r2, r3
+  0124  CreateClosure        r3, r1, f7 "fake"
+  0129  PutById              r0, r3, #c8, s22 "fake"
+  012f  GetByIdShort         r4, r0, #c9, s22 "fake"
+  0134  CreateClosure        r3, r1, f8 ""
+  0139  PutById              r4, r3, #c9, s20 "apply"
+  013f  TryGetById           r4, r0, #c1, s31 "print"
+  0145  GetByIdShort         r9, r0, #c2, s23 "forward"
+  014a  GetByIdShort         r5, r0, #c9, s22 "fake"
+  014f  GetByIdShort         r3, r0, #c4, s17 "ctx"
+  0154  LoadConstUInt8       r6, 3
+  0157  Call4                r3, r9, r2, r5, r3, r6
+  015e  Call2                r3, r4, r2, r3
+  0163  TryGetById           r3, r0, #c10, s19 "Function"
+  0169  GetByIdShort         r3, r3, #c11, s33 "prototype"
+  016e  GetByIdShort         r3, r3, #c12, s20 "apply"
+  0173  PutById              r0, r3, #c10, s26 "saved"
+  0179  TryGetById           r3, r0, #c10, s19 "Function"
+  017f  GetByIdShort         r3, r3, #c11, s33 "prototype"
+  0184  CreateClosure        r1, r1, f9 ""
+  0189  PutById              r3, r1, #c9, s20 "apply"
+  018f  TryGetById           r3, r0, #c1, s31 "print"
+  0195  GetByIdShort         r5, r0, #c2, s23 "forward"
+  019a  GetByIdShort         r4, r0, #c3, s28 "show"
+  019f  GetByIdShort         r1, r0, #c4, s17 "ctx"
+  01a4  Call4                r1, r5, r2, r4, r1, r8
+  01ab  Call2                r1, r3, r2, r1
+  01b0  TryGetById           r3, r0, #c1, s31 "print"
+  01b6  GetByIdShort         r5, r0, #c7, s24 "forwardLoose"
+  01bb  GetByIdShort         r15, r0, #c3, s28 "show"
+  01c0  GetByIdShort         r14, r0, #c4, s17 "ctx"
+  01c5  LoadConstUndefined   r16
+  01c7  Mov                  r13, r8
+  01ca  Mov                  r12, r7
+  01cd  Call                 r1, r5, 5
+  01d1  Call2                r1, r3, r2, r1
+  01d6  TryGetById           r1, r0, #c10, s19 "Function"
+  01dc  GetByIdShort         r3, r1, #c11, s33 "prototype"
+  01e1  GetByIdShort         r1, r0, #c13, s26 "saved"
+  01e6  PutById              r3, r1, #c9, s20 "apply"
+  01ec  TryGetById           r1, r0, #c1, s31 "print"
+  01f2  GetByIdShort         r5, r0, #c2, s23 "forward"
+  01f7  GetByIdShort         r15, r0, #c3, s28 "show"
+  01fc  GetByIdShort         r14, r0, #c4, s17 "ctx"
+  0201  LoadConstUInt8       r12, 4
+  0204  LoadConstUndefined   r16
+  0206  Mov                  r13, r6
+  0209  Call                 r0, r5, 5
+  020d  Call2                r0, r1, r2, r0
+  0212  Ret                  r0
+
+function #1 "kind"  params=2 frame=13 env=0 flags=dbg  @0x000004b0 size=50
+  0000  LoadParam            r4, 1
+  0003  LoadConstString      r0, s7 "f"
+  0007  LoadConstString      r1, s9 "o"
+  000b  TypeOf               r3, r4
+  000e  LoadConstString      r2, s8 "function"
+  0012  JStrictEqual         L2, r3, r2
+  0016  LoadConstString      r2, s12 "object"
+  001a  JStrictEqual         L1, r3, r2
+  001e  GetGlobalObject      r2
+  0020  TryGetById           r3, r2, #c1, s15 "String"
+  0026  LoadConstUndefined   r2
+  0028  Call2                r1, r3, r2, r4
+L1:
+  002d  Mov                  r0, r1
+L2:
+  0030  Ret                  r0
+
+function #2 "show"  params=1 frame=17 env=0 flags=dbg  @0x000004e2 size=100
+  0000  GetGlobalObject      r5
+  0002  LoadConstUndefined   r4
+  0004  LoadConstUInt8       r2, 1
+  0007  LoadConstUndefined   r1
+  0009  NewArray             r3, 0
+  000d  GetArgumentsLength   r0, r1
+  0010  LoadConstZero        r6
+  0012  JNotLess             L2, r6, r0
+L1:
+  0016  GetByIdShort         r7, r3, #c1, s18 "push"
+  001b  GetByIdShort         r8, r5, #c2, s30 "kind"
+  0020  GetArgumentsPropByVal r0, r6, r1
+  0024  Call2                r0, r8, r4, r0
+  0029  Call2                r0, r7, r3, r0
+  002e  AddN                 r6, r6, r2
+  0032  GetArgumentsLength   r0, r1
+  0035  JLess                L1, r6, r0
+L2:
+  0039  LoadThisNS           r0
+  003b  GetByIdShort         r1, r0, #c3, s32 "tag"
+  0040  LoadConstString      r0, s11 "this="
+  0044  Add                  r2, r0, r1
+  0048  GetByIdShort         r1, r3, #c4, s29 "join"
+  004d  LoadConstString      r0, s5 ","
+  0051  Call2                r1, r1, r3, r0
+  0056  LoadConstString      r0, s3 " args="
+  005a  Add                  r0, r2, r0
+  005e  Add                  r0, r0, r1
+  0062  Ret                  r0
+
+function #3 "forward"  params=3 frame=13 env=0 flags=strict,dbg  @0x00000546 size=26
+  0000  LoadParam            r3, 1
+  0003  LoadConstUndefined   r0
+  0005  GetByIdShort         r2, r3, #c1, s20 "apply"
+  000a  ReifyArguments       r0
+  000c  Mov                  r1, r0
+  000f  LoadParam            r0, 2
+  0012  Call3                r0, r2, r3, r0, r1
+  0018  Ret                  r0
+
+function #4 "forwardThis"  params=2 frame=13 env=0 flags=strict,dbg  @0x00000560 size=34
+  0000  LoadParam            r3, 1
+  0003  LoadConstUndefined   r0
+  0005  GetByIdShort         r2, r3, #c1, s20 "apply"
+  000a  ReifyArguments       r0
+  000c  Mov                  r1, r0
+  000f  LoadParam            r0, 0
+  0012  Call3                r1, r2, r3, r0, r1
+  0018  LoadConstString      r0, s4 "!"
+  001c  Add                  r0, r1, r0
+  0020  Ret                  r0
+
+function #5 "forwardLoose"  params=3 frame=13 env=0 flags=dbg  @0x00000546 size=26
+  0000  LoadParam            r3, 1
+  0003  LoadConstUndefined   r0
+  0005  GetByIdShort         r2, r3, #c1, s20 "apply"
+  000a  ReifyArguments       r0
+  000c  Mov                  r1, r0
+  000f  LoadParam            r0, 2
+  0012  Call3                r0, r2, r3, r0, r1
+  0018  Ret                  r0
+
+function #6 "forwardNoParams"  params=1 frame=13 env=0 flags=dbg  @0x00000582 size=29
+  0000  LoadConstUndefined   r0
+  0002  GetGlobalObject      r1
+  0004  GetByIdShort         r3, r1, #c1, s28 "show"
+  0009  GetByIdShort         r2, r3, #c2, s20 "apply"
+  000e  ReifyArguments       r0
+  0010  Mov                  r1, r0
+  0013  LoadThisNS           r0
+  0015  Call3                r0, r2, r3, r0, r1
+  001b  Ret                  r0
+
+function #7 "fake"  params=1 frame=1 env=0 flags=none  @0x0000059f size=6
+  0000  LoadConstString      r0, s13 "real"
+  0004  Ret                  r0
+
+function #8 ""  params=3 frame=3 env=0 flags=dbg  @0x000005a5 size=38
+  0000  LoadParam            r0, 1
+  0003  GetByIdShort         r1, r0, #c1, s32 "tag"
+  0008  LoadConstString      r0, s14 "shadowed "
+  000c  Add                  r2, r0, r1
+  0010  LoadParam            r0, 2
+  0013  GetByIdShort         r1, r0, #c2, s16 "length"
+  0018  LoadConstString      r0, s2 " "
+  001c  Add                  r0, r2, r0
+  0020  Add                  r0, r0, r1
+  0024  Ret                  r0
+
+function #9 ""  params=3 frame=3 env=0 flags=dbg  @0x000005cb size=36
+  0000  LoadParam            r0, 2
+  0003  GetByIdShort         r1, r0, #c1, s16 "length"
+  0008  LoadConstString      r2, s1 "overridden "
+  000c  LoadParam            r0, 1
+  000f  TypeOf               r0, r0
+  0012  Add                  r2, r2, r0
+  0016  LoadConstString      r0, s2 " "
+  001a  Add                  r0, r2, r0
+  001e  Add                  r0, r0, r1
+  0022  Ret                  r0

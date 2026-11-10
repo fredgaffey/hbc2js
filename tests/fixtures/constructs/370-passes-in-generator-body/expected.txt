@@ -1,0 +1,5 @@
+6 8 9 {"value":"{\"x\":4,\"y\":4,\"z\":\"k\"}function","done":true}
+0 1 2 4 10 {"done":true}
+0 0 {"value":0,"done":true}
+async 12 2
+async0 {"q":4,"s":1}

@@ -53,7 +53,7 @@ interface FoundSite {
 function recomputeSite(before: readonly Stmt[], fnBody: readonly Stmt[]): { readonly found: FoundSite | null; readonly firstReason: string | null } {
   let firstReason: string | null = null;
   for (const c of collectCandidates(before)) {
-    const v = classifyNode(c.node, fnBody);
+    const v = classifyNode(c.node, fnBody, { list: before, stmtIndex: c.stmtIndex });
     if (v.ok) return { found: { stmtIndex: c.stmtIndex, rule: v.rule, target: c.node, replacement: v.replacement }, firstReason };
     if (firstReason === null && v.reason !== "not-a-call-shape-site") firstReason = v.reason;
   }

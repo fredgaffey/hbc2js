@@ -1,0 +1,3 @@
+stamped: true 7 0 {}
+twice threw: true
+static: 1 2 true false false

@@ -588,11 +588,19 @@ function mapStmtChildren(s: Stmt, fs: (s: Stmt) => Stmt, fx: (e: Expr) => Expr):
  * recurses child-first). Lists compare by object identity, so the driver's
  * `refused` set works exactly as in stage A.
  */
-export function stmtLists(body: readonly Stmt[]): readonly (readonly Stmt[])[] {
+export function stmtLists(body: readonly Stmt[], opts?: { readonly sameFrame?: boolean }): readonly (readonly Stmt[])[] {
   const out: (readonly Stmt[])[] = [];
+  const intoSameFrame = opts?.sameFrame === true;
   const visit = (list: readonly Stmt[]): void => {
     for (const s of list) {
       switch (s.k) {
+        case "return": {
+          // `opts.sameFrame` (Pass.sameFrame): the generator/async resume
+          // closure is this frame's own body, re-entered per resume.
+          const resume = intoSameFrame ? sameFrameBody(s) : null;
+          if (resume !== null) visit(resume);
+          break;
+        }
         case "if":
           visit(s.then);
           visit(s.else);
@@ -622,6 +630,26 @@ export function stmtLists(body: readonly Stmt[]): readonly (readonly Stmt[])[] {
   };
   visit(body);
   return out;
+}
+
+/** The body of the `sameFrame` resume closure when `s` is the emitter's
+ *  `return function (__sent, __isReturn, __isThrow) { ... }` (v84/94/96
+ *  generator and async lowering, `src/emit/function.ts`), else `null`. That
+ *  closure is not a second Hermes function: it shares this frame's registers
+ *  and is re-entered at its top on every resume. */
+export function sameFrameBody(s: Stmt): readonly Stmt[] | null {
+  return s.k === "return" && s.arg !== null && s.arg.k === "func" && s.arg.sameFrame === true ? s.arg.body : null;
+}
+
+/** The `sameFrame` resume-closure body (see `sameFrameBody`) among
+ *  `fnBody`'s top-level statements that contains `target` (by identity, at
+ *  any depth short of a nested `func`), or `null`. */
+export function enclosingResumeBody(fnBody: readonly Stmt[], target: readonly Stmt[]): readonly Stmt[] | null {
+  for (const s of fnBody) {
+    const resume = sameFrameBody(s);
+    if (resume !== null && stmtLists(resume, { sameFrame: true }).includes(target)) return resume;
+  }
+  return null;
 }
 
 /** Replace `target` (by identity) with `repl`, rebuilding only the spine —
@@ -669,6 +697,13 @@ function spliceInStmt(s: Stmt, target: readonly Stmt[], repl: readonly Stmt[]): 
         return cbody === c.body ? c : { ...c, body: cbody };
       });
       return changed ? { ...s, cases } : s;
+    }
+    case "return": {
+      // A `sameFrame` resume closure is this frame's own body (`sameFrameBody`).
+      const resume = sameFrameBody(s);
+      if (resume === null || s.arg === null || s.arg.k !== "func") return s;
+      const body = spliceList(resume, target, repl);
+      return body === resume ? s : { ...s, arg: { ...s.arg, body } };
     }
     default:
       return s; // "func": a separate site, never spliced through its parent's list
@@ -1354,6 +1389,85 @@ export function isPureStmt(s: Stmt): boolean {
   return s.k === "expr" && s.expr.k === "assign" && s.expr.target.k === "ident" && isPure(s.expr.value);
 }
 
+/** Where evaluating `e` (ECMAScript order: member object before key before
+ *  the get; callee before arguments before the call; left before right)
+ *  first meets an unconditional read of `reg`. `"found"` when everything
+ *  evaluated before that read is unobservable — literals, non-global
+ *  binding reads (collected in `names`), closure creation, and the
+ *  operators `isPure` models as pure; `"pure"` when all of `e` is such and
+ *  it never reads `reg`; otherwise `"impure"` (an effect comes first, or the
+ *  read sits under a `&&`/`||`/`?:` branch). The predicate a rung uses
+ *  before moving an impure `rX = E` into the one read of `rX` (spec 05
+ *  section 7.4 evaluation-order rule; fix-jsx-read-order). */
+export function firstReadOrder(e: Expr, reg: string, names: string[]): "found" | "pure" | "impure" {
+  const seq = (parts: readonly Expr[]): "found" | "pure" | "impure" => {
+    for (const p of parts) {
+      const r = firstReadOrder(p, reg, names);
+      if (r !== "pure") return r;
+    }
+    return "pure";
+  };
+  // `parts` evaluated in order, then an observable operation.
+  const thenEffect = (parts: readonly Expr[]): "found" | "impure" => (seq(parts) === "found" ? "found" : "impure");
+  switch (e.k) {
+    case "lit":
+    case "this":
+    case "func":
+      return "pure";
+    case "ident":
+      if (e.name === reg) return "found";
+      if (e.global === true) return "impure";
+      names.push(e.name);
+      return "pure";
+    case "member":
+      return thenEffect(e.computed ? [e.obj, e.prop] : [e.obj]);
+    case "call":
+    case "new":
+      // The emitter's own `Reflect.apply(F, T, [A…])` stands for the call
+      // `F` with `this` `T`: the original evaluates no `Reflect.apply` read.
+      if (e.k === "call" && e.callee.k === "member" && !e.callee.computed && e.callee.obj.k === "ident" && e.callee.obj.name === "Reflect" && e.callee.prop.k === "lit" && e.callee.prop.text === "apply" && e.args.length === 3 && e.args[2]!.k === "array" && !e.args[2]!.elements.some((x) => x.k === "spread")) {
+        return thenEffect([e.args[0]!, e.args[1]!, ...e.args[2]!.elements]);
+      }
+      if (e.args.some((a) => a.k === "spread")) return thenEffect([e.callee]);
+      return thenEffect([e.callee, ...e.args]);
+    case "unary":
+      return e.op === "delete " ? thenEffect([e.arg]) : firstReadOrder(e.arg, reg, names);
+    case "bin": {
+      const r = seq([e.left, e.right]);
+      return r === "pure" && (e.op === "in" || e.op === "instanceof") ? "impure" : r;
+    }
+    case "logical": {
+      const l = firstReadOrder(e.left, reg, names);
+      if (l !== "pure") return l;
+      return firstReadOrder(e.right, reg, names) === "pure" ? "pure" : "impure";
+    }
+    case "cond": {
+      const t = firstReadOrder(e.test, reg, names);
+      if (t !== "pure") return t;
+      return firstReadOrder(e.then, reg, names) === "pure" && firstReadOrder(e.else, reg, names) === "pure" ? "pure" : "impure";
+    }
+    case "seq":
+      return seq(e.exprs);
+    case "array":
+      if (e.elements.some((x) => x.k === "spread")) return "impure";
+      return seq(e.elements);
+    case "object": {
+      const parts: Expr[] = [];
+      for (const p of e.props) {
+        if ("k" in p || p.computed || p.key === "__proto__") return "impure";
+        parts.push(p.value);
+      }
+      return seq(parts);
+    }
+    case "assign":
+      if (e.target.k === "ident" && isRegisterName(e.target.name)) return firstReadOrder(e.value, reg, names);
+      if (e.target.k === "member") return thenEffect(e.target.computed ? [e.target.obj, e.target.prop, e.value] : [e.target.obj, e.value]);
+      return thenEffect([e.value]);
+    default:
+      return "impure";
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helper-call recognition, by name, never by position.
 // ---------------------------------------------------------------------------
@@ -1820,7 +1934,7 @@ function namesTouching(list: readonly Stmt[]): ReadonlySet<string> {
  *  defUse(after)) …` — returns the first offending register name, or
  *  `null`. `head`/`tailBefore`/`tailAfter` are the reference-equal split
  *  points `expressionOnlyCheck` already found for the effect-sequence half. */
-function incrementalReadBeforeDef(before: readonly Stmt[], after: readonly Stmt[], head: number, tailBefore: number, tailAfter: number): string | null {
+function incrementalReadBeforeDef(before: readonly Stmt[], after: readonly Stmt[], head: number, tailBefore: number, tailAfter: number, carry: boolean): string | null {
   const { du: duBefore, posOf, violating: violatingBefore } = keyedDefUseCache.get(before) ?? coldKeyedDefUse(before);
 
   // `aKey` is deliberately `posOf(before[head])` — the *old* mid region's
@@ -1849,8 +1963,8 @@ function incrementalReadBeforeDef(before: readonly Stmt[], after: readonly Stmt[
   // is ever violated, and the honest fallback for the rare pure-append edge
   // case above.
   if ((head < before.length && aKey === undefined) || (tailAfter < after.length && bKey === undefined)) {
-    const cold = coldKeyedDefUse(after);
-    return firstOf(cold.violating);
+    coldKeyedDefUse(after);
+    return readBeforeDefBruteForceReference(before, after, carry);
   }
 
   let prev = aKey;
@@ -1867,8 +1981,8 @@ function incrementalReadBeforeDef(before: readonly Stmt[], after: readonly Stmt[
     // Thousands of splices landing in the exact same gap: drop the cached
     // lineage and pay one full recompute, same as a cold call for a fresh
     // list — always sound, just not `O(changed region)` this one time.
-    const cold = coldKeyedDefUse(after);
-    return firstOf(cold.violating);
+    coldKeyedDefUse(after);
+    return readBeforeDefBruteForceReference(before, after, carry);
   }
 
   const touched = new Set<string>(midDu.keys());
@@ -1903,19 +2017,77 @@ function incrementalReadBeforeDef(before: readonly Stmt[], after: readonly Stmt[
     if (entry !== undefined && isViolating(entry)) violating.add(name);
   }
   keyedDefUseCache.set(after, { du: merged, posOf, violating }); // same lineage: `posOf` is carried forward, not copied
-  return firstOf(violating);
-}
-
-function firstOf(names: ReadonlySet<string>): string | null {
-  for (const name of names) return name;
+  // Only a violation the rewrite introduced refuses (docs/specs/passes/
+  // 04-call-shape.md section 10, >3-argument `f.call`): a name already read
+  // before its first def in `before` (a register live into this list, then
+  // reassigned in it) is carried when its first def is the same statement,
+  // outside the changed region. Then every read before that def is either in
+  // the unchanged prefix, or (first def in the suffix) reads the live-in
+  // value both before and after, with no def of the name in between.
+  if (!carry) {
+    for (const name of violating) return name;
+    return null;
+  }
+  const outside = (k: number): boolean => (aKey !== undefined && k < aKey) || (bKey !== undefined && k >= bKey);
+  for (const name of violating) {
+    if (!touched.has(name)) {
+      if (violatingBefore.has(name)) continue;
+      return name;
+    }
+    const bef = duBefore.get(name);
+    const aft = merged.get(name);
+    if (violatingBefore.has(name) && bef !== undefined && aft !== undefined) {
+      const fb = Math.min(...bef.defs);
+      if (fb === Math.min(...aft.defs) && outside(fb)) continue;
+    }
+    return name;
+  }
   return null;
 }
 
-function readBeforeDefBruteForceReference(after: readonly Stmt[]): string | null {
-  for (const [name, { defs, reads }] of defUse(after)) {
+/** From scratch: the first name `after` reads before its first def that is
+ *  not carried over from `before` (the same rule `incrementalReadBeforeDef`
+ *  returns by: violating in `before` too, its first def the same statement
+ *  object, in the unchanged prefix or suffix). */
+function readBeforeDefBruteForceReference(before: readonly Stmt[], after: readonly Stmt[], carry = true): string | null {
+  let head = 0;
+  const minLen = Math.min(before.length, after.length);
+  while (head < minLen && before[head] === after[head]) head++;
+  let tb = before.length;
+  let ta = after.length;
+  while (tb > head && ta > head && before[tb - 1] === after[ta - 1]) {
+    tb--;
+    ta--;
+  }
+  // `defUse` positions count every statement walked (nested ones too), so the
+  // prefix/suffix boundaries are taken as walk positions of the boundary
+  // statements, not top-level indices.
+  const walk = (list: readonly Stmt[]): { du: Map<string, DefUse>; pos: Map<Stmt, number>; end: number } => {
+    let n = 0;
+    const pos = new Map<Stmt, number>();
+    const du = defUseWalk(list, (st) => {
+      pos.set(st, n);
+      return n++;
+    });
+    return { du, pos, end: n };
+  };
+  const B = walk(before);
+  const A = walk(after);
+  const at = (w: typeof B, list: readonly Stmt[], i: number): number => (i < list.length ? (w.pos.get(list[i]!) ?? w.end) : w.end);
+  const headB = at(B, before, head);
+  const tailB = at(B, before, tb);
+  const tailA = at(A, after, ta);
+  for (const [name, { defs, reads }] of A.du) {
     if (defs.length === 0) continue;
     const firstDef = Math.min(...defs);
-    if (reads.some((r) => r < firstDef)) return name;
+    if (!reads.some((r) => r < firstDef)) continue;
+    const b = B.du.get(name);
+    if (carry && b !== undefined && b.defs.length > 0) {
+      const fb = Math.min(...b.defs);
+      const carried = b.reads.some((r) => r < fb) && ((fb < headB && firstDef === fb) || (fb >= tailB && firstDef - tailA === fb - tailB));
+      if (carried) continue;
+    }
+    return name;
   }
   return null;
 }
@@ -1933,7 +2105,17 @@ export function _setExpressionOnlyCheckDiffProbeForTests(probe: typeof _expressi
 /** §4.3's expression-only `check`: the effect sequence is unchanged, and no
  *  `rN` in `after` is read before its own first def in `after` (a rewrite
  *  must not read a register earlier than the point it is actually computed). */
-export function expressionOnlyCheck(before: readonly Stmt[], after: readonly Stmt[]): CheckResult {
+export interface ExpressionOnlyOptions {
+  /** Carry a read-before-def the rewrite did not introduce (default). `false`
+   *  is the strict form, which refuses every fold in a list with any such
+   *  register: expr-rebuild asks for it in a derived-constructor frame,
+   *  whose unfolded lowering super-call, inline-new and private-fields
+   *  match (docs/specs/passes/02-expr-rebuild.md, "Carried live-in reads"). */
+  readonly carryLiveIn?: boolean;
+}
+
+export function expressionOnlyCheck(before: readonly Stmt[], after: readonly Stmt[], opts: ExpressionOnlyOptions = {}): CheckResult {
+  const carry = opts.carryLiveIn ?? true;
   // `effectSequence` is concatenative (`visitStmts` is a plain left-to-right
   // walk with no state carried between statements), so
   // `effectSequence(before) === effects(before[0,h)) ++ effects(before[h,tb))
@@ -1961,8 +2143,8 @@ export function expressionOnlyCheck(before: readonly Stmt[], after: readonly Stm
   const eb = JSON.stringify(effectSequence(before.slice(head, tailBefore)));
   const ea = JSON.stringify(effectSequence(after.slice(head, tailAfter)));
   if (eb !== ea) return { ok: false, reason: "the rewrite changed the observable effect sequence" };
-  const violation = incrementalReadBeforeDef(before, after, head, tailBefore, tailAfter);
-  if (_expressionOnlyCheckDiffProbe !== null) _expressionOnlyCheckDiffProbe(before, after, readBeforeDefBruteForceReference(after), violation);
+  const violation = incrementalReadBeforeDef(before, after, head, tailBefore, tailAfter, carry);
+  if (_expressionOnlyCheckDiffProbe !== null) _expressionOnlyCheckDiffProbe(before, after, readBeforeDefBruteForceReference(before, after, carry), violation);
   if (violation !== null) return { ok: false, reason: `${violation} is read before its first def in the rewrite` };
   return { ok: true };
 }
@@ -2072,7 +2254,7 @@ export function applyAstPasses(fnBody: readonly Stmt[], passes: readonly StmtLis
 }
 
 function firstAstMatch(fnBody: readonly Stmt[], pass: StmtListPass, ctx: PassContext, refused: ReadonlySet<readonly Stmt[]>): { list: readonly Stmt[]; match: NonNullable<ReturnType<StmtListPass["match"]>> } | null {
-  for (const list of stmtLists(fnBody)) {
+  for (const list of stmtLists(fnBody, { sameFrame: pass.sameFrame === true })) {
     if (refused.has(list)) continue;
     let m: ReturnType<StmtListPass["match"]>;
     try {

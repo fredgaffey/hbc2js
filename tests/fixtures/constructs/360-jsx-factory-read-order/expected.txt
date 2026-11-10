@@ -1,0 +1,2 @@
+X.Text,A.createElement,g,B.createElement,X.Text,C.jsx,D.createElement,g,E.jsx,g,F.jsx,X.Text,g
+[["Text",null],["View","a=1"],["Text",""],["View","a=2"],["View","a=3"],["Text","a=4"]]

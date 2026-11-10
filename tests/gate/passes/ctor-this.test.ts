@@ -234,3 +234,31 @@ test("ctor-this: refuses a stand-in holder that is not declared in the construct
   const outcome = foldCtorBody(cls, ctorOf(cls)) as Any;
   assert.equal(outcome.code, "R-CT0");
 });
+
+test("ctor-this (fix-jsx-read-order regression): folds the SEEDED-SPLIT allocation `rP = new.target.prototype; rO = Object.assign(Object.create(rP), {...})`", () => {
+  // R1a no longer folds the prototype read into the call (it would move it
+  // after the `Object`/`.assign`/`.create` reads), so v98/v99 seeded
+  // constructors reach this rung in two statements; same allocation.
+  const objCall = (name: string, args: Any[]): Any => ({ k: "call", callee: { k: "member", obj: { k: "ident", name: "Object" }, prop: { k: "lit", text: name }, computed: false }, args });
+  const seed: Any = { k: "object", props: [{ key: "x", computed: false, value: { k: "lit", text: "0" } }] };
+  for (const [p, o] of [["r2", "r2"], ["r1", "r2"]] as const) {
+    const cls = classWith([
+      { k: "init", kind: "let", name: p, value: NEW_TARGET_PROTO },
+      p === o ? { k: "expr", expr: { k: "assign", target: { k: "ident", name: o }, value: objCall("assign", [objCall("create", [{ k: "ident", name: p }]), seed]) } } : { k: "init", kind: "let", name: o, value: objCall("assign", [objCall("create", [{ k: "ident", name: p }]), seed]) },
+      { k: "return", arg: { k: "ident", name: o } },
+    ] as Any);
+    const outcome = foldCtorBody(cls, ctorOf(cls)) as Any;
+    assert.ok(!("code" in outcome), `${p}/${o}: expected a fold, got ${JSON.stringify(outcome)}`);
+    const body = outcome.body.filter((s: Any) => s.k !== "comment" && s.k !== "directive");
+    assert.equal(body.length, 1);
+    assert.equal(body[0].expr.callee.prop.text, "assign");
+    assert.equal(body[0].expr.args[0].k, "this");
+    // A seed that reads the prototype register is refused, as in the one-statement form.
+    const bad = classWith([
+      { k: "init", kind: "let", name: "r1", value: NEW_TARGET_PROTO },
+      { k: "init", kind: "let", name: "r2", value: objCall("assign", [objCall("create", [{ k: "ident", name: "r1" }]), { k: "object", props: [{ key: "x", computed: false, value: { k: "ident", name: "r1" } }] }]) },
+      { k: "return", arg: { k: "ident", name: "r2" } },
+    ] as Any);
+    assert.equal((foldCtorBody(bad, ctorOf(bad)) as Any).code, "R-CT2");
+  }
+});

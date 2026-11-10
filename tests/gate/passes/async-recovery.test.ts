@@ -225,13 +225,15 @@ test("async-recovery keeps 28-async-await-error's await inside its try (R-Y7)", 
   assert.match(on, /try \{[\s\S]*await /);
 });
 
-test("async-recovery refuses at v98/v99 with R-A4 until gen-lowered lands", () => {
+test("async-recovery at v98/v99 (R-A4, inner still lowered) keeps the driver but makes the stub an async function (BUGS export-boot L1)", () => {
   for (const version of ["v98", "v99"] as const) {
     for (const fixture of ASYNC_FIXTURES) {
       const on = js(fixture, version);
       const off = js(fixture, version, ["async-recovery"]);
-      assert.equal(count(on, SPAWN), count(off, SPAWN), `${fixture} ${version}: nothing is rewritten while the inner body is still lowered`);
-      assert.doesNotMatch(on, /async function /, `${fixture} ${version}`);
+      assert.equal(count(on, SPAWN), count(off, SPAWN), `${fixture} ${version}: the driver call is kept while the inner body is still lowered`);
+      assert.doesNotMatch(off, /async function /, `${fixture} ${version}: without the rung there is no async function`);
+      assert.equal(count(on, /async function /g), count(on, /return await /g), `${fixture} ${version}: every async shell returns await <driver>`);
+      assert.ok(count(on, /async function /g) > 0, `${fixture} ${version}: the stub is an async function (its prototype is AsyncFunction.prototype)`);
     }
   }
 });

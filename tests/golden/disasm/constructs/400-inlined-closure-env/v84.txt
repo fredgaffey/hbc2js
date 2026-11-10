@@ -1,0 +1,118 @@
+; hbc2js disassembly of 400-inlined-closure-env/v84.hbc
+; version=84 layout=B opcodeTable=hbc84 functions=7 strings=19 globalCodeIndex=0
+function #0 "global"  params=1 frame=9 env=0 flags=dbg  @0x000001d4 size=15
+  0000  CreateEnvironment    r0
+  0002  CreateClosure        r1, r0, f1 ""
+  0007  LoadConstUndefined   r0
+  0009  Call1                r1, r1, r0
+  000d  Ret                  r0
+
+function #1 ""  params=1 frame=19 env=2 flags=strict,dbg  @0x000001e3 size=126
+  0000  CreateEnvironment    r1
+  0002  CreateClosure        r0, r1, f2 "lazy"
+  0007  StoreToEnvironment   r1, 1, r0
+  000b  NewArray             r4, 0
+  000f  StoreToEnvironment   r1, 0, r4
+  0013  NewObject            r8
+  0015  CreateClosure        r3, r1, f4 "wire"
+  001a  LoadConstUndefined   r0
+  001c  LoadConstString      r2, s8 "alpha"
+  0020  CreateClosure        r1, r1, f6 ""
+  0025  Call4                r1, r3, r0, r8, r2, r1
+  002c  GetGlobalObject      r1
+  002e  TryGetById           r6, r1, #c1, s17 "print"
+  0034  GetByIdShort         r5, r8, #c2, s8 "alpha"
+  0039  GetByIdShort         r3, r8, #c2, s8 "alpha"
+  003e  TryGetById           r7, r1, #c3, s10 "Object"
+  0044  GetByIdShort         r2, r7, #c4, s16 "keys"
+  0049  Call2                r8, r2, r7, r8
+  004e  GetByIdShort         r7, r8, #c5, s15 "join"
+  0053  LoadConstString      r2, s3 ","
+  0057  Call2                r2, r7, r8, r2
+  005c  Call4                r2, r6, r0, r5, r3, r2
+  0063  TryGetById           r2, r1, #c1, s17 "print"
+  0069  GetByIdShort         r3, r4, #c5, s15 "join"
+  006e  LoadConstString      r1, s1 " "
+  0072  Call2                r1, r3, r4, r1
+  0077  Call2                r1, r2, r0, r1
+  007c  Ret                  r0
+
+function #2 "lazy"  params=4 frame=15 env=3 flags=strict,dbg  @0x00000261 size=67
+  0000  CreateEnvironment    r0
+  0002  LoadParam            r1, 3
+  0005  StoreToEnvironment   r0, 2, r1
+  0009  LoadConstFalse       r1
+  000b  StoreNPToEnvironment r0, 0, r1
+  000f  GetGlobalObject      r1
+  0011  TryGetById           r4, r1, #c1, s10 "Object"
+  0017  GetByIdShort         r3, r4, #c2, s13 "defineProperty"
+  001c  NewObjectWithBuffer  r2, 3, 3, lit@0x0000, lit@0x0000
+  0026  CreateClosure        r0, r0, f3 "get"
+  002b  PutById              r2, r0, #c1, s14 "get"
+  0031  LoadParam            r1, 1
+  0034  LoadConstString      r0, s8 "alpha"
+  0038  Call4                r0, r3, r4, r1, r0, r2
+  003f  LoadConstUndefined   r0
+  0041  Ret                  r0
+
+function #3 "get"  params=1 frame=10 env=0 flags=strict,dbg  @0x000002a4 size=36
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r1, r0, 0
+  0007  JmpTrue              L1, r1
+  000a  LoadConstTrue        r1
+  000c  StoreNPToEnvironment r0, 0, r1
+  0010  LoadFromEnvironment  r2, r0, 2
+  0014  LoadConstUndefined   r1
+  0016  Call1                r1, r2, r1
+  001a  StoreToEnvironment   r0, 1, r1
+L1:
+  001e  LoadFromEnvironment  r0, r0, 1
+  0022  Ret                  r0
+
+function #4 "wire"  params=4 frame=15 env=4 flags=strict,dbg  @0x000002c8 size=61
+  0000  CreateEnvironment    r1
+  0002  LoadConstString      r4, s8 "alpha"
+  0006  StoreToEnvironment   r1, 2, r4
+  000a  LoadParam            r0, 3
+  000d  StoreToEnvironment   r1, 3, r0
+  0011  LoadConstZero        r0
+  0013  StoreNPToEnvironment r1, 0, r0
+  0017  LoadConstString      r0, s2 "#"
+  001b  Add                  r0, r4, r0
+  001f  StoreToEnvironment   r1, 1, r0
+  0023  GetEnvironment       r0, 0
+  0026  LoadFromEnvironment  r3, r0, 1
+  002a  LoadConstUndefined   r0
+  002c  LoadParam            r2, 1
+  002f  CreateClosure        r1, r1, f5 "get"
+  0034  Call4                r1, r3, r0, r2, r4, r1
+  003b  Ret                  r0
+
+function #5 "get"  params=1 frame=13 env=0 flags=strict,dbg  @0x00000305 size=80
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r2, r0, 0
+  0007  LoadConstUInt8       r1, 1
+  000a  Add                  r1, r2, r1
+  000e  StoreNPToEnvironment r0, 0, r1
+  0012  GetEnvironment       r1, 1
+  0015  LoadFromEnvironment  r3, r1, 0
+  0019  GetByIdShort         r2, r3, #c1, s18 "push"
+  001e  LoadFromEnvironment  r4, r0, 1
+  0022  LoadFromEnvironment  r1, r0, 0
+  0026  Add                  r1, r4, r1
+  002a  Call2                r1, r2, r3, r1
+  002f  LoadFromEnvironment  r2, r0, 3
+  0033  LoadFromEnvironment  r3, r0, 2
+  0037  LoadConstString      r1, s4 ":"
+  003b  Add                  r1, r3, r1
+  003f  LoadFromEnvironment  r0, r0, 0
+  0043  Add                  r1, r1, r0
+  0047  LoadConstUndefined   r0
+  0049  Call2                r0, r2, r0, r1
+  004e  Ret                  r0
+
+function #6 ""  params=2 frame=9 env=0 flags=strict,dbg  @0x00000355 size=14
+  0000  LoadParam            r1, 1
+  0003  GetByIdShort         r0, r1, #c1, s11 "toUpperCase"
+  0008  Call1                r0, r0, r1
+  000c  Ret                  r0

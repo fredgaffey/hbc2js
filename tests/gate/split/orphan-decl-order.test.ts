@@ -111,7 +111,9 @@ for (const version of VERSIONS) {
     const text = moduleFile(fixtureBytes(version));
     const lines = text.split("\n");
     const prologue = lines.findIndex((l) => /^ {2}let _e\d+_0\b/.test(l));
-    const firstNested = lines.findIndex((l) => /^ {2}function _fn\d+\(/.test(l));
+    // a declaration, or (closure-inline, spec 32) a getter moved into its
+    // descriptor as a function expression: either way textually after the prologue
+    const firstNested = lines.findIndex((l) => /^ {2}function _fn\d+\(|\bfunction _fn\d+\(/.test(l));
     assert.ok(prologue >= 0, `v${version}: the factory declares no env slots — fixture shape changed under this test`);
     assert.ok(firstNested >= 0, `v${version}: the factory has no nested function declarations — fixture shape changed under this test`);
     assert.ok(

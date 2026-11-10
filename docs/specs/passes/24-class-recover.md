@@ -373,6 +373,22 @@ own register `r3` read as newly free. A name now passes when the function body
 declares it at top level and no mention of it is left inside a nested function
 or class.
 
+**review-1110: private reads and writes are own-only and throw.** Hermes
+`JSObject::getPrivateField` / `setPrivateField` look the name up on the
+object's own properties and throw a TypeError when it is absent; the
+interpreter throws first for a non-object base. The symbol lowering
+`obj[sym]` read `undefined` (or a prototype's field) and `obj[sym] = v`
+created the field on a foreign object. `GetOwnPrivateBySym` /
+`PutOwnPrivateBySym` now lower to the `__hbc_privGet(obj, sym)` /
+`__hbc_privSet(obj, sym, v)` helpers, which `private-fields` folds to
+`obj.#x` / `obj.#x = v` exactly where it folded the member form, and
+`call-shape` R3e keeps the helper read in statement form as it did the member
+read (fixture 112). Fixture `342-private-field-missing-throws` (foreign,
+primitive, prototype-inherited and same-named-nested-class receivers);
+negative control `343-private-return-override-stamp`. The symbol
+representation still differs from the VM on a Proxy, on a frozen object, and
+in `Object.getOwnPropertySymbols` (docs/BUGS.md).
+
 ### 1.7.1 Private methods (2026-11-09, folded)
 
 **Problem.** The 46 react-navigation `defining-body-escape` refusals that

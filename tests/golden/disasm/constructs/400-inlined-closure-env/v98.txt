@@ -1,0 +1,73 @@
+; hbc2js disassembly of 400-inlined-closure-env/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=3 strings=16 globalCodeIndex=0
+function #0 "global"  params=1 frame=21 env=0 flags=dbg,overflowed  @0x00000188 size=173
+  0000  CreateFunctionEnvironment r2, 1
+  0003  NewArray             r5, 0
+  0007  StoreToEnvironment   r2, 0, r5
+  000b  NewObject            r9
+  000d  CreateEnvironment    r2, r2, 2
+  0014  LoadConstZero        r0
+  0016  StoreNPToEnvironment r2, 0, r0
+  001a  LoadConstString      r3, s3 "alpha#"
+  001e  StoreToEnvironment   r2, 1, r3
+  0022  CreateFunctionEnvironment r3, 3
+  0025  CreateClosure        r2, r2, f2 "get"
+  002a  StoreToEnvironment   r3, 0, r2
+  002e  LoadConstFalse       r1
+  0030  StoreNPToEnvironment r3, 1, r1
+  0034  GetGlobalObject      r2
+  0036  TryGetById           r7, r2, #c0, s6 "Object"
+  003c  GetByIdShort         r6, r7, #c1, s10 "defineProperty"
+  0041  NewObjectWithBuffer  r4, sh0(numProps=3), lit@0x0000
+  0047  CreateClosure        r3, r3, f1 "get"
+  004c  PutOwnBySlotIdx      r4, r3, 0
+  0050  LoadConstString      r3, s5 "alpha"
+  0054  Call4                r3, r6, r7, r9, r3, r4
+  005b  TryGetById           r7, r2, #c2, s14 "print"
+  0061  GetByIdShort         r6, r9, #c3, s5 "alpha"
+  0066  GetByIdShort         r4, r9, #c3, s5 "alpha"
+  006b  TryGetById           r8, r2, #c0, s6 "Object"
+  0071  GetByIdShort         r3, r8, #c4, s13 "keys"
+  0076  Call2                r9, r3, r8, r9
+  007b  GetByIdShort         r8, r9, #c5, s12 "join"
+  0080  LoadConstString      r3, s1 ","
+  0084  Call2                r3, r8, r9, r3
+  0089  LoadConstUndefined   r1
+  008b  Call4                r3, r7, r1, r6, r4, r3
+  0092  TryGetById           r3, r2, #c2, s14 "print"
+  0098  GetByIdShort         r4, r5, #c5, s12 "join"
+  009d  LoadConstString      r2, s0 " "
+  00a1  Call2                r2, r4, r5, r2
+  00a6  Call2                r2, r3, r1, r2
+  00ab  Ret                  r1
+
+function #1 "get"  params=1 frame=17 env=0 flags=strict,dbg,overflowed  @0x00000235 size=99
+  0000  GetParentEnvironment r3, 0
+  0003  LoadFromEnvironment  r2, r3, 1
+  0007  JmpTrue              L1, r2
+  000a  LoadConstTrue        r2
+  000c  StoreNPToEnvironment r3, 1, r2
+  0010  LoadFromEnvironment  r4, r3, 0
+  0014  GetClosureEnvironment r4, r4
+  0017  LoadFromEnvironment  r1, r4, 0
+  001b  LoadConstUInt8       r0, 1
+  001e  AddN                 r0, r1, r0
+  0022  StoreNPToEnvironment r4, 0, r0
+  0026  GetEnvironment       r5, r4, 1
+  002a  LoadFromEnvironment  r7, r5, 0
+  002e  GetByIdShort         r6, r7, #c0, s15 "push"
+  0033  LoadFromEnvironment  r5, r4, 1
+  0037  LoadFromEnvironment  r0, r4, 0
+  003b  Add                  r5, r5, r0
+  003f  Call2                r5, r6, r7, r5
+  0044  LoadFromEnvironment  r0, r4, 0
+  0048  LoadConstString      r4, s4 "alpha:"
+  004c  Add                  r5, r4, r0
+  0050  GetByIdShort         r4, r5, #c1, s7 "toUpperCase"
+  0055  Call1                r4, r4, r5
+  0059  StoreToEnvironment   r3, 2, r4
+L1:
+  005d  LoadFromEnvironment  r3, r3, 2
+  0061  Ret                  r3
+
+function #2 "get"  params=1 frame=0 env=0 flags=strict  @0x00000298 size=0

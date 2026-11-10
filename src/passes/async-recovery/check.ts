@@ -21,7 +21,12 @@ export function check(before: readonly Stmt[] | Stmt, after: readonly Stmt[] | S
   // it produced. A `yield` in `after` that the rung did not produce means the
   // group was not the one §3.1 describes.
   let strayYield = false;
-  walk([got], { expr: (e) => { if (e.k === "yield") strayYield = true; } });
+  // The scan is of the async function's OWN body: a nested function
+  // declaration is its own frame (the shell of BUGS export-boot L1 keeps the
+  // factory, a `function*` around `yield*`, nested and untouched). Expression
+  // functions are still scanned, which can only over-refuse.
+  if (got.k === "func") walk(got.body.filter((s) => s.k !== "func"), { expr: (e) => { if (e.k === "yield") strayYield = true; } });
+  else walk([got], { expr: (e) => { if (e.k === "yield") strayYield = true; } });
   const stub = b[i]!;
   if (stub.k !== "func") return { ok: false, reason: "the replaced statement is not a function declaration, so no yield-to-await mapping can be re-derived" };
   const redone = recover(stub);

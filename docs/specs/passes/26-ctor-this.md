@@ -117,6 +117,12 @@ whose value is a `func`:
    *Or*, in the **seeded** spelling, one single store of `<reg> =
    Object.assign(Object.create(new.target.prototype), <object literal>)`;
    then `protoReg` is `reg` and the allocation is one statement, not two.
+   *Or* the **seeded-split** spelling: `<protoReg> = new.target.prototype`
+   then `<reg> = Object.assign(Object.create(<protoReg>), <object literal>)`
+   -- what expr-rebuild R1a leaves since its evaluation-order rule
+   (fix-jsx-read-order) stopped moving the prototype read after the
+   `Object`/`.assign`/`.create` reads. Same allocation, same fold; the seed
+   may read neither name.
 2. Both names must be **declared by this body** (`let` prologue or the `init`
    store). Not "must look like a register": `var-naming` runs on the
    constructor's own function long before `class-recover` moves its body into

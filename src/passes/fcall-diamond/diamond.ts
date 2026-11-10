@@ -28,6 +28,15 @@ export interface ArmValue {
 }
 
 export const UNDEF: Sym = "undef";
+/** The value `ReifyArguments{Loose,Strict}` leaves in its register: the
+ *  frame's own arguments object (only modelled for the `apply` diamond). */
+export const ARGUMENTS: Sym = "arguments";
+
+export interface EvalOptions {
+  /** Model `ReifyArguments*` (sets its register to `ARGUMENTS`). Off for the
+   *  `call` diamond, whose arms never reify. */
+  readonly reify?: boolean;
+}
 
 const FIXED_CALLS: Readonly<Record<string, number>> = { Call1: 1, Call2: 2, Call3: 3, Call4: 4 };
 
@@ -38,7 +47,7 @@ function isJump(name: string): boolean {
 /** Symbolic evaluation of one arm. `argBase` is `argSlotBase(version, frameSize)`
  *  (the register holding `arg[0]` of a long-form `Call`). Returns a refusal
  *  reason string when the arm is not a modelled shape. */
-export function evalArm(insns: readonly Instruction[], argBase: number): ArmValue | string {
+export function evalArm(insns: readonly Instruction[], argBase: number, opts: EvalOptions = {}): ArmValue | string {
   let end = insns.length;
   if (end > 0 && isJump(insns[end - 1]!.name)) end--;
   if (end === 0) return "arm-no-call";
@@ -52,6 +61,7 @@ export function evalArm(insns: readonly Instruction[], argBase: number): ArmValu
     if (insn.name === "LoadConstUndefined") regs.set(d, UNDEF);
     else if (insn.name.startsWith("LoadConst")) regs.set(d, `${insn.name}(${ops.slice(1).map((o) => o.value).join(",")})`);
     else if (insn.name === "Mov" || insn.name === "MovLong") regs.set(d, val(ops[1]!.value));
+    else if (opts.reify === true && (insn.name === "ReifyArgumentsLoose" || insn.name === "ReifyArgumentsStrict")) regs.set(d, ARGUMENTS);
     else return `arm-insn:${insn.name}`;
   }
   const preCall = new Map(regs);
@@ -67,6 +77,16 @@ export function evalArm(insns: readonly Instruction[], argBase: number): ArmValu
     if (argc < 1 || argBase - (argc - 1) < 0) return "arm-call-argc";
     args = [];
     for (let i = 0; i < argc; i++) args.push(val(argBase - i));
+  } else if (c.name === "CallBuiltin" || c.name === "CallBuiltinLong") {
+    // `CallBuiltin dst, builtin, argc`: argc counts `this`, which the VM sets
+    // to undefined itself; arg[i] (i >= 1) is the outgoing register argBase - i.
+    const argc = ops[2]!.value;
+    if (argc < 1 || argBase - (argc - 1) < 0) return "arm-call-argc";
+    args = [UNDEF];
+    for (let i = 1; i < argc; i++) args.push(val(argBase - i));
+    const dstB = ops[0]!.value;
+    regs.set(dstB, "RESULT");
+    return { call: { dst: dstB, callee: `builtin:${ops[1]!.value}`, args }, writes: regs, preCall };
   } else {
     return `arm-last:${c.name}`;
   }
@@ -90,6 +110,30 @@ export function callsCorrespond(fast: ArmCall, generic: ArmCall, testedReg: numb
   const want = genRest.length === 0 ? [UNDEF] : genRest;
   if (fast.args.length !== want.length) return "arg-count";
   for (let i = 0; i < want.length; i++) if (fast.args[i] !== want[i]) return `arg-${i}`;
+  return null;
+}
+
+/** hermesc's v98+ `F.apply(T, arguments)` diamond (lib/Optimizer/Scalar/
+ *  LowerBuiltinCalls.cpp: only when the `arguments` object has that call as its
+ *  one user). The fast arm is `CallBuiltin <applyArguments>(F, T)`, which calls
+ *  F with `this` = T and a copy of the caller frame's actual arguments; the
+ *  generic arm is `Call(C, F, [T, A])` with A the freshly reified arguments
+ *  object. With C the builtin Function.prototype.apply (what `JmpBuiltinIs`
+ *  tested), ES2024 20.2.3.1 performs IsCallable(F) (TypeError otherwise, as
+ *  applyArguments does), CreateListFromArrayLike(A) -- A's own `length` and
+ *  indices, i.e. the actual arguments while A is unmodified -- and
+ *  `Call(F, T, list)`: the fast arm. Proves the pair: fast callee is the
+ *  `applyArguments` builtin with arguments (F, T); generic callee is the
+ *  tested register's entry value, `this` = F, then T, then `ARGUMENTS`. That A
+ *  is unmodified (used by nothing else) is the caller's whole-function check. */
+export function applyCallsCorrespond(fast: ArmCall, generic: ArmCall, testedReg: number, applyArgumentsBuiltin: number): string | null {
+  if (fast.callee !== `builtin:${applyArgumentsBuiltin}`) return "fast-not-applyArguments";
+  if (fast.args.length !== 3) return "arg-count";
+  if (generic.callee !== `in:${testedReg}`) return "generic-callee-not-tested";
+  if (generic.args.length !== 3) return "arg-count";
+  if (generic.args[0] !== fast.args[1]) return "this-not-fast-callee";
+  if (generic.args[1] !== fast.args[2]) return "arg-0";
+  if (generic.args[2] !== ARGUMENTS) return "apply-args-not-arguments";
   return null;
 }
 

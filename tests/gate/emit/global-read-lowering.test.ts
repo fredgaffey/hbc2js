@@ -103,9 +103,11 @@ for (const version of VERSIONS) {
     assert.ok(!code.includes(`Property 'Error' doesn't exist`), `v${version}: unshadowed's guard should have folded away, got:\n${code}`);
     assert.match(code, /\bError\.name\b/, `v${version}: expected a bare "Error.name" read in the decompiled output`);
 
-    // --- loopy: the guard survives for BOTH reads it cannot prove safe. --
-    assert.ok(code.includes(`Property 'Reflect' doesn't exist`), `v${version}: loopy's Reflect guard should have survived (not provably safe to fold), got:\n${code}`);
-    assert.ok(code.includes(`Property 'String' doesn't exist`), `v${version}: loopy's String guard should have survived (not provably safe to fold), got:\n${code}`);
+    // --- loopy: since passes-roundtrip-guard the local proof also folds the
+    // do-while reads (they used to be refused as unproven; the refusal paths
+    // are covered by tests/gate/passes/global-access*.test.ts).
+    assert.ok(!code.includes(`Property 'Reflect' doesn't exist`), `v${version}: loopy's Reflect guard should now fold, got:\n${code}`);
+    assert.ok(!code.includes(`Property 'String' doesn't exist`), `v${version}: loopy's String guard should now fold, got:\n${code}`);
   });
 
   test(`global-read lowering v${version}: recompile round trip reproduces the original's TryGetById/Throw opcode counts`, (t) => {
@@ -138,17 +140,16 @@ for (const version of VERSIONS) {
       assert.equal(count(after, "Throw"), 0, `v${version}: a fully-folded read should cost zero Throw opcodes on recompile, got ${count(after, "Throw")}`);
     }
 
-    // --- loopy: both guards refused -> guard scaffolding round-trips too,
-    // at the accepted cost of 2 real Throw opcodes the original never paid.
+    // --- loopy: both guards fold -> exact round trip too, zero Throw, no literal globalThis.
     {
       const before = opcodeHistogram(originalBytes, "loopy");
       const after = opcodeHistogram(recompiledBytes, "loopy");
       const tax = countLiteralGlobalThis(code, "loopy");
-      assert.equal(tax, 1, `v${version}: loopy should keep exactly one literal globalThis reference (feeding both surviving guards)`);
+      assert.equal(tax, 0, `v${version}: loopy should have folded away its globalThis references`);
       assert.equal(count(before, "TryGetById"), 2, `v${version}: premise - loopy's original should compile "Reflect"+"String" via exactly two TryGetById`);
-      assert.equal(count(after, "TryGetById"), count(before, "TryGetById") + tax, `v${version}: loopy's TryGetById count should round-trip plus the literal-globalThis tax (before ${count(before, "TryGetById")}, after ${count(after, "TryGetById")}, tax ${tax})`);
+      assert.equal(count(after, "TryGetById"), count(before, "TryGetById"), `v${version}: loopy's TryGetById count should round-trip exactly (before ${count(before, "TryGetById")}, after ${count(after, "TryGetById")})`);
       assert.equal(count(before, "Throw"), 0, `v${version}: premise - the original has no separate Throw opcode either`);
-      assert.equal(count(after, "Throw"), 2, `v${version}: keeping both guards should cost exactly 2 Throw opcodes on recompile (one per surviving guard), got ${count(after, "Throw")}`);
+      assert.equal(count(after, "Throw"), 0, `v${version}: folded guards should cost zero Throw opcodes on recompile, got ${count(after, "Throw")}`);
     }
   });
 }

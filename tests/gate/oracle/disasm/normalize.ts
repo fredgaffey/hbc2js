@@ -15,7 +15,7 @@ import type { ExceptionHandler, FunctionFlags } from "../../../../src/parse/type
 // unrecognised fourth shape still fails loudly (spec's own instruction: "fail
 // loudly on any other prefix rather than silently dropping the line").
 // ---------------------------------------------------------------------------
-const HEADER_RE = /^(?<prefix>N?C?Function|Constructor)<(?<name>[^>]*)>\((?<p>\d+) params, (?<r>\d+) registers, (?:(?<s>\d+) symbols|(?<nr>\d+) numbers, (?<npr>\d+) non-pointers)\):$/;
+const HEADER_RE = /^(?<prefix>N?C?Function|Constructor)<(?<name>.*)>\((?<p>\d+) params, (?<r>\d+) registers, (?:(?<s>\d+) symbols|(?<nr>\d+) numbers, (?<npr>\d+) non-pointers)\):$/;
 const INSN_RE = /^\[@ (?<off>\d+)\] (?<op>\w+)(?: (?<ops>.*))?$/;
 const EH_HDR_RE = /^Exception Handlers:$/;
 const EH_RE = /^(?<n>\d+): start = (?<start>\d+), end = (?<end>\d+), target = (?<target>\d+)$/;

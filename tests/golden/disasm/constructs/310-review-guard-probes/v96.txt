@@ -1,0 +1,421 @@
+; hbc2js disassembly of 310-review-guard-probes/v96.hbc
+; version=96 layout=C opcodeTable=hbc96 functions=13 strings=41 globalCodeIndex=0
+function #0 "global"  params=1 frame=27 env=0 flags=dbg  @0x00000360 size=474
+  0000  DeclareGlobalVar     s34 "hits"
+  0005  DeclareGlobalVar     s12 "g"
+  000a  DeclareGlobalVar     s27 "shadowGT"
+  000f  DeclareGlobalVar     s28 "counted"
+  0014  DeclareGlobalVar     s36 "lateLoop"
+  0019  DeclareGlobalVar     s13 "gen"
+  001e  DeclareGlobalVar     s9 "asy"
+  0023  DeclareGlobalVar     s16 "tf"
+  0028  DeclareGlobalVar     s32 "forIn"
+  002d  CreateEnvironment    r0
+  002f  CreateClosure        r2, r0, f1 "shadowGT"
+  0034  GetGlobalObject      r1
+  0036  PutById              r1, r2, #c1, s27 "shadowGT"
+  003c  CreateClosure        r2, r0, f2 "counted"
+  0041  PutById              r1, r2, #c2, s28 "counted"
+  0047  CreateClosure        r2, r0, f3 "lateLoop"
+  004c  PutById              r1, r2, #c3, s36 "lateLoop"
+  0052  CreateGeneratorClosure r2, r0, f4 "gen"
+  0057  PutById              r1, r2, #c4, s13 "gen"
+  005d  CreateAsyncClosure   r2, r0, f6 "asy"
+  0062  PutById              r1, r2, #c5, s9 "asy"
+  0068  CreateClosure        r2, r0, f9 "tf"
+  006d  PutById              r1, r2, #c6, s16 "tf"
+  0073  CreateClosure        r2, r0, f10 "forIn"
+  0078  PutById              r1, r2, #c7, s32 "forIn"
+  007e  LoadConstZero        r6
+  0080  PutById              r1, r6, #c8, s34 "hits"
+  0086  TryGetById           r7, r1, #c1, s15 "Object"
+  008c  GetByIdShort         r5, r7, #c2, s29 "defineProperty"
+  0091  TryGetById           r4, r1, #c3, s17 "globalThis"
+  0097  NewObject            r3
+  0099  LoadConstTrue        r2
+  009b  PutNewOwnByIdShort   r3, r2, s11 "configurable"
+  009f  CreateClosure        r2, r0, f11 "get"
+  00a4  PutNewOwnByIdShort   r3, r2, s33 "get"
+  00a8  LoadConstString      r2, s19 "Counted310"
+  00ac  Call4                r2, r5, r7, r4, r2, r3
+  00b3  TryGetById           r11, r1, #c4, s37 "print"
+  00b9  GetByIdShort         r2, r1, #c5, s27 "shadowGT"
+  00be  LoadConstUndefined   r3
+  00c0  Call2                r10, r2, r3, r6
+  00c5  GetByIdShort         r4, r1, #c5, s27 "shadowGT"
+  00ca  LoadConstUInt8       r2, 3
+  00cd  Call2                r18, r4, r3, r2
+  00d2  GetByIdShort         r4, r1, #c6, s28 "counted"
+  00d7  Call2                r17, r4, r3, r6
+  00dc  GetByIdShort         r4, r1, #c6, s28 "counted"
+  00e1  LoadConstUInt8       r5, 1
+  00e4  Call2                r16, r4, r3, r5
+  00e9  GetByIdShort         r15, r1, #c7, s34 "hits"
+  00ee  LoadConstUndefined   r20
+  00f0  Mov                  r19, r10
+  00f3  Call                 r4, r11, 6
+  00f7  TryGetById           r7, r1, #c4, s37 "print"
+  00fd  GetByIdShort         r8, r1, #c8, s36 "lateLoop"
+  0102  LoadConstUInt8       r4, 5
+  0105  Call2                r4, r8, r3, r4
+  010a  Call2                r4, r7, r3, r4
+  010f  GetByIdShort         r4, r1, #c9, s13 "gen"
+  0114  Call2                r4, r4, r3, r6
+  0119  PutById              r1, r4, #c9, s12 "g"
+  011f  TryGetById           r10, r1, #c4, s37 "print"
+  0125  GetByIdShort         r7, r1, #c10, s12 "g"
+  012a  GetByIdShort         r4, r7, #c11, s14 "next"
+  012f  Call1                r4, r4, r7
+  0133  GetByIdShort         r9, r4, #c12, s40 "value"
+  0138  GetByIdShort         r7, r1, #c10, s12 "g"
+  013d  GetByIdShort         r4, r7, #c11, s14 "next"
+  0142  Call2                r4, r4, r7, r6
+  0147  GetByIdShort         r18, r4, #c12, s40 "value"
+  014c  GetByIdShort         r7, r1, #c10, s12 "g"
+  0151  GetByIdShort         r4, r7, #c11, s14 "next"
+  0156  Call1                r4, r4, r7
+  015a  GetByIdShort         r17, r4, #c12, s40 "value"
+  015f  TryGetById           r12, r1, #c13, s21 "JSON"
+  0165  GetByIdShort         r11, r12, #c14, s35 "stringify"
+  016a  GetByIdShort         r14, r1, #c10, s12 "g"
+  016f  GetByIdShort         r13, r14, #c11, s14 "next"
+  0174  LoadConstUInt8       r4, 7
+  0177  Call2                r4, r13, r14, r4
+  017c  Call2                r16, r11, r12, r4
+  0181  LoadConstUndefined   r20
+  0183  Mov                  r19, r9
+  0186  Call                 r4, r10, 5
+  018a  TryGetById           r7, r1, #c4, s37 "print"
+  0190  GetByIdShort         r4, r1, #c15, s16 "tf"
+  0195  Call2                r6, r4, r3, r6
+  019a  GetByIdShort         r4, r1, #c15, s16 "tf"
+  019f  Call2                r5, r4, r3, r5
+  01a4  GetByIdShort         r8, r1, #c16, s32 "forIn"
+  01a9  NewObjectWithBuffer  r4, 3, 3, lit@0x0000, lit@0x0000
+  01b3  Call2                r4, r8, r3, r4
+  01b8  Call4                r4, r7, r3, r6, r5, r4
+  01bf  GetByIdShort         r1, r1, #c17, s9 "asy"
+  01c4  Call2                r2, r1, r3, r2
+  01c9  GetByIdShort         r1, r2, #c18, s24 "then"
+  01ce  CreateClosure        r0, r0, f12 ""
+  01d3  Call2                r0, r1, r2, r0
+  01d8  Ret                  r0
+
+function #1 "shadowGT"  params=2 frame=15 env=0 flags=dbg  @0x0000053a size=66
+  0000  LoadParam            r5, 1
+  0003  NewObject            r0
+  0005  LoadConstString      r1, s6 "fake"
+  0009  PutNewOwnByIdShort   r0, r1, s23 "Math"
+  000d  LoadConstUInt8       r2, 1
+  0010  Greater              r1, r5, r2
+  0014  JmpFalse             L1, r1
+  0017  Mov                  r2, r5
+L1:
+  001a  GetGlobalObject      r1
+  001c  TryGetById           r4, r1, #c1, s23 "Math"
+  0022  GetByIdShort         r3, r4, #c2, s38 "max"
+  0027  LoadConstUInt8       r1, 2
+  002a  Call3                r1, r3, r4, r5, r1
+  0030  Add                  r1, r2, r1
+  0034  GetByIdShort         r0, r0, #c1, s23 "Math"
+  0039  TypeOf               r0, r0
+  003c  Add                  r0, r1, r0
+  0040  Ret                  r0
+
+function #2 "counted"  params=2 frame=3 env=0 flags=dbg  @0x0000057c size=36
+  0000  LoadParam            r0, 1
+  0003  LoadConstZero        r1
+  0005  JmpFalse             L1, r0
+  0008  Mov                  r1, r0
+L1:
+  000b  JmpTrue              L2, r1
+  000e  GetGlobalObject      r0
+  0010  TryGetById           r1, r0, #c1, s19 "Counted310"
+L2:
+  0016  GetGlobalObject      r0
+  0018  TryGetById           r0, r0, #c1, s19 "Counted310"
+  001e  Add                  r0, r1, r0
+  0022  Ret                  r0
+
+function #3 "lateLoop"  params=2 frame=13 env=0 flags=exc,dbg  @0x000005a0 size=147
+  .try T1..T2 -> L7 ; handler 0
+  0000  LoadParam            r2, 1
+  0003  Mov                  r9, r2
+  0006  LoadConstUndefined   r11
+  0008  LoadConstString      r0, s0 ""
+  000c  LoadConstZero        r1
+  000e  LoadConstZero        r10
+  0010  LoadConstString      r8, s5 "E"
+  0014  GetGlobalObject      r7
+  0016  LoadConstUInt8       r6, 3
+  0019  LoadConstUInt8       r5, 5
+  001c  LoadConstUInt8       r4, 1
+  001f  LoadConstUInt8       r3, 2
+  0022  JNotLess             L9, r1, r2
+L1:
+  0026  Mov                  r1, r10
+  0029  JGreater             L2, r1, r3
+  002d  Mov                  r1, r10
+  0030  Negate               r1, r1
+  0033  Jmp                  L3
+L2:
+  0035  Mov                  r1, r10
+L3:
+  0038  Mov                  r11, r1
+  003b  Mov                  r1, r10
+  003e  JStrictNotEqual      L4, r1, r4
+  0042  TryGetById           r1, r7, #c1, s17 "globalThis"
+  0048  PutById              r1, r5, #c1, s22 "Late310"
+L4:
+  004e  Mov                  r1, r10
+  0051  JStrictEqual         L5, r1, r6
+  0055  Jmp                  L6
+L5:
+  0057  TryGetById           r1, r7, #c1, s17 "globalThis"
+  005d  DelById              r1, r1, s22 "Late310"
+T1:
+L6:
+  0062  Mov                  r2, r0
+  0065  Mov                  r12, r11
+  0068  TryGetById           r1, r7, #c2, s22 "Late310"
+  006e  Add                  r1, r12, r1
+  0072  Add                  r0, r2, r1
+T2:
+  0076  Jmp                  L8
+L7:
+  0078  Catch                r1
+  007a  Mov                  r1, r0
+  007d  Add                  r0, r1, r8
+L8:
+  0081  Mov                  r1, r10
+  0084  Inc                  r2, r1
+  0087  Mov                  r10, r2
+  008a  Mov                  r1, r9
+  008d  JLess                L1, r2, r1
+L9:
+  0091  Ret                  r0
+
+function #4 "gen"  params=2 frame=1 env=0 flags=nc  @0x00000633 size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f5 "?anon_0_gen"
+  0007  Ret                  r0
+
+function #5 "?anon_0_gen"  params=2 frame=18 env=0 flags=exc,dbg  @0x0000063c size=254
+  .try T1..T2 -> L7 ; handler 0
+  0000  StartGenerator
+  0001  LoadParam            r2, 1
+  0004  ResumeGenerator      r0, r1
+  0007  JmpTrueLong          L10, r1
+  000d  LoadConstUndefined   r3
+  000f  LoadConstUndefined   r5
+  0011  LoadConstUInt8       r1, 1
+  0014  JmpFalse             L1, r2
+  0017  Mov                  r1, r2
+L1:
+  001a  Mov                  r5, r1
+  001d  SaveGenerator        L2
+  001f  Ret                  r1
+L2:
+  0021  ResumeGenerator      r1, r4
+  0024  JmpTrueLong          L9, r4
+  002a  Mov                  r5, r1
+  002d  Mov                  r6, r1
+  0030  JmpTrue              L3, r6
+  0033  GetGlobalObject      r4
+  0035  TryGetById           r7, r4, #c1, s23 "Math"
+  003b  GetByIdShort         r4, r7, #c2, s25 "abs"
+  0040  Negate               r2, r2
+  0043  Call2                r6, r4, r7, r2
+L3:
+  0048  Mov                  r5, r6
+  004b  GetGlobalObject      r4
+  004d  TryGetById           r8, r4, #c1, s23 "Math"
+  0053  GetByIdShort         r7, r8, #c3, s30 "floor"
+  0058  LoadConstDouble      r2, 1.5
+  0062  Call2                r2, r7, r8, r2
+  0067  Add                  r2, r6, r2
+  006b  SaveGenerator        L4
+  006d  Ret                  r2
+L4:
+  006f  ResumeGenerator      r2, r6
+  0072  JmpTrueLong          L8, r6
+T1:
+  0078  SaveGenerator        L5
+  007a  Ret                  r3
+L5:
+  007c  ResumeGenerator      r3, r6
+  007f  JmpTrue              L6, r6
+  0082  Mov                  r5, r3
+T2:
+  0085  Mov                  r7, r5
+  0088  TryGetById           r9, r4, #c1, s23 "Math"
+  008e  GetByIdShort         r8, r9, #c4, s31 "round"
+  0093  LoadConstDouble      r6, 0.4
+  009d  Call2                r6, r8, r9, r6
+  00a2  Add                  r6, r7, r6
+  00a6  Mov                  r5, r6
+  00a9  CompleteGenerator
+  00aa  Ret                  r6
+L6:
+  00ac  Mov                  r7, r5
+  00af  TryGetById           r9, r4, #c1, s23 "Math"
+  00b5  GetByIdShort         r8, r9, #c4, s31 "round"
+  00ba  LoadConstDouble      r6, 0.4
+  00c4  Call2                r6, r8, r9, r6
+  00c9  Add                  r5, r7, r6
+  00cd  CompleteGenerator
+  00ce  Ret                  r3
+L7:
+  00d0  Catch                r3
+  00d2  Mov                  r6, r5
+  00d5  TryGetById           r8, r4, #c1, s23 "Math"
+  00db  GetByIdShort         r7, r8, #c4, s31 "round"
+  00e0  LoadConstDouble      r4, 0.4
+  00ea  Call2                r4, r7, r8, r4
+  00ef  Add                  r5, r6, r4
+  00f3  Throw                r3
+L8:
+  00f5  CompleteGenerator
+  00f6  Ret                  r2
+L9:
+  00f8  CompleteGenerator
+  00f9  Ret                  r1
+L10:
+  00fb  CompleteGenerator
+  00fc  Ret                  r0
+
+function #6 "asy"  params=2 frame=15 env=0 flags=dbg,nc  @0x0000073a size=30
+  0000  LoadConstUndefined   r4
+  0002  LoadConstUndefined   r0
+  0004  ReifyArguments       r0
+  0006  Mov                  r3, r0
+  0009  GetBuiltinClosure    r2, b52 "spawnAsync"
+  000c  CreateEnvironment    r0
+  000e  CreateGeneratorClosure r1, r0, f7 "?anon_0_asy"
+  0013  LoadThisNS           r0
+  0015  Call4                r0, r2, r4, r1, r0, r3
+  001c  Ret                  r0
+
+function #7 "?anon_0_asy"  params=2 frame=1 env=0 flags=nc  @0x00000758 size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f8 "?anon_0_?anon_0_asy"
+  0007  Ret                  r0
+
+function #8 "?anon_0_?anon_0_asy"  params=2 frame=15 env=0 flags=dbg  @0x00000761 size=63
+  0000  StartGenerator
+  0001  LoadParam            r5, 1
+  0004  ResumeGenerator      r0, r1
+  0007  JmpTrue              L4, r1
+  000a  LoadConstUInt8       r1, 1
+  000d  JmpFalse             L1, r5
+  0010  Mov                  r1, r5
+L1:
+  0013  SaveGenerator        L2
+  0015  Ret                  r1
+L2:
+  0017  ResumeGenerator      r1, r2
+  001a  JmpTrue              L3, r2
+  001d  GetGlobalObject      r2
+  001f  TryGetById           r4, r2, #c1, s23 "Math"
+  0025  GetByIdShort         r3, r4, #c2, s39 "min"
+  002a  LoadConstZero        r2
+  002c  Call3                r2, r3, r4, r5, r2
+  0032  Add                  r2, r1, r2
+  0036  CompleteGenerator
+  0037  Ret                  r2
+L3:
+  0039  CompleteGenerator
+  003a  Ret                  r1
+L4:
+  003c  CompleteGenerator
+  003d  Ret                  r0
+
+function #9 "tf"  params=2 frame=4 env=0 flags=exc,dbg  @0x000007a0 size=99
+  .try T1..T2 -> L3 ; handler 0
+  .try T1..T3 -> L5 ; handler 1
+  0000  LoadParam            r1, 1
+  0003  LoadConstUndefined   r2
+  0005  LoadConstZero        r0
+  0007  JmpFalse             L1, r1
+  000a  Mov                  r0, r1
+L1:
+  000d  Mov                  r2, r0
+T1:
+  0010  Mov                  r1, r2
+  0013  Mov                  r0, r1
+  0016  JmpTrue              L2, r1
+  0019  GetGlobalObject      r1
+  001b  TryGetById           r0, r1, #c1, s20 "Gone310"
+L2:
+  0021  Mov                  r2, r0
+T2:
+  0024  Jmp                  L4
+L3:
+  0026  Catch                r0
+  0028  LoadConstString      r2, s10 "c"
+T3:
+L4:
+  002c  Mov                  r1, r2
+  002f  GetGlobalObject      r0
+  0031  TryGetById           r0, r0, #c2, s21 "JSON"
+  0037  GetByIdShort         r0, r0, #c3, s35 "stringify"
+  003c  TypeOf               r0, r0
+  003f  Add                  r0, r1, r0
+  0043  Mov                  r2, r0
+  0046  Ret                  r0
+L5:
+  0048  Catch                r0
+  004a  Mov                  r3, r2
+  004d  GetGlobalObject      r1
+  004f  TryGetById           r1, r1, #c2, s21 "JSON"
+  0055  GetByIdShort         r1, r1, #c3, s35 "stringify"
+  005a  TypeOf               r1, r1
+  005d  Add                  r2, r3, r1
+  0061  Throw                r0
+
+function #10 "forIn"  params=2 frame=22 env=0 flags=dbg  @0x00000803 size=79
+  0000  LoadParam            r10, 1
+  0003  Mov                  r8, r10
+  0006  GetGlobalObject      r3
+  0008  LoadConstUInt8       r2, 1
+  000b  LoadConstZero        r1
+  000d  LoadConstZero        r0
+  000f  GetPNameList         r9, r8, r7, r6
+  0014  JmpUndefined         L4, r9
+L1:
+  0017  Mov                  r0, r1
+  001a  GetNextPName         r5, r9, r8, r7, r6
+  0020  JmpUndefined         L4, r5
+  0023  Mov                  r11, r5
+  0026  GetByVal             r13, r10, r11
+  002a  LoadConstZero        r12
+  002c  JmpFalse             L2, r13
+  002f  Mov                  r12, r11
+L2:
+  0032  LoadConstZero        r11
+  0034  JmpFalse             L3, r12
+  0037  TryGetById           r13, r3, #c1, s23 "Math"
+  003d  GetByIdShort         r12, r13, #c2, s18 "sign"
+  0042  Call2                r11, r12, r13, r2
+L3:
+  0047  Add                  r1, r1, r11
+  004b  Jmp                  L1
+L4:
+  004d  Ret                  r0
+
+function #11 "get"  params=1 frame=2 env=0 flags=dbg  @0x00000852 size=23
+  0000  GetGlobalObject      r0
+  0002  GetByIdShort         r1, r0, #c1, s34 "hits"
+  0007  Inc                  r1, r1
+  000a  PutById              r0, r1, #c1, s34 "hits"
+  0010  GetByIdShort         r0, r0, #c1, s34 "hits"
+  0015  Ret                  r0
+
+function #12 ""  params=2 frame=13 env=0 flags=dbg  @0x00000869 size=25
+  0000  GetGlobalObject      r0
+  0002  TryGetById           r3, r0, #c1, s37 "print"
+  0008  LoadConstUndefined   r0
+  000a  LoadConstString      r2, s3 "async"
+  000e  LoadParam            r1, 1
+  0011  Call3                r1, r3, r0, r2, r1
+  0017  Ret                  r0

@@ -50,6 +50,26 @@ export function loadTag(): string {
   return `load ${(loadavg()[0] ?? 0).toFixed(2)}`;
 }
 
+/** Samples the 1-min load average every `intervalMs` while a timed region
+ *  runs. `stop()` returns the peak seen (start, periodic, end). Pass it to
+ *  `tooBusyForTiming(.., peak)` AFTER the measured work. The timer is
+ *  unref'd so it never keeps the process alive. */
+export function startLoadMonitor(intervalMs = 2000): { stop(): number } {
+  let peak = loadavg()[0] ?? 0;
+  const tick = () => {
+    peak = Math.max(peak, loadavg()[0] ?? 0);
+  };
+  const h = setInterval(tick, intervalMs);
+  h.unref();
+  return {
+    stop() {
+      clearInterval(h);
+      tick();
+      return peak;
+    },
+  };
+}
+
 /** Coarse load gate for a perf test whose real claim is irreducibly about
  *  wall-clock or CPU time: too few cores, or a busy shared box, makes any
  *  timing measurement meaningless. First defined for
@@ -60,9 +80,16 @@ export function loadTag(): string {
  *  trust the measurement. Use as `{ skip: tooBusyForTiming() }` on `test()`,
  *  or call directly to gate a single assertion inside a larger test that
  *  also makes an unconditional (load-tolerant) claim. */
-export function tooBusyForTiming(minCores = 4, maxLoad = 8): string | false {
+export function tooBusyForTiming(minCores = 4, maxLoad = 8, observedMaxLoad = 0): string | false {
   if (cpus().length < minCores) return `needs >= ${minCores} cores, have ${cpus().length}`;
-  const load = loadavg()[0] ?? 0;
+  // `observedMaxLoad` is the peak from a LoadMonitor spanning the measured
+  // interval: the 1-min average lags a burst, and a long test can start
+  // quiet and end loaded (or the reverse), so judge by the worst sample.
+  const load = Math.max(loadavg()[0] ?? 0, observedMaxLoad);
+  // HBC2JS_PERF_MAX_LOAD overrides the threshold (e.g. to prove an assertion
+  // is live on a box that is never quiet; see docs/PERF-TESTS.md).
+  const envMax = Number(process.env["HBC2JS_PERF_MAX_LOAD"]);
+  if (Number.isFinite(envMax) && envMax > 0) maxLoad = envMax;
   if (load > maxLoad) return `1-min load ${load.toFixed(1)} > ${maxLoad}`;
   return false;
 }

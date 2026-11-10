@@ -154,7 +154,7 @@ export interface BundleReport {
 /** Nested functions of `fn` in creation order: every distinct `function`
  *  operand (CreateClosure / CreateGeneratorClosure / CreateAsyncClosure and
  *  their long forms) by first appearance in the instruction stream. */
-function childrenOf(fn: DecodedFunction): readonly number[] {
+export function childrenOf(fn: DecodedFunction): readonly number[] {
   const seen = new Set<number>();
   const out: number[] = [];
   for (const insn of fn.instructions) {
@@ -186,6 +186,87 @@ export class Decoder {
     }
     return d;
   }
+}
+
+// ---------------------------------------------------------------------------
+// structural sibling alignment (pairing by identity, not by position)
+// ---------------------------------------------------------------------------
+
+/** Cheap structural signature of the closure subtree rooted at `fn`. */
+export interface FnSig {
+  readonly name: string;
+  readonly params: number;
+  /** Nodes in the closure subtree (inclusive). */
+  readonly size: number;
+  readonly children: number;
+}
+
+const sigCaches = new WeakMap<Decoder, Map<number, FnSig>>();
+function sigOf(dec: Decoder, fn: number, onPath: Set<number> = new Set()): FnSig {
+  let cache = sigCaches.get(dec);
+  if (cache === undefined) sigCaches.set(dec, (cache = new Map()));
+  const hit = cache.get(fn);
+  if (hit !== undefined) return hit;
+  const h = dec.mod.functions[fn];
+  const base = { name: dec.mod.functions[fn]?.name ?? "", params: h?.header.paramCount ?? -1 };
+  if (onPath.has(fn)) return { ...base, size: 1, children: 0 };
+  onPath.add(fn);
+  const d = dec.decode(fn);
+  let size = 1;
+  let children = 0;
+  if (!(d instanceof Error)) {
+    for (const c of childrenOf(d)) {
+      size += sigOf(dec, c, onPath).size;
+      children++;
+    }
+  }
+  onPath.delete(fn);
+  const out = { ...base, size, children };
+  cache.set(fn, out);
+  return out;
+}
+
+/** Similarity of one original/recompiled closure; always >= 1 so that, when
+ *  nothing distinguishes the candidates, alignment degenerates to the old
+ *  positional pairing. */
+function simScore(a: FnSig, b: FnSig): number {
+  let s = 1;
+  if (a.params === b.params) s += 2;
+  if (a.name.length > 0 && a.name === b.name) s += 2;
+  if (a.children === b.children) s += 1;
+  if (a.size === b.size) s += 3;
+  else s += Math.max(0, 2 - Math.abs(a.size - b.size) / Math.max(a.size, b.size) * 4);
+  return s;
+}
+
+/**
+ * Order-preserving alignment (Needleman-Wunsch, no gap penalty) of the
+ * sibling closures the name pass left unpaired. An inserted/removed closure
+ * becomes a gap instead of shifting every later sibling by one. Returns
+ * [origIndexInLo, recIndexInLr] pairs; unaligned entries on either side are
+ * the caller's `tree:unmatched-*`.
+ */
+export function alignLeftovers(orig: Decoder, lo: readonly number[], rec: Decoder, lr: readonly number[]): [number, number][] {
+  const n = lo.length;
+  const m = lr.length;
+  const so = lo.map((o) => sigOf(orig, o));
+  const sr = lr.map((r) => sigOf(rec, r));
+  const w = (i: number, j: number): number => simScore(so[i]!, sr[j]!);
+  const best: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      best[i]![j] = Math.max(best[i + 1]![j]!, best[i]![j + 1]!, best[i + 1]![j + 1]! + w(i, j));
+    }
+  }
+  const out: [number, number][] = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (best[i]![j] === best[i + 1]![j + 1]! + w(i, j)) out.push([i++, j++]);
+    else if (best[i]![j] === best[i + 1]![j]!) i++;
+    else j++;
+  }
+  return out;
 }
 
 /** Every function reachable from `root` (inclusive), pre-order. */
@@ -459,9 +540,14 @@ export async function compareModule(init: WorkerInit, orig: Decoder, task: Task)
       const r = byName.get(o);
       if (r !== undefined) pair(o, r);
     }
-    const n = Math.min(leftoverO.length, leftoverR.length);
-    for (let k = 0; k < n; k++) pair(leftoverO[k]!, leftoverR[k]!);
-    for (let k = n; k < leftoverO.length; k++) {
+    const aligned = alignLeftovers(orig, leftoverO, rec, leftoverR);
+    const alignedO = new Set<number>();
+    for (const [a, b] of aligned) {
+      alignedO.add(a);
+      pair(leftoverO[a]!, leftoverR[b]!);
+    }
+    for (let k = 0; k < leftoverO.length; k++) {
+      if (alignedO.has(k)) continue;
       for (const c of subtree(orig, leftoverO[k]!, new Set(visited))) {
         visited.add(c);
         push(c, "DIFFERENT", `tree:unmatched-closure(orig ${oc.length} vs recompiled ${rc.length})`);

@@ -236,6 +236,16 @@ So §4's recognition is done **through the registers**, with the same
   `before`, and `parses` the lowered output. `Reflect.apply(rF, rO, [args])`
   with a factory `rF` (`call-shape`'s residue when the member was spilled) is
   counted as a site and refused `reflect-apply-callee`.
+* **Factory read order** (fix-jsx-read-order, construct fixture 360). The
+  factory is read where the bytecode reads it: a spilled `rF = X.jsx` is
+  kept in place (the lowered call reads `rF`), the unfused
+  `Reflect.apply(rF, rO, …)` is never a site, and a member callee
+  (`R.createElement(…)`) is read at the call before every argument, so an
+  impure value computed ahead of such a call is never absorbed
+  (`moved-impure`). Under `--jsx` the rendered JSX hides the kept read; the
+  lowered call is the semantics. `reg-split` renames inside `jsx` nodes
+  (it used to skip them, leaving a split register's old name in an
+  attribute).
 * **Framework** (§7.1): `jsx` Expr node + `jsxToCall` in `src/emit/ast.ts`;
   printer `PrintOptions.jsx` (default lowers to the call, so `parses`,
   `node --check` and every effect walker see runnable JS); `Pass.optIn` +

@@ -1,0 +1,8 @@
+v84: OK - compiles; CreateThis + Construct + SelectObject triple.
+v94: OK - same.
+v96: OK - same.
+v98: OK - the shape under test: GetById "prototype" + NewObjectWithParent
+     + Mov into the frame's this slot + a bare Construct, no SelectObject
+     (the optimiser proved Root returns no object). Root must be large
+     enough not to be inlined, and called from more than one site.
+v99: OK - compiles; the prebuilt-this call is not a Construct here.

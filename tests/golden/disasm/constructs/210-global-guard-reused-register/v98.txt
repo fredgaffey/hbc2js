@@ -1,0 +1,186 @@
+; hbc2js disassembly of 210-global-guard-reused-register/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=8 strings=25 globalCodeIndex=0
+function #0 "global"  params=1 frame=21 env=0 flags=exc,dbg,overflowed  @0x0000024c size=296
+  .try T1..T2 -> L1 ; handler 0
+  0000  DeclareGlobalVar     s22 "pick"
+  0005  DeclareGlobalVar     s4 "loopy"
+  000a  DeclareGlobalVar     s10 "def"
+  000f  DeclareGlobalVar     s9 "absent"
+  0014  DeclareGlobalVar     s20 "shadow"
+  0019  DeclareGlobalVar     s21 "o"
+  001e  GetGlobalObject      r0
+  0020  LoadConstUndefined   r3
+  0022  CreateClosure        r1, r3, f1 "pick"
+  0027  PutByIdLoose         r0, r1, #c0, s22 "pick"
+  002d  CreateClosure        r1, r3, f2 "loopy"
+  0032  PutByIdLoose         r0, r1, #c1, s4 "loopy"
+  0038  CreateClosure        r1, r3, f3 "def"
+  003d  PutByIdLoose         r0, r1, #c2, s10 "def"
+  0043  CreateClosure        r1, r3, f4 "absent"
+  0048  PutByIdLoose         r0, r1, #c3, s9 "absent"
+  004e  CreateClosure        r1, r3, f5 "shadow"
+  0053  PutByIdLoose         r0, r1, #c4, s20 "shadow"
+  0059  GetByIdShort         r5, r0, #c0, s10 "def"
+  005e  LoadConstString      r4, s18 "x"
+  0062  CreateClosure        r2, r3, f6 ""
+  0067  NewObject            r1
+  0069  Call4                r1, r5, r3, r1, r4, r2
+  0070  PutByIdLoose         r0, r1, #c5, s21 "o"
+  0076  TryGetById           r7, r0, #c1, s23 "print"
+  007c  GetByIdShort         r1, r0, #c2, s21 "o"
+  0081  GetByIdShort         r6, r1, #c3, s18 "x"
+  0086  GetByIdShort         r4, r0, #c4, s22 "pick"
+  008b  LoadConstUInt8       r2, 4
+  008e  LoadConstUInt8       r1, 3
+  0091  Call3                r5, r4, r3, r1, r2
+  0097  GetByIdShort         r1, r0, #c4, s22 "pick"
+  009c  LoadConstZero        r4
+  009e  Call3                r10, r1, r3, r4, r4
+  00a4  GetByIdShort         r8, r0, #c5, s4 "loopy"
+  00a9  NewArrayWithBuffer   r1, 4, 4, lit@0x0000
+  00b1  Call2                r9, r8, r3, r1
+  00b6  LoadConstUndefined   r13
+  00b8  Mov                  r12, r6
+  00bb  Mov                  r11, r5
+  00be  Call                 r1, r7, 5
+  00c2  TryGetById           r2, r0, #c1, s23 "print"
+  00c8  GetByIdShort         r5, r0, #c6, s9 "absent"
+  00cd  LoadConstUInt8       r1, 5
+  00d0  Call2                r1, r5, r3, r1
+  00d5  Call2                r1, r2, r3, r1
+T1:
+  00da  TryGetById           r2, r0, #c1, s23 "print"
+  00e0  GetByIdShort         r1, r0, #c6, s9 "absent"
+  00e5  Call2                r1, r1, r3, r4
+  00ea  Call2                r1, r2, r3, r1
+  00ef  Jmp                  L2
+T2:
+L1:
+  00f1  Catch                r1
+  00f3  TryGetById           r2, r0, #c1, s23 "print"
+  00f9  GetByIdShort         r1, r1, #c7, s13 "name"
+  00fe  Call2                r1, r2, r3, r1
+L2:
+  0103  TryGetById           r2, r0, #c1, s23 "print"
+  0109  GetByIdShort         r1, r0, #c8, s20 "shadow"
+  010e  Call2                r1, r1, r3, r4
+  0113  GetByIdShort         r4, r0, #c8, s20 "shadow"
+  0118  LoadConstUInt8       r0, 2
+  011b  Call2                r0, r4, r3, r0
+  0120  Call3                r0, r2, r3, r1, r0
+  0126  Ret                  r0
+
+function #1 "pick"  params=3 frame=15 env=0 flags=dbg,overflowed  @0x00000374 size=63
+  0000  LoadParam            r4, 1
+  0003  LoadParam            r3, 2
+  0006  Mov                  r1, r3
+  0009  JNotGreater          L1, r4, r1
+  000d  Mov                  r1, r4
+L1:
+  0010  JmpTrue              L2, r1
+  0013  GetGlobalObject      r0
+  0015  TryGetById           r2, r0, #c0, s5 "Math"
+  001b  GetByIdShort         r0, r2, #c1, s17 "max"
+  0020  Call3                r1, r0, r2, r4, r3
+L2:
+  0026  GetGlobalObject      r0
+  0028  TryGetById           r2, r0, #c0, s5 "Math"
+  002e  GetByIdShort         r0, r2, #c2, s12 "min"
+  0033  Call3                r0, r0, r2, r4, r3
+  0039  Add                  r0, r1, r0
+  003d  Ret                  r0
+
+function #2 "loopy"  params=2 frame=22 env=0 flags=dbg,overflowed  @0x000003b3 size=85
+  0000  LoadParam            r8, 1
+  0003  GetByIdShort         r4, r8, #c0, s15 "length"
+  0008  LoadConstZero        r1
+  000a  Less                 r3, r1, r4
+  000e  LoadConstUInt8       r2, 1
+  0011  GetGlobalObject      r7
+  0013  LoadConstZero        r0
+  0015  LoadConstZero        r6
+  0017  LoadConstZero        r4
+  0019  JmpFalse             L3, r3
+L1:
+  001c  GetByVal             r12, r8, r0
+  0020  Mov                  r1, r0
+  0023  Mov                  r10, r6
+  0026  Mov                  r9, r10
+  0029  JmpFalse             L2, r12
+  002c  TryGetById           r11, r7, #c1, s5 "Math"
+  0032  GetByIdShort         r5, r11, #c2, s8 "abs"
+  0037  Call2                r5, r5, r11, r12
+  003c  Add                  r9, r10, r5
+L2:
+  0040  AddN                 r0, r1, r2
+  0044  GetByIdShort         r5, r8, #c0, s15 "length"
+  0049  Mov                  r6, r9
+  004c  Mov                  r4, r6
+  004f  JLess                L1, r0, r5
+L3:
+  0053  Ret                  r4
+
+function #3 "def"  params=4 frame=17 env=0 flags=dbg,overflowed  @0x00000408 size=82
+  0000  LoadParam            r0, 1
+  0003  LoadParam            r4, 2
+  0006  GetGlobalObject      r1
+  0008  TryGetById           r2, r1, #c0, s7 "Object"
+  000e  GetByIdShort         r2, r2, #c1, s24 "prototype"
+  0013  GetByIdShort         r3, r2, #c2, s6 "hasOwnProperty"
+  0018  GetByIdShort         r2, r3, #c3, s3 "call"
+  001d  JmpBuiltinIs         L1, 56, r2
+  0021  Call3                r2, r2, r3, r0, r4
+  0027  Jmp                  L2
+L1:
+  0029  Call2                r2, r3, r0, r4
+L2:
+  002e  JmpTrue              L3, r2
+  0031  LoadParam            r5, 3
+  0034  TryGetById           r3, r1, #c0, s7 "Object"
+  003a  GetByIdShort         r2, r3, #c4, s11 "defineProperty"
+  003f  NewObjectWithBuffer  r1, sh0(numProps=2), lit@0x0011
+  0045  PutOwnBySlotIdx      r1, r5, 1
+  0049  Call4                r1, r2, r3, r0, r4, r1
+L3:
+  0050  Ret                  r0
+
+function #4 "absent"  params=2 frame=2 env=0 flags=dbg,overflowed  @0x0000045a size=24
+  0000  LoadParam            r1, 1
+  0003  LoadConstZero        r0
+  0005  JmpFalse             L1, r1
+  0008  Mov                  r0, r1
+L1:
+  000b  JmpTrue              L2, r0
+  000e  GetGlobalObject      r1
+  0010  TryGetById           r0, r1, #c0, s19 "noSuchGlobal210"
+L2:
+  0016  Ret                  r0
+
+function #5 "shadow"  params=2 frame=16 env=0 flags=dbg,overflowed  @0x00000472 size=47
+  0000  LoadParam            r5, 1
+  0003  NewObjectWithBuffer  r4, sh1(numProps=1), lit@0x0012
+  0009  LoadConstUndefined   r1
+  000b  CreateClosure        r2, r1, f7 "max"
+  0010  PutOwnBySlotIdx      r4, r2, 0
+  0014  LoadConstZero        r2
+  0016  JmpFalse             L1, r5
+  0019  Mov                  r2, r5
+L1:
+  001c  JmpTrue              L2, r2
+  001f  GetByIdShort         r3, r4, #c0, s17 "max"
+  0024  LoadConstUInt8       r0, 1
+  0027  Call3                r2, r3, r4, r5, r0
+L2:
+  002d  Ret                  r2
+
+function #6 ""  params=1 frame=1 env=0 flags=none  @0x000004a1 size=5
+  0000  LoadConstUInt8       r0, 7
+  0003  Ret                  r0
+
+function #7 "max"  params=3 frame=2 env=0 flags=dbg,overflowed  @0x000004a6 size=20
+  0000  LoadConstString      r1, s2 "local"
+  0004  LoadParam            r0, 1
+  0007  Add                  r1, r1, r0
+  000b  LoadParam            r0, 2
+  000e  Add                  r0, r1, r0
+  0012  Ret                  r0

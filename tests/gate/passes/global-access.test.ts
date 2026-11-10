@@ -161,9 +161,23 @@ test("unproven-global: a register with two `globalThis` stores is ambiguous, ref
     guardFor("Object", id("r1")),
     exprStmt(call(member(id("r1"), "Object"), [])),
   ];
-  assert.equal(match(before, ctxFor(before)), null);
-  const shape = recognizeGuard(before[1]!)!;
-  const v = classifySite(before, before, 1, shape.name, shape.global);
+  // 2026-11-09 (§4 condition 7): in this flat list each store sits right
+  // before its own guard, so the local proof settles which one reaches each
+  // read and both sites fold.
+  assert.equal(classifySite(before, before, 1, "Array", id("r1")).ok, true);
+  assert.equal(classifySite(before, before, 4, "Object", id("r1")).ok, true);
+  // The ambiguity the whole-function rule refuses is still refused where no
+  // store dominates the guard from inside its own list: the second store sits
+  // in a branch between the first store and the guard.
+  const ambiguous: readonly Stmt[] = [
+    exprStmt(assignExpr(id("r1"), id("globalThis"))),
+    { k: "if", test: id("a1"), then: [exprStmt(assignExpr(id("r1"), id("globalThis")))], else: [] },
+    guardFor("Object", id("r1")),
+    exprStmt(call(member(id("r1"), "Object"), [])),
+  ];
+  assert.equal(match(ambiguous, ctxFor(ambiguous)), null);
+  const shape = recognizeGuard(ambiguous[2]!)!;
+  const v = classifySite(ambiguous, ambiguous, 2, shape.name, shape.global);
   assert.deepEqual(v, { ok: false, reason: "unproven-global" });
 });
 

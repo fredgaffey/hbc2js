@@ -157,6 +157,48 @@ conditions, all required:
    divergence) and the `14-nested-try-catch` `.obf` tests in
    `tests/gate/passes/global-access.test.ts`.
 
+7. **Local-store proof** (added 2026-11-09, roundtrip `diff:JmpTrue(label)`
+   bucket; `isLocallyProvenGlobal` in `match.ts`). An *alternative* to the
+   whole-function proof and conditions 5-6, decided per site. Hermes often
+   loads `globalThis` into a register that held an unrelated value earlier in
+   the function (`r0 = a > b ? a : b; ... r0 = globalThis; guard(r0,"Math");
+   r2 = r0.Math`), so the "first write is the only `globalThis` write" rule
+   refused, and the read round-tripped as `GetGlobalObject; TryGetById
+   globalThis; IsIn; JmpTrue ...` instead of one `TryGetById`. The site is
+   proven when (a) some `L[k]`, `k < i`, is exactly `rN = globalThis`, (b) no
+   statement in `L[k+1..i-1]` or `L[i+1..j-1]` writes `rN` at any depth
+   (`identUses(...).writes`, so a write buried in an expression counts), and
+   (c) `L[j]` writes `rN` nowhere, or is exactly `rN = value` with no write to
+   `rN` inside `value`. Sound because a structured list is only entered at its
+   start and a `break`/`continue` landing inside it lands after the statement
+   that holds it, so every arrival at the guard (every loop re-entry
+   included) has just run `L[k]`; this subsumes conditions 5 and 6. `check`
+   re-derives the same predicate from `before`. Where (a)-(c) fail, the
+   whole-function proof and conditions 5-6 decide as before, so the
+   two-store ambiguity stays refused whenever no store dominates the guard
+   from inside its own list. Side change in `check`: its final
+   "no register read before its first def" guard now only flags registers the
+   rewrite *newly* reads early, since a nested list (the usual condition-7
+   site) legitimately reads registers defined outside it. Absent-global
+   semantics are unchanged: the bare identifier recompiles to the same
+   `TryGetById`, so under Hermes it throws the same `ReferenceError`.
+   Fixture `210-global-guard-reused-register` (`pick`, a loop, `def`, an
+   absent global, a shadowing local `Math`) is T2 PASS at 84/94/96/98/99;
+   tests in `tests/gate/passes/global-access-local-store.test.ts`.
+   *Measured* (react-navigation-example-0.85.3, v98, passes-on, against
+   `integrate-1109n`): IDENTICAL 7382 -> 7489 of 14437; `diff:JmpTrue(label)`
+   308 -> 62, and the other label buckets fall too (`JmpFalse` 106 -> 59,
+   `JStrictEqual` 96 -> 57, `JEqual` 60 -> 26, `JmpTypeOfIs` 57 -> 34,
+   `GetGlobalObject(reg)` 75 -> 19). Growers are next differences in the
+   functions that moved: `diff:GetGlobalObject/CreateClosure` 18 -> 214 (the
+   source `Object.defineProperty(o, k, {get: g})` evaluates `Object` before
+   it creates the getter closure, while the decompiled text creates the
+   closure into a variable first), `TryGetById(reg)` 109 -> 160 and
+   `GetById(reg)` 212 -> 248. Six IDENTICAL functions went DIFFERENT
+   (modules 129, 251, 704). The decompiled text of all six is unchanged. The
+   recompiled module has one function fewer, so the harness pairs them with
+   their neighbours: a pairing artefact, not a decompile change.
+
 Match data: `{ guardIndex: i, useIndex: j, name: p, global: G }`.
 
 Only the *first* guard/read pair in the list is captured per call; the driver
@@ -240,6 +282,26 @@ write), `shadowed`, `unsafe-identifier`
 guard), `clobbered-between`, `read-twice`, `guard-in-other-list` (guard and
 read must share a statement list; a read that migrated into a nested `if` body
 is refused, not chased).
+
+**Lowered generator bodies (visited since 2026-11-10).**
+At v84/94/96 a generator (and an `async function`, lowered through one) is
+emitted as `return function (...) { switch (__state) ... }`, a `sameFrame`
+closure sharing the enclosing frame's registers. `global-access` opts in to
+those lists (`Pass.sameFrame`, 00-LADDER section 3.2 "Resumable bodies"):
+the store walks of section 4 see writes inside the closure, condition 5
+treats the closure body as the outermost loop (it is re-entered per
+resume), and condition 6 adds one refusal there -- a guard with **no**
+`globalThis` store earlier in the same resume is refused (`pre-guard-clobber`),
+because its register was stored by an earlier resume (or is still
+`undefined`). Condition 7 carries over unchanged (a resume enters every
+list at its start). Hermes loads `globalThis` once in the first resume and
+reuses that register in every later one, so those later guards (fixture
+310's 3 survivors, the `catch`-arm one among them; fixture 370's
+`JSON`/`Number`) stay guarded by design; 98/99 emit native generator bodies
+and fold all of them.
+The output is independent of the `moduleName` given to `decompile`, which
+reaches only the header comment (pinned by
+`tests/gate/passes/fix-modulename-dependence.test.ts`).
 
 **Semantic note (must appear in the commit message and `docs/BUGS.md` if a
 fixture trips it).** A bare `print` reference throws

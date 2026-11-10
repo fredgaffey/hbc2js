@@ -12,7 +12,7 @@
 // iteration).
 import type { Stmt } from "../ast.ts";
 import { declaredNames, EMITTER_NAME_CLASS_RE, FN_RE, IDENT_RE } from "./match.ts";
-import { freeNames, identUsesMany, isSafeIdentifier, printProgram } from "../ast.ts";
+import { freeNames, identUsesMany, isSafeIdentifier, printProgram, walk } from "../ast.ts";
 import type { CheckResult, PassContext } from "../types.ts";
 import { renameIdents } from "./rewrite.ts";
 
@@ -29,13 +29,35 @@ function findRenames(before: readonly Stmt[], after: readonly Stmt[]): readonly 
     if (b.k !== a.k) return null;
     if (b.k === "func" && a.k === "func" && b.name !== a.name) out.push({ from: b.name, to: a.name });
   }
+  // fix-closure-identity-2: function EXPRESSION names (spec 27 section 12's
+  // per-site closures), paired in walk order; one `N` may appear at several
+  // sites, all renamed alike, so identical pairs collapse to one.
+  const exprNames = (list: readonly Stmt[]): (string | null)[] => {
+    const names: (string | null)[] = [];
+    walk(list, { expr: (e) => { if (e.k === "func") names.push(e.name); } });
+    return names;
+  };
+  const eb = exprNames(before);
+  const ea = exprNames(after);
+  if (eb.length !== ea.length) return null;
+  const pairs = new Map<string, string>();
+  for (let i = 0; i < eb.length; i++) {
+    const b = eb[i]!;
+    const a = ea[i]!;
+    if (b === a) continue;
+    if (b === null || a === null) return null;
+    const prior = pairs.get(b);
+    if (prior !== undefined && prior !== a) return null;
+    if (prior === undefined && !out.some((r) => r.from === b)) out.push({ from: b, to: a });
+    pairs.set(b, a);
+  }
   return out.length === 0 ? null : out;
 }
 
 export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: PassContext): CheckResult {
   const renames = findRenames(before, after);
   if (renames === null) {
-    return { ok: false, reason: "unexpected shape: fn-naming only ever renames func statements in place, never adds/removes/reorders a statement" };
+    return { ok: false, reason: "unexpected shape: fn-naming only ever renames func statements and func expressions in place, never adds/removes/reorders a statement" };
   }
   const froms = new Set<string>();
   const tos = new Set<string>();
