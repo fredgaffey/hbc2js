@@ -83,7 +83,7 @@ Not rungs: `29-promise-chaining`, `31-microtask-ordering`, `50-this-binding`
 (no idiom); `30-async-generator` (uncompilable); `21-iife-closures` (module
 wrapper `_fn0.call(globalThis)` is the emitter's, not a lowering).
 
-**Count (2026-11-10): 37 registered passes** (10 stage A, 27 stage B; `jsx-recover` opt-in), per `src/passes/registry.ts`. The 31-rung table above is the original inventory; passes added since that have no row above: `fcall-diamond` (spec 04 §10), `globalthis-dead-store`, `array-literal` (spec 31), `inline-new` (spec 24 §9), `object-literal-arg` (spec 20 §9). Still unshipped: `gen-lowered`, `string-array-decode`, `closure-naming` (§5 hard rows); the ordering diagram below names them as planned positions only.
+**Count (2026-11-10): 38 registered passes** (10 stage A, 28 stage B; `jsx-recover` opt-in), per `src/passes/registry.ts`. The 31-rung table above is the original inventory; passes added since that have no row above: `fcall-diamond` (spec 04 §10), `globalthis-dead-store`, `array-literal` (spec 31), `inline-new` (spec 24 §9), `object-literal-arg` (spec 20 §9), `value-join` (spec 32). Still unshipped: `gen-lowered`, `string-array-decode`, `closure-naming` (§5 hard rows); the ordering diagram below names them as planned positions only.
 
 ### Registered order (authoritative: `src/passes/registry.ts`)
 
@@ -92,7 +92,7 @@ Checked mechanically by `tests/gate/docs/pass-order.test.ts`; update both when a
 <!-- registry-order:start -->
 ```
 finally-dedup fcall-diamond loop-cond for-header for-in for-of switch-raise if-chain try-shape label-clean
-expr-rebuild global-access globalthis-dead-store call-shape default-params destructure spread-rest template-literal optional-chain object-literal array-literal yield-recovery yield-loop async-recovery arguments-form literal-forms try-clean class-recover super-call ctor-this inline-new private-fields method-read jsx-recover object-literal-arg fn-naming closure-inline reg-split var-naming
+expr-rebuild global-access globalthis-dead-store call-shape default-params destructure spread-rest template-literal optional-chain object-literal array-literal value-join yield-recovery yield-loop async-recovery arguments-form literal-forms try-clean class-recover super-call ctor-this inline-new private-fields method-read jsx-recover object-literal-arg fn-naming closure-inline reg-split var-naming
 ```
 <!-- registry-order:end -->
 
