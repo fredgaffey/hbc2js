@@ -269,7 +269,7 @@ export async function exportBootProof(original: string, exportDir: string, opts:
   // export can be concluded, and the (slow) re-bundle is skipped.
   // Spec 31 §4.2 (L4): one native-module manifest, derived from the
   // original (plus its optional boot-native.json), for BOTH sides.
-  const originalSource = acquireBootSource(original).source;
+  const originalSource = acquireBootSource(original, { lenientEnv: true }).source;
   const natives = deriveNativeManifest(originalSource, overrideFor(original));
   const a = bootTrace(originalSource, { ...traceOpts, natives, wrapFactories: true, ...(run !== undefined ? { run } : {}) });
   const ra = observeRun(a.trace);

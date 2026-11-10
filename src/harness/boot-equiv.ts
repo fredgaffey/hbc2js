@@ -45,10 +45,13 @@ export interface AcquiredBootSource {
 /** Spec §8 "source acquisition": `.hbc` goes through `decompile()` (lower
  *  fidelity, flagged); `.js`/`.bundle` passes through unchanged (faithful —
  *  it is the Metro combined-bundle text itself). */
-export function acquireBootSource(inputPath: string): AcquiredBootSource {
+export function acquireBootSource(inputPath: string, opts: { readonly lenientEnv?: boolean } = {}): AcquiredBootSource {
   if (inputPath.endsWith(".hbc")) {
     const bytes = readFileSync(inputPath);
-    const result = decompile(new Uint8Array(bytes));
+    // Spec 33 apps: an HBC-only original (no Metro text shipped) with
+    // unresolved environment reads decompiles with markers when asked; a
+    // marker reached at boot throws, which the proof reads as INCONCLUSIVE.
+    const result = decompile(new Uint8Array(bytes), opts.lenientEnv === true ? { strictEnv: false } : {});
     return { source: result.code, sourceKind: "decompiled" };
   }
   return { source: readFileSync(inputPath, "utf8"), sourceKind: "bundle-js" };
