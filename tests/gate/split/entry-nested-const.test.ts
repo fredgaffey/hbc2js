@@ -23,7 +23,16 @@ test("export-boot L4: a startup id held in a register set once inside a nested b
   assert.deepEqual(resolveStartupModuleIds(body), [131, 0]);
 });
 
-test("export-boot L4: a register given two different ids in nested blocks stays unresolved", () => {
-  const body = [labelled([assign("r2", lit("0"))]), labelled([assign("r2", lit("7"))]), ...rCall("r2")];
+test("export-boot L4: a register given two different ids, one under a conditional, stays unresolved", () => {
+  const cond = (body: Stmt[]): Stmt => ({ k: "if", test: id("r5"), then: body, else: null, origin: o }) as unknown as Stmt;
+  const body = [labelled([assign("r2", lit("0"))]), cond([assign("r2", lit("7"))]), ...rCall("r2")];
   assert.deepEqual(resolveStartupModuleIds(body), []);
+});
+
+test("export-boot apps: a reused register's last unconditional write is the entry id (Expensify r3: 65535, then 0)", () => {
+  // Expensify fn#0 writes r3 = 65535 (a __d id) at offset 588 and r3 = 0 at
+  // 1393/1731; the final __r(r3) was dropped, so the export never entered
+  // module 0 (B1 DIVERGENT at entry 155: original "enter 0", export <end>).
+  const body = [assign("r3", lit("65535")), labelled([assign("r3", lit("0"))]), labelled([assign("r3", lit("0"))]), assign("r1", lit("100")), ...rCall("r1"), ...rCall("r3")];
+  assert.deepEqual(resolveStartupModuleIds(body), [100, 0]);
 });

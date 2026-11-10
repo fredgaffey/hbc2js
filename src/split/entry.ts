@@ -4,7 +4,6 @@
 // top-level statements only — see src/split/tag.ts's header comment.
 import type { Expr, Stmt } from "../emit/ast.ts";
 import { classify, isReflectApply, type Tag } from "./tag.ts";
-import { walk } from "../passes/ast.ts";
 
 /** Registers that every assignment in the global function's own code (nested
  *  blocks included, nested functions excluded) sets to one and the same
@@ -16,22 +15,45 @@ import { walk } from "../passes/ast.ts";
 function singleConstRegisters(globalBody: readonly Stmt[]): Map<string, number> {
   const fnOf = (s: Stmt): number | undefined => (s as { readonly origin?: { readonly fn?: number } }).origin?.fn;
   const own = globalBody.map(fnOf).find((f) => f !== undefined);
-  const seen = new Map<string, number | "mixed">();
-  walk(globalBody, {
-    stmt: (s) => {
-      if (fnOf(s) !== own) return;
-      const at = assignedIdent(s);
-      if (at === null) return;
-      const v = at.value.k === "lit" && /^-?\d+$/.test(at.value.text) ? Number(at.value.text) : "mixed";
-      const cur = seen.get(at.name);
-      seen.set(at.name, cur === undefined || cur === v ? v : "mixed");
-    },
-  });
+  // Writes in document order, each marked conditional when it sits under
+  // anything but plain/labelled blocks (an if, loop, try, switch arm).
+  // hermesc -O reuses the register: Expensify's r3 is first a module id
+  // (65535) and only later the entry id 0. Every write is unconditional
+  // there, so the last one is the value the final `__r(r3)` reads
+  // (export-boot apps). A conditional write of a different value leaves
+  // the register unresolved.
+  const writes = new Map<string, { v: number | "mixed"; cond: boolean }[]>();
+  const visit = (stmts: readonly unknown[], cond: boolean): void => {
+    for (const x of stmts) {
+      if (x === null || typeof x !== "object" || typeof (x as { k?: unknown }).k !== "string") continue;
+      const st = x as Stmt;
+      if (fnOf(st) !== undefined && fnOf(st) !== own) continue;
+      const at = assignedIdent(st);
+      if (at !== null) {
+        const v = at.value.k === "lit" && /^-?\d+$/.test(at.value.text) ? Number(at.value.text) : "mixed";
+        const list = writes.get(at.name) ?? [];
+        list.push({ v, cond });
+        writes.set(at.name, list);
+        continue;
+      }
+      if (st.k === "expr" || st.k === "init") continue;
+      const inner = cond || st.k !== "labeled";
+      for (const val of Object.values(st as object)) {
+        if (Array.isArray(val)) visit(val, inner);
+        else if (val !== null && typeof val === "object" && typeof (val as { k?: unknown }).k === "string" && !("expr" in st && val === (st as { expr?: unknown }).expr)) visit([val], inner);
+      }
+    }
+  };
+  visit(globalBody, false);
   const out = new Map<string, number>();
-  for (const [name, v] of seen) if (v !== "mixed") out.set(name, v);
+  for (const [name, list] of writes) {
+    const last = list[list.length - 1]!;
+    if (last.v === "mixed") continue;
+    if (list.some((w) => w.v !== last.v && (w.cond || last.cond))) continue;
+    out.set(name, last.v);
+  }
   return out;
 }
-
 function assignedIdent(s: Stmt): { readonly name: string; readonly value: Expr } | null {
   if (s.k === "init") return { name: s.name, value: s.value };
   if (s.k === "expr" && s.expr.k === "assign" && s.expr.target.k === "ident") return { name: s.expr.target.name, value: s.expr.value };
@@ -58,13 +80,15 @@ export function resolveStartupModuleIds(globalBody: readonly Stmt[]): number[] {
     if (!(fnTag.kind === "prop" && fnTag.name === "__r")) return;
     const arr = call.args[2]!;
     if (arr.k !== "array" || arr.elements.length !== 1) return;
-    const argTag = classify(arr.elements[0]!, regs, noParams);
-    if (argTag.kind === "num") ids.push(argTag.value);
-    else if (arr.elements[0]!.k === "ident") {
+    // A register argument: its writes across the whole global body (nested
+    // blocks included) decide, not just the top-level ones `regs` saw.
+    if (arr.elements[0]!.k === "ident") {
       consts ??= singleConstRegisters(globalBody);
       const v = consts.get(arr.elements[0]!.name);
-      if (v !== undefined) ids.push(v);
+      if (v !== undefined) { ids.push(v); return; }
     }
+    const argTag = classify(arr.elements[0]!, regs, noParams);
+    if (argTag.kind === "num") ids.push(argTag.value);
   };
 
   for (const s of globalBody) {
