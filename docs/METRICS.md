@@ -338,3 +338,16 @@ from `scattered` is the candidate fix; not tried here, so its FP cost is unmeasu
 The new Expensify FPs `jose` and `meros` are not supplement packages; the
 before run used the farm's index from 2026-11-09 and the after run an index rebuilt
 for the layered dir, so the index rebuild is an unseparated confounder (not run).
+
+## deps-land-1110 (2026-11-10, offline, deb)
+
+Confirmed / TP / FP against integrate-1110a (same `src/deps` as main). Full table, causes and the one precision shortfall (MetaMask +pop2, 80.21% to 80.20%, is-date-object) are in docs/DEPS.md "Landing check".
+
+| bundle | base | +pop | +pop2 | farm |
+|---|---|---|---|---|
+| Expensify | 135/98/37 = | 163/126/37 -> 159/125/34 | 169/125/44 -> 156/126/30 | 107/102/5 -> 104/101/3 |
+| react-navigation | 17/17/0 = | 20/20/0 = | 20/20/0 = | 22/22/0 = |
+| bluesky | 46/38/8 = | 54/46/8 = | 52/45/7 -> 54/47/7 | 47/46/1 = |
+| rainbow | 130/107/23 = | 134/109/25 = | 136/110/26 = | 116/109/7 -> 115/109/6 |
+| MetaMask | 190/155/35 -> 191/156/35 | 196/158/38 -> 197/159/38 | 192/154/38 -> 197/158/39 | 179/165/14 -> 177/164/13 |
+

@@ -2808,6 +2808,48 @@ The pathless base DB scores exactly as before. On Expensify, +pop loses sax, enc
 
 lodash.debounce, react-native-svg and react-native-gesture-handler (bluesky) and readable-web-to-node-stream (MetaMask) are TPs on every DB. +pop2 has at least the TPs of +pop on every app except MetaMask (158 vs 159). Open: esquery (bluesky +pop2) and @vitest/pretty-format (Expensify +pop2) are FPs under both counts, so the copies change brings them back (esquery shares the pegjs runtime with svg; pretty-format's module guard did not hold on the real file); MetaMask's +3 FPs and bluesky's +2 under the new count are not yet traced.
 
+### Landing check (deps-land-1110, 2026-11-10)
+
+Every open FP and TP loss from the ambiguity-cutoff and combined branches was traced on deb (matcher logging plus `why.mjs`, with rules switched off one at a time). Changes:
+- (1) **Owner count.** Under the new count, an unsupported owner keeps a hash that 20 or more names claim only when another claimant depends on it. MetaMask's `eventid` and `ent` held get-intrinsic-era code that 20-22 loaded packages carry. The hbc96 DB has no get-intrinsic or call-bound, so 9-15 mutually independent carriers were left and each kept the code. Removing dependents says something only about the package they depend on. es-define-property, hasown, has-symbols and ieee754 keep their hashes this way.
+- (2) **Support.** A supported package now needs `MIN_DISTINCT_EVIDENCE_HASHES` distinct unique target hits. Bluesky's `realm` (one 28-instruction function) and `victory-core` (8 and 13 instructions) were supported by one or two. Every bluesky TP that relies on support has dozens. Switching the rule off changes nothing on MetaMask, so cross-fetch, immer, react-native-screens and which-typed-array lose nothing.
+- (3) **Closure.** The closure rule uses the file's own version's closure: its sidecar entry, or else its own `subtractedDependencies`. The farm's sidecar lists only non-empty closures. lodash.throttle 4.0.x depends on lodash.debounce, while 4.1.1 depends on nothing and inlines debounce. The per-package union over versions set 4.1.1's inlined code aside.
+
+Tests: the "deps-land-1110:" tests in `tests/gate/deps/corpus-ambiguity-cutoff.test.ts`.
+
+**Rejected:** a held-module copies rule. It counted a function as a copy when other packages' modules that the target holds account for every instance. It fixed esquery and four Expensify +pop2 FPs, but lost @react-navigation/elements (react-navigation +pop/+pop2) and @sentry/feedback (bluesky +pop2). @sentry/react-native's pathless signature carries feedback's build, and a pathless file does not say which module a function is in. It also cost twin demotions on Expensify (FPs ai, builtins). Restricting it to files with no held module, or excluding dependents, did not remove those losses.
+
+**Still open:**
+- `is-date-object` (MetaMask +pop2): the same hashes and dependents as es-define-property. The source map has es-define-property, get-intrinsic and call-bound but no is-date-object or deep-equal.
+- `esquery` (bluesky +pop2): pegjs runtime shared with react-native-svg's pathless file. It is also an FP on integrate-1110a.
+- `call-bound` (Expensify +pop) and `abort-controller` (Expensify, farm): integrate-1110a confirmed call-bound by edge promotion from get-intrinsic on two hashes eight other packages hold, and abort-controller's five hits are all held by react-native's pathless file. The review-1110 rule (no promotion on another package's module) turns down both.
+- `readable-web-to-node-stream` (MetaMask, farm): its own code is 11 of 215 hits after closure subtraction; this is the corpus-db-growth attribution loss recorded under "Combined rule hardening". It is a TP on base, +pop and +pop2.
+
+**Measured** (deb, offline `scoreAgainstTruth`, confirmed / TP / FP, precision; integrate-1110a, which has the same `src/deps` as main, against deps-land-1110):
+
+| bundle | DB | integrate-1110a | deps-land-1110 | TP lost / gained |
+|---|---|---|---|---|
+| Expensify | base | 135 / 98 / 37, 72.6% | same | - |
+| Expensify | +pop | 163 / 126 / 37, 77.3% | 159 / 125 / 34, 78.6% | -call-bound |
+| Expensify | +pop2 | 169 / 125 / 44, 74.0% | 156 / 126 / 30, 80.8% | +react-is |
+| react-navigation | base / +pop / +pop2 | 17/17/0, 20/20/0, 20/20/0 | same | - |
+| bluesky | base | 46 / 38 / 8, 82.6% | same | - |
+| bluesky | +pop | 54 / 46 / 8, 85.2% | same | - |
+| bluesky | +pop2 | 52 / 45 / 7, 86.5% | 54 / 47 / 7, 87.0% | +color, +react-native-gesture-handler |
+| rainbow | base / +pop / +pop2 | 130/107/23, 134/109/25, 136/110/26 | same | - |
+| MetaMask | base | 190 / 155 / 35, 81.6% | 191 / 156 / 35, 81.7% | +ieee754 |
+| MetaMask | +pop | 196 / 158 / 38, 80.6% | 197 / 159 / 38, 80.7% | +ieee754 |
+| MetaMask | +pop2 | 192 / 154 / 38, 80.21% | 197 / 158 / 39, 80.20% | +es-define-property, +has-symbols, +hasown, +ieee754 (FP +is-date-object) |
+
+Transitive-subtraction farm (`deps-combined/run.sh`), integrate-1110a against deps-land-1110:
+- react-navigation: 22/22/0 against 22/22/0.
+- Expensify: 107/102/5 against 104/101/3. Lost abort-controller.
+- bluesky: 47/46/1 against 47/46/1.
+- rainbow: 116/109/7 against 115/109/6.
+- MetaMask: 179/165/14 against 177/164/13. Lost readable-web-to-node-stream.
+
+Precision is at least integrate-1110a's in every column but MetaMask +pop2. There it is 0.005 points lower: four TPs gained against the is-date-object FP.
+
 ### Fork relabel (corpus-fork-relabel, 2026-11-09)
 
 **Problem.** One kind of false positive comes from an app that ships a fork or
