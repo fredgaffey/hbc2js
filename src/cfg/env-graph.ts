@@ -310,6 +310,12 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
       if (name === "GetEnvironment") {
         if (insn.operands.length === 2) {
           // v<=96: (dst, levels), counted from the closure's own environment.
+          const fe = factorySelf.get(f);
+          if (fe !== undefined && insn.operands[1]!.value === 0) {
+            set(insn.operands[0]!.value, { t: "view", fn: f, node: fe, level: 0 });
+            if (collect !== null) envViewOps.set(siteKey(f, insn.offset), { k: "self-env" });
+            return;
+          }
           set(insn.operands[0]!.value, walkUp(selfEnv, insn.operands[1]!.value));
         } else {
           const start = get(insn.operands[1]!.value);
