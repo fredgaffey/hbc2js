@@ -36,7 +36,7 @@ const NEGATIVE = join(CONSTRUCTS, "141-define-property-observable-literal");
 const EMIT_BUG = join(repoRoot(), "tests", "fixtures", "constructs", "250-method-read-before-getter-arg");
 const SLOT_FILL = join(CONSTRUCTS, "260-literal-slot-fill-in-sequence");
 const SLOT_FILL_NEG = join(CONSTRUCTS, "261-literal-slot-fill-observable-store");
-const PUTBYID_BUG = join(repoRoot(), "tests", "fixtures", "adversarial", "50-putbyid-fold-inherited-setter");
+const PUTBYID_BUG = join(CONSTRUCTS, "390-putbyid-fold-inherited-setter");
 
 function decompiled(bytes: Uint8Array): string {
   try {
@@ -158,8 +158,9 @@ for (const version of VERSIONS) {
   });
 
   // docs/BUGS.md 2026-11-10 "object-literal folds a PutById past an inherited
-  // setter": src/passes/object-literal, not this rung. Open.
-  test(`adversarial/50-putbyid-fold-inherited-setter v${version}: an inherited setter still runs`, { todo: "docs/BUGS.md 2026-11-10 object-literal PutById fold" }, (t) => {
+  // setter" (DECISIONS D27a): src/passes/object-literal no longer folds a
+  // PutById-family store, so the setter Object.prototype carries still runs.
+  test(`constructs/390-putbyid-fold-inherited-setter v${version}: an inherited setter still runs`, (t) => {
     vmRun(PUTBYID_BUG, version, t);
   });
 }
