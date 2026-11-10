@@ -92,8 +92,10 @@ for (const version of VERSIONS) {
     const code = decompiled(new Uint8Array(readFileSync(join(POSITIVE, `v${version}.hbc`))));
     // Kind D (passes-roundtrip-objlit2) moves each getter into its slot as
     // `get: function () {`, which hermesc creates after the literal as the
-    // original did; a getter that stays a declaration is a plain name.
-    const calls = code.split("\n").filter((l) => /Object\.defineProperty\([^)]*, \{enumerable: [^,]+, get: (function \(\) \{$|[^}]+\}\);$)/.test(l));
+    // original did; since closure-inline (spec 32) `get:` may also be the
+    // named getter function expression; a getter that stays a declaration is
+    // a plain name.
+    const calls = code.split("\n").filter((l) => /Object\.defineProperty\([^)]*, \{enumerable: [^,]+, get: (function \(\) \{$|function \w+\(\) \{$|[^}]+\}\);$)/.test(l));
     assert.equal(calls.length, 3, `expected three inline Object.defineProperty calls:\n${code}`);
   });
 
