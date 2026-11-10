@@ -1,0 +1,171 @@
+; hbc2js disassembly of 345-loop-carried-fold-check/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=8 strings=23 globalCodeIndex=0
+function #0 "global"  params=1 frame=19 env=0 flags=dbg,overflowed  @0x000001fc size=354
+  0000  DeclareGlobalVar     s7 "runAll"
+  0005  DeclareGlobalVar     s16 "sumTags"
+  000a  DeclareGlobalVar     s8 "log"
+  000f  DeclareGlobalVar     s18 "fns"
+  0014  DeclareGlobalVar     s15 "calls"
+  0019  DeclareGlobalVar     s12 "tag"
+  001e  DeclareGlobalVar     s20 "order"
+  0023  DeclareGlobalVar     s6 "arr"
+  0028  GetGlobalObject      r2
+  002a  LoadConstUndefined   r1
+  002c  CreateClosure        r3, r1, f1 "runAll"
+  0031  PutByIdLoose         r2, r3, #c0, s7 "runAll"
+  0037  CreateClosure        r3, r1, f2 "sumTags"
+  003c  PutByIdLoose         r2, r3, #c1, s16 "sumTags"
+  0042  NewArray             r3, 0
+  0046  PutByIdLoose         r2, r3, #c2, s8 "log"
+  004c  NewArray             r3, 2
+  0050  CreateClosure        r4, r1, f3 ""
+  0055  DefineOwnInDenseArray r3, r4, 0
+  0059  CreateClosure        r4, r1, f4 ""
+  005e  DefineOwnInDenseArray r3, r4, 1
+  0062  PutByIdLoose         r2, r3, #c3, s18 "fns"
+  0068  TryGetById           r5, r2, #c0, s21 "print"
+  006e  GetByIdShort         r4, r2, #c1, s7 "runAll"
+  0073  GetByIdShort         r3, r2, #c2, s18 "fns"
+  0078  LoadConstZero        r0
+  007a  Call3                r4, r4, r1, r3, r0
+  0080  GetByIdShort         r7, r2, #c3, s8 "log"
+  0085  GetByIdShort         r6, r7, #c4, s19 "join"
+  008a  LoadConstString      r3, s1 ","
+  008e  Call2                r3, r6, r7, r3
+  0093  Call3                r3, r5, r1, r4, r3
+  0099  NewArray             r3, 0
+  009d  PutByIdLoose         r2, r3, #c4, s15 "calls"
+  00a3  NewObjectWithBuffer  r3, sh0(numProps=2), lit@0x0000
+  00a9  CreateClosure        r4, r1, f5 "handler"
+  00ae  PutOwnBySlotIdx      r3, r4, 1
+  00b2  PutByIdLoose         r2, r3, #c5, s12 "tag"
+  00b8  TryGetById           r5, r2, #c0, s21 "print"
+  00be  GetByIdShort         r4, r2, #c5, s16 "sumTags"
+  00c3  GetByIdShort         r6, r2, #c6, s12 "tag"
+  00c8  NewArray             r3, 2
+  00cc  DefineOwnInDenseArray r3, r6, 0
+  00d0  GetByIdShort         r6, r2, #c6, s12 "tag"
+  00d5  DefineOwnInDenseArray r3, r6, 1
+  00d9  Call2                r4, r4, r1, r3
+  00de  GetByIdShort         r7, r2, #c7, s15 "calls"
+  00e3  GetByIdShort         r6, r7, #c4, s19 "join"
+  00e8  LoadConstString      r3, s0 ""
+  00ec  Call2                r3, r6, r7, r3
+  00f1  Call3                r3, r5, r1, r4, r3
+  00f7  NewArray             r3, 0
+  00fb  PutByIdLoose         r2, r3, #c6, s20 "order"
+  0101  NewArray             r3, 0
+  0105  PutByIdLoose         r2, r3, #c7, s6 "arr"
+  010b  TryGetById           r6, r2, #c8, s11 "Object"
+  0111  GetByIdShort         r5, r6, #c9, s17 "defineProperty"
+  0116  GetByIdShort         r4, r2, #c10, s6 "arr"
+  011b  NewObjectWithBuffer  r3, sh1(numProps=1), lit@0x0003
+  0121  CreateClosure        r7, r1, f6 "get"
+  0126  PutOwnBySlotIdx      r3, r7, 0
+  012a  Call4                r3, r5, r6, r4, r0, r3
+  0131  TryGetById           r4, r2, #c0, s21 "print"
+  0137  GetByIdShort         r5, r2, #c1, s7 "runAll"
+  013c  GetByIdShort         r3, r2, #c10, s6 "arr"
+  0141  Call3                r3, r5, r1, r3, r0
+  0147  GetByIdShort         r6, r2, #c11, s20 "order"
+  014c  GetByIdShort         r5, r6, #c4, s19 "join"
+  0151  LoadConstString      r2, s2 ">"
+  0155  Call2                r2, r5, r6, r2
+  015a  Call3                r2, r4, r1, r3, r2
+  0160  Ret                  r2
+
+function #1 "runAll"  params=3 frame=14 env=0 flags=strict,dbg,overflowed  @0x0000035e size=47
+  0000  LoadParam            r4, 1
+  0003  LoadParam            r3, 2
+  0006  GetByIdShort         r2, r4, #c0, s9 "length"
+  000b  LoadConstUInt8       r0, 1
+  000e  Mov                  r1, r3
+  0011  JNotLess             L2, r1, r2
+L1:
+  0015  GetByVal             r2, r4, r3
+  0019  Call1                r2, r2, r4
+  001d  Add                  r3, r3, r0
+  0021  GetByIdShort         r2, r4, #c0, s9 "length"
+  0026  Mov                  r1, r3
+  0029  JLess                L1, r1, r2
+L2:
+  002d  Ret                  r1
+
+function #2 "sumTags"  params=2 frame=20 env=0 flags=dbg,overflowed  @0x0000038d size=87
+  0000  LoadParam            r7, 1
+  0003  GetByIdShort         r4, r7, #c0, s9 "length"
+  0008  LoadConstZero        r1
+  000a  Less                 r3, r1, r4
+  000e  LoadConstUInt8       r2, 1
+  0011  LoadConstZero        r0
+  0013  LoadConstZero        r6
+  0015  LoadConstZero        r4
+  0017  JmpFalse             L4, r3
+L1:
+  001a  GetByVal             r5, r7, r0
+  001e  GetByIdShort         r10, r5, #c1, s10 "handler"
+  0023  GetByIdShort         r5, r10, #c2, s14 "call"
+  0028  GetByVal             r9, r7, r0
+  002c  Mov                  r1, r0
+  002f  Mov                  r8, r6
+  0032  JmpBuiltinIs         L2, 56, r5
+  0036  Call2                r5, r5, r10, r9
+  003b  Jmp                  L3
+L2:
+  003d  Call1                r5, r10, r9
+L3:
+  0041  Add                  r6, r8, r5
+  0045  AddN                 r0, r1, r2
+  0049  GetByIdShort         r5, r7, #c0, s9 "length"
+  004e  Mov                  r4, r6
+  0051  JLess                L1, r0, r5
+L4:
+  0055  Ret                  r4
+
+function #3 ""  params=1 frame=13 env=0 flags=dbg,overflowed  @0x000003e4 size=25
+  0000  GetGlobalObject      r1
+  0002  GetByIdShort         r3, r1, #c0, s8 "log"
+  0007  GetByIdShort         r2, r3, #c1, s22 "push"
+  000c  LoadConstString      r1, s5 "a"
+  0010  Call2                r1, r2, r3, r1
+  0015  LoadConstUndefined   r0
+  0017  Ret                  r0
+
+function #4 ""  params=1 frame=13 env=0 flags=dbg,overflowed  @0x000003fd size=28
+  0000  GetGlobalObject      r1
+  0002  GetByIdShort         r3, r1, #c0, s8 "log"
+  0007  GetByIdShort         r2, r3, #c1, s22 "push"
+  000c  LoadThisNS           r1
+  000e  GetByIdShort         r1, r1, #c2, s9 "length"
+  0013  Call2                r1, r2, r3, r1
+  0018  LoadConstUndefined   r0
+  001a  Ret                  r0
+
+function #5 "handler"  params=1 frame=13 env=0 flags=dbg,overflowed  @0x00000419 size=29
+  0000  GetGlobalObject      r1
+  0002  GetByIdShort         r3, r1, #c0, s15 "calls"
+  0007  GetByIdShort         r2, r3, #c1, s22 "push"
+  000c  LoadThisNS           r1
+  000e  GetByIdShort         r1, r1, #c2, s12 "tag"
+  0013  Call2                r1, r2, r3, r1
+  0018  LoadConstUInt8       r0, 2
+  001b  Ret                  r0
+
+function #6 "get"  params=1 frame=13 env=0 flags=dbg,overflowed  @0x00000436 size=30
+  0000  GetGlobalObject      r1
+  0002  GetByIdShort         r3, r1, #c0, s20 "order"
+  0007  GetByIdShort         r2, r3, #c1, s22 "push"
+  000c  LoadConstString      r1, s13 "get"
+  0010  Call2                r1, r2, r3, r1
+  0015  LoadConstUndefined   r0
+  0017  CreateClosure        r1, r0, f7 ""
+  001c  Ret                  r1
+
+function #7 ""  params=1 frame=13 env=0 flags=dbg,overflowed  @0x00000454 size=25
+  0000  GetGlobalObject      r1
+  0002  GetByIdShort         r3, r1, #c0, s20 "order"
+  0007  GetByIdShort         r2, r3, #c1, s22 "push"
+  000c  LoadConstString      r1, s14 "call"
+  0010  Call2                r1, r2, r3, r1
+  0015  LoadConstUndefined   r0
+  0017  Ret                  r0
