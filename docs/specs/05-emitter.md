@@ -289,6 +289,20 @@ inline map is keyed by function index; otherwise the hoisted form is kept, since
 a wrong-scope binding that the unbound check reports is better than a silent
 binding to the wrong body.
 
+**A self-capturing recursion group is a closure factory, not copies.** A
+function in `closureFactories` (spec 03 §6.2 G2) is emitted once as
+`function _mk<n>(_c<n>) { return function <name>(...) { ... }; }`, hosted in
+the owner of its shared parent environment. `GetParentEnvironment 0` in the
+body is `_c<n>`, its slot reads/writes `__hbc_env_load` / `__hbc_env_store`,
+and every creation site is `_mk<n>(__hbc_env_view(null, slot, get, set, ...))`
+with the getters/setters closing over the creation site's real `_e<env>_<slot>`
+bindings. Each creation is a fresh function object with the original `.name`,
+writes reach the captured variables themselves, and deeper environments stay
+lexical. Copies cannot do this: a copy capturing an environment its own body
+creates declares the fresh `let _e<env>_*` over the captured one it reads
+(fixture 440 printed `undefinedm:NaN` before). Cost: one wrapper per factory
+plus a view per creation site.
+
 **`materialised` slots.** `const _env<id> = { s0: undefined, … };` in the owner,
 accesses become `_env<id>.s<slot>`, and any closure created with that env
 captures the object. Correct, uglier, and rare.
