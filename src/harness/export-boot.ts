@@ -10,7 +10,7 @@
 // the prelude's wrapped `__d` factories on the original side (§4 a) and by
 // the export registry's `r()` under `--instrument=modules` (§4 b).
 import { deriveNativeManifest, overrideFor } from "./native-manifest.ts";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acquireBootSource, bootTrace } from "./boot-equiv.ts";
@@ -321,6 +321,9 @@ export async function exportBootProof(original: string, exportDir: string, opts:
   const exportThrow = bThrowRec !== undefined && bThrowRec.k === "call"
     ? `throw ${String(bThrowRec.args[1])}: ${String(bThrowRec.throws ?? "")}`
     : b.reachedEnd ? null : `threw ${errText(b)}`;
+  // Debugging aid: both projections, one entry per line.
+  const dump = process.env.HBC2JS_EXPORT_BOOT_DUMP;
+  if (dump !== undefined && dump !== "") { writeFileSync(`${dump}.a.txt`, pa.join("\n")); writeFileSync(`${dump}.b.txt`, pb.join("\n")); }
   let i = 0;
   while (i < pa.length && i < pb.length && pa[i] === pb[i]) i++;
   if (i < pa.length || i < pb.length) {
