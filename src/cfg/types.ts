@@ -238,11 +238,18 @@ export interface EnvGraph {
    *  (`envViewOps` store). Such writes are not in `accesses`/`EnvSlot.accesses`,
    *  so any "this slot has exactly one store" reasoning must consult this too. */
   readonly envViewStores: ReadonlySet<string>;
+  /** G2 (spec 03 §6.2 "self-created closures"): functions emitted as a
+   *  factory `_mk<f>(_c<f>)` hosted where their shared parent chain is visible;
+   *  every creation site passes a view of the captured environment. */
+  readonly closureFactories: ReadonlySet<number>;
   readonly diagnostics: readonly Diagnostic[];
 }
 
 export type EnvViewOp =
   | { readonly k: "closure-env" }
+  // G2 closure factory (spec 03 §6.2 "self-created closures"): the function's
+  // own captured environment, i.e. the factory parameter `_c<fn>`.
+  | { readonly k: "self-env" }
   | { readonly k: "up"; readonly levels: number }
   | { readonly k: "load"; readonly slot: number }
   | { readonly k: "store"; readonly slot: number };

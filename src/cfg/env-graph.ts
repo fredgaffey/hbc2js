@@ -207,6 +207,9 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
   // name. Such a function has a creation context nobody can enumerate, so its
   // nodes' parent formulas never resolve.
   const unknownSites = new Map<string, number>();
+  // G2 closure factories: function -> the creation environment its body's
+  // captured-environment reads are collected against (never one it creates).
+  const factorySelf = new Map<number, EnvNodeId>();
   const closureEnvExposed = new Map<number, Map<number, Set<number>>>();
   const envViewStores = new Set<string>();
   const expose = (fnId: number, level: number, slot: number): void => {
@@ -253,7 +256,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
 
   const runFunction = (f: number, collect: RoundOut | null): boolean => {
     const cfg = input.cfg(f);
-    const selfEnv = closureEnvOf.has(f) ? closureEnvOf.get(f)! : noEnvClosures.has(f) ? null : undefined;
+    const selfEnv = factorySelf.get(f) ?? (closureEnvOf.has(f) ? closureEnvOf.get(f)! : noEnvClosures.has(f) ? null : undefined);
     let learned = false;
     let state: State = new Map();
 
@@ -324,6 +327,12 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
         return;
       }
       if (name === "GetParentEnvironment") {
+        const fe = factorySelf.get(f);
+        if (fe !== undefined && insn.operands[1]!.value === 0) {
+          set(insn.operands[0]!.value, { t: "view", fn: f, node: fe, level: 0 });
+          if (collect !== null) envViewOps.set(siteKey(f, insn.offset), { k: "self-env" });
+          return;
+        }
         const v = walkUp(selfEnv, insn.operands[1]!.value);
         set(insn.operands[0]!.value, v);
         if (v.t === "unknown") set(insn.operands[0]!.value, { t: "selfUp", k: insn.operands[1]!.value });
@@ -817,6 +826,118 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
     }
   }
 
+  // ---- G2: self-created closures become factories (spec 03 §6.2) ---------
+  // A copied function that (with others) creates itself has unboundedly many
+  // live instances of the environments it creates, and one of its creation
+  // environments is one it creates: no `_e<env>_<slot>` name can tell the
+  // captured instance from the fresh one, so per-context copies collide. When
+  // every creation context differs only in the captured environment itself
+  // (the parents agree), the body is emitted once as a factory over a view of
+  // that environment instead, hosted where the shared parents are visible.
+  {
+    const chainOf = (leaf: EnvNodeId): EnvNodeId[] | null => {
+      const out: EnvNodeId[] = [];
+      for (let cur: EnvNodeId | null | undefined = leaf; cur !== null; cur = drafts[cur]!.parent) {
+        if (cur === undefined || out.includes(cur)) return null;
+        out.push(cur);
+      }
+      return out;
+    };
+    const copied = new Set(closureCopies.keys());
+    const succ = new Map<number, Set<number>>();
+    for (const g of copied) {
+      for (const key of closureCreationSites.get(g)?.keys() ?? []) {
+        const c = Number(key.slice(0, key.indexOf(":")));
+        if (!copied.has(c)) continue;
+        let set = succ.get(c);
+        if (set === undefined) succ.set(c, (set = new Set()));
+        set.add(g);
+      }
+    }
+    // Tarjan's SCC over the copied functions' "creates" relation.
+    const index = new Map<number, number>();
+    const low = new Map<number, number>();
+    const onStack = new Set<number>();
+    const stack: number[] = [];
+    const comps: number[][] = [];
+    let counter = 0;
+    const visit = (v: number): void => {
+      index.set(v, counter);
+      low.set(v, counter++);
+      stack.push(v);
+      onStack.add(v);
+      for (const w of succ.get(v) ?? []) {
+        if (!index.has(w)) {
+          visit(w);
+          low.set(v, Math.min(low.get(v)!, low.get(w)!));
+        } else if (onStack.has(w)) low.set(v, Math.min(low.get(v)!, index.get(w)!));
+      }
+      if (low.get(v) === index.get(v)) {
+        const comp: number[] = [];
+        for (;;) {
+          const w = stack.pop()!;
+          onStack.delete(w);
+          comp.push(w);
+          if (w === v) break;
+        }
+        comps.push(comp);
+      }
+    };
+    for (const v of [...copied].sort((a, b) => a - b)) if (!index.has(v)) visit(v);
+    const chosen = new Map<number, { env0: EnvNodeId; parent: EnvNodeId }>();
+    for (const comp of comps) {
+      if (comp.length === 1 && !(succ.get(comp[0]!)?.has(comp[0]!) ?? false)) continue;
+      // Only where copies are impossible: some member captures an environment
+      // it creates itself (the captured and the fresh instance share a name).
+      // Other recursion groups keep spec 05 §6's per-instance copies.
+      if (!comp.some((f) => closureCopies.get(f)!.some((c) => drafts[c.env]!.ownerFunction === f))) continue;
+      const picks = new Map<number, { env0: EnvNodeId; parent: EnvNodeId }>();
+      for (const f of comp) {
+        const envs = closureCopies.get(f)!.map((c) => c.env);
+        const chains = envs.map(chainOf);
+        const c0 = chains[0];
+        if (c0 === null || c0 === undefined || c0.length < 2) break;
+        if (!chains.every((c) => c !== null && c.length === c0.length && c.every((e, k) => k === 0 || e === c0[k]))) break;
+        const env0 = envs.find((e) => drafts[e]!.ownerFunction !== f);
+        if (env0 === undefined) break;
+        picks.set(f, { env0, parent: c0[1]! });
+      }
+      if (picks.size !== comp.length) continue;
+      for (const [f, pk] of picks) chosen.set(f, pk);
+    }
+    // A copied function with a creation environment owned by a factory would be
+    // a copy hosted inside a factory body (and its `.name` a copy name): it
+    // becomes a factory too, under the same "parents agree" condition.
+    for (let grew = chosen.size > 0; grew; ) {
+      grew = false;
+      for (const f of [...copied].sort((x, y) => x - y)) {
+        if (chosen.has(f)) continue;
+        const envs = closureCopies.get(f)!.map((c) => c.env);
+        if (!envs.some((e) => chosen.has(drafts[e]!.ownerFunction))) continue;
+        const chains = envs.map(chainOf);
+        const c0 = chains[0];
+        if (c0 === null || c0 === undefined || c0.length < 2) continue;
+        if (!chains.every((c) => c !== null && c.length === c0.length && c.every((e, k) => k === 0 || e === c0[k]))) continue;
+        const env0 = envs.find((e) => drafts[e]!.ownerFunction !== f);
+        if (env0 === undefined) continue;
+        chosen.set(f, { env0, parent: c0[1]! });
+        grew = true;
+      }
+    }
+    if (chosen.size > 0) {
+      for (const [f, { env0, parent }] of chosen) {
+        closureCopies.delete(f);
+        factorySelf.set(f, env0);
+        closureEnvOf.set(f, parent);
+      }
+      // Re-collect the factories' bodies: captured-environment reads become
+      // view operations against the factory parameter.
+      for (let i = collected.accesses.length - 1; i >= 0; i--) if (factorySelf.has(collected.accesses[i]!.functionIndex)) collected.accesses.splice(i, 1);
+      for (const key of [...collected.resolvedAt.keys()]) if (factorySelf.has(Number(key.slice(0, key.indexOf(":"))))) collected.resolvedAt.delete(key);
+      for (const f of [...factorySelf.keys()].sort((a, b) => a - b)) runFunction(f, collected);
+    }
+  }
+
   for (const f of closureEnvConflict) {
     if (conflictResolved.has(f)) continue;
     diagnostics.push({
@@ -921,6 +1042,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
     envViewOps,
     closureEnvExposed,
     envViewStores,
+    closureFactories: new Set(factorySelf.keys()),
     diagnostics,
   };
 }

@@ -46,6 +46,8 @@ export interface FunctionEmitter {
   /** The `__hbc_env_view(...)` expression to bind on the closure of
    *  `functionIndex` created at `offset`, when some reader needs it. */
   closureEnvView(functionIndex: number, offset: number): Expr | undefined;
+  /** G2 closure factory (spec 05 §6): created as `_mk<f>(view)`. */
+  closureFactory(functionIndex: number): boolean;
   /** The binding name a `Create*Closure`/`Create*Class` at `offset` must use for
    *  function `functionIndex`: `_fn<n>` normally, `_fn<n>__c<i>` when that
    *  function has per-creation-context copies and this site captured copy i's
@@ -341,6 +343,9 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
       usedHelpers.add("__hbc_env_view");
       input.useHelper("__hbc_env_view");
       return view;
+    },
+    closureFactory(functionIndex: number): boolean {
+      return envGraph.closureFactories.has(functionIndex);
     },
     closureName(functionIndex: number, offset: number): string {
       return input.closureNameAt?.get(siteKey(fn.index, offset)) ?? fnName(functionIndex);

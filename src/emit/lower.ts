@@ -800,6 +800,7 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
     case "GetClosureEnvironment": {
       // §6.2 closure environment views: the handle is a runtime object.
       const view = f.envViewOp(insn);
+      if (view?.k === "self-env") return set(V(insn, 0), id(`_c${f.fn.index}`));
       if (view?.k === "closure-env") {
         f.useHelper("__hbc_closure_env");
         return set(V(insn, 0), call(id("__hbc_closure_env"), [RG(insn, 1)]));
@@ -832,11 +833,15 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
         // the top of the enclosing function.
         const fnExpr: Expr = { k: "func", name: inline.name, params: inline.params, body: inline.body };
         const boundInline = f.closureEnvView(V(insn, 2), insn.offset);
+        // G2 closure factory created at its site: call the factory expression.
+        if (f.closureFactory(V(insn, 2))) return set(V(insn, 0), call(fnExpr, [boundInline ?? lit("null")]));
         if (boundInline === undefined) return set(V(insn, 0), fnExpr);
         f.useHelper("__hbc_bind_env");
         return set(V(insn, 0), call(id("__hbc_bind_env"), [fnExpr, boundInline]));
       }
       const bound = f.closureEnvView(V(insn, 2), insn.offset);
+      // G2 closure factory: a fresh function over a view of this site's environment.
+      if (f.closureFactory(V(insn, 2))) return set(V(insn, 0), call(id(`_mk${V(insn, 2)}`), [bound ?? lit("null")]));
       if (bound !== undefined) {
         f.useHelper("__hbc_bind_env");
         return set(V(insn, 0), call(id("__hbc_bind_env"), [id(f.closureName(V(insn, 2), insn.offset)), bound]));
