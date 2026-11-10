@@ -280,5 +280,5 @@ result, and the `Construct` destination becomes `undefined` (fixture
 two call sites; v99 emits a different call there). Result, flat tier with
 `--substitute none --lenient-env`: B1 and B2 EQUIVALENT (`main`, 1586
 factories, 1 view, 1 commit each side). Test 10 is real (sweep tier). It
-exports with `--lenient-env`: 87 `__hbc_unresolved_env` markers remain in
-the held-out export, and none is reached by boot.
+exports with `--lenient-env`: 43 `__hbc_unresolved_env` markers remain in
+the held-out export (6 module files), and none is reached by boot.
