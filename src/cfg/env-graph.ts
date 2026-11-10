@@ -68,6 +68,10 @@ type EnvValue =
   // visible here: lowered through a runtime view (§6.2 closure environment views).
   | { readonly t: "view"; readonly fn: number; readonly node: EnvNodeId; readonly level: number }
   | { readonly t: "none" }
+  // `GetParentEnvironment k` of a function whose own environment is not known
+  // (G2): opaque like `unknown`, except that an environment created with it as
+  // parent records a parent formula (resolveParentFormulas).
+  | { readonly t: "selfUp"; readonly k: number }
   // A primitive constant (LoadConst* other than undefined): never a closure, so
   // a slot store of it cannot be what a later GetClosureEnvironment reads.
   | { readonly t: "prim" }
@@ -82,6 +86,7 @@ function sameValue(a: EnvValue, b: EnvValue): boolean {
   if (a.t === "env" && b.t === "env") return a.node === b.node;
   if (a.t === "closure" && b.t === "closure") return a.fn === b.fn && a.env === b.env && a.opaque === b.opaque;
   if (a.t === "view" && b.t === "view") return a.fn === b.fn && a.node === b.node && a.level === b.level;
+  if (a.t === "selfUp" && b.t === "selfUp") return a.k === b.k;
   return true;
 }
 
@@ -193,6 +198,15 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
   // check that made the load resolve already proved these lexically visible.
   const viaSlotClosure = new Set<string>();
   const envViewOps = new Map<string, EnvViewOp>();
+  // §6.2 "polymorphic parent": node -> k when the node was created with
+  // `CreateEnvironment d, rP` and rP held `GetParentEnvironment k` of a function
+  // whose own environment was not (yet) known. Resolved after the fixed point
+  // from every creation context of the creating function (resolveParentFormulas).
+  const parentFormula = new Map<EnvNodeId, number>();
+  // siteKey -> function created there with an environment the tracker could not
+  // name. Such a function has a creation context nobody can enumerate, so its
+  // nodes' parent formulas never resolve.
+  const unknownSites = new Map<string, number>();
   const closureEnvExposed = new Map<number, Map<number, Set<number>>>();
   const envViewStores = new Set<string>();
   const expose = (fnId: number, level: number, slot: number): void => {
@@ -281,6 +295,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
         else {
           const pv = get(insn.operands[1]!.value);
           parent = pv.t === "env" ? pv.node : pv.t === "none" ? null : undefined;
+          if (pv.t === "selfUp" && draft.parent === undefined) parentFormula.set(nodeId, pv.k);
         }
         if (parent !== undefined && draft.parent === undefined) {
           draft.parent = parent;
@@ -304,12 +319,14 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
             } else set(insn.operands[0]!.value, UNKNOWN);
             return;
           }
-          set(insn.operands[0]!.value, start.t === "env" ? walkUp(start.node, levels) : UNKNOWN);
+          set(insn.operands[0]!.value, start.t === "env" ? walkUp(start.node, levels) : start.t === "selfUp" ? { t: "selfUp", k: start.k + levels } : UNKNOWN);
         }
         return;
       }
       if (name === "GetParentEnvironment") {
-        set(insn.operands[0]!.value, walkUp(selfEnv, insn.operands[1]!.value));
+        const v = walkUp(selfEnv, insn.operands[1]!.value);
+        set(insn.operands[0]!.value, v);
+        if (v.t === "unknown") set(insn.operands[0]!.value, { t: "selfUp", k: insn.operands[1]!.value });
         return;
       }
       if (name === "GetClosureEnvironment") {
@@ -347,7 +364,10 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
         const fnId = insn.operands.find((o) => o.role === "function")!.value;
         if (env !== null) noteClosure(fnId, env);
         else if (ev.t === "none") noteNoEnvClosure(fnId);
-        if (env !== null || ev.t === "none") noteSite(fnId, siteKey(f, insn.offset), env);
+        if (env !== null || ev.t === "none") {
+          noteSite(fnId, siteKey(f, insn.offset), env);
+          unknownSites.delete(siteKey(f, insn.offset));
+        } else unknownSites.set(siteKey(f, insn.offset), fnId);
         set(insn.operands[0]!.value, { t: "closure", fn: fnId, env });
         return;
       }
@@ -358,7 +378,10 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
         const fnId = insn.operands[insn.operands.length - 1]!.value;
         if (env !== null) noteClosure(fnId, env);
         else if (ev.t === "none") noteNoEnvClosure(fnId);
-        if (env !== null || ev.t === "none") noteSite(fnId, siteKey(f, insn.offset), env);
+        if (env !== null || ev.t === "none") {
+          noteSite(fnId, siteKey(f, insn.offset), env);
+          unknownSites.delete(siteKey(f, insn.offset));
+        } else unknownSites.set(siteKey(f, insn.offset), fnId);
         clobber(insn);
         set(insn.operands[0]!.value, { t: "closure", fn: fnId, env });
         return;
@@ -557,11 +580,71 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
     return learned;
   };
 
+  /**
+   * §6.2 "polymorphic parent" (G2). A function created from several contexts
+   * that creates `CreateEnvironment d, (GetParentEnvironment k)` gets a node
+   * whose parent is "k levels above whichever environment this activation
+   * captured". When the function (directly or through others) creates itself,
+   * no single run of the tracker can name that: its own environment is one of
+   * the nodes being resolved. The set of possible parents is the least fixed
+   * point of P(N) = U_{X in sites(owner N)} up(X, k), with known parents
+   * fixed; every runtime instance of N comes from a finite creation chain
+   * starting outside the cycle, so the least fixed point is exact. A singleton
+   * becomes the node's parent. Refused (left unknown) when the owner has a
+   * creation site whose environment is unknown or none, or any walk reaches a
+   * node with neither a parent nor a formula, or runs off the root.
+   */
+  function resolveParentFormulas(): boolean {
+    const pending = [...parentFormula].filter(([n]) => drafts[n]!.parent === undefined);
+    if (pending.length === 0) return false;
+    const unknownCreated = new Set(unknownSites.values());
+    const TOP = -1;
+    const P = new Map<EnvNodeId, Set<EnvNodeId>>(pending.map(([n]) => [n, new Set<EnvNodeId>()]));
+    const up = (x: EnvNodeId, j: number, out: Set<EnvNodeId>): void => {
+      if (j === 0) {
+        out.add(x);
+        return;
+      }
+      const par = drafts[x]!.parent;
+      if (par === null) out.add(TOP);
+      else if (par !== undefined) up(par, j - 1, out);
+      else {
+        const ps = P.get(x);
+        if (ps === undefined) out.add(TOP);
+        else for (const y of ps) if (y === TOP) out.add(TOP);
+        else up(y, j - 1, out);
+      }
+    };
+    for (let changed = true, guard = 0; changed && guard < 64; guard++) {
+      changed = false;
+      for (const [n, k] of pending) {
+        const owner = drafts[n]!.ownerFunction;
+        const ps = P.get(n)!;
+        const before = ps.size;
+        const sites = closureCreationSites.get(owner);
+        if (sites === undefined || unknownCreated.has(owner) || noEnvClosures.has(owner)) ps.add(TOP);
+        else for (const x of new Set(sites.values())) if (x === null) ps.add(TOP);
+        else up(x, k, ps);
+        if (ps.size !== before) changed = true;
+      }
+    }
+    let any = false;
+    for (const [n] of pending) {
+      const ps = P.get(n)!;
+      if (ps.size !== 1 || ps.has(TOP)) continue;
+      drafts[n]!.parent = [...ps][0]!;
+      parentFormula.delete(n);
+      any = true;
+    }
+    return any;
+  }
+
   for (let round = 0; round < MAX_ROUNDS; round++) {
     let learned = false;
     for (const f of input.functionIndices) {
       if (runFunction(f, null)) learned = true;
     }
+    if (!learned && resolveParentFormulas()) learned = true;
     if (!learned) break;
   }
 
