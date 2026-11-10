@@ -539,7 +539,7 @@ export function splitProject(bytes: Uint8Array, opts: SplitOptions = {}): SplitR
   modules.sort((a, b) => a.id - b.id);
 
   const globalFn = bodies.get(module.header.globalCodeIndex);
-  const startupIds = isFuncStmt(globalFn) ? resolveStartupModuleIds(globalFn.body) : [];
+  const startupIds = isFuncStmt(globalFn) ? resolveStartupModuleIds(globalFn.body, analysis.cfg(module.header.globalCodeIndex)) : [];
   const entryModuleId = startupIds.length > 0 ? startupIds[startupIds.length - 1]! : null;
   if (entryModuleId === null || !known.has(entryModuleId)) {
     diagnostics.push(`could not resolve an entry module id from the global function's __r() call`);

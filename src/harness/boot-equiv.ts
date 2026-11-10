@@ -23,7 +23,7 @@ import type { HermesRunResult, HermesVm } from "./hermes-vm.ts";
 import { TRACE_VERDICT, compareTraces } from "./compare.ts";
 import type { TraceComparison, TraceVerdict } from "./compare.ts";
 import type { ErrRecord, Trace, TraceRecord } from "./trace.ts";
-import type { NativeManifest } from "./native-manifest.ts";
+import { PROMISE_METHODS, type NativeManifest } from "./native-manifest.ts";
 
 /** §3, §5: default cap on recorded native-module interactions per side. */
 export const DEFAULT_FIRST_NATIVE = 64;
@@ -45,10 +45,13 @@ export interface AcquiredBootSource {
 /** Spec §8 "source acquisition": `.hbc` goes through `decompile()` (lower
  *  fidelity, flagged); `.js`/`.bundle` passes through unchanged (faithful —
  *  it is the Metro combined-bundle text itself). */
-export function acquireBootSource(inputPath: string): AcquiredBootSource {
+export function acquireBootSource(inputPath: string, opts: { readonly lenientEnv?: boolean } = {}): AcquiredBootSource {
   if (inputPath.endsWith(".hbc")) {
     const bytes = readFileSync(inputPath);
-    const result = decompile(new Uint8Array(bytes));
+    // Spec 33 apps: an HBC-only original (no Metro text shipped) with
+    // unresolved environment reads decompiles with markers when asked; a
+    // marker reached at boot throws, which the proof reads as INCONCLUSIVE.
+    const result = decompile(new Uint8Array(bytes), opts.lenientEnv === true ? { strictEnv: false } : {});
     return { source: result.code, sourceKind: "decompiled" };
   }
   return { source: readFileSync(inputPath, "utf8"), sourceKind: "bundle-js" };
@@ -147,6 +150,44 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
   // the open host (every name present).
   var __hbcNatives = ${JSON.stringify(natives === null ? null : natives.present)};
   function present(n) { return __hbcNatives === null || Object.prototype.hasOwnProperty.call(__hbcNatives, n); }
+  // Spec 33 apps stub-host addition (spec 31 §4.2): Android's Hermes ships
+  // \`Intl\`; the host VMs here are built without it. An empty namespace lets
+  // an app's formatjs polyfills (\`defineProperty(Intl, 'Locale', …)\`)
+  // install themselves at module eval, as they would on a device that
+  // lacks the piece they polyfill.
+  // \`getCanonicalLocales\` is the one primitive those polyfills build on
+  // (a structurally valid tag comes back as itself).
+  if (typeof globalThis.Intl === "undefined") {
+    // Hermes's own Intl (Android) also has Collator, DateTimeFormat and
+    // NumberFormat, which apps construct at render time; deterministic
+    // en-US/UTC stand-ins, identical on both sides.
+    var canon = function (l) { return l === undefined ? [] : (Array.isArray(l) ? l : [l]).map(String); };
+    var intlClass = function (resolved, methods) {
+      var C = function (locales, options) {
+        if (!(this instanceof C)) return new C(locales, options);
+        this.__o = options || {};
+      };
+      C.supportedLocalesOf = function (l) { return canon(l); };
+      C.prototype.resolvedOptions = function () { var r = {}; for (var k in this.__o) r[k] = this.__o[k]; for (var j in resolved) r[j] = resolved[j]; return r; };
+      for (var m in methods) C.prototype[m] = methods[m];
+      return C;
+    };
+    var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+    var fmtDate = function (d) { var t = d === undefined ? new Date(0) : new Date(d); return isNaN(t.getTime()) ? "Invalid Date" : (t.getUTCMonth() + 1) + "/" + t.getUTCDate() + "/" + t.getUTCFullYear() + ", " + pad(t.getUTCHours()) + ":" + pad(t.getUTCMinutes()); };
+    globalThis.Intl = {
+      getCanonicalLocales: canon,
+      Collator: intlClass({ locale: "en-US", usage: "sort", sensitivity: "variant" }, { compare: function (a, b) { a = String(a); b = String(b); return a < b ? -1 : a > b ? 1 : 0; } }),
+      NumberFormat: intlClass({ locale: "en-US", numberingSystem: "latn" }, {
+        format: function (n) { return String(n); },
+        formatToParts: function (n) { return [{ type: "integer", value: String(n) }]; },
+      }),
+      DateTimeFormat: intlClass({ locale: "en-US", calendar: "gregory", numberingSystem: "latn", timeZone: "UTC" }, {
+        format: fmtDate,
+        formatToParts: function (d) { return [{ type: "literal", value: fmtDate(d) }]; },
+      }),
+    };
+  }
+  var __hbcPromises = ${JSON.stringify(PROMISE_METHODS)};
   function consts(n) { return __hbcNatives !== null && Object.prototype.hasOwnProperty.call(__hbcNatives, n) ? __hbcNatives[n] : null; }
   // Spec 33 §3 B2 / §4(c): null in B1 (schedules are only recorded, as in
   // spec 31); in B2 the host keeps callbacks and drains them on the virtual
@@ -280,6 +321,10 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
           // Spec 33 L1 stub-host addition (spec 31 §4.2): getConstants()
           // returns an object (see hostConstants), not undefined.
           if (p === "getConstants") return cs ? JSON.parse(JSON.stringify(cs)) : hostConstants(name);
+          // Spec 33 apps stub-host addition (spec 31 §4.2): a device's
+          // promise methods (PROMISE_METHODS) resolve, on both sides.
+          var pmod = __hbcPromises[name.slice(name.lastIndexOf(".") + 1)];
+          if (pmod && Object.prototype.hasOwnProperty.call(pmod, p)) return Promise.resolve(pmod[p]);
           // Spec 33 stub-host addition (spec 31 §4.2): a JSI library's
           // \`<X>TurboModule.installTurboModule()\` (worklets, reanimated)
           // natively installs \`globalThis.__<x>ModuleProxy\`, which the
@@ -296,6 +341,10 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
           // extendable base classes (EventEmitter, NativeModule, SharedObject,
           // ...) with no-op listener methods; the rest are JSI host stubs.
           if (p === "installModules" && /ExpoModulesCore$/.test(name) && globalThis.expo === undefined) globalThis.expo = expoStub();
+          // react-native-nitro-modules: \`NitroModules.install()\` installs the
+          // JSI \`globalThis.NitroModulesProxy\` (createHybridObject, box, ...),
+          // which the library reads back at once (spec 33 apps).
+          if (p === "install" && /\.NitroModules$/.test(name) && globalThis.NitroModulesProxy === undefined) globalThis.NitroModulesProxy = hostStub("NitroModulesProxy", true);
           if (jsi === true) return hostStub(name + "." + String(p) + "()", true);
           return undefined;
         };

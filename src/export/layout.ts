@@ -17,7 +17,7 @@ export interface ExportModuleInfo {
   readonly package: string | null;
 }
 
-const ANON_VENDOR_RE = /^node_modules\/_vendor\/module_(\d+)\.js$/;
+const ANON_VENDOR_RE = /^node_modules\/_vendor\/module_(-?\d+)\.js$/;
 
 /** §3.1's re-rooting table, applied to one `SegregatedModuleInfo`. Belt and
  *  braces for a bucket `segregateSplitTree` cannot produce today (spec 08 §4

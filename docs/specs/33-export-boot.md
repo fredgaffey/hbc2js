@@ -282,3 +282,48 @@ two call sites; v99 emits a different call there). Result, flat tier with
 factories, 1 view, 1 commit each side). Test 10 is real (sweep tier). It
 exports with `--lenient-env`: 43 `__hbc_unresolved_env` markers remain in
 the held-out export (6 module files), and none is reached by boot.
+
+**L5: more apps (2026-11-10, in progress).** Expensify (0.86.0, v98,
+12451 modules) and a public social app shipped as HBC only. Expensify's
+original needed six stub-host/manifest additions, all on both sides and all
+by rule, no per-app `boot-native.json`: the native manifest's bundle
+evidence now also counts a library's linking-error fallback
+(`NativeModules.X ? NativeModules.X : new Proxy(...)`), a module bound once
+and dereferenced unguarded in its factory, one whose factory throws when it
+is missing, and the "NativeModule.X is null. To fix this issue" message; the
+host resolves device promise methods (`Linking.getInitialURL`), installs
+`globalThis.NitroModulesProxy` on `NitroModules.install()`, and provides an
+`Intl` namespace (`getCanonicalLocales`, deterministic en-US/UTC
+`Collator`/`DateTimeFormat`/`NumberFormat`), because the host VMs are built
+without Intl and Android's Hermes has it. The original then boots clean (B1
+3007 factories, keys `LogBox`, `NewExpensify`; B2 reaches
+`runApplication("NewExpensify")`, 8 views, 2 commits). Two export bugs:
+Metro registers react-native-worklets' runtime under id `-2`, which the
+export's rewrite did not match (`tests/gate/export/negative-module-id.test.ts`),
+and hermesc reused the register holding the entry id (`65535`, then `0`), so
+the startup scan dropped `__r(0)` (`entry-nested-const.test.ts`). With those,
+B1 was DIVERGENT at projection entry 5613 (original `enter 712`, export
+`enter 1290`). Cause: the emitter replaced every `GetById "HermesInternal"`
+with the `__hbc_HermesInternal` shim whatever the receiver, so
+@sentry/react-native's `RN_GLOBAL_OBJ.HermesInternal.enablePromiseRejectionTracker`
+read the shim (which has none) and took the polyfill branch. The shim now
+stands only for a read off the global object (a `TryGetById`, or a register
+holding `GetGlobalObject`); construct `450-hermesinternal-own-property`.
+A clean re-export also showed the d9f3428 entry fix did not hold on the real
+fn#0 (its later `r3 = 0` writes sit under a structured `if`), so a register
+argument of `__r` is now resolved by a reaching-constant pass over the global
+function's bytecode CFG (`constRegisterBefore`, AST scan as fallback). B1 is
+then DIVERGENT at entry 6072 (3007 vs 3003 factories): the original's last
+four enters (3295, 3296, 5194, 3371) come from a microtask after boot, an
+OnyxDerived `compute` (module 11123: `queueMicrotask(N)` once every
+dependency connection has called back, `++T === O`); the export's trace ends
+after the same NitroSQLite `executeAsync` storage reads, with a different
+interleaving of `performance.now`/`executeAsync` calls before it (original:
+6 `now`, 1 `executeAsync`, 3 `now`; export: 2 `now`, 4 `executeAsync`), so
+one Onyx connection never calls back. Not yet diagnosed past that point;
+`HBC2JS_EXPORT_BOOT_DUMP=<prefix>` writes both projections for the next look. The export takes
+11 min and 10.5 GB RSS. The HBC-only app has no Metro text, so its control
+is a whole-file decompile: that took 19.6 min (the split export, 6 min) and
+fn#0 failed with `E_PASS_CRASH`, so it is INCONCLUSIVE before the export is
+looked at. `acquireBootSource` now decompiles an `.hbc` original with
+`--lenient-env` markers for the proof.

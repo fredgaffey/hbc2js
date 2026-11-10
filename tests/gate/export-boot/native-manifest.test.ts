@@ -86,3 +86,92 @@ test("export-boot L4: B2 drove RN's own LogBox surface (registered first) instea
   assert.equal(r.reachedEnd, true, JSON.stringify(r.bootError));
   assert.equal(observeRun(r.trace).runApplication, "main");
 });
+
+test("export-boot apps: a library whose absent fallback is a throwing `new Proxy` (linking-error template) is present", () => {
+  // Expensify, react-native-key-command: `t=n.NativeModules.KeyCommand?
+  // n.NativeModules.KeyCommand:new Proxy({},{get(){throw new Error(o)}})`.
+  // Read as a conditional probe it was absent, so the original's factory
+  // threw "doesn't seem to be linked" under the stub host (INCONCLUSIVE).
+  const src = [
+    "__d(function(g,r,i,a,m,e,d){var t=n.NativeModules.KeyCommand?n.NativeModules.KeyCommand:new Proxy({},{get(){throw new Error(o)}});e.default=t},1333,[21]);",
+    "__d(function(g,r,i,a,m,e,d){var M=NativeModules.RNFoo ? NativeModules.RNFoo : new Proxy({}, {get() { throw new Error(L) }});},1,[]);",
+    "__d(function(g,r,i,a,m,e,d){var M=NativeModules.Probe ? 1 : 2},2,[]);",
+  ].join("\n");
+  const ev = bundleEvidence(src);
+  assert.ok(ev.required.has("KeyCommand"));
+  assert.ok(ev.required.has("RNFoo"));
+  assert.ok(!ev.required.has("Probe") && !ev.spec.has("Probe"));
+  assert.ok("KeyCommand" in deriveNativeManifest(src).present);
+});
+
+test("export-boot apps: an app module bound once and dereferenced unguarded at module eval is present", () => {
+  // Expensify BootSplash: `n=r(d[2]).NativeModules.BootSplash;
+  // e.default={…,logoSizeRatio:n.logoSizeRatio||1}` threw "Cannot read
+  // property 'logoSizeRatio' of undefined" in the original (INCONCLUSIVE).
+  const src = [
+    "__d(function(g,r,i,a,m,e,d){var t=o(r(d[1])),n=r(d[2]).NativeModules.BootSplash;e.default={hide:function(){return n.hide()},logoSizeRatio:n.logoSizeRatio||1}},3604,[1]);",
+    "__d(function(g,r,i,a,m,e,d){var x=r(d[0]).NativeModules.EXDevLauncher;e.f=function(){return x?x.open():null}},5,[]);",
+    "__d(function(g,r,i,a,m,e,d){var y=r(d[0]).NativeModules.Opt;if(y){y.go()}},6,[]);",
+    // react-native-device-info: guarded only to throw when missing.
+    "__d(function(g,r,i,a,m,e,d){var o=r(d[0]),t=o.NativeModules.RNDeviceInfo;if('web'!==o.Platform.OS||(t=r(d[1])),!t&&('android'===o.Platform.OS))throw new Error(\"RNDeviceInfo is null\");e.default=t},1752,[21]);",
+  ].join("\n");
+  const ev = bundleEvidence(src);
+  assert.ok(ev.required.has("BootSplash"));
+  assert.ok(!ev.required.has("EXDevLauncher"), "guarded with ?");
+  assert.ok(!ev.required.has("Opt"), "guarded with if");
+  assert.ok(ev.required.has("RNDeviceInfo"), "throws when missing");
+  // netinfo: the module comes from another factory; the error names it.
+  const net = bundleEvidence("__d(function(g,r,i,a,m,e,d){var o=t(r(d[2]));if(!o.default)throw new Error(\"@react-native-community/netinfo: NativeModule.RNCNetInfo is null. To fix this issue try these steps\")},2245,[]);");
+  assert.ok(net.required.has("RNCNetInfo"));
+});
+
+test("export-boot apps: a device promise method (Linking.getInitialURL) resolves under the stub host", (t) => {
+  // Expensify module 3172 runs `Linking.getInitialURL().then(…)` at module
+  // eval; the stub returned undefined and the original threw "Cannot read
+  // property 'then' of undefined" (INCONCLUSIVE).
+  if (!vmOrSkip(t)) return;
+  const src = `
+    var p = globalThis.__turboModuleProxy("IntentAndroid").getInitialURL();
+    if (p === undefined || typeof p.then !== "function") throw new Error("getInitialURL must return a Promise");
+  `;
+  const r = bootTrace(src, { seed: 0, natives: deriveNativeManifest("") });
+  assert.equal(r.reachedEnd, true, JSON.stringify(r.bootError));
+});
+
+test("export-boot apps: NitroModules.install() installs globalThis.NitroModulesProxy under the stub host", (t) => {
+  // Expensify module 20 (react-native-nitro-modules) calls
+  // `getEnforcing('NitroModules').install()` and then reads
+  // `global.NitroModulesProxy`; it was null and the original threw
+  // "Failed to get NitroModules" (INCONCLUSIVE).
+  if (!vmOrSkip(t)) return;
+  const src = `
+    var r = globalThis.__turboModuleProxy("NitroModules").install();
+    if (r != null) throw new Error("install must return nothing");
+    var n = globalThis.NitroModulesProxy;
+    if (n == null) throw new Error("NitroModulesProxy missing");
+    var h = n.createHybridObject("NitroFetch");
+    if (h == null) throw new Error("hybrid object missing");
+  `;
+  const r = bootTrace(src, { seed: 0, natives: deriveNativeManifest("x.getEnforcing('NitroModules')") });
+  assert.equal(r.reachedEnd, true, JSON.stringify(r.bootError));
+});
+
+test("export-boot apps: the stub host provides an Intl namespace for module-eval polyfills", (t) => {
+  // Expensify module 3088 (@formatjs/intl-locale polyfill) runs
+  // `Object.defineProperty(Intl,'Locale',…)`; the host VM has no Intl, so
+  // the original threw "Property 'Intl' doesn't exist" (INCONCLUSIVE).
+  if (!vmOrSkip(t)) return;
+  // Then module 2444's `new Intl.Locale(l)` (the polyfill) called
+  // `Intl.getCanonicalLocales`: "undefined is not a function".
+  const src = `Object.defineProperty(Intl, "Locale", { value: function () {}, writable: true, enumerable: false, configurable: true });
+    var c = Intl.getCanonicalLocales("en");
+    if (c.length !== 1 || c[0] !== "en") throw new Error("getCanonicalLocales");
+    // B2: render constructed Intl.DateTimeFormat ("undefined cannot be used
+    // as a constructor", reported, no UI commit).
+    var tz = new Intl.DateTimeFormat("en-US").resolvedOptions().timeZone;
+    if (tz !== "UTC") throw new Error("DateTimeFormat");
+    if (typeof Intl.NumberFormat("en").format(1) !== "string") throw new Error("NumberFormat");
+    if (new Intl.Collator().compare("a", "b") !== -1) throw new Error("Collator");`;
+  const r = bootTrace(src, { seed: 0, natives: deriveNativeManifest("") });
+  assert.equal(r.reachedEnd, true, JSON.stringify(r.bootError));
+});
