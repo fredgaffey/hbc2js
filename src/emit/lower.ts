@@ -599,11 +599,16 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
       return;
     case "PutOwnPrivateBySym":
       // "Arg1[Arg4] = Arg2" (Arg3 is a cache index).
-      out.push(assign(member(RG(insn, 0), RG(insn, 3), true), RG(insn, 1)));
+      // Own-only and throwing when absent (review-1110, fixture 342): a
+      // helper, not `obj[sym] = v`, which would create the field.
+      f.useHelper("__hbc_privSet");
+      out.push({ k: "expr", expr: call(id("__hbc_privSet"), [RG(insn, 0), RG(insn, 3), RG(insn, 1)]) });
       return;
     case "GetOwnPrivateBySym":
-      // "Arg1 = Arg2[Arg4]" (Arg3 is a cache index).
-      return set(V(insn, 0), member(RG(insn, 1), RG(insn, 3), true));
+      // "Arg1 = Arg2[Arg4]" (Arg3 is a cache index). Own-only, throws when
+      // absent or on a primitive base (review-1110, fixture 342).
+      f.useHelper("__hbc_privGet");
+      return set(V(insn, 0), call(id("__hbc_privGet"), [RG(insn, 1), RG(insn, 3)]));
     case "PrivateIsIn":
       // Own-property check only: no prototype chain. A non-object right
       // operand throws a TypeError ("right operand of 'in' is not an object",
