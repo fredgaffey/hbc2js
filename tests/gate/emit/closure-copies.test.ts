@@ -145,7 +145,7 @@ test("a copy's children keep their own names — the copy's name renames the ins
 // leaves them invisible to every other instance of the group — the 35 unbound
 // `_fn<n>__c<i>` names item 1 left behind.
 
-test("a copy hosted inside its own recursion group is emitted in every instance of that host", (t) => {
+test("a recursion group that captures an environment it creates is a closure factory, not copies (G2)", (t) => {
   if (!existsSync(DONOR)) {
     t.skip(`${DONOR} not present — run tests/fixtures/constructs/build.sh (INCONCLUSIVE, not a failure)`);
     return;
@@ -153,17 +153,18 @@ test("a copy hosted inside its own recursion group is emitted in every instance 
   const result = emitSynth(mutualRecursionFunctions());
   const code = result.code;
 
-  // fn#4's copy over env 2 lives in fn#2, far from copy 0 of fn#3/fn#4 (both in
-  // fn#1). Its body creates fn#3 and fn#4 over the environment IT owns, i.e.
-  // the copies hosted in fn#4 — which must therefore travel into this instance.
-  const inFn2 = bodyOf(code, "_fn4__c1");
-  assert.ok(inFn2.includes("function _fn3__c3("), "the OTHER group member's copy hosted in fn#4 is not inside this instance of fn#4, so its reference is unbound (report §5 item 2)");
-  assert.ok(inFn2.includes("function _fn4__c3("), "fn#4's own copy hosted in fn#4 is not inside this instance either");
-
-  // …and the recursion stops: a copy is never nested inside itself. The site
-  // that would do it is the self-reference its own declaration already binds.
-  assert.doesNotMatch(bodyOf(code, "_fn3__c2"), /function _fn3__c2\(/, "a copy hosted inside its own group nested inside itself; the `hosted` set is what must stop that");
-  assert.doesNotMatch(bodyOf(code, "_fn4__c3"), /function _fn4__c3\(/);
+  // fn#3/fn#4 capture env 3/env 4, which they create themselves. Per-instance
+  // copies (the earlier landing) nested a copy whose own `let _e3_*` shadowed
+  // the captured `_e3_0` it reads. Now each is one factory over a view of the
+  // captured environment (fix-env-per-context, spec 05 §6), and no copy of
+  // either exists.
+  assert.match(code, /function _mk3\(_c3\) \{/);
+  assert.match(code, /function _mk4\(_c4\) \{/);
+  assert.doesNotMatch(code, /function _fn[34]__c\d+\(/);
+  // The captured read goes through the factory parameter, never a lexical name.
+  assert.match(bodyOf(code, "_mk3"), /(r\d+) = _c3;\s+r\d+ = __hbc_env_load\(\1, 0\);/);
+  // Every creation site (fn#1, fn#2 and the members themselves) calls a factory.
+  assert.ok((code.match(/_mk3\(__hbc_env_view\(/g) ?? []).length >= 4, "every creation site of fn#3 passes a view");
 
   assert.deepEqual(
     result.diagnostics.filter((d) => d.code === "W_UNBOUND_ISOLATED" || d.code === "W_AMBIGUOUS_CLOSURE_ENV" || d.code === "W_ORPHAN_FUNCTION").map((d) => `${d.code}: ${d.message}`),

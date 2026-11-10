@@ -1,0 +1,61 @@
+; hbc2js disassembly of 450-hermesinternal-own-property/v94.hbc
+; version=94 layout=C opcodeTable=hbc94 functions=4 strings=13 globalCodeIndex=0
+function #0 "global"  params=1 frame=9 env=0 flags=dbg  @0x00000170 size=15
+  0000  CreateEnvironment    r0
+  0002  CreateClosure        r1, r0, f1 ""
+  0007  LoadConstUndefined   r0
+  0009  Call1                r1, r1, r0
+  000d  Ret                  r0
+
+function #1 ""  params=1 frame=21 env=0 flags=strict,dbg  @0x0000017f size=135
+  0000  CreateEnvironment    r1
+  0002  LoadConstString      r7, s5 "untracked"
+  0006  CreateClosure        r2, r1, f2 "read"
+  000b  NewObject            r0
+  000d  LoadConstString      r3, s3 "own"
+  0011  PutNewOwnByIdShort   r0, r3, s8 "tag"
+  0015  CreateClosure        r1, r1, f3 "enablePromiseRejectionTracker"
+  001a  PutNewOwnByIdShort   r0, r1, s10 "enablePromiseRejectionTracker"
+  001e  NewObject            r1
+  0020  PutNewOwnByIdShort   r1, r0, s11 "HermesInternal"
+  0024  LoadConstUndefined   r0
+  0026  Call2                r4, r2, r0, r1
+  002b  NewObject            r1
+  002d  Call2                r1, r2, r0, r1
+  0032  Mov                  r5, r4
+  0035  JmpFalse             L1, r5
+  0038  GetByIdShort         r5, r4, #c1, s10 "enablePromiseRejectionTracker"
+L1:
+  003d  GetGlobalObject      r3
+  003f  TryGetById           r2, r3, #c2, s12 "print"
+  0045  GetByIdShort         r6, r4, #c3, s8 "tag"
+  004a  JmpFalse             L2, r5
+  004d  NewObject            r4
+  004f  LoadConstTrue        r8
+  0051  PutNewOwnByIdShort   r4, r8, s9 "allRejections"
+  0055  Call2                r7, r5, r0, r4
+L2:
+  005a  TryGetById           r3, r3, #c4, s11 "HermesInternal"
+  0060  GetByIdShort         r5, r3, #c5, s7 "concat"
+  0065  LoadConstString      r14, s0 ""
+  0069  LoadConstString      r3, s1 " "
+  006d  TypeOf               r11, r1
+  0070  Mov                  r13, r6
+  0073  Mov                  r12, r3
+  0076  Mov                  r10, r3
+  0079  Mov                  r9, r7
+  007c  Call                 r1, r5, 6
+  0080  Call2                r1, r2, r0, r1
+  0085  Ret                  r0
+
+function #2 "read"  params=2 frame=1 env=0 flags=strict,dbg  @0x00000206 size=10
+  0000  LoadParam            r0, 1
+  0003  GetByIdShort         r0, r0, #c1, s11 "HermesInternal"
+  0008  Ret                  r0
+
+function #3 "enablePromiseRejectionTracker"  params=2 frame=2 env=0 flags=strict,dbg  @0x00000210 size=18
+  0000  LoadParam            r0, 1
+  0003  GetByIdShort         r1, r0, #c1, s9 "allRejections"
+  0008  LoadConstString      r0, s6 "tracked:"
+  000c  Add                  r0, r0, r1
+  0010  Ret                  r0

@@ -556,3 +556,11 @@ adds unrelated `let` TDZ checks) and prints slot-named parameters at every
 version; fixture 271 (negative twins: slot rewritten in the body, in a
 closure, by a default initialiser, before the capture, and a sloppy alias)
 keeps every parameter `aK`; both are T2 PASS at 84/94/96/98/99.
+
+**Writes through a closure environment view count.** "The slot's only write"
+includes stores lowered through a closure environment view (spec 03 §6.2,
+`envViewOps`), which are not in `EnvSlot.accesses`; the env graph records them
+in `envViewStores` and `paramSlotFoldAllowed` refuses the fold for any slot in
+it. No hermesc shape reaches this today (the viewed closure's own body stores
+the slot lexically too, which already refuses), so the guard is pinned by a
+hand-built unit test, `tests/gate/emit/paramenv-view-store.test.ts`.

@@ -1,0 +1,6 @@
+v84: OK - compiles; `wrap` is not inlined into its methods.
+v94: OK - same.
+v96: OK - same.
+v98: OK - `wrap` inlined into `map`/`both`: CreateEnvironment with parent
+     GetParentEnvironment 1, closures re-created over it (G2 shape).
+v99: OK - same.

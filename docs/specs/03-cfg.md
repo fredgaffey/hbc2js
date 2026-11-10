@@ -678,17 +678,33 @@ environment created with an undefined parent has no parent.
   runs only behind the optional-call guard, i.e. on a function, and the one
   function ever stored is the one named (construct
   `430-slot-closure-or-undefined`).
-* **Not resolved: a function whose own environment is ambiguous.** The 18
-  remaining sites on react-navigation (fn#12754 and the mutually-creating
-  fn#14983/14984/14986, created again by fn#15401) read through
-  `GetParentEnvironment` of a function with several creation environments whose
-  chains do not align (each site's environment is created by another member of
-  the group, so the chains are unrooted). `selfEnv` is `unknown`, so these stay
-  `E_ENV_UNRESOLVED` / `__hbc_unresolved_env`. A view would need the *running*
-  closure object inside its own body, which strict-mode JS does not expose (no
-  `arguments.callee`) and a hoisted `_fn<n>` binding does not name when one body
-  serves several creation contexts; the fix is per-instance bodies (spec 05 §6),
-  not the tracker.
+* **Polymorphic parents and self-created closures (G2).** hermesc v98+
+  inlines a factory (`wrap(v)` returning closures) into the closures it makes,
+  so each closure's body runs `CreateEnvironment d, (GetParentEnvironment 1)`
+  and creates itself and its siblings over `d` (react-navigation fn#12754 and
+  fn#14983/14984/14986, created again by fn#15401; Expensify fn#95616-95619,
+  #72937, #76056: 18 and 20 unresolved sites; construct
+  `440-self-creating-closure-env`). The parent of `d` is "one level above
+  whichever environment this activation captured", and one of those
+  environments is `d` itself, so no single tracker run names it. `GetParentEnvironment k`
+  whose walk fails yields `selfUp(k)` instead of `unknown`; an environment
+  created with it as parent records the formula, and after the fixed point
+  `resolveParentFormulas` takes the least fixed point of
+  `P(N) = U over the owner's creation environments X of up(X, k)` (known
+  parents fixed). It is exact: every runtime instance of `N` descends from a
+  finite creation chain that starts outside the cycle. A singleton becomes the
+  parent and the fixed point runs again; the owner having a creation site whose
+  environment is unknown or `none`, or a walk off the root, refuses it. The
+  chains then align, and the function gets `closureCopies` — but a copy
+  whose environment is created by the function itself cannot be emitted: the
+  captured and the fresh instance share one `_e<env>_<slot>` name. Such
+  recursion groups (a strongly connected component of "creates" among copied
+  functions in which some member captures an environment it creates), plus the
+  copied functions created inside them, become `closureFactories` when every
+  creation chain differs only at the captured environment: copies are dropped,
+  `closureEnvOf` becomes the shared parent, and the body is re-collected with
+  `GetParentEnvironment 0` yielding a `self-env` view (loads/stores through it
+  are `envViewOps`, exposed slots in `closureEnvExposed`). Emission: spec 05 §6.
 * `Create*Closure d, rE, fn` with `rE` = `none` records `closureEnvOf(fn) =
   null` — *known* to capture nothing, which is what makes it not an orphan. If
   another site creates the same `fn` with a real environment, that is a genuine

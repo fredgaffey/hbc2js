@@ -13,8 +13,8 @@
 //      edge even though `__hbc.r` is what actually runs it (§4.4 point 3).
 import { relativeExportPath } from "./layout.ts";
 
-const BODY_REQUIRE_RE = /require\((['"])\.\/module_(\d+)\.js\1\)/g;
-const TRAILING_DEFINE_RE = /\n__d\(factory, (\d+), (\[[^\]]*\])\);\n?$/;
+const BODY_REQUIRE_RE = /require\((['"])\.\/module_(-?\d+)\.js\1\)/g;
+const TRAILING_DEFINE_RE = /\n__d\(factory, (-?\d+), (\[[^\]]*\])\);\n?$/;
 const HEADER_RE = /^\/\/ hbc2js --split[^\n]*\n/;
 
 export interface RewriteModuleFileOptions {

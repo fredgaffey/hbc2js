@@ -514,10 +514,15 @@ export function splitProject(bytes: Uint8Array, opts: SplitOptions = {}): SplitR
     // (last copy printed wins the one row `ix_ranges` has room for — same
     // "no fabrication, whichever the render actually printed" contract the
     // header above already documents for the non-duplicated case).
-    for (const mark of factoryMarks) {
-      const fnIdx = mark.name === "factory" ? m.factoryFunctionIndex : Number(/^_fn(\d+)/.exec(mark.name)?.[1] ?? NaN);
+    // A G2 closure factory (spec 05 §6, `emit/index.ts`) prints as a
+    // `_mk<idx>` wrapper around the function body: attribute it to `<idx>`,
+    // but process those marks first so the function's own `_fn<idx>` range
+    // (when the printer reports one) wins over the wrapper's.
+    const ordered = [...factoryMarks.filter((k) => k.name.startsWith("_mk")), ...factoryMarks.filter((k) => !k.name.startsWith("_mk"))];
+    for (const mark of ordered) {
+      const fnIdx = mark.name === "factory" ? m.factoryFunctionIndex : Number(/^_(?:fn|mk)(\d+)/.exec(mark.name)?.[1] ?? NaN);
       if (Number.isNaN(fnIdx)) {
-        diagnostics.push(`module ${id}: emitted function range named ${JSON.stringify(mark.name)} does not match _fn<idx>[__c<copy>]; range dropped rather than recorded under a fabricated fn id`);
+        diagnostics.push(`module ${id}: emitted function range named ${JSON.stringify(mark.name)} does not match _fn<idx>[__c<copy>] / _mk<idx>; range dropped rather than recorded under a fabricated fn id`);
         continue;
       }
       functionRanges.set(fnIdx, { file, lines: [mark.startLine + 1, mark.endLine + 1] });
@@ -539,7 +544,7 @@ export function splitProject(bytes: Uint8Array, opts: SplitOptions = {}): SplitR
   modules.sort((a, b) => a.id - b.id);
 
   const globalFn = bodies.get(module.header.globalCodeIndex);
-  const startupIds = isFuncStmt(globalFn) ? resolveStartupModuleIds(globalFn.body) : [];
+  const startupIds = isFuncStmt(globalFn) ? resolveStartupModuleIds(globalFn.body, analysis.cfg(module.header.globalCodeIndex)) : [];
   const entryModuleId = startupIds.length > 0 ? startupIds[startupIds.length - 1]! : null;
   if (entryModuleId === null || !known.has(entryModuleId)) {
     diagnostics.push(`could not resolve an entry module id from the global function's __r() call`);

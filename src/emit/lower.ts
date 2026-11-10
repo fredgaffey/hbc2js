@@ -423,6 +423,23 @@ export function closureFunctionId(insn: Instruction): number | undefined {
   return insn.operands[i]?.value;
 }
 
+/** Whether `reg` holds the global object at block instruction `index`: its
+ *  last write earlier in the block is `GetGlobalObject`, or (no write in the
+ *  block) every write of it function-wide is. */
+function readsGlobalObject(f: FunctionEmitter, plan: BlockPlan, index: number, reg: number): boolean {
+  for (let i = index - 1; i >= 0; i--) {
+    const c = plan.instructions[i]!;
+    if (writtenRegisters(c).includes(reg)) return c.name === "GetGlobalObject";
+  }
+  let seen = false;
+  for (const c of f.fn.instructions) {
+    if (!writtenRegisters(c).includes(reg)) continue;
+    if (c.name !== "GetGlobalObject") return false;
+    seen = true;
+  }
+  return seen;
+}
+
 export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: number, plan: BlockPlan, out: Stmt[]): void {
   const name = insn.name;
   if (plan.consumed.has(index)) return;
@@ -540,13 +557,19 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
     const dst = V(insn, 0);
     const obj = RG(insn, 1);
     const text = f.mod.strings.get(V(insn, 3));
-    if (text === "HermesInternal") {
+    if (text === "HermesInternal" && (name.startsWith("Try") || readsGlobalObject(f, plan, index, V(insn, 1)))) {
       // A Hermes *host* object, not a program value: `hermesc` lowers template
       // literals to unconditional `HermesInternal.concat(...)` calls with no
       // fallback (43-template-literals v94 offset 0x1c), so decompiled output
       // that reads `globalThis.HermesInternal` cannot run anywhere but Hermes.
       // The prelude supplies the shim instead of touching the global object,
       // which would show up in the equivalence checker's `globals` record.
+      // Only a read off the global object (a `TryGetById`, hermesc's global
+      // variable read, or a register holding `GetGlobalObject`) is the host
+      // object: any other
+      // receiver's `HermesInternal` is an ordinary property (export-boot apps,
+      // Expensify: `RN_GLOBAL_OBJ.HermesInternal.enablePromiseRejectionTracker`
+      // read the shim, which has none; construct 450).
       f.useHelper("__hbc_HermesInternal");
       return set(dst, id("__hbc_HermesInternal"));
     }
@@ -800,6 +823,7 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
     case "GetClosureEnvironment": {
       // §6.2 closure environment views: the handle is a runtime object.
       const view = f.envViewOp(insn);
+      if (view?.k === "self-env") return set(V(insn, 0), id(`_c${f.fn.index}`));
       if (view?.k === "closure-env") {
         f.useHelper("__hbc_closure_env");
         return set(V(insn, 0), call(id("__hbc_closure_env"), [RG(insn, 1)]));
@@ -832,11 +856,15 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
         // the top of the enclosing function.
         const fnExpr: Expr = { k: "func", name: inline.name, params: inline.params, body: inline.body };
         const boundInline = f.closureEnvView(V(insn, 2), insn.offset);
+        // G2 closure factory created at its site: call the factory expression.
+        if (f.closureFactory(V(insn, 2))) return set(V(insn, 0), call(fnExpr, [boundInline ?? lit("null")]));
         if (boundInline === undefined) return set(V(insn, 0), fnExpr);
         f.useHelper("__hbc_bind_env");
         return set(V(insn, 0), call(id("__hbc_bind_env"), [fnExpr, boundInline]));
       }
       const bound = f.closureEnvView(V(insn, 2), insn.offset);
+      // G2 closure factory: a fresh function over a view of this site's environment.
+      if (f.closureFactory(V(insn, 2))) return set(V(insn, 0), call(id(`_mk${V(insn, 2)}`), [bound ?? lit("null")]));
       if (bound !== undefined) {
         f.useHelper("__hbc_bind_env");
         return set(V(insn, 0), call(id("__hbc_bind_env"), [id(f.closureName(V(insn, 2), insn.offset)), bound]));

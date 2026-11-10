@@ -4,6 +4,7 @@
 import { ErrorCode, Hbc2jsError } from "../errors.ts";
 import { argumentsForm } from "./arguments-form/index.ts";
 import { arrayLiteral } from "./array-literal/index.ts";
+import { valueJoin } from "./value-join/index.ts";
 import { asyncRecovery } from "./async-recovery/index.ts";
 import { literalForms } from "./literal-forms/index.ts";
 import { callShape } from "./call-shape/index.ts";
@@ -26,6 +27,7 @@ import { forIn } from "./for-in/index.ts";
 import { forOf } from "./for-of/index.ts";
 import { globalAccess } from "./global-access/index.ts";
 import { globalthisDeadStore } from "./globalthis-dead-store/index.ts";
+import { hermesInternalDeadStore } from "./hermes-internal-dead-store/index.ts";
 import { closureInline } from "./closure-inline/index.ts";
 import { ifChain } from "./if-chain/index.ts";
 import { labelClean } from "./label-clean/index.ts";
@@ -128,12 +130,16 @@ export const REGISTRY: readonly Pass[] = [
   destructure as Pass,
   spreadRest as Pass,
   templateLiteral as Pass,
+  hermesInternalDeadStore as Pass,
   optionalChain as Pass,
   objectLiteral as Pass,
   // docs/specs/passes/31-array-literal.md: the array-literal analogue of
   // `object-literal`, registered immediately after it for the same reason
   // (same stage-B structure-recovery block, same `after`/`before`).
   arrayLiteral as Pass,
+  // docs/specs/passes/33-value-join.md: `||`/`&&`/`?:` value joins, after
+  // every narrower labelled-block idiom has claimed its sites.
+  valueJoin as Pass,
   yieldRecovery as Pass,
   // R15 (docs/specs/passes/29-yield-loop.md): the cyclic form of the same
   // idiom, straight after the acyclic rung and before `async-recovery`, whose

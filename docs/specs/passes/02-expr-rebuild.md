@@ -133,7 +133,12 @@ dead `Mov` of the uninitialised `this` slot), so they never folded before, and
 super-call, inline-new (a lock-step comparison of the inlined copy against the
 constructor body) and private-fields match their unfolded statements. Turning
 it on there printed `if (__hbc_empty !== __hbc_empty)` and broke fixtures
-81/88/91/110. It also exposed a super-call bug, now fixed: deleting a dead
+81/88/91/110. Fixture 345 (passes-roundtrip-getbyidreg) is the loop-body
+case: `i` in `s[i](); i = i + 1` is read before its first def in the body
+(the previous iteration's value), so the strict form left `s[i]()` as
+`Reflect.apply`, whose global read shifted later registers (round-trip
+`diff:GetById(reg)`); its getter-ordered twin pins the element read before
+the call. It also exposed a super-call bug, now fixed: deleting a dead
 `let T = __hbc_empty;` dropped T's only declaration.
 
 The driver adds `parses(fnBody)` once per function (01 F1) and `checkBindings`
