@@ -1264,3 +1264,33 @@ bundled-dist/copies classes) and no TP lost. Marginal return fell sharply
 (batch 1 +32 TPs for 480 jobs, batch 2 +6 for 800): ranking by downloads
 runs out of names the apps actually ship by about rank 250, which is the
 overlap table's ceiling showing up in the measurement.
+
+## 10. Supplementary population (sigdb-supplement, 2026-11-10)
+
+**Truth-chosen overlay: not an honest recall figure.** The package list in
+`tools/pkgsig/bulk/supplement-packages.json` was taken from the packages the
+react-navigation recall analysis found missing (docs/DEPS.md, DB coverage), plus
+seven dependencies (`call-bind`, `call-bound`, `function-bind`, `get-intrinsic`,
+`pako`, `@xmldom/xmldom`, `@wagmi/core`) chosen to remove MetaMask false
+positives under transitive subtraction. Both lists came from truth files, so
+recall gained on react-navigation is not a recall estimate. The other four apps
+and every FP change are the informative signal.
+
+Policy (`supplement-jobs.mjs`): the version pinned in the example app's lockfile
+(only 8 workspace packages carry one in its truth file, all alphas) plus the
+latest 3 stable releases from the npm registry, for hbc 94/96/98/99. 644 jobs
+(46 packages): 525 built, 119 failed (hbc94 41, hbc96 39, hbc98 21, hbc99 18).
+Failures: Metro 0.72 cannot bundle the alpha/new releases (hbc94/96); the four
+`@expo-google-fonts/*` and `@react-native/assets-registry` have no build at any
+version (`expo-asset` imports `expo/internal/bundle-origin`, a peer that is not
+installed; asset-only modules).
+
+Procedure (deb, own bulk dir, 4 slots so a concurrent build keeps its cores):
+copy the two scaffolds, `run.sh setup` and `run.sh baselines` with
+`HBC2JS_BULK_DIR` pointing at the new dir, run `worker.sh` over the job list with
+`xargs -P 4`, then `dep-subtract.mjs` (two passes, dependencies resolved against
+db-v3-clean) into `db-v4-supp`. Layering for measurement: `cp -al` of the v4 farm
+into a new dir, new files linked only where the name is absent (476 added), the
+copied `candidate-hash-index__*` files deleted (they are hard links: rebuilding
+in place would rewrite the shared farm) and rebuilt. Nothing was confirmed
+against a shared DB.

@@ -296,3 +296,35 @@ farm; confirmed / TP / FP, precision, recall. "+ pop" also links the
 | rainbow | 116 / 109 / 7, 94.0%, 21.0% | 123 / 115 / 8, 93.5%, 22.2% | 124 / 115 / 9, 92.7%, 22.2% | 132 / 120 / 12, 90.9%, 23.2% |
 | MetaMask | 179 / 165 / 14, 92.2%, 22.0% | 196 / 181 / 15, 92.3%, 24.2% | 200 / 184 / 16, 92.0%, 24.6% | 204 / 185 / 19, 90.7%, 24.7% |
 
+## Supplement overlay (sigdb-supplement, 2026-11-10, offline, truth-chosen overlay — not an honest recall figure)
+
+525 path-bearing signature files for 46 packages chosen from react-navigation's
+missed truth (docs/PACKAGE-SIGNATURES.md section 10) layered over the v4 farm;
+confirmed / TP / FP, recall; code = deps-rnav-recall.
+
+| app | v4 farm | + supplement |
+|---|---|---|
+| react-navigation (the app the list came from: inflated) | 22 / 22 / 0, 28.9% | 31 / 31 / 0, 40.8% |
+| Expensify J3 | 107 / 100 / 7, 34.7% | 120 / 111 / 9, 38.5% |
+| bluesky | 47 / 46 / 1, 23.2% | 56 / 55 / 1, 27.8% |
+| rainbow | 116 / 109 / 7, 21.0% | 121 / 114 / 7, 22.0% |
+| MetaMask | 179 / 159 / 20, 21.2% | 185 / 166 / 19, 22.2% |
+
+New FPs: Expensify `jose` and `meros`. FP removed: MetaMask `p-map`. Every
+other FP set is unchanged. With deps-transitive-subtract's code and
+`dependency-closure.json` sidecar over the supplement, MetaMask is
+177 / 168 / 9 (precision 94.9%, recall 22.4%); `fast-json-patch`, `is-regex`,
+`jszip`, `mammoth`, `wagmi` stay FPs (also `typeorm`, `resq`,
+`react-reconciler`, `@shopify/react-native-skia`). Those seven dependency
+packages were chosen from the MetaMask FP list: also truth-chosen.
+
+Open item (deps-rnav-recall): `invariant`, `react-freeze` and `stacktrace-parser`
+reach `high` through the DB-unique tiny path (react-navigation, supplemented
+farm, `runDeps`), then lose it to the `scattered` demotion: with only 2 exact hits
+the package can never reach `MIN_DISTINCT_EVIDENCE_HASHES` (3) anchored hashes, so
+`tier` ends `medium` and they are not reported. (`stacktrace-parser@0.1.11` stays
+`high` with 3 hits, a version the app does not pin.) Exempting `tinyUniqueSignal`
+from `scattered` is the candidate fix; not tried here, so its FP cost is unmeasured.
+The new Expensify FPs `jose` and `meros` are not supplement packages; the
+before run used the farm's index from 2026-11-09 and the after run an index rebuilt
+for the layered dir, so the index rebuild is an unseparated confounder (not run).
