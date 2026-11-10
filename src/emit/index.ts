@@ -6,7 +6,7 @@ import { structure } from "../structure/index.ts";
 import type { StructureOptions, StructuredFunction } from "../structure/index.ts";
 import { getBuiltinTable } from "../tables/registry.ts";
 import { helperPrelude } from "../runtime/helpers.ts";
-import type { Param, Stmt } from "./ast.ts";
+import type { Expr, Param, Stmt } from "./ast.ts";
 import { id, lit, p } from "./ast.ts";
 import { emitFunction, envDeclaringFunction, ownedEnvSlots } from "./function.ts";
 import { closureFunctionId } from "./lower.ts";
@@ -1017,6 +1017,11 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
         const passed = opts.astPasses(out, cfg);
         out = passed.fn;
         for (const d of passed.diagnostics) diagnostics.push(d);
+      }
+      // G2 closure factory (spec 05 §6): one body, a fresh function per
+      // creation, its captured environment passed in as a view.
+      if (envGraph.closureFactories.has(index)) {
+        return { k: "func", name: `_mk${index}`, params: [{ name: `_c${index}` }], body: [{ k: "return", arg: { ...out } as Expr }] } as Stmt;
       }
       return out;
     } catch (e) {
