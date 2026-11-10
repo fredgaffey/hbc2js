@@ -161,7 +161,11 @@ test("export-boot apps: the stub host provides an Intl namespace for module-eval
   // `Object.defineProperty(Intl,'Locale',…)`; the host VM has no Intl, so
   // the original threw "Property 'Intl' doesn't exist" (INCONCLUSIVE).
   if (!vmOrSkip(t)) return;
-  const src = `Object.defineProperty(Intl, "Locale", { value: function () {}, writable: true, enumerable: false, configurable: true });`;
+  // Then module 2444's `new Intl.Locale(l)` (the polyfill) called
+  // `Intl.getCanonicalLocales`: "undefined is not a function".
+  const src = `Object.defineProperty(Intl, "Locale", { value: function () {}, writable: true, enumerable: false, configurable: true });
+    var c = Intl.getCanonicalLocales("en");
+    if (c.length !== 1 || c[0] !== "en") throw new Error("getCanonicalLocales");`;
   const r = bootTrace(src, { seed: 0, natives: deriveNativeManifest("") });
   assert.equal(r.reachedEnd, true, JSON.stringify(r.bootError));
 });

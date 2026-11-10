@@ -152,7 +152,13 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
   // an app's formatjs polyfills (\`defineProperty(Intl, 'Locale', …)\`)
   // install themselves at module eval, as they would on a device that
   // lacks the piece they polyfill.
-  if (typeof globalThis.Intl === "undefined") globalThis.Intl = {};
+  // \`getCanonicalLocales\` is the one primitive those polyfills build on
+  // (a structurally valid tag comes back as itself).
+  if (typeof globalThis.Intl === "undefined") {
+    globalThis.Intl = {
+      getCanonicalLocales: function (l) { return l === undefined ? [] : (Array.isArray(l) ? l : [l]).map(String); },
+    };
+  }
   var __hbcPromises = ${JSON.stringify(PROMISE_METHODS)};
   function consts(n) { return __hbcNatives !== null && Object.prototype.hasOwnProperty.call(__hbcNatives, n) ? __hbcNatives[n] : null; }
   // Spec 33 §3 B2 / §4(c): null in B1 (schedules are only recorded, as in
