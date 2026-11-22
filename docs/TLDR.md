@@ -31,6 +31,17 @@ hbc2js name llm-fill my-project --backend claude-cli --only src --limit 20
 hbc2js readability agent my-project --module 3 --max-turns 8
 ```
 
+**Machine contract (`hbc2js-machine/1`, spec 34).** For an external orchestrator
+that wants one JSON object per call and no side effects: `hbc2js --version --json`,
+`hbc2js --info <in.hbc> --json`, `hbc2js modules <in.hbc> --json [--offset N] [--limit N]`
+(Metro `__d` registrations from the global function only, no decompile) and
+`hbc2js decompile <in.hbc> --fn N|--module M --json`. Each reply carries `schema`,
+`kind`, `ok`, the input sha256 and `warnings[]`; failures are
+`{kind:"error", error:{code,message,context}}` with exit codes 2 usage/IO, 3 decode,
+4 unsupported version/layout, 5 syntax failure (source still returned). The
+syntax check is in-process (`vm.Script`, compile only), nothing is written and no
+child is spawned. Fields are only ever added within `contract: 1`.
+
 `--split`'s `index/functions.jsonl` and `index/modules.json` (spec 10 §2.1/
 §2.6) each carry a `rendersJsx` boolean -- true for a function/module that
 calls a JSX-factory (`jsx`/`jsxs`/`createElement`), computed from the call

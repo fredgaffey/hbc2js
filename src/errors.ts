@@ -42,6 +42,8 @@ export const ErrorCode = {
   // whose builtFor doesn't match the loaded artifact is refused at open —
   // step 6 relaxes this into live orphan-flagging instead of a hard refusal.
   E_STALE_PROJECT_STORE: "E_STALE_PROJECT_STORE",
+  // machine contract (docs/specs/34-rea-provider.md): the heap cannot hold the job
+  E_RESOURCE: "E_RESOURCE",
   // internal
   E_INTERNAL: "E_INTERNAL",
 } as const;
@@ -58,6 +60,8 @@ export interface ErrorContext {
   // pass that refused, its named reason code, and how many distinct sites.
   readonly pass?: string;
   readonly reason?: string;
+  readonly requiredMb?: number; // E_RESOURCE
+  readonly limitMb?: number;
   readonly count?: number;
 }
 

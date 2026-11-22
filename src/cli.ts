@@ -11,6 +11,7 @@ import type { LayoutClass, OpcodeTableId } from "./parse/types.ts";
 import { printModule } from "./disasm/print.ts";
 import type { DisasmMode } from "./disasm/print.ts";
 import { VERSION } from "./version.ts";
+import { MACHINE_SCHEMA, errorReply, inputDigest, machineExitCode, runMachineDecompile, runModules, versionReply, warningsOf } from "./machine.ts";
 import { runProgram } from "./harness/runner.ts";
 import type { RunOptions } from "./harness/runner.ts";
 import { compareTraces, TRACE_VERDICT } from "./harness/compare.ts";
@@ -141,7 +142,12 @@ Usage:
                                               stdio JSON-RPC 2.0 server (initialize/tools/list/tools/call/resources/list/
                                               resources/read)
   hbc2js --help                    print this message
-  hbc2js --version                 print the version
+  hbc2js --version [--json]        print the version (--json: hbc2js-machine/1 "version" reply with supported hbcVersions)
+  hbc2js modules <in.hbc> [--json] [--offset N] [--limit N]
+                                   list Metro __d modules (id, factoryFn, deps, fnCount) from the global function only; no decompile
+  hbc2js decompile <in.hbc> (--fn N | --module M) --json [--passes=none]
+                                   one function/module as a hbc2js-machine/1 "function" reply (source, verified, warnings); in-process
+                                   syntax check, no child processes or files; errors are a JSON envelope (docs/specs/34-rea-provider.md)
   hbc2js help [topic]              start here: agent-facing docs (tldr, tools, workflow,
                                               examples, limits, glossary) -- see docs/TLDR.md
 
@@ -287,9 +293,10 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
   return { help, version, info, layout, opcodeTable, verify, json };
 }
 
-function fail(code: ErrorCode, message: string, exitCode: number, json: boolean): never {
+function fail(code: ErrorCode, message: string, exitCode: number, json: boolean, context: Record<string, unknown> = {}): never {
   if (json) {
-    process.stdout.write(JSON.stringify({ code, message }) + "\n");
+    // hbc2js-machine/1 envelope (spec 34); top-level code/message kept for pre-contract readers.
+    process.stdout.write(JSON.stringify(errorReply(code, message, context)) + "\n");
   } else {
     process.stderr.write(`hbc2js: ${code}: ${message}\n`);
   }
@@ -694,6 +701,8 @@ interface DecompileArgs {
   readonly jsx: boolean;
   /** `--no-return-annotations` (H3b): drop the two default-on return header comments. */
   readonly returnAnnotations: boolean;
+  readonly json: boolean;
+  readonly moduleId: number | undefined;
   readonly passes: { readonly none: boolean; readonly skip: readonly string[]; readonly optIn: readonly string[] };
 }
 
@@ -717,6 +726,8 @@ function parseDecompileArgs(argv: readonly string[]): DecompileArgs {
   let jsx = false;
   let returnAnnotations = true;
   let passesNone = false;
+  let json = false;
+  let moduleId: number | undefined;
   const skipPasses: string[] = [];
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
@@ -724,6 +735,9 @@ function parseDecompileArgs(argv: readonly string[]): DecompileArgs {
     if (a === "--help" || a === "-h") help = true;
     else if (a === "-o") outPath = argv[++i];
     else if (a === "--passes=none") passesNone = true;
+    else if (a === "--json") json = true;
+    else if (a === "--module") moduleId = Number(argv[++i]);
+    else if (a.startsWith("--module=")) moduleId = Number(a.slice("--module=".length));
     else if (a === "--no-pass") skipPasses.push(String(argv[++i]));
     else if (a.startsWith("--no-pass=")) skipPasses.push(a.slice("--no-pass=".length));
     else if (a.startsWith("--function=")) functionIndex = Number(a.slice("--function=".length));
@@ -746,7 +760,7 @@ function parseDecompileArgs(argv: readonly string[]): DecompileArgs {
   }
   input = positional[0];
   if (outPath === undefined) outPath = positional[1];
-  return { help, input, outPath, functionIndex, scopedFn, verify, emitTree, emitAst, nodeCheck: check, split, overwrite, opcodeTable, forceV98, strictLayout, stats, lenientEnv, jsx, returnAnnotations, passes: { none: passesNone, skip: skipPasses, optIn: jsx ? ["jsx-recover"] : [] } };
+  return { help, input, outPath, functionIndex, scopedFn, verify, emitTree, emitAst, nodeCheck: check, split, overwrite, opcodeTable, forceV98, strictLayout, stats, lenientEnv, jsx, returnAnnotations, json, moduleId, passes: { none: passesNone, skip: skipPasses, optIn: jsx ? ["jsx-recover"] : [] } };
 }
 
 function warnIfHeapTooSmall(inputBytes: number, name: string): void {
@@ -768,6 +782,15 @@ function runDecompile(argv: readonly string[]): void {
   if (args.help || args.input === undefined) {
     process.stdout.write(USAGE);
     process.exit(args.help ? 0 : 2);
+  }
+  if (args.json && args.scopedFn === undefined && args.moduleId === undefined) {
+    // Spec 34: `--json` is only defined for `--fn N` / `--module M`.
+    process.exitCode = runMachineDecompile({ ...args, scopedFn: undefined });
+    return;
+  }
+  if (args.json) {
+    process.exitCode = runMachineDecompile(args);
+    return;
   }
   let bytes: Uint8Array;
   try {
@@ -3371,6 +3394,10 @@ function main(): void {
     process.exitCode = runHelpCmd(argv.slice(1));
     return;
   }
+  if (argv[0] === "modules") {
+    process.exitCode = runModules(argv.slice(1));
+    return;
+  }
   if (argv[0] === "decompile") {
     runDecompile(argv.slice(1));
     return;
@@ -3533,6 +3560,10 @@ function main(): void {
     process.exit(0);
   }
   if (args.version) {
+    if (args.json) {
+      process.stdout.write(JSON.stringify(versionReply()) + "\n");
+      process.exit(0);
+    }
     process.stdout.write(`${VERSION}\n`);
     process.exit(0);
   }
@@ -3557,6 +3588,12 @@ function main(): void {
       process.stdout.write(
         JSON.stringify(
           {
+            schema: MACHINE_SCHEMA,
+            kind: "info",
+            ok: true,
+            hbc2js: VERSION,
+            input: inputDigest(bytes),
+            warnings: warningsOf(module.diagnostics),
             version: module.header.version,
             layoutClass: module.layout.layoutClass,
             opcodeTable: module.layout.opcodeTable ?? null,
@@ -3590,7 +3627,7 @@ function main(): void {
     process.exit(0);
   } catch (e) {
     if (e instanceof Hbc2jsError) {
-      fail(e.code, e.message, exitCodeFor(e.code), args.json);
+      fail(e.code, e.message, exitCodeFor(e.code), args.json, { ...e.context });
     }
     fail(ErrorCode.E_INTERNAL, e instanceof Error ? e.message : String(e), 1, args.json);
   }
