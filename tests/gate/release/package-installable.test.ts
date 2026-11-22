@@ -25,5 +25,13 @@ test("release: package.json is publishable (not private, MIT, repository set)", 
 test("release: a git install builds the CLI (prepare runs the build; dist ships)", () => {
   assert.match(pkg.scripts?.prepare ?? "", /\bnpm run build\b/);
   assert.ok(pkg.files?.includes("dist"), "files must ship dist");
-  assert.equal(pkg.bin?.hbc2js, "./dist/cli.js");
+  assert.equal(pkg.bin?.hbc2js, "dist/cli.js");
+});
+
+test("release (publish dry-run 2026-11-23): bin paths carry no leading ./, which npm 11 publish drops", () => {
+  // `npm publish` (not `npm pack`) rejected "./dist/cli.js" as an invalid bin
+  // script name and removed it, so the published package had no hbc2js command.
+  for (const [name, path] of Object.entries(pkg.bin ?? {})) {
+    assert.ok(!path.startsWith("./"), `bin.${name} = ${path} would be dropped by npm publish`);
+  }
 });

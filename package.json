@@ -16,7 +16,7 @@
     "node": ">=22.18.0"
   },
   "bin": {
-    "hbc2js": "./dist/cli.js"
+    "hbc2js": "dist/cli.js"
   },
   "exports": {
     ".": {

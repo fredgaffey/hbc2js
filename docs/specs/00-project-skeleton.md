@@ -171,7 +171,7 @@ and is recorded here so that M1/M2 scaffolding does not have to be moved later.
   "license": "MIT",
   "type": "module",
   "engines": { "node": ">=22.18.0" },
-  "bin": { "hbc2js": "./dist/cli.js" },
+  "bin": { "hbc2js": "dist/cli.js" },
   "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
   "files": ["dist"],
   "scripts": {
@@ -192,6 +192,12 @@ and is recorded here so that M1/M2 scaffolding does not have to be moved later.
   }
 }
 ```
+
+Later changes (2026-11-23, for publishing): `private` was dropped, `repository`
+and a `prepare` build were added, and `bin` must be written without a leading
+`./`. `npm publish` (unlike `npm pack`) treats `"./dist/cli.js"` as an invalid
+bin name and silently removes the `hbc2js` command from the published package.
+`tests/gate/release/package-installable.test.ts` guards all of this.
 
 ### 3.1 Dependency justification (required by the task; keep this table current)
 
