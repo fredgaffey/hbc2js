@@ -182,3 +182,12 @@ test("machine 7: a heap limit too small for the input is E_RESOURCE (exit 3) wit
   assert.equal(j.error.code, "E_RESOURCE");
   assert.ok(j.error.context.requiredMb > 64);
 });
+
+test("machine 8 (orchestrator review of L1): --module without --json is a usage error, never a silent whole-bundle decompile", () => {
+  const good = construct(readdirSync(join(FIX, "constructs")).find((d) => existsSync(construct(d, "v96")))!, "v96");
+  const r = cli(["decompile", good, "--module", "0"]);
+  assert.equal(r.status, 2);
+  assert.equal(r.stdout, "");
+  assert.match(r.stderr, /E_USAGE/);
+  assert.match(r.stderr, /--module.*--json/);
+});

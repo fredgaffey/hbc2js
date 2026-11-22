@@ -783,12 +783,14 @@ function runDecompile(argv: readonly string[]): void {
     process.stdout.write(USAGE);
     process.exit(args.help ? 0 : 2);
   }
-  if (args.json && args.scopedFn === undefined && args.moduleId === undefined) {
-    // Spec 34: `--json` is only defined for `--fn N` / `--module M`.
-    process.exitCode = runMachineDecompile({ ...args, scopedFn: undefined });
-    return;
+  if (args.moduleId !== undefined && !args.json) {
+    // Spec 34: `--module M` is only defined in the machine (--json) path; a
+    // text-mode run must not silently decompile the whole bundle instead.
+    fail(ErrorCode.E_USAGE, "--module M requires --json (spec 34); use --fn N for a text-mode scoped decompile", 2, false);
   }
   if (args.json) {
+    // Spec 34: the machine path handles --fn N / --module M and reports a
+    // missing selector itself.
     process.exitCode = runMachineDecompile(args);
     return;
   }
