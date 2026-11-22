@@ -1,9 +1,16 @@
 {
   "name": "hbc2js",
   "version": "0.1.0",
-  "private": true,
   "description": "Hermes bytecode (HBC) -> runnable JavaScript decompiler",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fredgaffey/hbc2js.git"
+  },
+  "homepage": "https://github.com/fredgaffey/hbc2js#readme",
+  "bugs": {
+    "url": "https://github.com/fredgaffey/hbc2js/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=22.18.0"
@@ -23,6 +30,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node -e \"require('fs').chmodSync('dist/cli.js', 0o755)\" && node tools/copy-build-assets.mjs",
+    "prepare": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node tools/run-tests.mjs",
     "test:gate": "HBC2JS_E2E_DEFER=1 node --test \"tests/gate/**/*.test.ts\" \"tests/artifact/**/*.test.ts\" \"tests/project/**/*.test.ts\" \"tests/projdb/**/*.test.ts\" \"tests/secrets/**/*.test.ts\" \"tests/security/**/*.test.ts\" \"tests/appgen/**/*.test.ts\" \"tests/mcp/**/*.test.ts\" \"tests/readability/**/*.test.ts\" \"tests/workers/**/*.test.ts\" \"tests/ui-core/**/*.test.ts\" \"tests/ui-server/**/*.test.ts\" \"tests/cli/**/*.test.ts\" tests/fuzz/spec-consistency.test.ts && node --test tests/gate/ui/e2e-smoke.test.ts",
