@@ -11,7 +11,7 @@ import type { LayoutClass, OpcodeTableId } from "./parse/types.ts";
 import { printModule } from "./disasm/print.ts";
 import type { DisasmMode } from "./disasm/print.ts";
 import { VERSION } from "./version.ts";
-import { MACHINE_SCHEMA, errorReply, inputDigest, machineExitCode, runMachineDecompile, runModules, versionReply, warningsOf } from "./machine.ts";
+import { MACHINE_SCHEMA, errorReply, inputDigest, runMachineDecompile, runModules, versionReply, warningsOf } from "./machine.ts";
 import { runProgram } from "./harness/runner.ts";
 import type { RunOptions } from "./harness/runner.ts";
 import { compareTraces, TRACE_VERDICT } from "./harness/compare.ts";

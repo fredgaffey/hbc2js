@@ -13,7 +13,7 @@ import { decodeFunction } from "./disasm/decode.ts";
 import { ErrorCode, Hbc2jsError } from "./errors.ts";
 import type { Diagnostic } from "./errors.ts";
 import { parseHbc } from "./parse/module.ts";
-import type { HbcModule } from "./parse/types.ts";
+import type { HbcModule, OpcodeTableId } from "./parse/types.ts";
 import { listOpcodeTableIds } from "./tables/registry.ts";
 import { VERSION } from "./version.ts";
 
@@ -212,7 +212,7 @@ export interface MachineDecompileArgs {
   readonly strictLayout: boolean;
   readonly lenientEnv: boolean;
   readonly passes: { readonly none: boolean; readonly skip: readonly string[]; readonly optIn: readonly string[] };
-  readonly opcodeTable?: import("./parse/types.ts").OpcodeTableId;
+  readonly opcodeTable?: OpcodeTableId | undefined;
 }
 
 /** `decompile <in.hbc> --fn N|--module M --json`; returns the exit code. */
