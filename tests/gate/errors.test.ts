@@ -36,10 +36,12 @@ const P2_1_CODES = ["E_STALE_RANGES", "E_STALE_INDEX"];
 // Added by P2.2 step 5 (docs/specs/11-project-store.md §2.5): the
 // ProjectService open-time builtFor guard.
 const P2_2_CODES = ["E_STALE_PROJECT_STORE"];
+// Added by spec 34 (hbc2js-machine/1): heap too small for the input.
+const SPEC34_CODES = ["E_RESOURCE"];
 
 test("ErrorCode exports every code from spec 00 section 6.1, plus the M4/M5 codes", () => {
   const actual = Object.values(ErrorCode).sort();
-  assert.deepEqual(actual, [...EXPECTED_CODES, ...M4_CODES, ...P2_1_CODES, ...P2_2_CODES].sort());
+  assert.deepEqual(actual, [...EXPECTED_CODES, ...M4_CODES, ...P2_1_CODES, ...P2_2_CODES, ...SPEC34_CODES].sort());
 });
 
 test("Hbc2jsError serialises code, message and context via toJSON", () => {
