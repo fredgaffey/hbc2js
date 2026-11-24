@@ -312,6 +312,52 @@ export function scanFnIdentifiers(text: string): { readonly declared: readonly n
   return { declared, referenced };
 }
 
+/** The transitive closure of functions `rootText` references but does not
+ *  declare, in pull order, each exactly once. A pulled function counts as
+ *  declared the moment it is pulled -- not only when its printed text matches
+ *  `function _fnN(` -- so mutually recursive helpers whose print does not
+ *  carry that exact shape cannot re-queue each other forever (0.1.2 corpus
+ *  a03: the split never finished). */
+export function pullReferencedFunctions<T>(
+  rootText: string,
+  globalIdx: number,
+  lookup: (idx: number) => T | undefined,
+  print: (f: T) => string,
+  skipped: (idx: number, why: "global" | "no-body") => void,
+): T[] {
+  const declared = new Set<number>();
+  const pulled: T[] = [];
+  const queue: number[] = [];
+  const scan = (text: string): void => {
+    // Comments never reference anything: see `scanFnIdentifiers`.
+    const found = scanFnIdentifiers(text);
+    for (const d of found.declared) declared.add(d);
+    for (const idx of found.referenced) if (!declared.has(idx)) queue.push(idx);
+  };
+  scan(rootText);
+  while (queue.length > 0) {
+    const idx = queue.shift()!;
+    if (declared.has(idx)) continue;
+    declared.add(idx);
+    if (idx === globalIdx) {
+      // The global function's body is the whole bundle's registration code
+      // (every `__d(...)` in the program); it is never a module-local helper,
+      // so a reference to it from one module file is a decompilation defect,
+      // not a function to copy in (docs/BUGS.md `split-comment-ref-pull`).
+      skipped(idx, "global");
+      continue;
+    }
+    const f = lookup(idx);
+    if (f === undefined) {
+      skipped(idx, "no-body");
+      continue;
+    }
+    pulled.push(f);
+    scan(print(f));
+  }
+  return pulled;
+}
+
 export function splitProject(bytes: Uint8Array, opts: SplitOptions = {}): SplitResult {
   const module = parseHbc(bytes);
   const inventory = buildInventoryFromModule(module);
@@ -407,39 +453,15 @@ export function splitProject(bytes: Uint8Array, opts: SplitOptions = {}): SplitR
     // without knowing their true original nesting depth (that is the
     // still-open, harder half of docs/BUGS.md "e2e split unmatched-closure":
     // envGraph could not find a closure creation site for them at all).
-    const declaredIdx = new Set<number>();
-    const extraStmts: Extract<Stmt, { k: "func" }>[] = [];
-    const queue: number[] = [];
-    const scan = (text: string): void => {
-      // Comments never reference anything: see `scanFnIdentifiers`.
-      const found = scanFnIdentifiers(text);
-      for (const d of found.declared) declaredIdx.add(d);
-      for (const idx of found.referenced) {
-        if (!declaredIdx.has(idx)) queue.push(idx);
-      }
-    };
-    scan(funcText);
-    while (queue.length > 0) {
-      const idx = queue.shift()!;
-      if (declaredIdx.has(idx)) continue;
-      if (idx === module.header.globalCodeIndex) {
-        // The global function's body is the whole bundle's registration code
-        // (every `__d(...)` in the program); it is never a module-local helper,
-        // so a reference to it from one module file is a decompilation defect,
-        // not a function to copy in (docs/BUGS.md `split-comment-ref-pull`).
-        declaredIdx.add(idx);
-        diagnostics.push(`module ${id}: fn#${idx} (_fn${idx}) is the bundle's global function; left undeclared rather than copied into a module file`);
-        continue;
-      }
-      const extraFn = bodies.get(idx);
-      if (!isFuncStmt(extraFn)) {
-        declaredIdx.add(idx);
-        diagnostics.push(`module ${id}: fn#${idx} (_fn${idx}) is referenced but has no emitted body; left undeclared (runtime ReferenceError if reached)`);
-        continue;
-      }
-      extraStmts.push(extraFn);
-      scan(printProgram([extraFn], printOpts));
-    }
+    const extraStmts = pullReferencedFunctions(funcText, module.header.globalCodeIndex, (idx) => {
+      const f = bodies.get(idx);
+      return isFuncStmt(f) ? f : undefined;
+    }, (f) => printProgram([f], printOpts), (idx, why) =>
+      diagnostics.push(
+        why === "global"
+          ? `module ${id}: fn#${idx} (_fn${idx}) is the bundle's global function; left undeclared rather than copied into a module file`
+          : `module ${id}: fn#${idx} (_fn${idx}) is referenced but has no emitted body; left undeclared (runtime ReferenceError if reached)`,
+      ));
 
     const finalFnStmt = extraStmts.length > 0 ? { ...fnStmt, name: "factory", body: withExtraDeclarations(body, extraStmts) } : { ...fnStmt, name: "factory", body };
     let finalFuncText: string;

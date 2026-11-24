@@ -109,7 +109,7 @@ test("ignite-11.5.0: deps report RN 0.83.2 / React 19.2.0 from bundle constants 
 // react-native at all and paired cli 13 / metro 0.80 with RN 0.78, so
 // `npx react-native bundle` failed "unknown command 'bundle'".
 test("react-native and react are always dependencies once the RN version is known", () => {
-  const empty = report({ reactNativeVersion: null, confirmedDeps: [], guessedDeps: [], hintedDeps: [], nativeChannel: null } as Partial<DepsReport>);
+  const empty = report({ reactNativeVersion: null, confirmedDeps: [], guessedDeps: [], hintedDeps: [], nativeChannel: null } as unknown as Partial<DepsReport>);
   const deps = exportDependencies(empty, "0.82.1");
   assert.equal(deps["react-native"]!.version, "0.82.1");
   assert.equal(deps["react"]!.version, "^19.1.1");

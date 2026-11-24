@@ -53,14 +53,14 @@ test("react 19 bundle constant moves a signature-matched RN 0.73 onto a react-19
   const { rnReactPeer, satisfies: sat } = await import("../../../src/export/rn-compat.ts");
   const r = report({
     reactNativeVersion: "0.72.17",
-    reactNativeVersionSource: "deps-signature-match",
+    reactNativeVersionSource: "signature-match",
     reactNativeVersionExpectedRange: "RN 0.72.x-0.87.x",
     confirmedDeps: [
       { package: "react", version: "19.0.0", confidence: "high", modulesCovered: 1, moduleTotal: 1, source: "bundle-string", versionEvidence: "bundle-string" },
       { package: "react-native", version: "0.73.3", confidence: "high", modulesCovered: 5, moduleTotal: 9, source: "db-match", versionEvidence: "exact-hash" },
     ],
     hintedDeps: [],
-  } as Partial<DepsReport>);
+  } as unknown as Partial<DepsReport>);
   const rn = resolveReactNativeVersion(r, undefined);
   assert.match(rn.version!, /^0\.78\./, "nearest RN line whose react peer admits 19.0.0");
   assert.match(rn.note ?? "", /react 19\.0\.0/);
@@ -78,7 +78,7 @@ test("an RN known from the bundle's own constants pulls a weaker react onto its 
       { package: "react", version: "19.0.0", confidence: "high", modulesCovered: 2, moduleTotal: 3, source: "db-match", versionEvidence: "exact-hash" },
     ],
     hintedDeps: [],
-  } as Partial<DepsReport>);
+  } as unknown as Partial<DepsReport>);
   const deps = exportDependencies(r, "0.77.3");
   // RN 0.77 has no Expo SDK line, so only the rn-compat react peer decides.
   assert.equal(deps["react"]!.version, "^18.2.0");
