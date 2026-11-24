@@ -705,3 +705,11 @@ build.
 | P-72 | Does spec 08 keep emitting `node_modules/`, with export re-rooting it (this spec), or should segregate gain a `--vendor-dir` so there is one layout? |
 | P-73 | May `--tier jsx` become the default for `rendersJsx` modules, given babel compiles JSX in an export tree and D20's "not runnable JS" rationale is about hbc2js's own Node-based guards? |
 | P-74 | Assets: accept "builds, boots with missing images", or add an APK-side asset extraction step so the exported tree is visually complete? |
+
+## 12. Performance and memory (2026-11-24)
+
+- **One emit layout per analysis.** `emitModule`'s whole-bundle closure-placement layout (`buildEmitLayout` in `src/emit/index.ts`) depends only on the analysis and is cached per analysis, so the per-module scoped renders (§4) no longer recompute it per module (it was quadratic in the bundle).
+- **Render pool.** Rung 1 (§7.3) runs on worker threads (`src/export/render-pool.ts`, `render-worker.ts`). Each worker parses the bundle and takes the main thread's env graph (v8-serialized once into a `SharedArrayBuffer`, `analyseModule`'s `preset.envGraph`), drops the eager whole-module decode (`preset.releaseDecoded`), and renders modules handed out largest first. Outcomes are keyed by module id and consumed in module order, so the tree is byte-identical for every worker count (`tests/gate/export/export-workers.test.ts`). Count: `HBC2JS_WORKERS` (or `ExportOptions.workers`) when set; otherwise `cpus - 2`, 1 below 8000 functions, capped so the estimated worker footprint (110 bytes per bundle byte each) stays within half of RAM.
+- **Deps alongside the split.** With more than one thread available, the offline deps stage runs on a worker (`src/export/deps-worker.ts`) while the main thread splits. Its progress lines come from the worker and are timed from the worker's start.
+- **Heap bound.** `hbc2js export` re-runs itself once with `--max-old-space-size` set to 250 bytes per bundle byte, capped at 75% of RAM, when that is more than the current limit (`src/util/heap-reexec.ts`). It does not do this when the user already set a limit in the node flags or `NODE_OPTIONS`. `HBC2JS_HEAP_REEXEC=0` turns it off.
+- **Progress lines** end in `[+<phase>s, <total>s]`: the time since the previous line and since the command started.
