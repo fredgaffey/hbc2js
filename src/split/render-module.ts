@@ -1,6 +1,7 @@
 import type { Diagnostic } from "../errors.ts";
 import type { ModuleAnalysis } from "../cfg/types.ts";
 import { emitModule } from "../emit/index.ts";
+import type { SubtreeJob, SubtreeOptions, SubtreeResult } from "../emit/index.ts";
 import type { Stmt } from "../emit/ast.ts";
 import { astPassHook, passHook } from "../passes/index.ts";
 import type { PassPipelineOptions } from "../passes/index.ts";
@@ -24,6 +25,8 @@ export interface RenderModuleOptions {
    *  throws away a name the naming/readability layer already produced. */
   readonly store?: OverlayStore;
   readonly moduleName?: string;
+  /** Function-granularity parallel render (`emitModule`'s `subtrees`). */
+  readonly subtrees?: SubtreeOptions;
   readonly dependencyAnnotations?: {
     readonly deps: readonly number[];
     readonly packageOf?: (moduleId: number) => string | undefined;
@@ -40,6 +43,8 @@ export interface RenderModuleResult {
    *  shared `src/_hbc/helpers.js`, since there is no longer one whole-bundle
    *  `emitModule` call to read a single `helpersUsed` off. */
   readonly helpersUsed: readonly string[];
+  readonly subtreeJobs?: readonly SubtreeJob[];
+  readonly subtree?: SubtreeResult;
 }
 
 function tierLabel(opts: RenderModuleOptions): string {
@@ -85,9 +90,10 @@ export function renderModuleReadable(analysis: ModuleAnalysis, factoryFn: number
     astPasses,
     onlyFunction: factoryFn,
     ...(opts.tier === "jsx" ? { jsx: true } : {}),
+    ...(opts.subtrees !== undefined ? { subtrees: opts.subtrees } : {}),
   });
   const header =
     `// hbc2js readable render -- module ${moduleId} (factory fn#${factoryFn}), tier: ${tierLabel(opts)}\n` +
     `// nested closures this module hosts are placed inside it exactly as the whole-bundle render would.\n`;
-  return { code: header + result.code, diagnostics: result.diagnostics, decompileDiagnostics: result.stubbedFunctions, helpersUsed: result.helpersUsed };
+  return { code: header + result.code, diagnostics: result.diagnostics, decompileDiagnostics: result.stubbedFunctions, helpersUsed: result.helpersUsed, ...(result.subtreeJobs !== undefined ? { subtreeJobs: result.subtreeJobs } : {}), ...(result.subtree !== undefined ? { subtree: result.subtree } : {}) };
 }

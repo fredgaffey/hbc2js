@@ -17,6 +17,7 @@ import { envGraphToTransfer } from "../cfg/env-graph.ts";
 import { emitLayoutTransfer } from "../emit/index.ts";
 import { siblingWorkerPath } from "../util/worker-path.ts";
 import type { ReadableOutcome, ReadableRenderOptions } from "./tiers.ts";
+import type { SubtreeJob } from "../emit/index.ts";
 
 export type RenderJob = Omit<ReadableRenderOptions, "analysis" | "store"> & {
   /** Relative cost estimate (the module's flat text length): jobs are handed
@@ -25,6 +26,15 @@ export type RenderJob = Omit<ReadableRenderOptions, "analysis" | "store"> & {
    *  output -- results are keyed by module id. */
   readonly cost: number;
 };
+
+/** One unit of worker work: a whole module; one nested function's subtree
+ *  of a module split across workers (spec 29 §12); or the assembly of such
+ *  a module from its subtrees' results (`v8.serialize`d `SubtreeResult`s,
+ *  passed through the main thread unopened). */
+export type RenderTask =
+  | { readonly kind: "module"; readonly job: RenderJob }
+  | { readonly kind: "subtree"; readonly job: RenderJob; readonly sub: SubtreeJob }
+  | { readonly kind: "assemble"; readonly job: RenderJob; readonly results: readonly Uint8Array[] };
 
 export interface RenderWorkerData {
   /** The bundle bytes, in a SharedArrayBuffer (one copy for every worker). */
@@ -52,7 +62,13 @@ export interface WorkerHeap {
 }
 
 export type RenderWorkerReply =
-  | { readonly ok: true; readonly results: readonly { readonly moduleId: number; readonly outcome: ReadableOutcome }[]; readonly heap: WorkerHeap }
+  | {
+      readonly ok: true;
+      readonly results: readonly { readonly moduleId: number; readonly outcome: ReadableOutcome }[];
+      /** One per subtree task, in task order; `data` null when it threw. */
+      readonly subtrees: readonly { readonly moduleId: number; readonly data: Uint8Array | null }[];
+      readonly heap: WorkerHeap;
+    }
   | { readonly ok: false; readonly error: { readonly message: string; readonly stack?: string } };
 
 /** Below this many functions the pool's per-worker setup (a parse plus a
@@ -184,6 +200,11 @@ export async function renderModulesInPool(
   plan: Pick<RenderWorkerPlan, "count" | "budget" | "max">,
   onProgress?: (done: number) => void,
   stats: PoolStats = { peakWorkers: 0, peakWorkerHeap: 0 },
+  /** Modules rendered across workers at function granularity: their
+   *  subtree jobs go out first; once a module's are all back its assembly
+   *  goes out ahead of everything else. A job listed here is not also
+   *  rendered whole. */
+  splits: ReadonlyMap<number, readonly SubtreeJob[]> = new Map(),
 ): Promise<Map<number, ReadableOutcome>> {
   const results = new Map<number, ReadableOutcome>();
   const bytesLength = data.bytes.byteLength;
@@ -193,7 +214,7 @@ export async function renderModulesInPool(
   // up to the limit it is given, and that, not live data, was the pool's
   // RSS. A module that needs more is redone without the bound (below).
   const envLimit = Number.parseInt(process.env.HBC2JS_WORKER_HEAP_MB ?? "", 10);
-  const startCount = Math.max(1, Math.min(plan.count, Math.ceil(jobs.length / BATCH)));
+  const startCount = Math.max(1, Math.min(plan.count, Math.ceil(jobs.length / BATCH) + [...splits.values()].reduce((n, l) => n + l.length, 0)));
   const heapLimitMb = Number.isFinite(envLimit) && envLimit > 0 ? envLimit : plan.budget !== null ? heapBoundMb(plan.budget / startCount - WORKER_NATIVE_BYTES, bytesLength) : null;
   // A bounded worker's old generation never passes its bound, so bound +
   // native per worker is a hard ceiling: never more workers than fit the
@@ -204,9 +225,17 @@ export async function renderModulesInPool(
   const count = Math.min(startCount, maxLive);
   const workers: Worker[] = [];
   let live = 0;
-  let next = 0;
   let done = 0;
-  const order = [...jobs].sort((a, b) => b.cost - a.cost || a.moduleId - b.moduleId);
+  const queue: RenderTask[] = [];
+  const pendingParts = new Map<number, { left: number; parts: Uint8Array[]; job: RenderJob }>();
+  for (const job of jobs) {
+    const subs = splits.get(job.moduleId);
+    if (subs === undefined || subs.length === 0) continue;
+    pendingParts.set(job.moduleId, { left: subs.length, parts: [], job });
+    for (const sub of subs) queue.push({ kind: "subtree", job, sub });
+  }
+  queue.push(...jobs.filter((j) => !pendingParts.has(j.moduleId)).sort((a, b) => b.cost - a.cost || a.moduleId - b.moduleId).map((job): RenderTask => ({ kind: "module", job })));
+  const solo = (t: RenderTask): boolean => t.kind !== "module" || t.job.cost > 50_000;
   try {
     await new Promise<void>((resolve, reject) => {
       if (jobs.length === 0) {
@@ -221,20 +250,20 @@ export async function renderModulesInPool(
         reject(err instanceof Error ? err : new Error(String(err)));
       };
       const finishIfDone = (): void => {
-        if (!settled && next >= order.length && busy === 0) {
+        if (!settled && queue.length === 0 && busy === 0) {
           settled = true;
           resolve();
         }
       };
       const feed = (w: Worker): void => {
         if (settled) return;
-        if (next >= order.length) {
+        if (queue.length === 0) {
           finishIfDone();
           return;
         }
         // Expensive jobs go out one at a time, the long tail in batches.
-        const batch = order.slice(next, next + (order[next]!.cost > 50_000 ? 1 : BATCH));
-        next += batch.length;
+        const batch: RenderTask[] = [queue.shift()!];
+        if (!solo(batch[0]!)) while (batch.length < BATCH && queue.length > 0 && !solo(queue[0]!)) batch.push(queue.shift()!);
         busy++;
         inflight.set(w, batch);
         w.postMessage(batch);
@@ -242,7 +271,7 @@ export async function renderModulesInPool(
       const retired = new Set<Worker>();
       const unlimited = new Set<Worker>();
       const heapOf = new Map<Worker, number>();
-      const inflight = new Map<Worker, readonly RenderJob[]>();
+      const inflight = new Map<Worker, readonly RenderTask[]>();
       const spawn = (limited = heapLimitMb !== null): Worker => {
         const w = new Worker(WORKER_SCRIPT, { workerData: data, ...(limited && heapLimitMb !== null ? { resourceLimits: { maxOldGenerationSizeMb: heapLimitMb } } : {}) });
         if (!limited) unlimited.add(w);
@@ -258,6 +287,14 @@ export async function renderModulesInPool(
           }
           for (const r of msg.results) results.set(r.moduleId, r.outcome);
           done += msg.results.length;
+          for (const st of msg.subtrees) {
+            const p = pendingParts.get(st.moduleId)!;
+            if (st.data !== null) p.parts.push(st.data);
+            if (--p.left === 0) {
+              pendingParts.delete(st.moduleId);
+              queue.unshift({ kind: "assemble", job: p.job, results: p.parts });
+            }
+          }
           onProgress?.(done);
           stats.peakWorkerHeap = Math.max(stats.peakWorkerHeap, msg.heap.total);
           heapOf.set(w, msg.heap.total);
@@ -266,7 +303,7 @@ export async function renderModulesInPool(
             // not yet reported counts as the largest seen), plus native.
             let footprint = 0;
             for (const x of workers) if (!retired.has(x)) footprint += (heapOf.get(x) ?? stats.peakWorkerHeap) + WORKER_NATIVE_BYTES;
-            if (footprint > plan.budget && live > 1 && next < order.length) {
+            if (footprint > plan.budget && live > 1 && queue.length > 0) {
               // Over budget: retire this (now idle) worker; the rest carry on.
               retired.add(w);
               live--;
@@ -274,7 +311,7 @@ export async function renderModulesInPool(
               finishIfDone();
               return;
             }
-            const left = order.length - next;
+            const left = queue.length;
             if (live < maxLive && footprint + stats.peakWorkerHeap + WORKER_NATIVE_BYTES <= plan.budget && left > live * BATCH * 4) feed(spawn());
           }
           feed(w);

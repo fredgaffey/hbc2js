@@ -10,14 +10,28 @@ import { segregateSplitTree } from "../split/segregate.ts";
 import { runDeps } from "../deps/index.ts";
 import type { DepsReport } from "../deps/report.ts";
 import { VERSION } from "../version.ts";
-import { buildIndexRows } from "../artifact/index-rows.ts";
+import { buildModulesIndexOnly } from "../artifact/index-rows.ts";
 import { exportPathForModule } from "./layout.ts";
 import type { ExportModuleInfo } from "./layout.ts";
 import { buildHelpersJs, buildRegistryJs } from "./registry.ts";
 import { rewriteModuleFile, wrapReadableModule } from "./rewrite.ts";
-import { renderModuleTiered, tieredFromOutcome } from "./tiers.ts";
+import { probeReadableSubtrees, renderModuleTiered, tieredFromOutcome } from "./tiers.ts";
 import type { ReadableOutcome, RenderedTier } from "./tiers.ts";
 import { planRenderWorkers, renderModulesInPool, shareForRenderWorkers } from "./render-pool.ts";
+import { nestedBytecodeSizes } from "../emit/index.ts";
+import type { SubtreeJob } from "../emit/index.ts";
+
+/** Modules whose flat text is at least this long are split into function-
+ *  level render jobs when more than one worker renders (spec 29 §12)... */
+const SPLIT_MIN_COST = envInt("HBC2JS_SPLIT_MIN_COST") ?? 200_000;
+/** ...into nested subtrees of at least this many bytecode bytes. (Both
+ *  overridable, for the byte-identity gate test on a small bundle.) */
+const SPLIT_MIN_PART = envInt("HBC2JS_SPLIT_MIN_PART") ?? 2_000;
+
+function envInt(name: string): number | undefined {
+  const n = Number.parseInt(process.env[name] ?? "", 10);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
 import { resolveWorkerCount } from "../parallel/pool.ts";
 import type { PoolStats, RenderJob } from "./render-pool.ts";
 import { loadModuleSyntaxCheck, syntaxStubFlatText } from "./syntax-check.ts";
@@ -140,7 +154,7 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
 
   // §7.1/§7.2's own inputs (`DepEdge[]`, `rendersJsx`) -- reuses
   // `splitResult.module`/`.analysis` (`analyseForArtifact`), no second parse.
-  const { modulesIndex } = buildIndexRows({ bytes, splitResult, passes: {}, strictEnv: false, form: "flat" });
+  const modulesIndex = buildModulesIndexOnly({ bytes, splitResult });
   const moduleIndexById = new Map(modulesIndex.modules.map((m) => [m.id, m]));
 
   // §5's S1-S4 boundary analysis, over the SAME `DepEdge[]` graph §7.1 built
@@ -192,6 +206,21 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
         cost: splitResult.files.get(info.originalFile)?.length ?? 0,
       });
     }
+    // Spec 29 §12: a module whose render alone would outlast the rest is
+    // rendered at function granularity -- its large nested subtrees as
+    // separate jobs, then assembled on one worker -- byte-identical to the
+    // whole render (`emitModule`'s `subtrees`).
+    const splits = new Map<number, readonly SubtreeJob[]>();
+    if (workerCount > 1) {
+      const sizes = nestedBytecodeSizes(splitResult.analysis);
+      for (const job of jobs) {
+        if (job.cost < SPLIT_MIN_COST || job.factoryFn === null) continue;
+        const lim = Math.max(SPLIT_MIN_PART, (sizes.get(job.factoryFn) ?? 0) / (workerCount * 4));
+        const parts = probeReadableSubtrees({ ...job, analysis: splitResult.analysis }, (fn) => (sizes.get(fn) ?? 0) > lim);
+        if (parts !== null && parts.length > 1) splits.set(job.moduleId, parts);
+      }
+      if (splits.size > 0) progress(`splitting ${splits.size} large module(s) into ${[...splits.values()].reduce((n, l) => n + l.length, 0)} function-level jobs`);
+    }
     progress(`rendering ${jobs.length} modules on ${Math.min(workerCount, jobs.length)} worker thread(s)${workerPlan.limitedBy === "memory" ? " (capped by physical memory)" : ""}`);
     let reported = 0;
     const poolStats: PoolStats = { peakWorkers: 0, peakWorkerHeap: 0 };
@@ -200,7 +229,7 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
         reported = done - (done % 250);
         progress(`rendering modules ${reported}/${jobs.length}`);
       }
-    }, poolStats);
+    }, poolStats, splits);
     progress(`render pool: at most ${poolStats.peakWorkers} worker(s) at once, largest worker heap ${Math.round(poolStats.peakWorkerHeap / 2 ** 20)} MB; main thread rss ${Math.round(process.memoryUsage().rss / 2 ** 20)} MB (process-wide)`);
   }
 

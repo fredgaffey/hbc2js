@@ -16,11 +16,11 @@ import { initialWorkerEstimate, planRenderWorkers } from "../../../src/export/re
 
 const BUNDLE = join(repoRoot(), "tests", "fixtures", "bundles", "rn-template-0.72", "index.android.hbc");
 
-function exportWith(workers: number): { out: string; stderr: string } {
+function exportWith(workers: number, extraEnv: Record<string, string> = {}): { out: string; stderr: string } {
   const out = join(mkdtempSync(join(tmpdir(), "hbc2js-export-workers-")), "out");
   const r = spawnSync(process.execPath, [CLI, "export", BUNDLE, "--out", out], {
     encoding: "utf8",
-    env: { ...process.env, HBC2JS_WORKERS: String(workers) },
+    env: { ...process.env, HBC2JS_WORKERS: String(workers), ...extraEnv },
     timeout: 600_000,
   });
   assert.equal(r.status, 0, `export (workers=${workers}) failed: ${r.stderr}`);
@@ -51,6 +51,23 @@ test("export: workers=1 and workers=3 write byte-identical trees (rn-template-0.
   } finally {
     cleanup(dirname(serial.out));
     cleanup(dirname(pooled.out));
+  }
+});
+
+test("export: modules split into function-level jobs render byte-identically (rn-template-0.72, workers=3)", () => {
+  const serial = exportWith(1);
+  // Thresholds lowered so this small bundle's larger modules are split into
+  // nested-subtree jobs and assembled (spec 29 §12).
+  const split = exportWith(3, { HBC2JS_SPLIT_MIN_COST: "4000", HBC2JS_SPLIT_MIN_PART: "100" });
+  try {
+    assert.match(split.stderr, /splitting \d+ large module\(s\) into \d+ function-level jobs/, "expected modules split into function-level jobs");
+    const a = tree(serial.out);
+    const b = tree(split.out);
+    assert.deepEqual([...b.keys()].sort(), [...a.keys()].sort());
+    for (const [rel, text] of a) assert.equal(b.get(rel), text, `${rel} differs between workers=1 and the function-level split`);
+  } finally {
+    cleanup(dirname(serial.out));
+    cleanup(dirname(split.out));
   }
 });
 

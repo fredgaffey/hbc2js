@@ -319,16 +319,24 @@ function closureSlot(list: readonly Stmt[], fnBody: readonly Stmt[], ctx: PassCo
   // `_fnN` -> the bytecode name of function N: the key the slot must have.
   const decls = new Map<string, number>();
   const keyOf = new Map<string, string>();
+  const candidates: [string, number][] = [];
   list.forEach((s, i) => {
     const n = s.k === "func" ? /^_fn(\d+)$/.exec(s.name) : null;
     if (s.k === "func" && n !== null) {
       const key = module.functionName(Number(n[1]));
       if (!isSafeIdentifier(key)) return;
       keyOf.set(s.name, key);
-      const u = identUses(fnBody, s.name);
-      if (u.reads === 1 && u.writes === 0 && u.nested === 0) decls.set(s.name, i);
+      candidates.push([s.name, i]);
     }
   });
+  // One walk for every candidate (`identUsesMany` counts each name exactly
+  // as `identUses` does): one walk per hoisted function was quadratic in a
+  // large module factory (spec 29 §12).
+  const uses = candidates.length > 0 ? identUsesMany(fnBody, candidates.map(([name]) => name)) : new Map<string, never>();
+  for (const [name, i] of candidates) {
+    const u = uses.get(name)!;
+    if (u.reads === 1 && u.writes === 0 && u.nested === 0) decls.set(name, i);
+  }
   if (decls.size === 0) return null;
   for (let i = 0; i < list.length; i++) {
     const s = list[i]!;
