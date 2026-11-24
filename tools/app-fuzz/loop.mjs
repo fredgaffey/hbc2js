@@ -288,10 +288,9 @@ const slug = (s) => s.replace(/[^A-Za-z0-9_.-]+/g, "_").slice(0, 80);
 
 function clusterOf(f, plan) {
   if (f.kind.startsWith("core:")) return `app-fuzz:${f.kind}:${f.core}`;
-  if (f.kind === "export-crash") {
-    const shapes = plan.length && plan.length < 4 ? ":" + [...new Set(plan.flatMap((p) => p.parts.map((x) => x.t)))].sort().join("+") : "";
-    return `app-fuzz:export-crash:${f.sig}${shapes}`;
-  }
+  // Crashes cluster by signature alone (the minimal shapes go in the detail),
+  // so a minimised and an unminimised sighting share one key.
+  if (f.kind === "export-crash") return `app-fuzz:export-crash:${f.sig}`;
   const shapes = [...new Set(plan.flatMap((p) => p.parts.map((x) => x.t)))].sort();
   const err = f.kind === "stub" ? ":" + f.error.split(",")[0] : "";
   return `app-fuzz:${f.kind}${err}:${shapes.join("+")}`;
