@@ -14,6 +14,9 @@ import type { ExportModuleInfo } from "./layout.ts";
 import { buildHelpersJs, buildRegistryJs } from "./registry.ts";
 import { rewriteModuleFile, wrapReadableModule } from "./rewrite.ts";
 import { renderModuleTiered } from "./tiers.ts";
+import type { RenderedTier } from "./tiers.ts";
+import { loadModuleSyntaxCheck, syntaxStubFlatText } from "./syntax-check.ts";
+import type { ModuleSyntaxCheck } from "./syntax-check.ts";
 import type { ExportManifestModule, ExportManifestUnresolved } from "./manifest.ts";
 import { buildExportManifest } from "./manifest.ts";
 import { planSubstitutions } from "./substitute.ts";
@@ -50,6 +53,9 @@ export interface ExportOptions {
    *  vendored, byte-for-byte the 6a/6b tree. */
   readonly substitute?: SubstituteMode;
   readonly instrument?: "modules";
+  /** Test hook only: replaces the per-module syntax check (default: parse
+   *  with `@babel/parser`, `src/export/syntax-check.ts`). */
+  readonly syntaxCheck?: ModuleSyntaxCheck;
 }
 
 export interface ExportResult {
@@ -64,6 +70,7 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   const bytes = readFileSync(bundlePath);
   const moduleName = basename(bundlePath);
   const tier = opts.tier ?? "passes";
+  const syntaxCheck = opts.syntaxCheck ?? (await loadModuleSyntaxCheck());
 
   // Always the flat (no-passes) split: the ONE whole-bundle parse+analysis
   // this run pays for (§1's pipeline diagram), and every module's flat text
@@ -157,18 +164,43 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
       factoryFunctionIndex: splitModule?.factoryFunctionIndex ?? -1,
       boundaryPackage: plan.boundaryPackage,
     };
-    const text =
+    let text =
       tiered.tier === "passes" || tiered.tier === "jsx"
         ? wrapReadableModule(tiered.code, info.id, depIds, rewriteOpts).text
         : rewriteModuleFile(tiered.code, info.id, rewriteOpts).text;
+    let finalTier: RenderedTier = tiered.tier;
+    let finalReason = tiered.tierDowngradeReason;
+    // Safety net: never write a module file that does not parse. Drop down
+    // the ladder -- the flat text (when the failing render was a readable
+    // one), then a throwing stub -- and record it (EXPORT.json `unresolved`
+    // kind "syntax-check-failed" plus the module's `tierDowngradeReason`).
+    const syntaxError = syntaxCheck(text, exportInfo.path);
+    if (syntaxError !== null) {
+      let fallback: string | null = null;
+      if (tiered.tier === "passes" || tiered.tier === "jsx") {
+        const flat = rewriteModuleFile(originalText, info.id, { ...rewriteOpts, tier: "flat" }).text;
+        if (syntaxCheck(flat, exportInfo.path) === null) {
+          fallback = flat;
+          finalTier = "flat";
+          for (const h of splitResult.helpersUsed) helpersUsedAll.add(h);
+        }
+      }
+      if (fallback === null) {
+        fallback = rewriteModuleFile(syntaxStubFlatText(info.id, splitModule?.deps ?? depIds, `the ${tiered.tier} render does not parse`), info.id, { ...rewriteOpts, tier: "stub" }).text;
+        finalTier = "stub";
+      }
+      text = fallback;
+      finalReason = `the ${tiered.tier} render failed the export syntax check (${syntaxError}); wrote the ${finalTier} render instead`;
+      unresolved.push({ kind: "syntax-check-failed", detail: `module ${info.id} (${exportInfo.path}): ${finalReason}` });
+    }
     files.set(exportInfo.path, text);
 
     modulesForManifest.push({
       id: info.id,
       path: exportInfo.path,
       bucket: exportInfo.bucket,
-      tier: tiered.tier,
-      tierDowngradeReason: tiered.tierDowngradeReason,
+      tier: finalTier,
+      tierDowngradeReason: finalReason,
       rendersJsx: rendersJsxTag,
       owner: exportInfo.package,
       eagerDeps,

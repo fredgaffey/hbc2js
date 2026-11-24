@@ -44,7 +44,7 @@ for (const version of VERSIONS) {
 test(`for-of P4.3: ${FIXTURE} is PASS under the gate tier at every version`, async () => {
   const report = await runTier({ tier: "gate", decompiler: hbc2jsDecompiler, versions: [84, 94, 96, 98, 99], only: [FIXTURE] });
   assert.ok(report.results.length > 0);
-  for (const r of report.results) assert.equal(r.verdict, VERDICT.PASS, `${r.fixture.name} ${r.version}: ${r.oracles.map((o) => `${o.oracle}=${o.verdict} ${o.detail ?? ""}`).join(" ")}`);
+  for (const r of report.results) assert.equal(r.verdict, VERDICT.PASS, `${r.fixture.name}: ${r.oracles.map((o) => `${o.oracle}=${o.verdict} ${o.detail ?? ""}`).join(" ")}`);
 });
 
 const fn = (name: string, body: Stmt[]): Stmt => ({ k: "func", name, params: [], body });
