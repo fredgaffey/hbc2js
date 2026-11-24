@@ -177,6 +177,10 @@ target:
 
 ### 2.1 What is generated
 
+> Sibling: `tools/app-fuzz/` (README there) runs decompiler-hostile generated
+> code through the torture pipeline, with an exact checksum oracle, static
+> checks, minimisation and coverage-guided template weights.
+
 Both the **app source** and the **build config**, from one seed:
 
 - **Source generator** (`src/appgen/`): template-based, not random-AST — the
