@@ -46,5 +46,5 @@ for (const version of ["v94", "v96", "v98", "v99"] as const) {
 test(`finally-dedup R-FD9: ${FIXTURE} is PASS under the gate tier at every version`, async () => {
   const report = await runTier({ tier: "gate", decompiler: hbc2jsDecompiler, versions: [84, 94, 96, 98, 99], only: [FIXTURE] });
   assert.ok(report.results.length > 0);
-  for (const r of report.results) assert.equal(r.verdict, VERDICT.PASS, `${r.fixture.name} ${r.version}: ${r.oracles.map((o) => `${o.oracle}=${o.verdict} ${o.detail ?? ""}`).join(" ")}`);
+  for (const r of report.results) assert.equal(r.verdict, VERDICT.PASS, `${r.fixture.name}: ${r.oracles.map((o) => `${o.oracle}=${o.verdict} ${o.detail ?? ""}`).join(" ")}`);
 });
