@@ -286,6 +286,14 @@ export type PatternElement = { readonly k: "pel"; readonly target: Pattern; read
 export interface ObjectProp {
   readonly key: string; // identifier text, or a rendered literal when `computed`
   readonly computed: boolean;
+  /** The computed key as an expression, when it is one (object-literal's
+   *  `computedStoreOf` fold: `{[r12]: v}`). The printer renders THIS, not
+   *  `key`, and the shared walks (`walk`/`mapExpr`/register use counts/
+   *  var-naming's rename/EM-01) visit it, so a register in a key stays
+   *  visible to every later rename. Before it existed the key lived only in
+   *  the `key` string: bench 2026-11-24 found `{[r12]: v}` in the Ignite
+   *  export after var-naming renamed r12's def to `key` (ReferenceError). */
+  readonly keyExpr?: Expr;
   readonly value: Expr;
 }
 

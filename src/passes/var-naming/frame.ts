@@ -43,7 +43,31 @@ export function walkFrame(stmts: readonly Stmt[], visit: FrameVisitor): void {
         e.elements.forEach(walkExpr);
         return;
       case "object":
-        e.props.forEach((p) => walkExpr("k" in p ? p.arg : p.value));
+        e.props.forEach((p) => { if (!("k" in p) && p.keyExpr !== undefined) walkExpr(p.keyExpr); walkExpr("k" in p ? p.arg : p.value); });
+        return;
+      case "optmember": // F18 (bench 2026-11-24: an `r?.x` read was invisible here)
+        walkExpr(e.obj);
+        if (e.computed) walkExpr(e.prop);
+        return;
+      case "optcall": // F18
+        walkExpr(e.callee);
+        for (const a of e.args) walkExpr(a);
+        return;
+      case "template": // F14
+        for (const x of e.exprs) walkExpr(x);
+        return;
+      case "tagged": // F14
+        walkExpr(e.tag);
+        walkExpr(e.quasi);
+        return;
+      case "spread": // F17
+        walkExpr(e.arg);
+        return;
+      case "await": // F25-1
+        walkExpr(e.arg);
+        return;
+      case "yield":
+        if (e.arg !== null) walkExpr(e.arg);
         return;
       case "seq":
         e.exprs.forEach(walkExpr);
@@ -215,7 +239,31 @@ export function frameOccurrences(stmts: readonly Stmt[], names: ReadonlySet<stri
         e.elements.forEach((x) => visitExpr(x, at));
         return;
       case "object":
-        e.props.forEach((p) => visitExpr("k" in p ? p.arg : p.value, at));
+        e.props.forEach((p) => { if (!("k" in p) && p.keyExpr !== undefined) visitExpr(p.keyExpr, at); visitExpr("k" in p ? p.arg : p.value, at); });
+        return;
+      case "optmember": // F18 (bench 2026-11-24: an `r?.x` read was invisible here)
+        visitExpr(e.obj, at);
+        if (e.computed) visitExpr(e.prop, at);
+        return;
+      case "optcall": // F18
+        visitExpr(e.callee, at);
+        for (const a of e.args) visitExpr(a, at);
+        return;
+      case "template": // F14
+        for (const x of e.exprs) visitExpr(x, at);
+        return;
+      case "tagged": // F14
+        visitExpr(e.tag, at);
+        visitExpr(e.quasi, at);
+        return;
+      case "spread": // F17
+        visitExpr(e.arg, at);
+        return;
+      case "await": // F25-1
+        visitExpr(e.arg, at);
+        return;
+      case "yield":
+        if (e.arg !== null) visitExpr(e.arg, at);
         return;
       case "seq":
         e.exprs.forEach((x) => visitExpr(x, at));
