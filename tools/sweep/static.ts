@@ -21,7 +21,7 @@
 //   STUB         EM-* isolation stub (a function the emitter refused / scope-
 //                check isolated)
 //   WARN         decompile() diagnostic (W_* code)
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "@babel/parser";
 import traverseMod from "@babel/traverse";
@@ -237,13 +237,46 @@ export function warnFindings(res: DecompileResult, app: string, hbc: number): Fi
   }));
 }
 
+/** `--dir <export tree>`: static checks over every module file of an
+ *  `hbc2js export` tree (no whole-bundle decompile in memory -- the route for
+ *  the 99k-function app). Export output carries no `// fn#` markers, so
+ *  findings are attributed to the module file (fn -1, `module` = file). */
+function dirMode(dir: string, outDir: string, app: string, hbc: number, argv: string[]): void {
+  for (let i = 0; i < argv.length; i++) if (argv[i] === "--host-from") addHostFrom(readFileSync(argv[i + 1]!, "utf8"));
+  const files: string[] = [];
+  const walk = (d: string): void => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      if (e.name === "node_modules" && d === dir) continue; // the scaffold's own deps, if installed
+      const p = join(d, e.name);
+      if (e.isDirectory()) walk(p); else if (e.name.endsWith(".js")) files.push(p);
+    }
+  };
+  walk(dir);
+  const t0 = Date.now(); const all: Finding[] = []; let parseFail = 0;
+  for (const f of files) {
+    const rel = f.slice(dir.length + 1);
+    let fs: Finding[];
+    try { fs = staticFindings(readFileSync(f, "utf8"), app, hbc); } catch (e) {
+      parseFail++; fs = [{ app, hbc, fn: -1, check: "PARSE", sig: "PARSE:fatal", detail: (e as Error).message }];
+    }
+    for (const x of fs) all.push({ ...x, module: rel } as Finding);
+  }
+  writeFileSync(join(outDir, "findings.jsonl"), all.map((f) => JSON.stringify(f)).join("\n") + "\n");
+  const byCheck: Record<string, number> = {};
+  for (const f of all) byCheck[f.check] = (byCheck[f.check] ?? 0) + 1;
+  const summary = { app, input: dir, hbc, mode: "export-dir", files: files.length, functions: null, decompileMs: 0, totalMs: Date.now() - t0, parseFail, findings: byCheck };
+  writeFileSync(join(outDir, "summary.json"), JSON.stringify(summary, null, 2) + "\n");
+  console.log(JSON.stringify(summary));
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const flag = (k: string): string | undefined => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
   const input = argv[0];
   const outDir = flag("--out");
-  if (!input || !outDir) { console.error("usage: static.ts <app.hbc> --out <dir> [--app L] [--workers N] [--host-from bundle.js]..."); process.exit(2); }
+  if ((!input && !argv.includes("--dir")) || !outDir) { console.error("usage: static.ts <app.hbc> --out <dir> [--app L] [--workers N] [--host-from bundle.js]..."); process.exit(2); }
   const app = flag("--app") ?? input;
+  if (flag("--dir") !== undefined) return dirMode(flag("--dir")!, outDir, app, Number(flag("--hbc") ?? 0), argv);
   const workers = Number(flag("--workers") ?? "1");
   mkdirSync(outDir, { recursive: true });
   const bytes = new Uint8Array(readFileSync(input));
