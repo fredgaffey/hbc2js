@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { acquireBootSource, bootTrace } from "./boot-equiv.ts";
 import type { BootTraceResult } from "./boot-equiv.ts";
 import { findAllHermesVms, findHermesVm } from "./hermes-vm.ts";
+import { progress } from "../util/progress.ts";
 import { findHermesc as findHermescVersion } from "./roundtrip.ts";
 import type { Trace, TraceRecord } from "./trace.ts";
 
@@ -259,7 +260,7 @@ export async function exportBootProof(original: string, exportDir: string, opts:
   const phase = opts.phase ?? "register";
   const seed = opts.seed ?? 0;
   const vm = opts.vm ?? pickBootVm(exportDir);
-  const traceOpts = { seed, firstNative: HOST_NATIVE_CAP, ...(vm !== undefined ? { vm } : {}), ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}) };
+  const traceOpts = { seed, firstNative: HOST_NATIVE_CAP, lowerFrom: exportDir, ...(vm !== undefined ? { vm } : {}), ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}) };
   const projOpts = (mask?: ReadonlySet<number>): ProjectOptions => ({ firstNative: opts.firstNative ?? DEFAULT_PROJECTED_NATIVE, ...(mask !== undefined ? { mask } : {}) });
   const mask = substitutedIds(exportDir);
   // §1: the export side is compiled with the pinned hermesc (prelude
@@ -280,8 +281,10 @@ export async function exportBootProof(original: string, exportDir: string, opts:
   // export can be concluded, and the (slow) re-bundle is skipped.
   // Spec 31 §4.2 (L4): one native-module manifest, derived from the
   // original (plus its optional boot-native.json), for BOTH sides.
+  progress(original.endsWith(".hbc") ? `decompiling the original ${original} (the control)` : `reading the original ${original}`);
   const originalSource = acquireBootSource(original, { lenientEnv: true }).source;
   const natives = deriveNativeManifest(originalSource, overrideFor(original));
+  progress(`booting the original under the stub host (${vm ?? "discovered VM"}, source mode)`);
   const a = bootTrace(originalSource, { ...traceOpts, natives, wrapFactories: true, ...(run !== undefined ? { run } : {}) });
   const ra = observeRun(a.trace);
   const pa = projectBootTrace(a.trace, projOpts(mask));
@@ -303,6 +306,7 @@ export async function exportBootProof(original: string, exportDir: string, opts:
     if (gap !== null) return { ...inconclusive(`the original ${gap} under the stub host: a stub-host gap (spec 31 §4.1), not evidence about the export`), runApplication: { a: ra.runApplication, b: null }, views: { a: ra.views, b: [] }, commits: { a: ra.commits, b: 0 } };
   }
 
+  progress(`original booted: ${enters(pa)} factories, keys ${keys(pa).join(", ")}${a.lowered === true ? " (class syntax lowered for this VM)" : ""}; bundling the export offline (Metro)`);
   const { offlineBundle } = await import("../export/offline-check.ts");
   let bundlePath: string;
   try {
@@ -312,7 +316,9 @@ export async function exportBootProof(original: string, exportDir: string, opts:
   }
   if (!existsSync(bundlePath)) return inconclusive(`offline bundle missing at ${bundlePath}`);
   const bOpts = compiler !== null ? { ...traceOpts, vm: compiler.vm, hermesc: compiler.hermesc } : traceOpts;
+  progress(compiler !== null ? `booting the export (hermesc v${compiler.version} + hermes -b)` : "booting the export (source mode)");
   const b = bootTrace(readFileSync(bundlePath, "utf8"), { ...bOpts, natives, wrapFactories: false, ...(run !== undefined ? { run } : {}) });
+  progress(`export booted: ${b.ran ? "trace" : "no trace"}; comparing projections`);
   const rb = observeRun(b.trace);
   const pb = projectBootTrace(b.trace, projOpts());
   const runPart = run !== undefined ? { runApplication: { a: ra.runApplication, b: rb.runApplication }, views: { a: ra.views, b: rb.views }, commits: { a: ra.commits, b: rb.commits } } : {};

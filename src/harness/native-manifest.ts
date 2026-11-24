@@ -92,6 +92,14 @@ const KNOWN_CONSTANTS: Readonly<Record<string, NativeConstants>> = {
   ExponentConstants: { executionEnvironment: "bare", appOwnership: null, isHeadless: false, statusBarHeight: 24, deviceName: "stub", systemFonts: [], sessionId: "00000000-0000-0000-0000-000000000000", manifest: null, platform: { android: {} } },
 };
 
+/** The stand-in embedded app config (see deriveNativeManifest). */
+export const EMBEDDED_MANIFEST = { name: "app", slug: "app", android: { package: "com.hbc2js.boot" } } as const;
+
+function ovSetsManifest(ov: NativeOverride): boolean {
+  const c = ov.present?.ExponentConstants;
+  return typeof c === "object" && c !== null && "manifest" in c;
+}
+
 export interface NativeOverride {
   readonly present?: Readonly<Record<string, NativeConstants | true>>;
   readonly absent?: readonly string[];
@@ -196,6 +204,14 @@ export function deriveNativeManifest(source: string, override: NativeOverride | 
   // An Expo module (\`requireNativeModule('X')\`) is reachable only through
   // expo-modules-core's installer, so a required one implies it.
   if (!("ExpoModulesCore" in present) && !absent.has("ExpoModulesCore") && /requireNativeModule\)?\(/.test(source)) add("ExpoModulesCore");
+  // An app built with Expo's tooling embeds its app config (expo's Gradle
+  // plugin writes assets/app.config, which expo-constants exposes as
+  // \`manifest\`); expo-linking throws at module eval without one. The real
+  // config is in the APK, not the bundle: stand in a minimal one (no URI
+  // scheme, so expo-linking takes its "native app identifier" path), unless
+  // boot-native.json supplies the real \`ExponentConstants.manifest\`.
+  const ec = present.ExponentConstants;
+  if (ec !== undefined && ec.manifest === null && !ovSetsManifest(ov) && /\bexpoConfig\b/.test(source)) present.ExponentConstants = { ...ec, manifest: EMBEDDED_MANIFEST };
   const sorted: Record<string, NativeConstants> = {};
   for (const k of Object.keys(present).sort()) sorted[k] = present[k]!;
   return { schema: "boot-native/1", present: sorted };

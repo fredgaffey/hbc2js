@@ -17,6 +17,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createRequire } from "node:module";
 import { decompile } from "../decompile.ts";
 import { NO_VM_HELP, findAllHermesVms, runHermes } from "./hermes-vm.ts";
 import type { HermesRunResult, HermesVm } from "./hermes-vm.ts";
@@ -84,6 +85,9 @@ export interface BootTraceOptions {
    *  present module with no constants beyond `hostConstants`. A comparison
    *  passes the SAME manifest (derived from the original) to both sides. */
   readonly natives?: NativeManifest;
+  /** Where to resolve Babel from when the source needs class-syntax
+   *  lowering (an export tree's directory); hbc2js's own install otherwise. */
+  readonly lowerFrom?: string;
 }
 
 export interface BootRunOptions {
@@ -109,6 +113,9 @@ export interface BootTraceResult {
   /** Human-readable reason, set whenever `vm === null` or `ran === false`. */
   readonly why: string | null;
   readonly raw?: HermesRunResult;
+  /** True when the bundle's class private members were lowered first
+   *  because the parsing engine lacks them (see `lowerClassSyntax`). */
+  readonly lowered?: boolean;
 }
 
 function resolveVm(override: string | undefined): HermesVm | null {
@@ -762,17 +769,104 @@ function buildBootSource(bundleSource: string, seed: number, firstNative: number
 
 const NO_VM_MESSAGE = NO_VM_HELP;
 
+// --- 0.1.2: class syntax the executing engine lacks --------------------
+// An HBC v98/v99 original decompiles to classes with private members
+// (`#e`), and the prebuilt VMs/compilers that exist (classic Hermes,
+// HBC <= 96) reject both at parse time (classic Hermes has no `class` at
+// all: Metro's preset lowered classes for it). Hermes >= v98 supports them natively on the device,
+// so the faithful move is to keep the program's meaning and change only how
+// private state is stored and how classes are wired: Babel's spec-mode
+// lowering (WeakMap / WeakSet brand checks, `#x in o` included; ES5
+// constructor functions, as Metro emits for classic Hermes), applied identically to BOTH sides of a
+// comparison, and only when the engine that parses the source cannot.
+
+const PRIVATE_SYNTAX = /(?<![\w$'"`\\])#[A-Za-z_$][\w$]*\s*(?:[=;(}]|in\b)|\.#[A-Za-z_$]|(?<![\w$.])class\s*(?:[A-Za-z_$][\w$]*\s*)?(?:extends\b|\{)/;
+const syntaxCache = new Map<string, boolean>();
+
+/** Whether `exe` (a `hermes` VM run in source mode, or a `hermesc`) parses
+ *  class private members. Probed once per binary. */
+export function classSyntaxSupported(exe: string, kind: "vm" | "hermesc"): boolean {
+  const key = `${kind}:${exe}`;
+  const hit = syntaxCache.get(key);
+  if (hit !== undefined) return hit;
+  const dir = mkdtempSync(join(tmpdir(), "hbc2js-syntax-probe-"));
+  let ok = false;
+  try {
+    const f = join(dir, "p.js");
+    writeFileSync(f, "class A { #a = 1; #m() { return this.#a; } static has(o) { return #a in o; } }\nnew A();\n");
+    const args = kind === "vm" ? [f] : ["-emit-binary", `-out=${join(dir, "p.hbc")}`, f];
+    ok = spawnSync(exe, args, { encoding: "utf8", timeout: 30000 }).status === 0;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  syntaxCache.set(key, ok);
+  return ok;
+}
+
+const LOWER_PLUGINS = [
+  "@babel/plugin-transform-class-static-block",
+  "@babel/plugin-transform-private-property-in-object",
+  "@babel/plugin-transform-private-methods",
+  "@babel/plugin-transform-class-properties",
+  "@babel/plugin-transform-classes",
+];
+
+/** Lowers classes and their private members (and static blocks, when that plugin is
+ *  installed) with Babel resolved from `fromDir` (an export tree's own
+ *  node_modules, which a bundled export always has), else from hbc2js's own
+ *  install. Text with no private syntax comes back unchanged. Null when
+ *  lowering is needed but no `@babel/core` + plugins can be resolved. */
+export function lowerClassSyntax(source: string, fromDir: string | undefined): string | null {
+  if (!PRIVATE_SYNTAX.test(source)) return source;
+  const requirers = [...(fromDir !== undefined ? [createRequire(join(fromDir, "package.json"))] : []), createRequire(import.meta.url)];
+  for (const req of requirers) {
+    let core: { transformSync: (code: string, o: object) => { code?: string | null } | null };
+    try {
+      core = req("@babel/core") as typeof core;
+    } catch {
+      continue;
+    }
+    const plugins: unknown[] = [];
+    let missing = false;
+    for (const name of LOWER_PLUGINS) {
+      try {
+        plugins.push(req(name));
+      } catch {
+        if (name !== LOWER_PLUGINS[0]) missing = true;
+      }
+    }
+    if (missing) continue;
+    const out = core.transformSync(source, { babelrc: false, configFile: false, compact: true, comments: false, sourceType: "script", plugins });
+    if (out?.code != null) return out.code;
+  }
+  return null;
+}
+
 /** Boots one bundle source under the stub host and returns its trace (spec
  *  §8). Always concatenates the prelude with `bundleSource`; runs
  *  `hermes <file.js>` in source mode, or, with `opts.hermesc` (spec 33 L2),
  *  compiles that concatenation and runs `hermes -b` on the result. */
-export function bootTrace(bundleSource: string, opts: BootTraceOptions = {}): BootTraceResult {
+export function bootTrace(bundleSourceIn: string, opts: BootTraceOptions = {}): BootTraceResult {
+  let bundleSource = bundleSourceIn;
   const seed = opts.seed ?? 0;
   const firstNative = opts.firstNative ?? DEFAULT_FIRST_NATIVE;
   const timeout = opts.timeoutMs ?? 10000;
   const vm = resolveVm(opts.vm);
   if (vm === null) {
     return { trace: { kind: "full", records: [] }, reachedEnd: false, bootError: null, vm: null, ran: false, why: NO_VM_MESSAGE };
+  }
+
+  // The engine that parses the concatenated source: hermesc when compiling,
+  // else the VM in source mode.
+  let lowered = false;
+  if (PRIVATE_SYNTAX.test(bundleSource) && !classSyntaxSupported(opts.hermesc ?? vm.path, opts.hermesc !== undefined ? "hermesc" : "vm")) {
+    const low = lowerClassSyntax(bundleSource, opts.lowerFrom);
+    if (low === null) {
+      const why = `${opts.hermesc ?? vm.path} cannot parse class private members (#x) and no @babel/core with the class-properties / private-methods / private-property-in-object plugins could be resolved to lower them (install them, use a Hermes >= v98 VM via --vm, or build one: tools/build-hermes-vm.sh 98)`;
+      return { trace: { kind: "full", records: [] }, reachedEnd: false, bootError: null, vm, ran: false, why };
+    }
+    bundleSource = low;
+    lowered = true;
   }
 
   const dir = mkdtempSync(join(tmpdir(), "hbc2js-boot-equiv-"));
@@ -804,6 +898,7 @@ export function bootTrace(bundleSource: string, opts: BootTraceOptions = {}): Bo
     bootError: bootErrRec !== undefined ? { name: bootErrRec.name, message: bootErrRec.message } : null,
     vm,
     ran,
+    lowered,
     why: ran ? null : `hermes produced no boot trace at all: ${excerpt(raw.stderr !== "" ? raw.stderr : raw.stdout)}`,
     raw,
   };

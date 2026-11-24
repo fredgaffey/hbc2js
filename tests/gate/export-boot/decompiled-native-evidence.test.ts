@@ -71,3 +71,12 @@ test("0.1.2 apps: a boot-native.json that names only an Expo module makes it rea
   assert.ok("ExpoLinking" in m.present);
   assert.ok("ExpoModulesCore" in m.present, "expo-modules-core in the bundle means its native half is linked");
 });
+
+test("0.1.2 apps: an Expo-built app reads an embedded app config (expo-linking throws at module eval without one); boot-native.json can supply the real one", () => {
+  const src = `__d(function(g,r,i,a,m,e,d){var c=(0,r(d[0]).requireOptionalNativeModule)('ExponentConstants')},15,[6]);\n__d(function(g,r,i,a,m,e,d){var x=r(d[0]).default.expoConfig},16,[15]);`;
+  assert.deepEqual(deriveNativeManifest(src).present.ExponentConstants!.manifest, { name: "app", slug: "app", android: { package: "com.hbc2js.boot" } });
+  const real = { name: "Real", slug: "real", scheme: "real" };
+  assert.deepEqual(deriveNativeManifest(src, { present: { ExponentConstants: { manifest: real } } }).present.ExponentConstants!.manifest, real);
+  // A bare app that never reads expoConfig keeps the bare default.
+  assert.equal(deriveNativeManifest(src.replace("default.expoConfig", "default.sessionId")).present.ExponentConstants!.manifest, null);
+});
