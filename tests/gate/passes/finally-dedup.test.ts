@@ -119,7 +119,7 @@ for (const version of VERSIONS) {
     const want = version === "v98" || version === "v99" ? "R-FD3" : "R-FD5";
     const got = refusals(withRung.diagnostics);
     assert.ok(got.some((m) => m.includes(want)), `a named ${want} refusal is reported: ${got.join(" / ")}`);
-    assert.ok(got.every((m) => /R-FD[1-8]/.test(m)), "every refusal carries a code from the table");
+    assert.ok(got.every((m) => /R-FD[1-9]/.test(m)), "every refusal carries a code from the table");
   });
 
   test(`spec 30 item 5: 54's applyWithGuard is refused R-FD3 at ${version}`, () => {

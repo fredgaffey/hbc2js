@@ -9,7 +9,7 @@
 import type { Stmt } from "../../structure/ir.ts";
 import type { BlockId, Instruction } from "../tree.ts";
 import type { CheckResult, PassContext } from "../types.ts";
-import { blocksMultiset, sameShape, writtenRegisters } from "../tree.ts";
+import { blocksMultiset, registerLiveAfter, sameShape, writtenRegisters } from "../tree.ts";
 
 /** The range `[from, to)` of `ins`, renamed so that the text depends only on
  *  the *pattern* of definitions and uses, never on register numbers. */
@@ -103,6 +103,37 @@ export function check(before: Stmt, after: Stmt, ctx: PassContext): CheckResult 
       if (c.to >= ins.length) return { ok: false, reason: "a case-A finalizer copy swallowed its own control transfer" };
     } else if (c.to !== ins.length || ins[ins.length - 1]!.kind !== h[h.length - 1]!.kind) {
       return { ok: false, reason: "a case-B finalizer copy does not end in the same transfer as the finalizer" };
+    }
+    // 5. R-FD9: the printed finalizer (the handler-side range) is a faithful
+    //    stand-in for this copy ON THIS PATH. Re-derived positionally, not
+    //    from match's bijection: (a) at every read the source makes of a
+    //    register it has not yet defined, the copy reads that same register;
+    //    (b) for every register the source writes that is live after the
+    //    copy, the copy's last definition of it is at the same index as the
+    //    source's (so, given 2., it holds the corresponding value).
+    {
+      const defined = new Set<number>();
+      const lastSrc = new Map<number, number>();
+      const lastCopy = new Map<number, number>();
+      for (let k = 0; k < c.to - c.from; k++) {
+        const sx = h[form.source.from + k]!;
+        const cx = ins[c.from + k]!;
+        const sw = writtenRegisters(sx);
+        for (let j = 0; j < sx.operands.length; j++) {
+          const op = sx.operands[j]!;
+          if (op.role !== "reg" || (j === 0 && sw.includes(op.value)) || defined.has(op.value)) continue;
+          if (cx.operands[j]?.value !== op.value) return { ok: false, reason: "the finalizer reads a register the copy does not (R-FD9)" };
+        }
+        for (const w of sw) {
+          defined.add(w);
+          lastSrc.set(w, k);
+        }
+        for (const w of writtenRegisters(cx)) lastCopy.set(w, k);
+      }
+      for (const [w, k] of lastSrc) {
+        if (lastCopy.get(w) === k) continue;
+        if (registerLiveAfter(structured, c.cfgBlock, c.to, w)) return { ok: false, reason: "the finalizer clobbers a register live after the copy (R-FD9)" };
+      }
     }
     // 4. Nothing the printer drops is still needed at the copy site.
     for (let i = c.from; i < c.to; i++) {

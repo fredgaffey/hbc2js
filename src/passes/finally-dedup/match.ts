@@ -21,7 +21,22 @@ export type TryNode = Stmt & { readonly k: "try" };
  * has to map to itself while it holds the parameter and to `r2` afterwards.
  */
 export function isomorphicModuloRegisters(a: readonly Instruction[], b: readonly Instruction[]): boolean {
-  if (a.length !== b.length || a.length === 0) return false;
+  return registerCorrespondence(a, b) !== null;
+}
+
+/** What `isomorphicModuloRegisters` proves, kept: `liveIn` pairs every
+ *  register `a` reads before defining it with the register `b` reads at the
+ *  same operand, and `liveOut` is the correspondence in force at the end of the
+ *  range (register of `a` -> register of `b` holding the same value). */
+export interface RegisterCorrespondence {
+  readonly liveIn: ReadonlyMap<number, number>;
+  readonly liveOut: ReadonlyMap<number, number>;
+}
+
+export function registerCorrespondence(a: readonly Instruction[], b: readonly Instruction[]): RegisterCorrespondence | null {
+  if (a.length !== b.length || a.length === 0) return null;
+  const liveIn = new Map<number, number>();
+  const definedInA = new Set<number>();
   const fwd = new Map<number, number>();
   const back = new Map<number, number>();
   const bindRead = (x: number, y: number): boolean => {
@@ -41,28 +56,30 @@ export function isomorphicModuloRegisters(a: readonly Instruction[], b: readonly
   for (let i = 0; i < a.length; i++) {
     const x = a[i]!;
     const y = b[i]!;
-    if (x.name !== y.name || x.operands.length !== y.operands.length) return false;
+    if (x.name !== y.name || x.operands.length !== y.operands.length) return null;
     const wx = writtenRegisters(x);
     const wy = writtenRegisters(y);
     const isDest = (insn: Instruction, written: readonly number[], j: number): boolean => j === 0 && insn.operands[0]!.role === "reg" && written.includes(insn.operands[0]!.value);
     for (let j = 0; j < x.operands.length; j++) {
       const ox = x.operands[j]!;
       const oy = y.operands[j]!;
-      if (ox.role !== oy.role || ox.type !== oy.type) return false;
+      if (ox.role !== oy.role || ox.type !== oy.type) return null;
       if (ox.role !== "reg") {
-        if (ox.value !== oy.value) return false;
+        if (ox.value !== oy.value) return null;
         continue;
       }
-      if (isDest(x, wx, j) !== isDest(y, wy, j)) return false;
+      if (isDest(x, wx, j) !== isDest(y, wy, j)) return null;
       if (isDest(x, wx, j)) continue; // a definition: rebound below, after every read of this instruction
-      if (!bindRead(ox.value, oy.value)) return false;
+      if (!bindRead(ox.value, oy.value)) return null;
+      if (!definedInA.has(ox.value)) liveIn.set(ox.value, oy.value);
     }
     for (let j = 0; j < x.operands.length; j++) {
       if (!isDest(x, wx, j)) continue;
       bindWrite(x.operands[j]!.value, y.operands[j]!.value);
+      definedInA.add(x.operands[j]!.value);
     }
   }
-  return true;
+  return { liveIn, liveOut: fwd };
 }
 
 /**
@@ -147,7 +164,28 @@ export function match(node: Stmt, ctx: PassContext): Match<Stmt, FinallyForm> | 
     // `finally` relocates that code INSIDE the try's protected scope and moves
     // the finalizer to after it, which is a semantic change, not a cosmetic one.
     if (rethrowOnly && ins.slice(to).some((insn) => canThrow(insn))) return refuse("R-FD2b remainder-is-not-just-a-transfer");
-    if (!isomorphicModuloRegisters(fh, ins.slice(from, to))) return refuse("R-FD1 not-isomorphic");
+    const corr = registerCorrespondence(fh, ins.slice(from, to));
+    if (corr === null) return refuse("R-FD1 not-isomorphic");
+
+    // R-FD9 (2026-11-24, docs/BUGS.md `finally-dedup-register-mismatch`): the
+    // printed `finally` body is the HANDLER-side range, and it now also runs on
+    // this normal path in place of the copy. Isomorphism modulo a rebinding
+    // bijection is not enough for that: (a) every register the source reads
+    // before defining it must be the very register the copy reads -- otherwise
+    // the finalizer reads a different value here; (b) every register the
+    // source writes that is still live after the copy must hold, at the end of
+    // the range, the copy's value for that same register. The handler side
+    // ends in a rethrow, so Hermes freely uses live-on-the-normal-path
+    // registers as scratch there (torture s1-n10000: `arr.push(29)` landed its
+    // result in the register holding `arr`, and its receiver Mov in the one
+    // holding `str`).
+    for (const [x, y] of corr.liveIn) if (x !== y) return refuse("R-FD9 finalizer-reads-other-registers");
+    const sourceWrites = new Set<number>();
+    for (const insn of fh) for (const w of writtenRegisters(insn)) sourceWrites.add(w);
+    for (const w of sourceWrites) {
+      if (corr.liveOut.get(w) === w) continue;
+      if (liveAfterRange(ins, to, w) ?? registerLiveAfter(structured, b, to, w)) return refuse("R-FD9 finalizer-clobbers-a-live-value");
+    }
 
     // R-FD8 (added when this landed; see spec 30 section 6): an instruction of
     // the copy whose destination is still live after the range cannot simply
