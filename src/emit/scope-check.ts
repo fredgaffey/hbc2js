@@ -345,3 +345,78 @@ export function collectUnbound(program: readonly Stmt[], helperNames: readonly s
   });
   return out;
 }
+
+/**
+ * EM-01b — every emitted `break L` / `continue L` must name a label that
+ * encloses it in the same function (`continue L` an enclosing *loop* label),
+ * and an unlabeled `break`/`continue` must sit inside a loop (or, for
+ * `break`, a `switch`). A leak here is a parse-time `SyntaxError` for the
+ * whole file (docs/BUGS.md `for-of-noreturn-handler-label`), so it is
+ * collected exactly like an unbound identifier and isolated the same way:
+ * the innermost emitted function *statement* becomes a throwing stub.
+ */
+export interface UnboundLabel {
+  readonly message: string;
+  readonly path: readonly string[];
+}
+
+interface LabelCtx {
+  readonly labels: readonly { readonly name: string; readonly loop: boolean }[];
+  readonly loop: boolean;
+  readonly sw: boolean;
+}
+
+const LOOP_KINDS: ReadonlySet<string> = new Set(["while", "do-while", "for", "for-in", "for-of"]);
+const FRESH: LabelCtx = { labels: [], loop: false, sw: false };
+
+export function collectUnboundLabels(program: readonly Stmt[]): readonly UnboundLabel[] {
+  const out: UnboundLabel[] = [];
+  const walk = (v: unknown, ctx: LabelCtx, where: readonly string[]): void => {
+    if (Array.isArray(v)) {
+      for (const x of v) walk(x, ctx, where);
+      return;
+    }
+    if (v === null || typeof v !== "object") return;
+    const n = v as { readonly k?: unknown; readonly [key: string]: unknown };
+    const k = n.k;
+    if (k === "break" || k === "continue") {
+      const label = n.label as string | null;
+      const ok =
+        label === null ? (k === "break" ? ctx.loop || ctx.sw : ctx.loop) : ctx.labels.some((l) => l.name === label && (k === "break" || l.loop));
+      if (!ok) out.push({ message: `emitted "${k}${label === null ? "" : ` ${label}`}" has no enclosing ${label === null ? (k === "break" ? "loop or switch" : "loop") : `${k === "continue" ? "loop " : ""}label ${label}`} (${where.join(" > ")})`, path: [...where] });
+      return;
+    }
+    if (k === "func" && Array.isArray(n.body)) {
+      walk(n.params, FRESH, where);
+      walk(n.body, FRESH, typeof n.name === "string" ? [...where, n.name] : where);
+      return;
+    }
+    if (k === "iife" || k === "class") {
+      for (const key of Object.keys(n)) if (key !== "k") walk(n[key], FRESH, where);
+      return;
+    }
+    if (k === "labeled" || LOOP_KINDS.has(k as string)) {
+      const loop = LOOP_KINDS.has(k as string);
+      const label = n.label as string | null;
+      const inner: LabelCtx = { labels: label === null ? ctx.labels : [...ctx.labels, { name: label, loop }], loop: ctx.loop || loop, sw: ctx.sw };
+      for (const key of Object.keys(n)) if (key !== "k" && key !== "body") walk(n[key], ctx, where);
+      walk(n.body, inner, where);
+      return;
+    }
+    if (k === "switch") {
+      walk(n.disc, ctx, where);
+      const inner: LabelCtx = { ...ctx, sw: true };
+      walk(n.cases, inner, where);
+      return;
+    }
+    for (const key of Object.keys(n)) if (key !== "k" && key !== "origin") walk(n[key], ctx, where);
+  };
+  walk(program, FRESH, ["module"]);
+  return out;
+}
+
+/** EM-01b, throwing form. */
+export function checkLabels(program: readonly Stmt[]): void {
+  const first = collectUnboundLabels(program)[0];
+  if (first !== undefined) throw new Hbc2jsError(ErrorCode.E_INTERNAL, first.message, { section: "emit/scope-check" });
+}

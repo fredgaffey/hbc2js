@@ -1,0 +1,8 @@
+v84: OK - compiles; no noreturn inference, the call's block jumps back to the loop head.
+v94: OK - same as v84.
+v96: OK - same as v84.
+v98: OK - the shape under test: `fail` is proven never to return, so the
+     block holding its call falls straight into the for-of cleanup
+     `Catch; IteratorClose; Throw` (a merge point), and the for-of pass
+     must refuse rather than drop the wrapper label the fallthrough breaks to.
+v99: OK - same as v98.

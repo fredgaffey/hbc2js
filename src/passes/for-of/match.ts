@@ -20,6 +20,7 @@
 import type { Instruction } from "../tree.ts";
 import type { IterForm, Stmt, StructuredFunction } from "../../structure/ir.ts";
 import type { Match, PassContext } from "../types.ts";
+import { postOrder } from "../driver.ts";
 import { instructionsOf, items, precedingSibling, registerLiveAfter, usesOf } from "../tree.ts";
 
 export type LoopNode = Stmt & { readonly k: "loop" };
@@ -64,8 +65,16 @@ export function match(node: Stmt, ctx: PassContext): ForOfMatch | null {
   // wrapper whose following sibling holds the shared cleanup handler.
   const located = locateTry(guard, body.slice(2), node.label);
   if (located === null) return null;
-  const { tryNode, negate, mergeLabel, mergeHandler } = located;
+  const { tryNode, negate, mergeLabel, mergeHandler, mergeWrapper } = located;
   if (tryNode.k !== "try") return null;
+  // P4.3 (docs/BUGS.md `for-of-noreturn-handler-label`): in the merge-point
+  // shape the printer drops the wrapper label along with the cleanup, so
+  // every `break <mergeLabel>` under it must be some `try`'s handler (the
+  // abrupt-close path for-of syntax already implies). v98/v99 prove a callee
+  // never returns and let its block fall straight into `Catch`; the
+  // structurer prints that fallthrough as a plain `break <mergeLabel>` in
+  // the try *body*, which would dangle once the wrapper is gone. Refuse.
+  if (mergeLabel !== undefined && (mergeWrapper === undefined || !mergeBreaksAreHandlers(mergeWrapper, mergeLabel))) return null;
 
   // P4: setup — the loop's own flat preceding sibling holds `IteratorBegin
   // state, src`. Measured at v84/v94 as the block's *last* instruction, but
@@ -187,6 +196,15 @@ interface Located {
   /** The statement immediately following that wrapper: the shared
    *  `Catch; IteratorClose state, 1; Throw` the wrapper's breaks land on. */
   readonly mergeHandler?: Stmt;
+  /** The `labeled` merge-point wrapper itself. */
+  readonly mergeWrapper?: Stmt;
+}
+
+/** Is every `break <label>` under `wrapper` exactly some `try`'s `handler`? */
+function mergeBreaksAreHandlers(wrapper: Stmt, label: number): boolean {
+  let handlers = 0;
+  for (const n of postOrder(wrapper)) if (n.k === "try" && n.handler.k === "break" && n.handler.label === label) handlers++;
+  return usesOf(wrapper, label).breaks === handlers;
 }
 
 /**
@@ -230,7 +248,7 @@ function findContinuingTry(list: readonly Stmt[], loopLabel: number): Omit<Locat
     if (nested.length !== 1) continue;
     const after = list[i + 1];
     if (after === undefined) continue;
-    found.push({ tryNode: nested[0]!, mergeLabel: s.label, mergeHandler: after });
+    found.push({ tryNode: nested[0]!, mergeLabel: s.label, mergeHandler: after, mergeWrapper: s });
   }
   return found.length === 1 ? found[0]! : null;
 }

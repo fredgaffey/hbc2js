@@ -12,7 +12,7 @@ import { emitFunction, envDeclaringFunction, ownedEnvSlots } from "./function.ts
 import { closureFunctionId } from "./lower.ts";
 import { resolveOrphanHosts } from "./placement.ts";
 import { fnName, quote } from "./names.ts";
-import { checkBindings, collectUnbound, unboundMessage } from "./scope-check.ts";
+import { checkBindings, checkLabels, collectUnbound, collectUnboundLabels, unboundMessage } from "./scope-check.ts";
 import { printProgram } from "./print.ts";
 import { findGlobalCallSites, formatReturnAnnotation, isAsyncFunction } from "./return-annotate.ts";
 
@@ -1154,8 +1154,16 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
   ];
 
   const unbound = collectUnbound(program, prelude.names, globalIndex);
-  if (unbound.length > 0) {
+  const badLabels = collectUnboundLabels(program);
+  if (unbound.length > 0 || badLabels.length > 0) {
     const targets = new Map<string, string[]>(); // function name -> reasons
+    for (const u of badLabels) {
+      const fn = u.path.length > 1 ? u.path[u.path.length - 1]! : undefined;
+      if (fn === undefined) throw new Hbc2jsError(ErrorCode.E_INTERNAL, u.message, { section: "emit/scope-check" });
+      const list = targets.get(fn);
+      if (list === undefined) targets.set(fn, [u.message]);
+      else list.push(u.message);
+    }
     for (const u of unbound) {
       const fn = u.path.length > 1 ? u.path[u.path.length - 1]! : undefined;
       if (fn === undefined) {
@@ -1173,12 +1181,13 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
       diagnostics.push({
         severity: "warn",
         code: "W_UNBOUND_ISOLATED",
-        message: `function ${name} referenced an identifier no enclosing scope declares; its body was replaced with a throwing stub (${reasons.join("; ")})`,
+        message: `function ${name} referenced an identifier or label no enclosing scope declares; its body was replaced with a throwing stub (${reasons.join("; ")})`,
         context: { section: "emit/scope-check" },
       });
     }
   }
   checkBindings(program, prelude.names, globalIndex);
+  checkLabels(program);
 
   const code = printProgram(program, { indent, jsx: opts.jsx === true });
   return { code, helpersUsed: prelude.names, lineMap: [], diagnostics, stubbedFunctions };
