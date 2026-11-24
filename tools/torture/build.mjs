@@ -216,11 +216,16 @@ function obfuscateTree(ws) {
   }
 }
 
-function metroBundle(ws, entry, out, minify) {
+// Metro's main process holds the whole graph + source map: 8 GB OOMs at
+// N=100k (JSON.parse of worker results), so the heap scales with N, and the
+// worker count is capped so 31 transform workers don't starve the host.
+function metroBundle(ws, entry, out, minify, functions) {
+  const heapMb = functions > 20000 ? 20480 : 8192;
   sh(join(ws, "node_modules/.bin/react-native"), [
     "bundle", "--platform", "android", "--dev", "false", "--minify", String(minify),
     "--entry-file", entry, "--bundle-output", out, "--sourcemap-output", out + ".map", "--reset-cache",
-  ], ws, { NODE_OPTIONS: "--max-old-space-size=8192" });
+    "--max-workers", String(functions > 20000 ? 6 : 12),
+  ], ws, { NODE_OPTIONS: `--max-old-space-size=${heapMb}` });
 }
 
 export async function build(opts) {
@@ -263,8 +268,8 @@ export async function build(opts) {
   rmSync(join(out, "_truth"), { recursive: true, force: true });
 
   t0 = Date.now();
-  metroBundle(ws, "index.js", join(ws, "bundle.js"), minify);
-  metroBundle(ws, "headless.js", join(ws, "headless.js.bundle"), minify);
+  metroBundle(ws, "index.js", join(ws, "bundle.js"), minify, functions);
+  metroBundle(ws, "headless.js", join(ws, "headless.js.bundle"), minify, functions);
   timings.metroMs = ms(t0);
 
   const hc = hermescFor(hbc, ws);
