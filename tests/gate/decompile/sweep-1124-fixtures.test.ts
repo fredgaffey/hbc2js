@@ -4,6 +4,8 @@
 //   492 S1 spread-rest: the fold deleted a register load it could not substitute.
 //   493 S3 destructure: a register written in a pattern default was invisible
 //       to the use counter, so a later definition became its `let` (TDZ).
+//   494 S4 default-params: temporaries var-naming had renamed stayed body
+//       `let`s, so the default IIFE assigned globals.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -13,7 +15,7 @@ import { decompile } from "../../../src/decompile.ts";
 import { findHermesVm, runHermes } from "../../../src/harness/hermes-vm.ts";
 import { repoRoot } from "../../support/paths.ts";
 
-const FIXTURES = ["492-spread-drops-env-load", "493-destructure-default-tdz"];
+const FIXTURES = ["492-spread-drops-env-load", "493-destructure-default-tdz", "494-default-param-body-temps"];
 
 for (const fixture of FIXTURES) {
   const dir = join(repoRoot(), "tests", "fixtures", "constructs", fixture);

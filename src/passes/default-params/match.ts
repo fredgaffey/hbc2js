@@ -342,6 +342,16 @@ export function classifyFunc(F: FuncLike): ClassifyResult {
   const constantValue = new Map<string, Expr>();
   const defaults: DefaultSite[] = [];
   let next = n;
+  // Sweep 2026-11-24 S4 (q7 hbc99 fn#20119): this rung runs from the PARENT
+  // function's pass run, after `F`'s own stage-B passes, so `var-naming` may
+  // already have renamed a prologue register (`r3` -> `SIGHASH_ALL`). Such a
+  // name is still a body-local `let`, which the parameter scope cannot see:
+  // left out of the IIFE's own `let`, the default assigned an implicit
+  // global. A name declared by the body's own top-level `decl`s (an
+  // environment slot `_e<env>_<slot>` excepted: that binding is shared with
+  // closures and must stay the body's) counts as a temporary like a register.
+  const bodyLocals = new Set<string>();
+  for (const st of B) if (st.k === "decl" && st.kind === "let") for (const nm of st.names) if (!/^_e\d+_\d+$/.test(nm)) bodyLocals.add(nm);
 
   for (let i = 0; i < B.length; i++) {
     const s = B[i]!;
@@ -427,6 +437,10 @@ export function classifyFunc(F: FuncLike): ClassifyResult {
       for (const name of exprRegisterReads(substituted)) {
         if (!allowed.has(name) && !produced.has(name)) readsBodyState = true;
       }
+      for (const name of bodyLocals) {
+        if (isRegisterName(name) || allowed.has(name) || produced.has(name)) continue;
+        if (identUses([{ k: "expr", expr: substituted }], name).reads > 0) readsBodyState = true;
+      }
       if (substituted.k === "assign" && substituted.target.k === "ident") {
         // Only a register can ever need an IIFE-local `let` (`localTemps`,
         // below): a non-register target (an env slot like `_e0_0`, a
@@ -435,6 +449,12 @@ export function classifyFunc(F: FuncLike): ClassifyResult {
         // shadow — `withSideEffectDefault`'s own counter would silently
         // reset to `undefined` on every call otherwise.
         if (isRegisterName(substituted.target.name)) produced.add(substituted.target.name);
+        else if (bodyLocals.has(substituted.target.name)) {
+          // Moving it into the IIFE is only sound when nothing after the
+          // prologue still uses the body's binding.
+          if (identUses(B.slice(i + 1), substituted.target.name).reads + identUses(B.slice(i + 1), substituted.target.name).writes > 0) readsBodyState = true;
+          produced.add(substituted.target.name);
+        }
         if (liveConstants.has(substituted.target.name)) {
           liveConstants = new Map(liveConstants);
           liveConstants.delete(substituted.target.name);
