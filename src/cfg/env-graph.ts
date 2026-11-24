@@ -219,6 +219,13 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
     if (slots === undefined) byLevel.set(level, (slots = new Set()));
     slots.add(slot);
   };
+  // S6 (sweep 2026-11-24): an environment created by `CreateEnvironment d, rV`
+  // where rV is a closure-environment view (hermesc v98 inlined a call to a
+  // closure whose captured scope is not lexically visible). The node has no
+  // static parent, but at runtime its parent is the closure's captured
+  // environment: node -> that view. Per-site copies of functions created over
+  // such a node read the view's environments through the runtime view.
+  const viewParentOf = new Map<EnvNodeId, { readonly fn: number; readonly node: EnvNodeId; readonly level: number; readonly site: string }>();
   const slotClosure = new Map<string, { readonly fn: number; readonly env: EnvNodeId } | "conflict">();
   // Change tracking for the fixed point (spec 29 §12). Every fact a
   // function's run reads from the shared state is a key -- `f:<fn>` (its
@@ -341,6 +348,17 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
           const pv = get(insn.operands[1]!.value);
           parent = pv.t === "env" ? pv.node : pv.t === "none" ? null : undefined;
           if (pv.t === "selfUp" && draft.parent === undefined) parentFormula.set(nodeId, pv.k);
+          // A G2 factory's own `_c<f>` view (fn === f) is not a closure view.
+          if (pv.t === "view" && pv.fn !== f) {
+            viewParentOf.set(nodeId, { fn: pv.fn, node: pv.node, level: pv.level, site: siteKey(f, insn.offset) });
+            // The view is read at runtime (`__hbc_closure_env`), so every
+            // creation site of the closure must bind one, even with no slots.
+            if (collect !== null) {
+              let byLevel = closureEnvExposed.get(pv.fn);
+              if (byLevel === undefined) closureEnvExposed.set(pv.fn, (byLevel = new Map()));
+              if (!byLevel.has(pv.level)) byLevel.set(pv.level, new Set());
+            }
+          }
         }
         if (parent !== undefined && draft.parent === undefined) {
           draft.parent = parent;
@@ -758,6 +776,10 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
   // `W_AMBIGUOUS_CLOSURE_ENV` with today's behaviour.
   const closureCopies = new Map<number, readonly ClosureCopy[]>();
   const conflictResolved = new Set<number>();
+  // S6: synthetic env ids a copy's remap sends view-read environments to.
+  const envViewReads = new Map<number, { readonly handle: EnvNodeId; readonly levels: number }>();
+  const viewReadIds = new Map<string, number>();
+  const viewHandles = new Set<EnvNodeId>();
   {
     /** Leaf-first chain up to the root, or `null` when it is not rooted. */
     const chainOf = (leaf: EnvNodeId): EnvNodeId[] | null => {
@@ -831,6 +853,33 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
       return out;
     };
 
+    /** Like `chainOf`, but a node with no static parent that was created over a
+     *  closure-environment view continues at the view's environment. `boundary`
+     *  is the index of the first chain element reached through the view. */
+    const chainViaView = (leaf: EnvNodeId): { chain: EnvNodeId[]; boundary: number; view: { fn: number; level: number } | null } | null => {
+      const out: EnvNodeId[] = [];
+      const seen = new Set<EnvNodeId>();
+      let boundary = -1;
+      let view: { fn: number; level: number } | null = null;
+      let cur: EnvNodeId | null | undefined = leaf;
+      while (cur !== null && cur !== undefined) {
+        if (seen.has(cur)) return null;
+        seen.add(cur);
+        out.push(cur);
+        const p: EnvNodeId | null | undefined = drafts[cur]!.parent;
+        const vp: { fn: number; level: number; node: EnvNodeId } | undefined = p === null || p === undefined ? viewParentOf.get(cur) : undefined;
+        if (vp !== undefined && view === null) {
+          view = { fn: vp.fn, level: vp.level };
+          boundary = out.length;
+          cur = vp.node;
+          continue;
+        }
+        cur = p;
+      }
+      return cur === null || view !== null ? { chain: out, boundary: view === null ? out.length : boundary, view } : null;
+    };
+    let accessesByFn: Map<number, EnvAccess[]> | null = null;
+
     for (const f of [...closureEnvConflict].sort((a, b) => a - b)) {
       const sites = closureCreationSites.get(f);
       const env0 = closureEnvOf.get(f);
@@ -853,18 +902,20 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
       if (chain0 === null) continue;
       const order: EnvNodeId[] = [env0, ...[...byEnv.keys()].filter((e) => e !== env0).sort((a, b) => a - b)];
       const chains: EnvNodeId[][] = [];
+      const views: ({ boundary: number; fn: number; level: number } | null)[] = [];
       for (const e of order) {
-        const c = e === env0 ? chain0 : chainOf(e);
-        if (c === null || c.length !== chain0.length) {
+        const cv = e === env0 ? { chain: chain0, boundary: chain0.length, view: null } : chainViaView(e);
+        if (cv === null || cv.chain.length !== chain0.length || (cv.view !== null && cv.boundary < 1)) {
           chains.length = 0;
           break;
         }
-        chains.push(c);
+        chains.push(cv.chain);
+        views.push(cv.view === null ? null : { boundary: cv.boundary, fn: cv.view.fn, level: cv.view.level });
       }
       if (chains.length === 0) continue; // unequal or unrooted: stays ambiguous
       const differing = new Set<EnvNodeId>();
       for (let k = 0; k < chain0.length; k++) {
-        for (let i = 1; i < chains.length; i++) if (chains[i]![k] !== chain0[k]) differing.add(chain0[k]!);
+        for (let i = 1; i < chains.length; i++) if (chains[i]![k] !== chain0[k] || (views[i] !== null && k >= views[i]!.boundary)) differing.add(chain0[k]!);
       }
       conflictResolved.add(f);
 
@@ -886,7 +937,43 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
       const copies: ClosureCopy[] = [];
       for (let i = 0; i < order.length; i++) {
         const remap = new Map<EnvNodeId, EnvNodeId>();
-        for (let k = 0; k < chain0.length; k++) {
+        const v = views[i]!;
+        if (v !== null) {
+          // Environments above the view boundary are not lexically visible at
+          // this site: the copy reads them through the runtime view the
+          // creating function captured into `_v<handle>` (S6), and every
+          // creation site of the viewed closure exposes the slots read.
+          const handle = chains[i]![v.boundary - 1]!;
+          viewHandles.add(handle);
+          if (accessesByFn === null) {
+            accessesByFn = new Map();
+            for (const a of collected.accesses) {
+              const l = accessesByFn.get(a.functionIndex);
+              if (l === undefined) accessesByFn.set(a.functionIndex, [a]);
+              else l.push(a);
+            }
+          }
+          const subtree = lexicalSubtree(f);
+          for (let k = v.boundary; k < chain0.length; k++) {
+            const levels = k - v.boundary;
+            const key = `${handle}:${levels}`;
+            let synth = viewReadIds.get(key);
+            if (synth === undefined) {
+              synth = drafts.length + viewReadIds.size;
+              viewReadIds.set(key, synth);
+              envViewReads.set(synth, { handle, levels });
+            }
+            remap.set(chain0[k]!, synth);
+            for (const g of subtree) {
+              for (const a of accessesByFn.get(g) ?? []) {
+                if (a.env !== chain0[k]) continue;
+                expose(v.fn, v.level + levels, a.slot);
+                if (a.kind === "store") envViewStores.add(`${chains[i]![k]}:${a.slot}`);
+              }
+            }
+          }
+        }
+        for (let k = 0; k < (v === null ? chain0.length : v.boundary); k++) {
           const from = chain0[k]!;
           const to = chains[i]![k]!;
           if (from === to) continue;
@@ -901,6 +988,8 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
       closureCopies.set(f, copies);
     }
   }
+
+  for (const h of viewHandles) envViewOps.set(viewParentOf.get(h)!.site, { k: "view-parent", node: h });
 
   // ---- G2: self-created closures become factories (spec 03 §6.2) ---------
   // A copied function that (with others) creates itself has unboundedly many
@@ -1118,6 +1207,8 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
     envViewOps,
     closureEnvExposed,
     envViewStores,
+    envViewReads,
+    envViewHandles: viewHandles,
     closureFactories: new Set(factorySelf.keys()),
     diagnostics,
   };

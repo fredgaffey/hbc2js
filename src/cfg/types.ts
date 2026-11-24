@@ -238,6 +238,13 @@ export interface EnvGraph {
    *  (`envViewOps` store). Such writes are not in `accesses`/`EnvSlot.accesses`,
    *  so any "this slot has exactly one store" reasoning must consult this too. */
   readonly envViewStores: ReadonlySet<string>;
+  /** S6: synthetic env id (>= nodes.length, only ever a `ClosureCopy.envRemap`
+   *  target) -> the environment `levels` above the runtime view held in
+   *  `_v<handle>`; accesses go through `__hbc_env_load`/`__hbc_env_store`. */
+  readonly envViewReads: ReadonlyMap<number, { readonly handle: EnvNodeId; readonly levels: number }>;
+  /** S6: env nodes created over a closure-environment view whose view some
+   *  copy reads; the creating function keeps the view in `_v<node>`. */
+  readonly envViewHandles: ReadonlySet<EnvNodeId>;
   /** G2 (spec 03 §6.2 "self-created closures"): functions emitted as a
    *  factory `_mk<f>(_c<f>)` hosted where their shared parent chain is visible;
    *  every creation site passes a view of the captured environment. */
@@ -247,6 +254,9 @@ export interface EnvGraph {
 
 export type EnvViewOp =
   | { readonly k: "closure-env" }
+  // S6: `CreateEnvironment d, rV` over a closure-environment view whose view a
+  // per-site copy reads: the creator saves rV in `_v<node>`.
+  | { readonly k: "view-parent"; readonly node: EnvNodeId }
   // G2 closure factory (spec 03 §6.2 "self-created closures"): the function's
   // own captured environment, i.e. the factory parameter `_c<fn>`.
   | { readonly k: "self-env" }

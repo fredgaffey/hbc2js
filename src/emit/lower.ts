@@ -11,7 +11,7 @@ import type { Expr, Stmt } from "./ast.ts";
 import { assign, bin, call, id, lit, member, num, un, UNDEF } from "./ast.ts";
 import { resolveBuiltin } from "./builtins.ts";
 import { arrayFromBuffer, bigIntLiteral, objectFromBuffers, objectKeys, regExpExpr, stringLiteral } from "./literals.ts";
-import { EXC_VALUE, envSlot, fnName, GEN_DONE, GEN_IS_RETURN, GEN_SENT, GEN_STATE, isSafePropertyName, quote, reg, SCRATCH } from "./names.ts";
+import { EXC_VALUE, envSlot, envViewHandle, fnName, GEN_DONE, GEN_IS_RETURN, GEN_SENT, GEN_STATE, isSafePropertyName, quote, reg, SCRATCH } from "./names.ts";
 import type { FunctionEmitter } from "./function.ts";
 import { typeOfIsExpr, typeOfIsTableFor } from "./typeofis.ts";
 
@@ -456,6 +456,10 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
     // instead of 0,1,2.
     const slots = f.loopLocalSlotsAt(insn.offset);
     if (slots !== undefined && slots.length > 0) out.push({ k: "decl", kind: "let", names: [...slots] });
+    // S6: an environment created over a closure-environment view keeps the
+    // view for the per-site copies that read the environments above it.
+    const vp = f.envViewOp(insn);
+    if (vp?.k === "view-parent") out.push(assign(id(envViewHandle(vp.node)), RG(insn, 1)));
     return;
   }
 
@@ -786,6 +790,14 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
   // `resolveEnv` returns null only under `--lenient-env` (review M4-H2); the
   // default is still spec 03 §6.4's R3 refusal. The marker throws when reached,
   // so an unknown environment can never be read as `undefined`.
+  /** S6: a copy's remap target that is read through a runtime view. */
+  const viewReadExpr = (env: number): Expr | undefined => {
+    const v = f.envViewRead(env);
+    if (v === undefined) return undefined;
+    if (v.levels === 0) return id(envViewHandle(v.handle));
+    f.useHelper("__hbc_env_up");
+    return call(id("__hbc_env_up"), [id(envViewHandle(v.handle)), num(v.levels)]);
+  };
   const unresolvedEnvMarker = (kind: "load" | "store", slot: number): Expr => {
     f.useHelper("__hbc_unresolved_env");
     return call(id("__hbc_unresolved_env"), [lit(JSON.stringify(kind)), num(f.fn.index), num(insn.offset), num(slot)]);
@@ -799,6 +811,11 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
         return set(V(insn, 0), call(id("__hbc_env_load"), [RG(insn, 1), num(V(insn, 2))]));
       }
       const env = f.resolveEnv(insn);
+      const through = env === null ? undefined : viewReadExpr(env);
+      if (through !== undefined) {
+        f.useHelper("__hbc_env_load");
+        return set(V(insn, 0), call(id("__hbc_env_load"), [through, num(V(insn, 2))]));
+      }
       return set(V(insn, 0), env === null ? unresolvedEnvMarker("load", V(insn, 2)) : id(envSlot(env, V(insn, 2))));
     }
     case "StoreToEnvironment":
@@ -814,6 +831,12 @@ export function lowerInstruction(f: FunctionEmitter, insn: Instruction, index: n
         return;
       }
       const env = f.resolveEnv(insn);
+      const through = env === null ? undefined : viewReadExpr(env);
+      if (through !== undefined) {
+        f.useHelper("__hbc_env_store");
+        out.push({ k: "expr", expr: call(id("__hbc_env_store"), [through, num(V(insn, 1)), RG(insn, 2)]) });
+        return;
+      }
       if (env === null) out.push({ k: "expr", expr: unresolvedEnvMarker("store", V(insn, 1)) });
       else out.push(assign(id(envSlot(env, V(insn, 1))), RG(insn, 2)));
       return;

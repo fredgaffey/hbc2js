@@ -12,7 +12,7 @@ import { emitFunction, envDeclaringFunction } from "./function.ts";
 import { closureFunctionId } from "./lower.ts";
 import { resolveOrphanHosts, withExtraDeclarations } from "./placement.ts";
 import { settleLoopLocalDecls } from "./loop-env-scope.ts";
-import { envSlot, fnName, quote } from "./names.ts";
+import { envSlot, envViewHandle, fnName, quote } from "./names.ts";
 import { checkBindings, checkLabels, collectUnbound, collectUnboundLabels, unboundMessage } from "./scope-check.ts";
 import { printProgram } from "./print.ts";
 import { findGlobalCallSites, formatReturnAnnotation, isAsyncFunction } from "./return-annotate.ts";
@@ -907,6 +907,7 @@ function buildEmitLayout(analysis: ModuleAnalysis) {
       let list = ownedSlotsByFn.get(f);
       if (list === undefined) ownedSlotsByFn.set(f, (list = []));
       for (let i = 0; i <= maxSlot; i++) list.push(envSlot(node.id, i));
+      if (envGraph.envViewHandles.has(node.id)) list.push(envViewHandle(node.id));
     }
   }
   return { parentOf, isAncestor, chainUp, copyNameOf, closureNameAt, copyAt, extraCopies, createdIn, recursionGroupOf, composeRemap, childrenOf, declaringFunction, loopLocal, inlineFunctions, perCreatorInline, perCreatorFns, ownedSlotsByFn, diagnostics: diagnostics as readonly Diagnostic[] };

@@ -14,7 +14,7 @@ import { conditionFor, isConditionalJump } from "./conds.ts";
 import { resolveBuiltin } from "./builtins.ts";
 import { lowerInstruction, planBlock, prop } from "./lower.ts";
 import { originOfInsn, stampFrom, withOrigin, type Origin } from "./origin.ts";
-import { EXC_VALUE, envSlot, excName, fnName, GEN_DONE, GEN_STATE, labelName, PC_VAR, quote, reg, SCRATCH, stateVar } from "./names.ts";
+import { EXC_VALUE, envSlot, envViewHandle, excName, fnName, GEN_DONE, GEN_STATE, labelName, PC_VAR, quote, reg, SCRATCH, stateVar } from "./names.ts";
 import { writtenRegisters } from "../cfg/reg-effects.ts";
 import { argSlotBase } from "./semantics.ts";
 import { resolveShapes } from "./shapes.ts";
@@ -43,6 +43,8 @@ export interface FunctionEmitter {
   resolveEnv(insn: Instruction): number | null;
   /** Spec 03 §6.2 closure environment view lowering for this site, if any. */
   envViewOp(insn: Instruction): EnvViewOp | undefined;
+  /** S6: a resolved (remapped) env that is read through a runtime view. */
+  envViewRead(env: number): { readonly handle: number; readonly levels: number } | undefined;
   /** The `__hbc_env_view(...)` expression to bind on the closure of
    *  `functionIndex` created at `offset`, when some reader needs it. */
   closureEnvView(functionIndex: number, offset: number): Expr | undefined;
@@ -315,6 +317,9 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
     envViewOp(insn: Instruction): EnvViewOp | undefined {
       return envGraph.envViewOps.get(siteKey(fn.index, insn.offset));
     },
+    envViewRead(env: number): { readonly handle: number; readonly levels: number } | undefined {
+      return envGraph.envViewReads.get(env);
+    },
     closureEnvView(functionIndex: number, offset: number): Expr | undefined {
       const exposed = envGraph.closureEnvExposed.get(functionIndex);
       if (exposed === undefined) return undefined;
@@ -330,12 +335,29 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
       for (let level = maxLevel; level >= 0; level--) {
         const node = input.envRemap?.get(chain[level]!) ?? chain[level]!;
         const args: Expr[] = [view];
+        // S6: inside a per-site copy an environment may itself be read through a view.
+        const through = envGraph.envViewReads.get(node);
+        let handle: Expr | undefined;
+        if (through !== undefined) {
+          handle = id(envViewHandle(through.handle));
+          if (through.levels > 0) {
+            usedHelpers.add("__hbc_env_up");
+            input.useHelper("__hbc_env_up");
+            handle = call(id("__hbc_env_up"), [handle, num(through.levels)]);
+          }
+          for (const h of ["__hbc_env_load", "__hbc_env_store"]) {
+            usedHelpers.add(h);
+            input.useHelper(h);
+          }
+        }
         for (const slot of [...(exposed.get(level) ?? [])].sort((a, b) => a - b)) {
           const name = envSlot(node, slot);
+          const read: Expr = handle !== undefined ? call(id("__hbc_env_load"), [handle, num(slot)]) : id(name);
+          const write: Expr = handle !== undefined ? call(id("__hbc_env_store"), [handle, num(slot), id("v")]) : { k: "assign", target: id(name), value: id("v") };
           args.push(
             num(slot),
-            { k: "func", name: null, params: [], body: [{ k: "return", arg: id(name) }] },
-            { k: "func", name: null, params: [{ name: "v" }], body: [{ k: "expr", expr: { k: "assign", target: id(name), value: id("v") } }] },
+            { k: "func", name: null, params: [], body: [{ k: "return", arg: read }] },
+            { k: "func", name: null, params: [{ name: "v" }], body: [{ k: "expr", expr: write }] },
           );
         }
         view = call(id("__hbc_env_view"), args);

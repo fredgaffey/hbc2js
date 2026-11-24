@@ -7,6 +7,8 @@ export const reg = (n: number): string => `r${n}`;
 /** The top-level binding for function-table entry n. */
 export const fnName = (n: number): string => `_fn${n}`;
 export const envSlot = (env: number, slot: number): string => `_e${env}_${slot}`;
+/** S6: the runtime closure-environment view an env node was created over. */
+export const envViewHandle = (env: number): string => `_v${env}`;
 /** The catch binding of region n. */
 export const excName = (n: number): string => `_exc${n}`;
 /** A structurer label. */

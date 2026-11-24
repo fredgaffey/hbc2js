@@ -4,6 +4,12 @@
 //   492 S1 spread-rest: the fold deleted a register load it could not substitute.
 //   493 S3 destructure: a register written in a pattern default was invisible
 //       to the use counter, so a later definition became its `let` (TDZ).
+//   498 S6 env graph: hermesc v98 inlined a closure `o` whose captured scope is
+//       not visible at the caller (`GetClosureEnvironment` + `CreateEnvironment`
+//       over that view); o's inner closures got a second creation site whose
+//       environment had no parent, so they were orphaned (E_UNBOUND_IDENT
+//       stub, or reads of the wrong scope). Per-site copies now read the
+//       viewed scope through the runtime view.
 //   494 S4 default-params: temporaries var-naming had renamed stayed body
 //       `let`s, so the default IIFE assigned globals.
 import { test } from "node:test";
@@ -15,7 +21,7 @@ import { decompile } from "../../../src/decompile.ts";
 import { findHermesVm, runHermes } from "../../../src/harness/hermes-vm.ts";
 import { repoRoot } from "../../support/paths.ts";
 
-const FIXTURES = ["492-spread-drops-env-load", "493-destructure-default-tdz", "494-default-param-body-temps"];
+const FIXTURES = ["492-spread-drops-env-load", "493-destructure-default-tdz", "494-default-param-body-temps", "498-inlined-closure-env-view"];
 
 for (const fixture of FIXTURES) {
   const dir = join(repoRoot(), "tests", "fixtures", "constructs", fixture);
