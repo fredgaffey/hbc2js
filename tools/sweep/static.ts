@@ -90,10 +90,13 @@ export function staticFindings(code: string, app: string, hbc: number): Finding[
   // fn# markers, sorted by position.
   const marks: { pos: number; fn: number }[] = [];
   const stubs: { pos: number; text: string }[] = [];
-  for (const c of ast.comments ?? []) {
+  const comments = ast.comments ?? [];
+  for (let i = 0; i < comments.length; i++) {
+    const c = comments[i]!;
     const m = /^\s*fn#(\d+)\b/.exec(c.value);
     if (m) marks.push({ pos: c.start ?? 0, fn: Number(m[1]) });
-    if (c.value.includes("ISOLATED FAILURE")) stubs.push({ pos: c.start ?? 0, text: c.value });
+    // A stub's reason is printed as the following line comment(s).
+    if (c.value.includes("ISOLATED FAILURE")) stubs.push({ pos: c.start ?? 0, text: [c.value, comments[i + 1]?.value ?? "", comments[i + 2]?.value ?? ""].join("\n") });
   }
   marks.sort((a, b) => a.pos - b.pos);
   const firstMarkAfter = (p: number): { pos: number; fn: number } | undefined => {

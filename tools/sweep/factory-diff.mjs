@@ -111,7 +111,7 @@ const PRELUDE = String.raw`(function (g) {
     }
     for (var k = 0; k < fns.length; k++) {
       try { var rv = fns[k][1](); res[fns[k][0]] = "ret:" + ty(rv); if (rv && typeof rv.then === "function" && !tags.has(rv)) rv.then(null, function () {}); }
-      catch (x) { res[fns[k][0]] = "throw:" + errClass(x) + (errClass(x) === "ReferenceError" ? ":" + errMsg(x) : ""); }
+      catch (x) { res[fns[k][0]] = "throw:" + errClass(x) + (errClass(x) === "ReferenceError" || errClass(x) === "Error" ? ":" + errMsg(x).slice(0, 90) : ""); }
     }
     return JSON.stringify(res);
   }
