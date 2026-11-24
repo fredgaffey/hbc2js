@@ -12,6 +12,7 @@ import { dirname, join } from "node:path";
 import { CLI, cleanup, walk } from "./support.ts";
 import { repoRoot } from "../../support/paths.ts";
 import { heapLimitFor } from "../../../src/util/heap-reexec.ts";
+import { initialWorkerEstimate, planRenderWorkers } from "../../../src/export/render-pool.ts";
 
 const BUNDLE = join(repoRoot(), "tests", "fixtures", "bundles", "rn-template-0.72", "index.android.hbc");
 
@@ -63,4 +64,29 @@ test("export heap bound: re-run only when the bundle needs more than the current
   assert.equal(heapLimitFor(45.6e6, 4144, 8 * GB), 6144);
   // A user-raised limit already big enough: no re-run.
   assert.equal(heapLimitFor(45.6e6, 16000, 32 * GB), null);
+});
+
+test("render worker plan: defaults fit half of RAM less the main thread; explicit counts are used as given", () => {
+  const GB = 2 ** 30;
+  const saved = process.env.HBC2JS_WORKERS;
+  delete process.env.HBC2JS_WORKERS;
+  try {
+    // A 16 GB, 10-core laptop, 13.8k-function / 4.4 MB app, main thread at
+    // 1.8 GB: 8 workers (cores - 2), within a 6.2 GB worker budget.
+    const laptop = planRenderWorkers(undefined, 13_800, 4.4e6, { total: 16 * GB, mainRss: 1.8 * GB, cpus: 10 });
+    assert.equal(laptop.count, 8);
+    assert.equal(laptop.budget, 6.2 * GB);
+    assert.ok(laptop.count * initialWorkerEstimate(4.4e6) <= laptop.budget!);
+    // The 99k-function / 45.6 MB app on the same laptop, main at 6 GB:
+    // memory, not cores, sets the starting count.
+    const big = planRenderWorkers(undefined, 99_000, 45.6e6, { total: 16 * GB, mainRss: 6 * GB, cpus: 10 });
+    assert.equal(big.limitedBy, "memory");
+    assert.equal(big.count, Math.floor((2 * GB) / initialWorkerEstimate(45.6e6)) || 1);
+    // Small bundles render serially; an explicit count is never resized.
+    assert.equal(planRenderWorkers(undefined, 5000, 1e6, { total: 16 * GB, mainRss: GB, cpus: 10 }).count, 1);
+    const explicit = planRenderWorkers(5, 99_000, 45.6e6, { total: 16 * GB, mainRss: 6 * GB, cpus: 10 });
+    assert.deepEqual(explicit, { count: 5, limitedBy: null, budget: null, max: 5 });
+  } finally {
+    if (saved !== undefined) process.env.HBC2JS_WORKERS = saved;
+  }
 });

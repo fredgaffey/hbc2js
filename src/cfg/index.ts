@@ -172,6 +172,11 @@ export function analyseModule(mod: HbcModule, opts: AnalysisOptions = {}, preset
     decoded,
     options: { strictEnv, maxBlocks, checkInvariants },
     diagnostics,
+    releaseCaches(): void {
+      if (envGraph === null) graph(); // building the env graph needs every decode; never drop them before it
+      decodeCache.clear();
+      cfgCache.clear();
+    },
   };
 }
 

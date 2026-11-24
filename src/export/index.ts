@@ -19,7 +19,7 @@ import { renderModuleTiered, tieredFromOutcome } from "./tiers.ts";
 import type { ReadableOutcome } from "./tiers.ts";
 import { planRenderWorkers, renderModulesInPool } from "./render-pool.ts";
 import { resolveWorkerCount } from "../parallel/pool.ts";
-import type { RenderJob } from "./render-pool.ts";
+import type { PoolStats, RenderJob } from "./render-pool.ts";
 import type { ExportManifestModule, ExportManifestUnresolved } from "./manifest.ts";
 import { buildExportManifest } from "./manifest.ts";
 import { planSubstitutions } from "./substitute.ts";
@@ -164,7 +164,7 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   // than one is available; everything else below stays serial, in module
   // order, consuming the outcomes by id -- so the tree does not depend on the
   // worker count.
-  const workerPlan = tier === "flat" ? { count: 1, limitedBy: null } : planRenderWorkers(opts.workers, splitResult.module.functions.length, bytes.length);
+  const workerPlan = tier === "flat" ? { count: 1, limitedBy: null, budget: null, max: 1 } : planRenderWorkers(opts.workers, splitResult.module.functions.length, bytes.length);
   const workerCount = workerPlan.count;
   let pooled: Map<number, ReadableOutcome> | undefined;
   if (workerCount > 1) {
@@ -183,12 +183,14 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
     }
     progress(`rendering ${jobs.length} modules on ${Math.min(workerCount, jobs.length)} worker thread(s)${workerPlan.limitedBy === "memory" ? " (capped by physical memory)" : ""}`);
     let reported = 0;
-    pooled = await renderModulesInPool(new Uint8Array(bytes), splitResult.analysis, jobs, workerCount, (done) => {
+    const poolStats: PoolStats = { peakWorkers: 0, peakWorkerHeap: 0 };
+    pooled = await renderModulesInPool(new Uint8Array(bytes), splitResult.analysis, jobs, workerPlan, (done) => {
       if (done - reported >= 250) {
         reported = done - (done % 250);
         progress(`rendering modules ${reported}/${jobs.length}`);
       }
-    });
+    }, poolStats);
+    progress(`render pool: at most ${poolStats.peakWorkers} worker(s) at once, largest worker heap ${Math.round(poolStats.peakWorkerHeap / 2 ** 20)} MB; main thread rss ${Math.round(process.memoryUsage().rss / 2 ** 20)} MB (process-wide)`);
   }
 
   let renderedCount = 0;

@@ -282,4 +282,11 @@ export interface ModuleAnalysis {
   decoded(functionIndex: number): import("../disasm/decode.ts").DecodedFunction;
   readonly options: Required<Pick<AnalysisOptions, "strictEnv" | "maxBlocks" | "checkInvariants">>;
   readonly diagnostics: readonly Diagnostic[];
+  /** Drops the memoized per-function decodes and CFGs (rebuilt on demand,
+   *  identically). For a long-lived analysis that renders one module at a
+   *  time (export's render workers) or is done with its whole-bundle pass
+   *  (export's main thread before the render pool), so memory tracks the
+   *  module in hand instead of every function ever touched. Optional: only
+   *  `analyseModule`'s own analyses have it. */
+  releaseCaches?(): void;
 }
