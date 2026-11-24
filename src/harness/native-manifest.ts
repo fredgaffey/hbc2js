@@ -124,8 +124,18 @@ export function bundleEvidence(text: string): { required: Set<string>; spec: Set
     // …and a call through a register alias of the lookup function
     // (\`r3 = a2(a7[0]).requireNativeModule;\n r1 = r3("ExpoFontLoader");\`).
     .replace(ALIASED_CALL, (m, _reg: string, kind: string, lhs: string, name: string) => `${m.slice(0, m.indexOf(";") + 1)} ${lhs} = ${kind}(${name})`);
+  // A legacy-bridge read (`NativeModules.X`, `(R=b.NativeModules).X`, or the
+  // readable decompile's `NativeModules = a2(a7[0]).NativeModules; r1 =
+  // NativeModules.X`) is a lookup too: as `.get("X")` the chain rules below
+  // see an old library's `NativeModules.A || NativeModules.B || NativeModules.C`
+  // (corpus a08, RN 0.66: async-storage 1.x has no TurboModuleRegistry arm,
+  // so its tail RNCAsyncStorage was never found). Only the lookup scan reads
+  // this view; the rules after it keep the source as written.
+  const scan = source.replace(NM_PROP, (_m, nm: string, name: string) => `${nm}.get("${name}")`);
   LOOKUP.lastIndex = 0;
   let m: RegExpExecArray | null;
+  {
+  const source = scan;
   while ((m = LOOKUP.exec(source)) !== null) {
     const kind = m[1]!;
     const name = m[2]!;
@@ -164,9 +174,28 @@ export function bundleEvidence(text: string): { required: Set<string>; spec: Set
     // Readable decompile (\`let v = requireOptionalNativeModule("X");\n
     // list["default"] = v;\n return r0;\n }\`): exported, then the factory ends.
     if (!inTry && /^\s*;\s*[\w$.]+(?:\["default"\]|\.default)\s*=\s*[\w$]+\s*;\s*return\b[^;{}()]*;?\s*\}/.test(tail) && !/(?:\|\||&&|\?\?|!=|==)\s*[^,;=]*$/.test(before)) spec.add(name);
+    // …or exported as a live binding (TS/Babel `export default
+    // TurboModuleRegistry.get("X")`): stored into the variable a `default`
+    // getter returns, then the factory ends (`let v = T.get("X");\n _e1130_0
+    // = v;\n return r0;\n }` with `get: function get() { return _e1130_0; }`;
+    // react-native-blob-util's spec, corpus a09: its fs module reads
+    // `getConstants()` at module eval).
+    const live = /^\s*;\s*([\w$]+)\s*=\s*[\w$]+\s*;\s*return\b[^;{}()]*;?\s*\}/.exec(tail);
+    if (!inTry && live !== null && !/(?:\|\||&&|\?\?|!=|==)\s*[^,;=]*$/.test(before)) {
+      const e = live[1]!.replace(/\$/g, "\\$");
+      if (new RegExp(`get:\\s*function[\\w$\\s]*\\(\\)\\s*\\{[^{}]*?return\\s+${e}\\s*;\\s*\\}`).test(source.slice(Math.max(0, m.index - 1500), m.index))) spec.add(name);
+    }
     if (!inTry && /^\s*;\s*return\b[^;{}()]*\}\s*,\s*-?\d+\s*,\s*\[/.test(tail) && !/(?:\|\||&&|\?\?|!=|==)\s*[^,;=]*$/.test(before)) spec.add(name);
     if (!inTry && /^\s*\}\s*(?:,\s*\d+\s*,\s*\[|\)|$)/.test(after) && !/(?:\|\||&&|\?\?|!=|==)\s*[^,;=]*$/.test(before)) spec.add(name);
   }
+  }
+  // A library's module config naming its own native module (Invertase's
+  // NativeModule base class: Notifee, react-native-firebase): the
+  // `nativeModuleName` it later reads as `NativeModules[config.nativeModuleName]`
+  // and throws without ("Notifee native module not found.", corpus a06). The
+  // library ships that module with its native half.
+  NATIVE_MODULE_NAME.lastIndex = 0;
+  while ((m = NATIVE_MODULE_NAME.exec(source)) !== null) required.add((m[1] ?? m[3])!);
   // A library that falls back to a throwing Proxy when its module is
   // missing (create-react-native-library's LINKING_ERROR template:
   // `NativeModules.X ? NativeModules.X : new Proxy({}, {get(){throw …}})`)
@@ -200,6 +229,8 @@ const HOISTED_STMT = /(?<![\w$.])([\w$]+)\s*=\s*"([A-Z][\w$]*)"\s*;\s*([\w$]+\s*
 const ALIASED_CALL = /(?<![\w$.])([\w$]+)\s*=\s*[\w$.()[\]]*\.(requireNativeModule|requireOptionalNativeModule|getEnforcing)\s*;\s*([\w$]+)\s*=\s*\1\(\s*("[A-Z][\w$]*")\s*\)/g;
 const HOISTED_NAME = /(?<![\w$.])([\w$]+)="([A-Z][\w$]*)",([\w$]+=[\w$.()[\]]*\.(?:getEnforcing|get))\(\1\)/g;
 const UNGUARDED_BIND = /(?<![\w$.])([\w$]+)\s*=\s*[\w$.()[\]]*\.NativeModules\.([A-Z][\w$]*)\s*[;,]/g;
+const NM_PROP = /((?:\.|(?<![\w$.]))NativeModules\)?)\.([A-Z][\w$]*)(?![\w$(])(?!\s*=[^=])/g;
+const NATIVE_MODULE_NAME = /\bnativeModuleName\s*[:=]\s*(?:[\w$]+\s*=\s*)?"([A-Z][\w$]*)"|(?<![\w$.])([\w$]+)\s*=\s*"([A-Z][\w$]*)"\s*[;,]\s*[\w$]+\.nativeModuleName\s*=\s*\2(?![\w$])/g;
 const IS_NULL_MSG = /NativeModule\.([A-Z][\w$]*) is null\. To fix/g;
 const LINKED_OR_THROW = /\.([A-Z][\w$]*)\s*\?\s*[\w$.]*\.\1\s*:\s*new\s+Proxy\s*\(/g;
 
