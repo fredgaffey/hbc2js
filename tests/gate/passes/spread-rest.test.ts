@@ -400,3 +400,48 @@ for (const version of [84, 94, 96, 98, 99]) {
     }
   });
 }
+
+// Sweep 2026-11-24 S5 (react-navigation hbc98 fn#6793, E_PASS_CRASH "Maximum
+// call stack size exceeded"): a pure register move absorbed into the run's
+// substitution map that names itself -- `r4 = r4` (v98's SelectObject after a
+// `new`), or a swap `r8 = r7; r7 = r8` -- made `Subst.resolve` chase a cycle.
+// A move whose target is already read by an earlier absorbed value (or by its
+// own resolved value) is not absorbed: re-binding it would also re-point those
+// earlier aliases at the new value.
+test("spread-rest: S5 self-move and swap in a run do not recurse forever", () => {
+  for (const moves of [
+    [asg(id("r7"), id("r7"))],
+    [asg(id("r8"), id("r7")), asg(id("r7"), id("r8"))],
+  ]) {
+    const body: Stmt[] = [
+      asg(id("r7"), id("fn")),
+      asg(id("r1"), { k: "new", callee: id("Array"), args: [lit("0")] }),
+      ...moves,
+      { k: "expr", expr: call("__hbc_b_arraySpread", [id("r1"), id("r3"), lit("0")]) },
+      asg(id("r1"), call("__hbc_b_apply", [id("r7"), id("r1"), lit("undefined")])),
+      ret(id("r1")),
+    ];
+    const m = match(body, { ...ctx, fnBody: body });
+    if (m === null) continue;
+    const rewritten = spreadRest.rewrite(m, ctx);
+    const res = check(body, rewritten, { ...ctx, fnBody: body });
+    assert.equal(res.ok, true, JSON.stringify(res));
+  }
+});
+
+test("spread-rest: S5 an alias is not re-pointed when its source register is rebound in the run", () => {
+  // r2 = r7 (old r7 = fn); r7 = g; apply(r2, ...) must still call fn.
+  const body: Stmt[] = [
+    asg(id("r7"), id("fn")),
+    asg(id("r1"), { k: "new", callee: id("Array"), args: [lit("0")] }),
+    asg(id("r2"), id("r7")),
+    asg(id("r7"), id("g")),
+    { k: "expr", expr: call("__hbc_b_arraySpread", [id("r1"), id("r3"), lit("0")]) },
+    asg(id("r1"), call("__hbc_b_apply", [id("r2"), id("r1"), lit("undefined")])),
+    ret(id("r1")),
+  ];
+  const m = match(body, { ...ctx, fnBody: body });
+  if (m === null) return;
+  const printed = printProgram(spreadRest.rewrite(m, ctx));
+  assert.doesNotMatch(printed, /\bg\(\.\.\.r3\)/, printed);
+});

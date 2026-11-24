@@ -105,7 +105,17 @@ class Subst {
   absorb(s: Stmt): boolean {
     const setup = pureSetup(s);
     if (setup === null) return false;
-    this.map.set(setup.name, this.resolve(setup.value));
+    // Sweep 2026-11-24 S5: binding a name that an absorbed value (or this
+    // value itself) still reads would re-point those aliases at the new value
+    // (`r2 = r7; r7 = g` made `r2` mean `g`) and, for `r4 = r4` or a swap,
+    // close a cycle `resolve` never leaves. Such a move stays in the run.
+    const value = this.resolve(setup.value);
+    if (identUsesMany([{ k: "expr", expr: value }], [setup.name]).get(setup.name)?.reads) return false;
+    for (const v of this.map.values()) {
+      const u = identUsesMany([{ k: "expr", expr: v }], [setup.name]).get(setup.name);
+      if (u !== undefined && (u.reads > 0 || u.nested > 0)) return false;
+    }
+    this.map.set(setup.name, value);
     return true;
   }
   /** `resolve`, then flag any absorbed register still read by the result. */
