@@ -48,6 +48,19 @@ export interface IndexRows {
   readonly rangeRows: readonly RangeRow[];
 }
 
+/** Only `modulesIndex` (factory fn, `rendersJsx`, eager/lazy `DepEdge`s): the
+ *  part of `buildIndexRows` that `hbc2js export` reads. Same builders, same
+ *  inputs, so the rows are the ones `buildIndexRows` returns; it skips the
+ *  function/string/native/range/points-to rows and the manifest, which export
+ *  never reads (the native rows alone rebuild a classification report). */
+export function buildModulesIndexOnly(opts: Pick<BuildIndexRowsOptions, "bytes" | "splitResult">): ModulesIndex {
+  const { module, analysis, parents } = analyseForArtifact(opts.bytes, { module: opts.splitResult.module, analysis: opts.splitResult.analysis });
+  const ownership = computeFnOwnership(module, parents, opts.splitResult.modules);
+  const factoryInfo = buildFactoryInfo(module, opts.splitResult.modules);
+  const { callRows, rendersJsxByFn } = buildSemanticIndexes(module, analysis, factoryInfo, ownership);
+  return buildModulesIndex(opts.splitResult, ownership, rendersJsxByFn, callRows);
+}
+
 /** Builds every §2 index row + the `manifest.json` shape from `opts`,
  *  independent of whichever sink (JSONL files, `write.ts`; DB rows,
  *  `src/projdb/ix-write.ts`) consumes them next. */

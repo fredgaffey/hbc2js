@@ -10,7 +10,7 @@ import { segregateSplitTree } from "../split/segregate.ts";
 import { runDeps } from "../deps/index.ts";
 import type { DepsReport } from "../deps/report.ts";
 import { VERSION } from "../version.ts";
-import { buildIndexRows } from "../artifact/index-rows.ts";
+import { buildModulesIndexOnly } from "../artifact/index-rows.ts";
 import { exportPathForModule } from "./layout.ts";
 import type { ExportModuleInfo } from "./layout.ts";
 import { buildHelpersJs, buildRegistryJs } from "./registry.ts";
@@ -140,7 +140,7 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
 
   // §7.1/§7.2's own inputs (`DepEdge[]`, `rendersJsx`) -- reuses
   // `splitResult.module`/`.analysis` (`analyseForArtifact`), no second parse.
-  const { modulesIndex } = buildIndexRows({ bytes, splitResult, passes: {}, strictEnv: false, form: "flat" });
+  const modulesIndex = buildModulesIndexOnly({ bytes, splitResult });
   const moduleIndexById = new Map(modulesIndex.modules.map((m) => [m.id, m]));
 
   // §5's S1-S4 boundary analysis, over the SAME `DepEdge[]` graph §7.1 built
