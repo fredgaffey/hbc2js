@@ -260,9 +260,16 @@ test("P-1: on rn-template, decompiling with every pass on costs at most 12x pass
 // before/after diff: a removed report
 // -- 12 lines at exactly the three folded sites (fn#446, fn#2074, fn#3177):
 // each `try` gains its `finalizer=`/`copies=` annotation, nothing else moves.
+//
+// Pin moved 2026-11-26 at the paramless-catch fix (fix-s6 4b64f11, try-shape
+// keeps the catch binding when the catch register is live after the
+// handler). Old hash 35bb93de..., new hash 0a3f9e23.... Reviewed
+// before/after tree-text diff on this bundle: exactly one line differs --
+// fn#245's provenance lists `try-shape@360` once instead of twice; no
+// emitted code changes.
 test("P-1/part-2: rn-template passes-on output hash is unchanged by the check.ts register-delta rewrite", () => {
   const bytes = new Uint8Array(readFileSync(join(repoRoot(), "tests", "fixtures", "bundles", "rn-template-0.72", "index.android.hbc")));
   const text = decompileTree(bytes, { passes: {}, analysis: { strictEnv: false }, verify: false, resolveV98Ambiguity: true });
   const hash = createHash("sha256").update(text).digest("hex");
-  assert.equal(hash, "35bb93de5e562e7f93dfa134dc0dbb41e67a33b027e9842d31828486a4e16ab2");
+  assert.equal(hash, "0a3f9e23ed0feee092606ffb990d305ed65f1a56f3260b65b788870ea1e74b83");
 });
