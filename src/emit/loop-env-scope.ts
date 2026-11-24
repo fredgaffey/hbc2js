@@ -59,6 +59,13 @@ function childLists(s: Stmt): { field: string; list: readonly Stmt[]; loop: bool
       return [{ field: "body", list: s.body, loop: true }];
     case "labeled":
       return [{ field: "body", list: s.body, loop: false }];
+    // An inlined callee's reconstructed IIFE (corpus a03 `getPathFromState`):
+    // its body runs once per execution of the statement, so for placing a
+    // loop-local declaration it is one more block; not descending into it
+    // left a loop inside it unsettled (`let` stranded in a labeled block,
+    // E_UNBOUND_IDENT for the sibling blocks' reads).
+    case "iife":
+      return [{ field: "body", list: s.body, loop: false }];
     case "try":
       return [
         { field: "block", list: s.block, loop: false },
