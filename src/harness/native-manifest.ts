@@ -100,9 +100,13 @@ export interface NativeOverride {
 const LOOKUP = /(getEnforcing|\.get|requireNativeModule\)?|requireOptionalNativeModule\)?)\(\s*["']([A-Z][\w$]*)["']\s*\)/g;
 
 /** Rules 3 and 4 over a Metro bundle source (exported for tests). */
-export function bundleEvidence(source: string): { required: Set<string>; spec: Set<string> } {
+export function bundleEvidence(text: string): { required: Set<string>; spec: Set<string> } {
   const required = new Set<string>();
   const spec = new Set<string>();
+  // A decompiled original (`.hbc` input) hoists the name into a register
+  // first (\`L="RNCAsyncStorage",R=b.TurboModuleRegistry.get(L)\`); fold
+  // that back into the literal call so the rules below see one shape.
+  const source = text.replace(HOISTED_NAME, (_m, _reg: string, name: string, call: string) => `${call}("${name}")`);
   LOOKUP.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = LOOKUP.exec(source)) !== null) {
@@ -116,11 +120,19 @@ export function bundleEvidence(source: string): { required: Set<string>; spec: S
     // (\`get('ExpoModulesCore')?.installModules()\`): that library's own
     // native half, so present even inside a try.
     if (/^\s*\??\.\s*install\w*\(/.test(after)) required.add(name);
+    // …the same installer decompiled: \`(u=…get("X"))==(t=null)?t:u.installModules()\`.
+    if (/^\s*\)\s*==\s*\(?\s*(?:[\w$]+\s*=\s*)?null\s*\)?\s*\?\s*[\w$]+\s*:\s*[\w$]+\.install\w*\(/.test(source.slice(m.index + m[0].length, m.index + m[0].length + 80))) required.add(name);
+    // expo-modules-core in the bundle at all: its native half (the JSI
+    // installer of \`globalThis.expo\`) is autolinked with it, and every
+    // Expo module is reached only through it.
+    if (name === "ExpoModulesCore") required.add(name);
     // The last alternative of a lookup chain (\`get(A) || get(B) || get(C)\`):
     // a library's final fallback is its canonical module, the one its
     // autolinked native half registers (async-storage throws when the
     // whole chain is null).
-    if (/\|\|\s*[\w$.()]*$/.test(before) && /^\s*[;:,)}]/.test(after)) required.add(name);
+    // Decompiled, the tail is an assignment in parentheses: \`R||(R=b.T.get("X")),M=R\`.
+    // (Not when the chain goes on: \`…get("B")),R||(R=…get("C"))\`.)
+    if (/\|\|\s*(?:\(\s*[\w$]+\s*=\s*)?[\w$.()]*$/.test(before) && /^\s*[;:,)}]/.test(after) && !/^\s*\)\s*,\s*[\w$]+\s*\|\|/.test(after)) required.add(name);
     // Last expression of the factory: `...('X')},<id>,[` (Metro), or the
     // `...('X')}` end of a factory body without Metro's trailer.
     if (!inTry && /^\s*\}\s*(?:,\s*\d+\s*,\s*\[|\)|$)/.test(after) && !/(?:\|\||&&|\?\?|!=|==)\s*[^,;=]*$/.test(before)) spec.add(name);
@@ -153,6 +165,7 @@ export function bundleEvidence(source: string): { required: Set<string>; spec: S
   }
   return { required, spec };
 }
+const HOISTED_NAME = /(?<![\w$.])([\w$]+)="([A-Z][\w$]*)",([\w$]+=[\w$.()[\]]*\.(?:getEnforcing|get))\(\1\)/g;
 const UNGUARDED_BIND = /(?<![\w$.])([\w$]+)\s*=\s*[\w$.()[\]]*\.NativeModules\.([A-Z][\w$]*)\s*[;,]/g;
 const IS_NULL_MSG = /NativeModule\.([A-Z][\w$]*) is null\. To fix/g;
 const LINKED_OR_THROW = /\.([A-Z][\w$]*)\s*\?\s*[\w$.]*\.\1\s*:\s*new\s+Proxy\s*\(/g;
@@ -180,6 +193,9 @@ export function deriveNativeManifest(source: string, override: NativeOverride | 
   for (const [k, v] of Object.entries(RN_CORE_PRESENT)) if (!(ov.absent ?? []).includes(k)) add(k, v);
   for (const n of [...required, ...spec]) if (!absent.has(n) && !(n in present)) add(n);
   for (const [k, v] of Object.entries(ov.present ?? {})) add(k, v === true ? undefined : v);
+  // An Expo module (\`requireNativeModule('X')\`) is reachable only through
+  // expo-modules-core's installer, so a required one implies it.
+  if (!("ExpoModulesCore" in present) && !absent.has("ExpoModulesCore") && /requireNativeModule\)?\(/.test(source)) add("ExpoModulesCore");
   const sorted: Record<string, NativeConstants> = {};
   for (const k of Object.keys(present).sort()) sorted[k] = present[k]!;
   return { schema: "boot-native/1", present: sorted };
