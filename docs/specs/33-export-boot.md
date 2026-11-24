@@ -327,3 +327,30 @@ is a whole-file decompile: that took 19.6 min (the split export, 6 min) and
 fn#0 failed with `E_PASS_CRASH`, so it is INCONCLUSIVE before the export is
 looked at. `acquireBootSource` now decompiles an `.hbc` original with
 `--lenient-env` markers for the proof.
+
+**0.1.2: from a plain npm install (2026-11-24).** Three benchmark apps (an
+Expo/Ignite app, hbc96; a bare RN 0.88 app, hbc99; the react-navigation
+example, Expo, hbc98) were INCONCLUSIVE on 0.1.1 for reasons outside the
+export. (1) No VM: `setup-vm 98|99` installed hermesc only, because no prebuilt
+VM exists past HBC 96 (docs/TOOLCHAIN.md survey). `setup-vm 96` now installs
+the sha256-pinned facebook/hermes v0.13.0 CLI (macOS, Linux x64) and the
+others say so. (2) That classic VM has no `class` at all, and decompiled
+v98/v99 code has classes with private members: `bootTrace` probes the parsing
+engine (VM, or hermesc in bytecode mode) once and, when it cannot parse them,
+lowers the bundle with Babel's spec-mode class/private transforms (resolved
+from the export's own node_modules), identically on both sides
+(`private-field-lowering.test.ts`); source mode passes `hermes -w`, since a
+large decompile's warnings overflowed the output buffer and hid the run. (3)
+The native manifest read Metro-text shapes only; a decompiled original hoists
+names into registers and ends factories with `return`, so `ExpoModulesCore`,
+`ExponentConstants` and `RNCAsyncStorage` looked absent. The rules now read
+both shapes, expo-modules-core in the bundle implies its JSI installer (which
+is also why a `boot-native.json` naming only `ExpoLinking` did nothing), and
+an Expo app that reads `expoConfig` gets a stand-in embedded app config
+(`decompiled-native-evidence.test.ts`; `hbc2js help boot`). (4) `equiv --boot`
+prints phase lines on stderr (off under `--json` unless `--progress`). Result:
+the react-navigation original now stops on a decompiler miscompile
+(docs/BUGS.md, private-field initializer naming a constructor local), so it
+stays INCONCLUSIVE for a real reason; the Expo/Ignite original gets past
+expo-linking's manifest checks and stops in the same factory on a further
+gap (`replace` of undefined, not yet diagnosed).
