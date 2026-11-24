@@ -74,7 +74,7 @@ test("0.1.2 apps: an un-instrumented export tree is INCONCLUSIVE up front, namin
   // The original need not exist: the check precedes the (slow) control.
   const r = await exportBootProof(join(dir, "missing.hbc"), dir);
   assert.equal(r.verdict, "INCONCLUSIVE");
-  assert.match(r.reason, /not instrumented.*--instrument=modules/);
+  assert.match(r.reason ?? "", /not instrumented.*--instrument=modules/);
 });
 
 test("0.1.2 apps: a decompiled lookup called through a register alias is rule-3 evidence (expo-font's ExpoFontLoader)", () => {
