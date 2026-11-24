@@ -81,6 +81,7 @@ import { McpContext } from "./mcp/context.ts";
 import { buildToolTable, serveMcpStdio } from "./mcp/server.ts";
 import { HelpTopicError, loadHelpTopic } from "./mcp/help.ts";
 import { enableProgress } from "./util/progress.ts";
+import { maybeReexecForHeap } from "./util/heap-reexec.ts";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { userVmDir } from "./harness/hermes-vm.ts";
@@ -3510,6 +3511,15 @@ function main(): void {
     return;
   }
   if (argv[0] === "export") {
+    // Large bundles: re-run once with a heap sized from the bundle
+    // (src/util/heap-reexec.ts) instead of OOMing at Node's default.
+    const reexec = maybeReexecForHeap(parseExportArgs(argv.slice(1)).input);
+    if (reexec !== null) {
+      void reexec.then((code) => {
+        process.exitCode = code;
+      });
+      return;
+    }
     void runExportCmd(argv.slice(1)).then((code) => {
       process.exitCode = code;
     });

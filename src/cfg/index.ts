@@ -91,11 +91,22 @@ export function buildCfg(fn: DecodedFunction, ctx: BuildCfgContext): FunctionCfg
   return cfg;
 }
 
+export interface AnalysisPreset {
+  readonly envGraph?: EnvGraph;
+  /** Drop the eager whole-module decode once `kinds` is classified, keeping
+   *  only what `cfg`/`decoded` are later asked for (re-decoded on demand,
+   *  then cached as usual). Decoded functions are most of an analysis's
+   *  memory, so a render worker that only touches part of the bundle, with
+   *  `envGraph` preset, saves most of it. Only meaningful with `envGraph`:
+   *  building the env graph decodes everything anyway. */
+  readonly releaseDecoded?: boolean;
+}
+
 /** `preset.envGraph`: an env graph already built for this same module and
  *  options elsewhere (another thread; see `envGraphFromTransfer`), used
  *  instead of re-running `buildEnvGraph` -- the diagnostics and the strict
  *  check are applied exactly as for a freshly built one. */
-export function analyseModule(mod: HbcModule, opts: AnalysisOptions = {}, preset?: { readonly envGraph?: EnvGraph }): ModuleAnalysis {
+export function analyseModule(mod: HbcModule, opts: AnalysisOptions = {}, preset?: AnalysisPreset): ModuleAnalysis {
   const strictEnv = opts.strictEnv ?? true;
   const maxBlocks = opts.maxBlocks ?? DEFAULT_MAX_BLOCKS;
   const checkInvariants = opts.checkInvariants ?? true;
@@ -123,6 +134,7 @@ export function analyseModule(mod: HbcModule, opts: AnalysisOptions = {}, preset
   }
 
   const kinds = classifyFunctions(mod, decoded);
+  if (preset?.releaseDecoded === true && preset.envGraph !== undefined) decodeCache.clear();
 
   const cfgCache = new Map<number, FunctionCfg>();
   const cfg = (i: number): FunctionCfg => {

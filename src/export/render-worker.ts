@@ -26,7 +26,7 @@ parentPort!.on("message", (jobs: readonly RenderJob[]) => {
     analysis ??= analyseModule(
       parseHbc(new Uint8Array(data.bytes)),
       { strictEnv: false },
-      { envGraph: envGraphFromTransfer(deserialize(new Uint8Array(data.envGraph)) as EnvGraphTransfer) },
+      { envGraph: envGraphFromTransfer(deserialize(new Uint8Array(data.envGraph)) as EnvGraphTransfer), releaseDecoded: true },
     );
     const results = jobs.map((job) => ({
       moduleId: job.moduleId,

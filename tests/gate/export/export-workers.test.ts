@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { CLI, cleanup, walk } from "./support.ts";
 import { repoRoot } from "../../support/paths.ts";
+import { heapLimitFor } from "../../../src/util/heap-reexec.ts";
 
 const BUNDLE = join(repoRoot(), "tests", "fixtures", "bundles", "rn-template-0.72", "index.android.hbc");
 
@@ -50,4 +51,16 @@ test("export: workers=1 and workers=3 write byte-identical trees (rn-template-0.
     cleanup(dirname(serial.out));
     cleanup(dirname(pooled.out));
   }
+});
+
+test("export heap bound: re-run only when the bundle needs more than the current limit, capped by RAM", () => {
+  const GB = 2 ** 30;
+  // A 4.4 MB bundle fits the ~4 GB default: no re-run.
+  assert.equal(heapLimitFor(4.4e6, 4144, 32 * GB), null);
+  // A 45.6 MB (~99k-function) bundle wants ~10.9 GB.
+  assert.equal(heapLimitFor(45.6e6, 4144, 32 * GB), Math.ceil((45.6e6 * 250) / 2 ** 20));
+  // ...but never more than 75% of physical memory.
+  assert.equal(heapLimitFor(45.6e6, 4144, 8 * GB), 6144);
+  // A user-raised limit already big enough: no re-run.
+  assert.equal(heapLimitFor(45.6e6, 16000, 32 * GB), null);
 });
