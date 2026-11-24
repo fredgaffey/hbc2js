@@ -245,7 +245,8 @@ export async function build(opts) {
   }
   for (const f of readdirSync(join(HERE, "app"))) cpSync(join(HERE, "app", f), join(ws, f), { recursive: true });
   let t0 = Date.now();
-  const junk = generateJunk(seed, functions);
+  // opts.generate: a gen-junk-compatible generator (tools/app-fuzz/gen-shapes.mjs).
+  const junk = (opts.generate || generateJunk)(seed, functions);
   for (const [rel, content] of junk.files) {
     mkdirSync(dirname(join(ws, rel)), { recursive: true });
     writeFileSync(join(ws, rel), content);
@@ -268,15 +269,22 @@ export async function build(opts) {
   rmSync(join(out, "_truth"), { recursive: true, force: true });
 
   t0 = Date.now();
-  metroBundle(ws, "index.js", join(ws, "bundle.js"), minify, functions);
+  // opts.headlessOnly: skip the RN app; bundle.* is the headless entry
+  // (core + junk, no React Native) -- the fast app-fuzz configuration.
+  if (!opts.headlessOnly) metroBundle(ws, "index.js", join(ws, "bundle.js"), minify, functions);
   metroBundle(ws, "headless.js", join(ws, "headless.js.bundle"), minify, functions);
+  if (opts.headlessOnly) {
+    cpSync(join(ws, "headless.js.bundle"), join(ws, "bundle.js"));
+    cpSync(join(ws, "headless.js.bundle.map"), join(ws, "bundle.js.map"));
+  }
   timings.metroMs = ms(t0);
 
   const hc = hermescFor(hbc, ws);
   t0 = Date.now();
   sh(hc.path, ["-emit-binary", "-O", "-output-source-map", "-out", join(ws, "bundle.hbc"), join(ws, "bundle.js")], ws);
   timings.hermescMs = ms(t0);
-  sh(hc.path, ["-emit-binary", "-O", "-out", join(ws, "headless.hbc"), join(ws, "headless.js.bundle")], ws);
+  if (opts.headlessOnly) cpSync(join(ws, "bundle.hbc"), join(ws, "headless.hbc"));
+  else sh(hc.path, ["-emit-binary", "-O", "-out", join(ws, "headless.hbc"), join(ws, "headless.js.bundle")], ws);
   sh(process.execPath, ["--max-old-space-size=" + (functions > 20000 ? 16384 : 4096), join(ws, "node_modules/react-native/scripts/compose-source-maps.js"),
     join(ws, "bundle.js.map"), join(ws, "bundle.hbc.map"), "-o", join(out, "bundle.map")], ws);
   for (const f of ["bundle.hbc", "bundle.js", "bundle.js.map", "headless.hbc"]) cpSync(join(ws, f), join(out, f));
@@ -295,7 +303,7 @@ export async function build(opts) {
     schema: "hbc2js-torture-manifest/1",
     variant, seed: String(seed), functionsRequested: functions,
     framework: "bare-rn", rnVersion: RN_VERSION, hbcVersion: hbc, compiler: hc.compiler,
-    minify, obfuscate, obfuscationCheck,
+    minify, obfuscate, obfuscationCheck, headlessOnly: !!opts.headlessOnly,
     dependencies: { ...PINS.dependencies },
     bundledPackages: packages,
     appModules,
