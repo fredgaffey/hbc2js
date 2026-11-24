@@ -18,6 +18,7 @@ import { join } from "node:path";
 import { findAllHermesVms } from "../../../src/harness/hermes-vm.ts";
 import { bootTrace } from "../../../src/harness/boot-equiv.ts";
 import { exportBootProof } from "../../../src/harness/export-boot.ts";
+import { deriveNativeManifest } from "../../../src/harness/native-manifest.ts";
 import type { NativeManifest } from "../../../src/harness/native-manifest.ts";
 
 function vmOrSkip(t: TestContext): boolean {
@@ -74,4 +75,11 @@ test("0.1.2 apps: an un-instrumented export tree is INCONCLUSIVE up front, namin
   const r = await exportBootProof(join(dir, "missing.hbc"), dir);
   assert.equal(r.verdict, "INCONCLUSIVE");
   assert.match(r.reason, /not instrumented.*--instrument=modules/);
+});
+
+test("0.1.2 apps: a decompiled lookup called through a register alias is rule-3 evidence (expo-font's ExpoFontLoader)", () => {
+  const src = `__d(function(g,r,i,a,m,e,d){ if (typeof globalThis.window === "undefined") { r1 = {}; } else {\n r3 = r(d[0]).requireNativeModule;\n r1 = r3("ExpoFontLoader"); } },7,[6]);`;
+  assert.ok("ExpoFontLoader" in deriveNativeManifest(src).present);
+  // The optional lookup through an alias stays a probe, not a requirement.
+  assert.ok(!("ExpoFontLoader" in deriveNativeManifest(src.replace("requireNativeModule", "requireOptionalNativeModule")).present));
 });

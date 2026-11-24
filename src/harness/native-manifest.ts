@@ -117,7 +117,10 @@ export function bundleEvidence(text: string): { required: Set<string>; spec: Set
   // Likewise an assignment in the argument: \`requireOptionalNativeModule)(O="ExpoUpdates")\`.
   const source = text
     .replace(HOISTED_NAME, (_m, _reg: string, name: string, call: string) => `${call}("${name}")`)
-    .replace(ASSIGNED_ARG, (_m, call: string, name: string) => `${call}(${name})`);
+    .replace(ASSIGNED_ARG, (_m, call: string, name: string) => `${call}(${name})`)
+    // …and a call through a register alias of the lookup function
+    // (\`r3 = a2(a7[0]).requireNativeModule;\n r1 = r3("ExpoFontLoader");\`).
+    .replace(ALIASED_CALL, (m, _reg: string, kind: string, lhs: string, name: string) => `${m.slice(0, m.indexOf(";") + 1)} ${lhs} = ${kind}(${name})`);
   LOOKUP.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = LOOKUP.exec(source)) !== null) {
@@ -183,6 +186,7 @@ export function bundleEvidence(text: string): { required: Set<string>; spec: Set
   return { required, spec };
 }
 const ASSIGNED_ARG = /(\b(?:getEnforcing|get|requireNativeModule\)?|requireOptionalNativeModule\)?))\(\s*[\w$]+\s*=\s*("[A-Z][\w$]*")\s*\)/g;
+const ALIASED_CALL = /(?<![\w$.])([\w$]+)\s*=\s*[\w$.()[\]]*\.(requireNativeModule|requireOptionalNativeModule|getEnforcing)\s*;\s*([\w$]+)\s*=\s*\1\(\s*("[A-Z][\w$]*")\s*\)/g;
 const HOISTED_NAME = /(?<![\w$.])([\w$]+)="([A-Z][\w$]*)",([\w$]+=[\w$.()[\]]*\.(?:getEnforcing|get))\(\1\)/g;
 const UNGUARDED_BIND = /(?<![\w$.])([\w$]+)\s*=\s*[\w$.()[\]]*\.NativeModules\.([A-Z][\w$]*)\s*[;,]/g;
 const IS_NULL_MSG = /NativeModule\.([A-Z][\w$]*) is null\. To fix/g;

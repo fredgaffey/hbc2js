@@ -169,7 +169,9 @@ test("export-boot apps: the stub host provides an Intl namespace for module-eval
     // B2: render constructed Intl.DateTimeFormat ("undefined cannot be used
     // as a constructor", reported, no UI commit).
     var tz = new Intl.DateTimeFormat("en-US").resolvedOptions().timeZone;
-    if (tz !== "UTC") throw new Error("DateTimeFormat");
+    // "UTC" from the stand-in; a VM with its own Intl (the prebuilt v96 CLI)
+    // reports the host's zone instead, so only the shape is checked.
+    if (typeof tz !== "string" || tz.length === 0) throw new Error("DateTimeFormat");
     if (typeof Intl.NumberFormat("en").format(1) !== "string") throw new Error("NumberFormat");
     if (new Intl.Collator().compare("a", "b") !== -1) throw new Error("Collator");`;
   const r = bootTrace(src, { seed: 0, natives: deriveNativeManifest("") });
