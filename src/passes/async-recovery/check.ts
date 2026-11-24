@@ -1,7 +1,8 @@
 // §3.4 — the same generator-shape obligation as `yield-recovery`, plus R-A5:
 // this rung never turns a `yield` it did not account for into an `await`.
 import type { Stmt } from "../ast.ts";
-import { freeNames, parses, walk } from "../ast.ts";
+import { walk } from "../ast.ts";
+import { checkOneStatementRewrite } from "../scoped-check.ts";
 import type { CheckResult } from "../types.ts";
 import { recover } from "./recover.ts";
 
@@ -33,8 +34,7 @@ export function check(before: readonly Stmt[] | Stmt, after: readonly Stmt[] | S
   if (!redone.ok) return { ok: false, reason: `no async group to re-derive from (${redone.reason}: ${redone.detail}); every recovered yield must have become an await` };
   if (strayYield) return { ok: false, reason: "the rewritten function carries a `yield` this rung did not produce, so it cannot be turned into an await (R-A5)" };
   if (!same(redone.fn, got)) return { ok: false, reason: "the rewritten function is not the one §3.1/§3.3 derive from `before`: the await order does not match the suspend order" };
-  if (!parses(a)) return { ok: false, reason: "the rewritten statement list is not syntactically valid JavaScript" };
-  const bf = freeNames(b);
-  for (const n of freeNames(a)) if (!bf.has(n)) return { ok: false, reason: `the rewrite introduced the free name \`${n}\`` };
-  return { ok: true };
+  // `parses(a)` and no new free name, linear in the replaced statement
+  // (spec 29 section 12, "Scoped rewrite checks").
+  return checkOneStatementRewrite(b, a, i);
 }
