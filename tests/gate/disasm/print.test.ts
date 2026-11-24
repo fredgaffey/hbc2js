@@ -185,3 +185,24 @@ test("canonical mode: T-label positions are printed inline, both colocated with 
   assert.ok(t3Index !== -1, "T3: label line not found");
   assert.match(lines[t3Index + 1]!, /^\s+0031\s+LoadConstString/);
 });
+
+// 0.1.2 gate: hermesc -dump-bytecode prints a function's integer jump tables
+// before its exception handlers; we printed handlers first, so the 7.A oracle
+// diff failed on constructs/500-try-ladder-deep v98/v99 (the only fixture with
+// both in one function). Checked here without hermesc.
+test("raw mode: Jump Tables precede Exception Handlers within a function (hermesc order)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { parseHbc } = await import("../../../src/index.ts");
+  const { printModule } = await import("../../../src/disasm/print.ts");
+  const { repoRoot } = await import("../../support/paths.ts");
+  for (const v of ["v98", "v99"]) {
+    const bytes = readFileSync(join(repoRoot(), "tests", "fixtures", "constructs", "500-try-ladder-deep", `${v}.hbc`));
+    const chunks: string[] = [];
+    printModule(parseHbc(bytes), { write: (s: string): boolean => (chunks.push(s), true) } as NodeJS.WritableStream, { mode: "raw" });
+    const fns = chunks.join("").split(/\n(?=(?:NC)?(?:Function|Constructor)<)/);
+    const both = fns.filter((f) => f.includes(" Jump Tables: ") && f.includes("Exception Handlers:"));
+    assert.ok(both.length > 0, `${v}: fixture has a function with both sections`);
+    for (const f of both) assert.ok(f.indexOf(" Jump Tables: ") < f.indexOf("Exception Handlers:"), `${v}: jump tables first`);
+  }
+});

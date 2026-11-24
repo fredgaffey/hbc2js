@@ -235,14 +235,17 @@ function printFunctionRaw(mod: HbcModule, fn: DecodedFunction, w: ChunkWriter): 
   // follows — verified against tests/fixtures/hermes-dec-sample/source.js's
   // "global" function (no handlers, no switch) at v94.
   w.push("\n");
-  const handlerLines = rawHandlersBlock(fn);
-  if (handlerLines.length > 0) {
-    for (const l of handlerLines) w.push(l + "\n");
-    w.push("\n");
-  }
+  // hermesc prints a function's integer " Jump Tables: " BEFORE its
+  // "Exception Handlers:" (every version 84-99; first seen with both in one
+  // function by constructs/500-try-ladder-deep at v98/v99, a generator's
+  // state-machine switch inside try ladders). String tables come last.
   const jumpLines = rawJumpTablesBlock(fn);
-  if (jumpLines.length > 0) {
-    for (const l of jumpLines) w.push(l + "\n");
+  const stringAt = jumpLines.indexOf(" String switch Tables: ");
+  const intLines = stringAt < 0 ? jumpLines : jumpLines.slice(0, stringAt);
+  const stringLines = stringAt < 0 ? [] : jumpLines.slice(stringAt);
+  for (const block of [intLines, rawHandlersBlock(fn), stringLines]) {
+    if (block.length === 0) continue;
+    for (const l of block) w.push(l + "\n");
     w.push("\n");
   }
 }
