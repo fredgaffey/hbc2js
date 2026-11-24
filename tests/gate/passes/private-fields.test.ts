@@ -384,3 +384,78 @@ test("private-fields R-PF1 def-use: the same list as a loop body still refuses (
   const fnBody = [{ k: "while", label: null, test: id("c"), body: list }];
   assert.deepEqual(foldAll(list, { fnBody }).folded, []);
 });
+
+// REGRESSION (docs/BUGS.md 2026-11-24, whole-file decompile of a performance
+// polyfill): a private field whose initialiser hermesc computes through
+// constructor registers (`let r3 = ns.EventCounts; r3 = new r3(); install r3`)
+// was lifted into the class body as `#e = new r3();` -- `r3` does not exist
+// there, so every construction threw `r3 is not a constructor`. Fixture 480
+// pins it, plus a private initialiser after a side-effecting public field
+// (evaluation order). Before the fix: both `--passes=on` runs threw and the
+// `makeOrdered` function was stubbed (E_UNBOUND_IDENT).
+for (const version of ["v98", "v99"] as const) {
+  const fixture = "480-private-field-ctor-local-init";
+  const expected = readFileSync(join(repoRoot(), "tests", "fixtures", "constructs", fixture, "expected.txt"), "utf8");
+  for (const mode of ["none", "on"] as const) {
+    test(`private-fields lift rule: ${fixture} ${version} --passes=${mode} prints expected.txt`, async () => assert.equal(await runPrint(fixtureJs(fixture, version, mode)), expected));
+  }
+  test(`private-fields lift rule: ${fixture} ${version} keeps a constructor-local initialiser in the constructor`, () => {
+    const on = fixtureJs(fixture, version, "on");
+    assert.doesNotMatch(on, /could not decompile/);
+    assert.doesNotMatch(on, /^\s*#\w+ = /m, "no initialiser may be lifted out of the constructor here");
+    assert.match(on, /^\s*#e;$/m);
+    assert.match(on, /this\.#e = \w+;/);
+    assert.match(on, /this\.#t = \w+;/);
+  });
+}
+
+test("private-fields lift rule: 480 is PASS under T2 at v98 and v99", async () => {
+  const { runTier, hbc2jsDecompiler } = await import("../../../src/harness/tiers.ts");
+  const { VERDICT } = await import("../../../src/harness/ladder.ts");
+  const report = await runTier({ tier: "gate", decompiler: hbc2jsDecompiler, versions: [98, 99], only: ["480-private-field-ctor-local-init"] });
+  assert.equal(report.results.length, 2);
+  for (const r of report.results) assert.equal(r.verdict, VERDICT.PASS, `${r.fixture.name}: ${r.oracles.map((o) => `${o.oracle}=${o.verdict} ${o.detail ?? ""}`).join(" ")}`);
+});
+
+test("private-fields lift rule: an install becomes a field initialiser only when closed and first", async () => {
+  const { foldInBody } = (await import("../../../src/passes/private-fields/match.ts")) as Any;
+  const lit = (text: string): Any => ({ k: "lit", text });
+  const install = (value: Any): Any => ({
+    k: "expr",
+    expr: {
+      k: "call",
+      callee: { k: "member", obj: id("Object"), prop: lit("defineProperty"), computed: false },
+      args: [{ k: "this" }, id("_e0_0"), { k: "object", props: [["value", value], ["writable", lit("true")], ["enumerable", lit("false")], ["configurable", lit("false")]].map(([key, v]) => ({ key, computed: false, value: v })) }],
+    },
+  });
+  const effect: Any = { k: "expr", expr: { k: "call", callee: id("f"), args: [] } };
+  const newOf = (c: Any): Any => ({ k: "new", callee: c, args: [] });
+  const outer = { k: "member", obj: id("_e0_1"), prop: lit("C"), computed: false };
+  const run = (body: Any[], params: string[] = []): Any => foldInBody(body, "_e0_0", "#x", true, params);
+  // Closed and first: lifted, and the consumed store goes with it.
+  let out = run([{ k: "init", name: "r3", value: newOf(outer) }, install(id("r3")), effect]);
+  assert.equal(out.initExpr.k, "new");
+  assert.equal(out.body.length, 1);
+  // The same store as a plain assignment is not claimed (its target counts
+  // as a second use); lifting would evaluate `new C()` twice. Kept.
+  out = run([setReg("r3", newOf(outer)), install(id("r3"))]);
+  assert.deepEqual(out.initExpr, id("undefined"));
+  out = run([{ k: "init", name: "r3", value: newOf(outer) }, install(id("r3")), effect]);
+  assert.equal(out.initExpr.k, "new");
+  assert.equal(out.body.length, 1);
+  // Reads a constructor register (the BUGS.md shape): kept as `this.#x = r3`.
+  out = run([{ k: "init", name: "r3", value: outer }, setReg("r3", newOf(id("r3"))), install(id("r3"))]);
+  assert.deepEqual(out.initExpr, id("undefined"));
+  assert.equal(out.body.length, 3);
+  assert.equal(out.body[2].expr.k, "assign");
+  // Reads a parameter: a field initialiser cannot see it.
+  out = run([install(id("a1"))], ["a1"]);
+  assert.deepEqual(out.initExpr, id("undefined"));
+  // Closed, but an effect runs first: lifting would reorder it.
+  out = run([effect, setReg("r3", newOf(outer)), install(id("r3"))]);
+  assert.deepEqual(out.initExpr, id("undefined"));
+  assert.equal(out.body.length, 3);
+  // A literal behind only register copies still lifts.
+  out = run([setReg("r2", lit("0")), install(lit("1"))]);
+  assert.deepEqual(out.initExpr, lit("1"));
+});

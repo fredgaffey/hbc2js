@@ -10,7 +10,7 @@
 // third form to diff against), so this checker does not need
 // `effectSequence`.
 import type { Stmt } from "../ast.ts";
-import { freeNames, parses } from "../ast.ts";
+import { freeNames, parses, walk } from "../ast.ts";
 import type { CheckResult, PassContext } from "../types.ts";
 import { foldAll } from "./match.ts";
 
@@ -30,6 +30,8 @@ export function check(before: readonly Stmt[], after: readonly Stmt[], ctx: Pass
     if (beforeFree.has(name) || frameBound(name, after, ctx.fnBody)) continue;
     return { ok: false, reason: `private-fields introduced the free name ${name}` };
   }
+  const leak = fieldInitLeak(after);
+  if (leak !== null) return { ok: false, reason: `private-fields lifted a field initialiser that reads the constructor-local ${leak}` };
   if (!parses(after)) return { ok: false, reason: "private-fields produced a body that does not parse" };
   return { ok: true };
 }
@@ -56,4 +58,36 @@ function frameBound(name: string, after: readonly Stmt[], fnBody: readonly Stmt[
   };
   visit(after, false);
   return !nested;
+}
+
+/** Spec 24 section 1.7.2, re-checked independently of `liftable`: a field
+ *  initialiser runs in the class scope, so it may not read any name the
+ *  constructor binds or assigns (a register, a parameter). `freeNames` cannot
+ *  see this -- it is scope-naive, and the constructor's own `let r3` makes a
+ *  field's `r3` look bound (the `#e = new r3()` miscompile, docs/BUGS.md
+ *  2026-11-24). Returns the first offending name, or `null`. */
+function fieldInitLeak(after: readonly Stmt[]): string | null {
+  let found: string | null = null;
+  walk(after, {
+    expr: (e) => {
+      if (found !== null || e.k !== "class") return;
+      const ctor = e.members.find((m) => m.kind === "method" && !m.static && m.key.k === "ident" && m.key.name === "constructor");
+      if (ctor === undefined || ctor.value === null || ctor.value.k !== "func") return;
+      const local = new Set<string>(ctor.value.params.map((p) => p.name));
+      walk(ctor.value.body, {
+        stmt: (t) => {
+          if (t.k === "decl") for (const n of t.names) local.add(n);
+          else if (t.k === "init") local.add(t.name);
+        },
+        expr: (x) => {
+          if (x.k === "assign" && x.target.k === "ident") local.add(x.target.name);
+        },
+      });
+      for (const m of e.members) {
+        if (m.kind !== "field" || m.static || m.value === null) continue;
+        walk([{ k: "expr", expr: m.value }], { expr: (x) => { if (found === null && x.k === "ident" && local.has(x.name)) found = x.name; } });
+      }
+    },
+  });
+  return found;
 }

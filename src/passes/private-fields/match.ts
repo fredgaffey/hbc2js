@@ -228,7 +228,7 @@ interface FoldOutcome {
  *  extended to match, not a silent wrong rewrite, because the escape scan
  *  below still runs over its full (unrecursed) subtree and refuses any
  *  reference it cannot place. */
-export function foldInBody(body: readonly Stmt[], envName: string, displayName: string, allowInstall: boolean): FoldOutcome | null {
+export function foldInBody(body: readonly Stmt[], envName: string, displayName: string, allowInstall: boolean, params: readonly string[] = []): FoldOutcome | null {
   // A `lit` node, not an `ident`: `member`'s non-computed printer reads
   // `.text` off whatever `prop` is regardless of its `k` (`src/emit/print.ts`),
   // and `walk`'s "member" case visits `prop` unconditionally, so an `ident`
@@ -238,6 +238,13 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
   // as-is, and only `ident` nodes count as a use in `freeNames`).
   const displayKey = (): Expr => ({ k: "lit", text: displayName });
   let initExpr: Expr | null = null;
+  // The install's own `value` operand as written (`r3`), its statement, and
+  // the store `resolveClaim` would delete if the value is lifted into a field
+  // initialiser -- the lift is decided only once the whole body is folded
+  // (`liftable` below), so nothing is claimed eagerly.
+  let installValue: Expr | null = null;
+  let installStmt: Stmt | null = null;
+  let pendingClaim: Stmt | null = null;
   let installs = 0;
   let escaped = false;
   const droppedInits: string[] = [];
@@ -291,7 +298,7 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
       if (src !== undefined) {
         let uses = 0;
         walk(body, { expr: (n) => { if (isIdent(n) && n.name === e.name) uses++; } });
-        if (uses === 1) claimedSources.add(src);
+        if (uses === 1) pendingClaim = src;
       }
       return regs.get(e.name)!;
     }
@@ -331,6 +338,7 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
             const value = privateInstallValue(defineArgs);
             if (value !== null) {
               consumed.add(defineArgs[1]!);
+              installValue = value;
               initExpr = resolveClaim(regs, value);
               installs++;
             }
@@ -410,7 +418,8 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
         const defineArgs = objectCall(s.expr, "defineProperty");
         if (defineArgs !== null && defineArgs.length === 3 && isIdent(defineArgs[1]!) && aliases.has((defineArgs[1] as Ident).name) && isThisArg(defineArgs[0]!, regs) && privateInstallValue(defineArgs) !== null) {
           processExpr(s.expr, aliases, regs, assignTarget); // records initExpr/installs, consumes the key
-          return { stmt: null, aliasesOut: nextAliases, regsOut: nextRegs };
+          installStmt = s; // kept as a placeholder; `liftable` below decides lift vs `this.#x = v`
+          return { stmt: s, aliasesOut: nextAliases, regsOut: nextRegs };
         }
       }
       const expr = processExpr(s.expr, aliases, regs, assignTarget);
@@ -627,9 +636,93 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
   const bodyHasTry = (() => { let t = false; walk(body, { stmt: (x) => { if (x.k === "try") t = true; } }); return t; })();
   const result = fold(body, new Set([envName]), new Map());
   if (escaped || installs > 1) return null;
-  const folded = claimedSources.size === 0 ? result.stmts : result.stmts.filter((s) => !claimedSources.has(s));
+  if (installs === 1 && (installStmt === null || installValue === null)) return null; // an install inside a larger expression: no shape for it
+  let stmts = result.stmts;
+  if (installStmt !== null && initExpr !== null && installValue !== null) {
+    const install = installStmt;
+    const claim = pendingClaim;
+    const withoutClaim = claim === null ? stmts : stmts.filter((t) => t !== claim);
+    if (liftable(withoutClaim, install, initExpr, body, params)) {
+      // A real field initialiser: the install and the store it consumed go.
+      stmts = withoutClaim.filter((t) => t !== install);
+    } else {
+      // Keep the value where the constructor computes it: declare `#x;` (an
+      // `undefined` initialiser) and assign it in place, `this.#x = v;`. The
+      // declaration's own PrivateFieldAdd runs at construction start, ahead
+      // of every statement that could observe the field, and the assignment
+      // keeps the evaluation order and the constructor-local registers.
+      const assign: Stmt = { k: "expr", expr: { k: "assign", target: { k: "member", obj: { k: "this" }, prop: displayKey(), computed: false }, value: installValue } };
+      stmts = mapStmts(stmts, (t) => (t === install ? assign : t));
+      initExpr = { k: "ident", name: "undefined" };
+    }
+  }
+  const folded = claimedSources.size === 0 ? stmts : stmts.filter((s) => !claimedSources.has(s));
   const finalBody = redeclare(folded, droppedInits);
   return { body: finalBody, initExpr };
+}
+
+/** A constructor's field install may become a class-field initialiser only
+ *  when moving its value out of the constructor changes nothing (spec 24
+ *  section 1.7.2):
+ *
+ *  1. Closed: the initialiser reads no name the constructor binds or writes
+ *     (its registers, parameters, nested declarations, any slot it assigns)
+ *     and no `arguments`/`super`/`new.target` -- a field initialiser runs in
+ *     the class scope, where a constructor register does not exist (the
+ *     `#e = new r3()` miscompile, docs/BUGS.md 2026-11-24).
+ *  2. Ordered: the install sits directly in the constructor body (not under
+ *     an `if`/label/loop), and nothing between the constructor's start (or
+ *     its `super(...)` call, after which a derived class's fields are
+ *     initialised) and the install has an effect: only declarations, plain
+ *     register copies of a literal/name/`this`, and other private installs of
+ *     such a value. A field initialiser runs before the rest of the
+ *     constructor body, so any effectful statement ahead of the install
+ *     would otherwise swap order with the initialiser.
+ *
+ *  `stmts` is the folded body with the consumed value store already removed
+ *  (the store is part of the initialiser when lifted). */
+function liftable(stmts: readonly Stmt[], install: Stmt, init: Expr, ctor: readonly Stmt[], params: readonly string[]): boolean {
+  const at = stmts.indexOf(install);
+  if (at < 0) return false;
+  const local = new Set<string>(params);
+  local.add("arguments");
+  walk(ctor, {
+    stmt: (t) => {
+      if (t.k === "decl") for (const n of t.names) local.add(n);
+      else if (t.k === "init") local.add(t.name);
+      else if (t.k === "func") local.add(t.name);
+      else if (t.k === "try" && t.param !== null) local.add(t.param);
+    },
+    expr: (e) => {
+      if (e.k === "assign" && isIdent(e.target)) local.add(e.target.name);
+    },
+  });
+  let closed = true;
+  walk([{ k: "expr", expr: init }], {
+    expr: (e) => {
+      if (e.k === "ident" && local.has(e.name)) closed = false;
+      else if (e.k === "argumentsObject") closed = false;
+      else if (e.k === "lit" && (e.text === "super" || e.text === "new.target")) closed = false;
+    },
+  });
+  if (!closed) return false;
+  const inertValue = (v: Expr): boolean => v.k === "lit" || v.k === "ident" || v.k === "this";
+  const isSuperCall = (v: Expr): boolean => v.k === "call" && v.callee.k === "lit" && v.callee.text === "super";
+  for (let j = at - 1; j >= 0; j--) {
+    const t = stmts[j]!;
+    if (t.k === "comment" || t.k === "directive" || t.k === "decl") continue;
+    const store = simpleStore(t);
+    if (store !== null && isSuperCall(store.value)) return true;
+    if (t.k === "expr" && isSuperCall(t.expr)) return true;
+    if (store !== null && inertValue(store.value)) continue;
+    if (t.k === "expr") {
+      const args = objectCall(t.expr, "defineProperty");
+      const value = args !== null && args.length === 3 && isIdent(args[1]!) ? privateInstallValue(args) : null;
+      if (value !== null && inertValue(value)) continue;
+    }
+    return false;
+  }
+  return true;
 }
 
 /** Re-declare every name whose `k:"init"` declaration this fold dropped and
@@ -661,7 +754,8 @@ export function foldOne(before: readonly Stmt[], candidate: PrivateFieldCandidat
   const ctor = ctorBody(cls);
   if (ctor === null) return null;
 
-  const ctorOut = foldInBody(ctor, envName, displayName, true);
+  const ctorFn = cls.members.find((m) => m.kind === "method" && !m.static && m.key.k === "ident" && m.key.name === "constructor")!.value as { readonly params: readonly { readonly name: string }[] };
+  const ctorOut = foldInBody(ctor, envName, displayName, true, ctorFn.params.map((p) => p.name));
   if (ctorOut === null || ctorOut.initExpr === null) return null;
 
   let ok = true;

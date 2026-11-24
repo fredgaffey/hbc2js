@@ -577,6 +577,35 @@ worktrees; `private-fields-refusals.ts --inline-new`): candidates 142 -> 132
 `defining-body-escape` 64 -> 34, new rows `pm-folded` 2 (frames), `pm-slot-escape`
 3; `roundtrip-corpus --passes on` IDENTICAL 6272 -> 6272 of 14437 (43.44 percent; no function flips to IDENTICAL yet: the folded classes' other differences remain), DIFFERENT 8165, bucket `diff:GetOwnPrivateBySym/GetByVal` 140 -> 130.
 
+### 1.7.2 Field initialiser lift rule (2026-11-24)
+
+`private-fields` turns the constructor's install (`Object.defineProperty(this,
+sym, {value: v, ...})`) into a field declaration. A field initialiser runs in
+the class scope at construction start (right after `super()` returns in a
+derived class), not where the constructor body computed `v`, so the value is
+lifted into `#x = <init>` only when both hold (`liftable` in
+`src/passes/private-fields/match.ts`):
+
+1. **Closed.** The resolved initialiser reads no name the constructor binds or
+   assigns -- registers, parameters, nested declarations, any env slot it
+   writes -- and no `arguments`, `super` or `new.target`.
+2. **Ordered.** The install sits directly in the constructor body, and between
+   the constructor's start (or its `super(...)` call) and the install there is
+   nothing with an effect: only declarations, plain stores of a literal, name
+   or `this`, and other private installs of such a value. The store the value
+   came from counts only if it is claimed (deleted with the install); an
+   unclaimed source would be evaluated twice.
+
+Otherwise the field is declared without an initialiser (`#x;`, whose
+PrivateFieldAdd runs ahead of every statement that could observe it) and the
+install becomes `this.#x = v;` in place, keeping the constructor's evaluation
+order and its registers. The checker re-checks rule 1 on its own (a
+scope-naive `freeNames` cannot: the constructor's `let r3` makes a field's
+`r3` look bound). Found on a whole-file decompile of RN 0.85.3's performance
+polyfill: `#e = new r3();` with `r3` a constructor register, so every
+construction threw. Fixture 480-private-field-ctor-local-init,
+`tests/gate/passes/private-fields.test.ts` ("lift rule").
+
 ### 1.8 Corpus reach
 
 `tests/fixtures/bundles/rn-template-0.72/index.android.hbc` is v94 (layout C), so it has
