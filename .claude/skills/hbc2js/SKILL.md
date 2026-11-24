@@ -127,6 +127,15 @@ expected outcome when the evidence is thin, not a failure to route around.
 - `claude -p` refuses stdin over 10 MB -- keep `--fn`/`--module` scope small;
   never hand it a whole large bundle's render as a prompt.
 
+## Installed from npm: Hermes VM and long runs
+
+- `equiv --boot` needs a Hermes VM. `hbc2js setup-vm 96` fetches a prebuilt
+  one (explicit, pinned `npm pack`, into `~/.cache/hbc2js/hermesc`); or pass
+  `--vm <path>`, set `HERMES_VM_V<version>`, or build with
+  `tools/build-hermes-vm.sh`. Without one the verdict is INCONCLUSIVE (exit 2).
+- `export` and `deps` take minutes on a real app; they print phase progress
+  on stderr (suppressed by `--json`). `hbc2js help skill` reprints this file.
+
 ## Read next
 
 `docs/READABILITY.md` (the naming/rewrite/file-op layer in depth) and

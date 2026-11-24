@@ -59,7 +59,7 @@ export function hbcVsJsUnderHermes(hbcPath: string, jsPath: string, opts: HbcVsJ
       .join(", ");
     return {
       verdict: TRACE_VERDICT.INCONCLUSIVE,
-      why: `no Hermes VM for HBC version ${String(version)}; available: ${have === "" ? "none" : have}. The Hermes VM refuses bytecode whose version is not exactly its own (HA-05: never falls back to Node).`,
+      why: `no Hermes VM for HBC version ${String(version)}; available: ${have === "" ? "none" : have}. The Hermes VM refuses bytecode whose version is not exactly its own (HA-05: never falls back to Node). To get one: hbc2js setup-vm ${String(version)}, or build from source with tools/build-hermes-vm.sh ${String(version)}.`,
       lines: 0,
       oracle,
     };

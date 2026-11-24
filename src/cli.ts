@@ -80,6 +80,10 @@ import { dbPath as projectDbPath } from "./projdb/artifact-read.ts";
 import { McpContext } from "./mcp/context.ts";
 import { buildToolTable, serveMcpStdio } from "./mcp/server.ts";
 import { HelpTopicError, loadHelpTopic } from "./mcp/help.ts";
+import { enableProgress } from "./util/progress.ts";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
+import { userVmDir } from "./harness/hermes-vm.ts";
 import type { Tier as SecretTier } from "./secrets/patterns.ts";
 
 const USAGE = `hbc2js ${VERSION} — Hermes bytecode (HBC) -> JavaScript decompiler
@@ -150,6 +154,10 @@ Usage:
                                    syntax check, no child processes or files; errors are a JSON envelope (docs/specs/34-rea-provider.md)
   hbc2js help [topic]              start here: agent-facing docs (tldr, tools, workflow,
                                               examples, limits, glossary) -- see docs/TLDR.md
+  hbc2js help skill                print the agent skill (SKILL.md): when to use hbc2js and the command recipes
+  hbc2js setup-vm [84|94|96|98|99|all]   explicit, opt-in fetch of a prebuilt Hermes VM (equiv --boot needs one);
+                                              pinned npm pack of the same packages tools/get-hermesc.sh uses; installs to
+                                              ~/.cache/hbc2js/hermesc. Never runs implicitly.
 
 Options (decompile):
   --fn N                    scoped readable decompile of ONE function: emit fn N
@@ -1421,6 +1429,7 @@ async function runInformedDepsCmd(args: DepsArgs): Promise<number> {
 
 async function runDepsCmd(argv: readonly string[]): Promise<number> {
   const args = parseDepsArgs(argv);
+  if (!args.json) enableProgress("deps");
   if (args.help || args.input === undefined) {
     process.stdout.write(USAGE);
     return args.help ? 0 : 2;
@@ -2051,6 +2060,7 @@ function parseExportArgs(argv: readonly string[]): ExportArgs {
 
 async function runExportCmd(argv: readonly string[]): Promise<number> {
   const args = parseExportArgs(argv);
+  if (!args.json) enableProgress("export");
   if (args.help || args.input === undefined || args.out === undefined) {
     process.stdout.write(USAGE);
     return args.help ? 0 : 2;
@@ -3376,8 +3386,40 @@ async function runRenderModulesCmd(argv: readonly string[]): Promise<void> {
   });
 }
 
+function runSetupVm(argv: readonly string[]): number {
+  const SETUP_USAGE = `hbc2js setup-vm [84|94|96|98|99|all]
+
+Fetch a prebuilt Hermes VM (and hermesc) with a pinned 'npm pack' of the same
+packages tools/get-hermesc.sh uses (npm verifies the tarball integrity). Needed
+by 'equiv --boot'. Installs to ${userVmDir()} (override: XDG_CACHE_HOME).
+Explicit only: hbc2js never downloads anything on its own. Default version: 96.
+VMs for versions the prebuilt route cannot reach: tools/build-hermes-vm.sh <version>.
+`;
+  if (argv.includes("--help") || argv.includes("-h")) {
+    process.stdout.write(SETUP_USAGE);
+    return 0;
+  }
+  const version = argv.find((a) => !a.startsWith("-")) ?? "96";
+  if (!["84", "94", "96", "98", "99", "all"].includes(version)) {
+    process.stderr.write(`hbc2js setup-vm: unknown version ${version}\n${SETUP_USAGE}`);
+    return 2;
+  }
+  const script = join(dirname(fileURLToPath(import.meta.url)), "..", "tools", "get-hermesc.sh");
+  if (!existsSync(script)) {
+    process.stderr.write(`hbc2js setup-vm: ${script} is missing from this install\n`);
+    return 3;
+  }
+  const r = spawnSync("bash", [script, version], { stdio: "inherit", env: { ...process.env, HERMESC_OUT_DIR: userVmDir() } });
+  return r.status ?? 3;
+}
+
 function runHelpCmd(argv: readonly string[]): number {
   const topic = argv.find((a) => !a.startsWith("-"));
+  if (topic === "skill") {
+    const skill = join(dirname(fileURLToPath(import.meta.url)), "..", ".claude", "skills", "hbc2js", "SKILL.md");
+    process.stdout.write(`${readFileSync(skill, "utf8").trim()}\n`);
+    return 0;
+  }
   try {
     process.stdout.write(`${loadHelpTopic(topic)}\n`);
     return 0;
@@ -3394,6 +3436,10 @@ function main(): void {
   const argv = process.argv.slice(2);
   if (argv[0] === "help") {
     process.exitCode = runHelpCmd(argv.slice(1));
+    return;
+  }
+  if (argv[0] === "setup-vm") {
+    process.exitCode = runSetupVm(argv.slice(1));
     return;
   }
   if (argv[0] === "modules") {

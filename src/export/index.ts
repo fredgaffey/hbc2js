@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { progress } from "../util/progress.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { ErrorCode, Hbc2jsError } from "../errors.ts";
@@ -58,6 +59,7 @@ export interface ExportResult {
 /** `hbc2js export <bundle.hbc> --out <dir>` (spec 29 §2-§4). Builds the
  *  whole file map in memory; write it with `writeExportResult`. */
 export async function exportProject(bundlePath: string, opts: ExportOptions = {}): Promise<ExportResult> {
+  progress(`reading ${bundlePath}`);
   const bytes = readFileSync(bundlePath);
   const moduleName = basename(bundlePath);
   const tier = opts.tier ?? "passes";
@@ -69,6 +71,7 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   // per module (`renderModuleTiered` -> `renderModuleReadable`, lane item 4)
   // instead of one whole-bundle pass-ladder emit -- so one bad function's
   // pass-ladder failure downgrades ONLY that module, never the whole run.
+  progress("splitting the bundle into modules (decompiling every function)");
   const splitResult = splitProject(new Uint8Array(bytes), { moduleName });
 
   // The deps stage never touches the network from inside `export` — same
@@ -77,6 +80,7 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   // has a `--confirm`ed report. This is a second, cheap bytecode-inventory
   // scan (`buildInventory`), not a second full decompile — `splitProject`
   // above remains the one expensive parse.
+  progress(`split: ${splitResult.modules.length} modules; ${opts.depsReport !== undefined ? "using the supplied deps report" : "running deps (offline)"}`);
   const report: DepsReport = opts.depsReport ?? (await runDeps(bundlePath, { offline: true })).report;
 
   // §7.1/§7.2's own inputs (`DepEdge[]`, `rendersJsx`) -- reuses
@@ -90,6 +94,7 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   const substituteMode: SubstituteMode = opts.substitute ?? "safe";
   const plan = planSubstitutions(report, modulesIndex.modules, substituteMode);
 
+  progress("segregating app code from dependencies");
   const segregated = segregateSplitTree(splitResult.files, report);
   const exportInfoById = new Map<number, ExportModuleInfo>();
   for (const info of segregated.modules) exportInfoById.set(info.id, exportPathForModule(info));
@@ -106,7 +111,10 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   const unresolved: ExportManifestUnresolved[] = [];
   const helpersUsedAll = new Set<string>();
 
+  let renderedCount = 0;
   for (const info of segregated.modules) {
+    if (renderedCount % 250 === 0) progress(`rendering modules ${renderedCount}/${segregated.modules.length}`);
+    renderedCount += 1;
     // §5.2: "every file in own(P) is deleted from the tree" -- this module's
     // id is covered instead by `substitutions[].replacedModules` (below),
     // never written and never double-counted (manifest.ts's own coverage
@@ -170,6 +178,7 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   files.set("src/_hbc/registry.js", buildRegistryJs(plan.boundaryPackage, opts.instrument === "modules"));
   files.set("src/_hbc/helpers.js", buildHelpersJs([...helpersUsedAll]));
 
+  progress("rendering done; recovering app name and writing the manifest");
   const appName = recoverAppName(splitResult.files, splitResult.modules, opts.appName);
   const rn = resolveReactNativeVersion(report, opts.rnVersion);
 
