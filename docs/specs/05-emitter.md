@@ -611,6 +611,7 @@ One ES module, this order:
 | # | Invariant | Violation |
 |---|---|---|
 | EM-01 | every emitted identifier is declared in an enclosing emitted scope | `E_UNBOUND_IDENT` |
+| EM-01b | every emitted `break L`/`continue L` names a label enclosing it in the same function (`continue` a loop label); unlabeled ones sit in a loop (or `switch` for `break`) | isolated stub `W_UNBOUND_ISOLATED`; `E_INTERNAL` at module scope |
 | EM-02 | output passes `node --check` | acceptance gate |
 | EM-03 | no helper is emitted that is not in `helpersUsed`, and vice versa | `E_INTERNAL` |
 | EM-04 | no `.bind(` appears anywhere in emitted call lowering | grep test |

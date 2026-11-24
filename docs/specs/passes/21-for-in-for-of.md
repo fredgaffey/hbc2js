@@ -425,6 +425,7 @@ structure-recovery block, far ahead of D23's renaming boundary.
 | a loop `loop-cond`/`for-header` already formed (P0) | the two annotations would fight; unmeasured | `docs/BUGS.md` `for-iter-preformed` |
 | a source `continue` in the body (a second back edge, P2) | the writer has not been measured against it | `docs/BUGS.md` `for-iter-continue` |
 | binding live after the loop (`for (k in o)` over an outer `k`) | needs a `var`/bare-target decision D14 has not been made for | `docs/BUGS.md` `for-iter-outer-binding` |
+| merge-point wrapper with a `break <mergeLabel>` that is not a `try` handler (P4.3: a v98/v99 proven-noreturn call falling straight into the cleanup `Catch`) | the printer drops the wrapper label, so that break would dangle (invalid JS) | `docs/BUGS.md` `for-of-noreturn-handler-label` |
 | a user `try`/`catch` around a `for-of` body (§4.2 P5) | the handler is not the synthesized one; `try-shape` owns it | `docs/BUGS.md` `for-of-user-try` |
 | `for await (… of …)` | not measured at any version; no fixture | `docs/BUGS.md` `for-await-unmeasured` |
 | destructuring/spread iterator sites (§4.4) | not loops; other rungs' rows | not a bug — asserted by test |

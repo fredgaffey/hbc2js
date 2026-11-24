@@ -608,6 +608,13 @@ function). The tree must still be complete, so every module goes through a
 | 2 | the flat `--split` text for that module (already in hand; no passes) | `flat` + `tierDowngradeReason` |
 | 3 | split's own empty-factory stub for an unreachable factory | `stub` + an `unresolved` row |
 
+**Syntax safety net.** Every module file is parsed (`@babel/parser`, JSX on;
+`src/export/syntax-check.ts`) before it is written. A step-1 render that does
+not parse drops to step 2; a step-2 text that does not parse is replaced by a
+throwing stub (`stub`). Either way the module's `tierDowngradeReason` names
+the parse error and an `unresolved` row of kind `syntax-check-failed` is
+added, so export never writes invalid JavaScript.
+
 A module is never omitted and never left as a dangling id. Each file's header
 comment names its tier, so the tier is visible in the tree as well as the
 manifest (the rule lane item 4 set for `readable/module_N.js`).
