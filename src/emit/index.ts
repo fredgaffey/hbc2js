@@ -1092,8 +1092,15 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
     const scoped: Stmt[] = [
       { k: "comment", text: `hbc2js scoped render — function ${target} of ${opts.moduleName ?? "input.hbc"}` },
       { k: "comment", text: `HBC version ${mod.header.version}, layout ${mod.layout.layoutClass}; nested closures are placed as in the full-module render.` },
-      { k: "comment", text: `identifiers captured from enclosing functions are declared by parents not shown here and appear free.` },
     ];
+    // Name the captures, or say there are none: a module factory (the export
+    // tree's case) captures nothing, and an unconditional "appear free" line
+    // misled a bench agent (2026-11-24) into reporting declared `_eN_M`
+    // parameters as undeclared.
+    const captured = [...new Set(collectUnbound([node], prelude.names, target).map((u) => u.name))];
+    if (captured.length > 0) {
+      scoped.push({ k: "comment", text: `identifiers captured from enclosing functions are declared by parents not shown here and appear free: ${captured.join(", ")}.` });
+    }
     if (prelude.code.length > 0) scoped.push({ k: "raw", text: prelude.code });
     scoped.push(node);
     const code = printProgram(scoped, { indent, jsx: opts.jsx === true });
