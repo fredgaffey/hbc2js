@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-const assets = ["src/projdb/schema.sql", "src/deps/sigdb-schema.sql", "src/export/expo-bundled-modules.json"];
+const assets = ["src/projdb/schema.sql", "src/deps/sigdb-schema.sql", "src/export/expo-bundled-modules.json", "src/export/rn-compat.json"];
 
 for (const rel of assets) {
   const src = join(repoRoot, rel);

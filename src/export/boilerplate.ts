@@ -4,6 +4,7 @@
 // not derivable from the bundle at all).
 import type { DepsReport } from "../deps/report.ts";
 import { expoCompatRange, expoSdkReactNative } from "./expo-compat.ts";
+import { rnCompatPin } from "./rn-compat.ts";
 import { tierConfidenceScore } from "./substitute.ts";
 import { newestRnVersionForHbc } from "../deps/report.ts";
 
@@ -199,7 +200,10 @@ export function exportDependencies(report: DepsReport, rnVersion: string | null)
       out[name] = { ...d, version: range, note: d.versionDerived ? `pinned from Expo SDK ${sdk} bundledNativeModules.json` : `signature version ${d.version} conflicts with Expo SDK ${sdk} (${range}); using the SDK's range` };
     } else if (range === null && d.versionDerived) {
       if ((name === "expo" || name.startsWith("expo-")) && sdk !== null) out[name] = { ...d, version: `~${sdk}.0.0`, note: `Expo SDK ${sdk} line derived from the detected RN; not in the compat table` };
-      else out[name] = { ...d, note: "unpinned: no version evidence and no compatibility table for this package" };
+      else {
+        const pin = rnVersion !== null ? rnCompatPin(name, rnVersion) : null;
+        out[name] = pin !== null ? { ...d, version: pin.version, note: pin.note } : { ...d, note: "unpinned: no version evidence and no compatibility table for this package" };
+      }
     }
   }
   // reanimated >= 4 hard-requires react-native-worklets as a peer; without it
