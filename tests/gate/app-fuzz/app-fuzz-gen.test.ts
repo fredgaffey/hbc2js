@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { generateShapes, planShapes, renderFunction, TEMPLATE_NAMES, DEFAULT_WEIGHTS } from "../../../tools/app-fuzz/gen-shapes.mjs";
-import { guidedWeights, seedConfig } from "../../../tools/app-fuzz/loop.mjs";
+import { crashSig, guidedWeights, seedConfig } from "../../../tools/app-fuzz/loop.mjs";
 
 const digest = (files: [string, string][]) => createHash("sha256").update(JSON.stringify(files)).digest("hex");
 
@@ -68,4 +68,10 @@ test("app-fuzz loop: guided weights boost shapes seen with rare features", () =>
   assoc["labelled"] = { "#modules": 10, "tier:passes": 10, "fail:wrong-value": 4 };
   const w = guidedWeights({ seeds: 10, feature: { "tier:passes": 100, "fail:wrong-value": 4 }, assoc });
   assert.ok(w["labelled"]! > w["spread"]!, JSON.stringify(w));
+});
+
+test("app-fuzz loop: export-crash signature masks numbers and the trailing location", () => {
+  const log = 'hbc2js export: E_INTERNAL: CFG-05: block 131 (offset 2145) is unreachable in an era:"opcode" generator body (at 0x861 in cfg/invariants)\n';
+  assert.equal(crashSig(log), 'E_INTERNAL: CFG-N: block N (offset N) is unreachable in an era:"opcode" generator body');
+  assert.equal(crashSig("nothing"), "no-error-code");
 });

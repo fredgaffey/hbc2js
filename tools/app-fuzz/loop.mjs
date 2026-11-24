@@ -113,6 +113,14 @@ function runExport(hbcPath, outDir) {
   return { ok, error, ms: ms(t0), log: stderr };
 }
 
+/** Normalised crash signature from an export log: the first E_* line, numbers
+ *  and offsets masked. */
+export function crashSig(log) {
+  const m = /\b(E_[A-Z_]+): ([^\n]*)/.exec(log || "");
+  if (!m) return "no-error-code";
+  return (m[1] + ": " + m[2]).replace(/0x[0-9a-f]+/gi, "0xN").replace(/\d+/g, "N").replace(/\s+\(at [^)]*\)\s*$/, "").slice(0, 120);
+}
+
 function childRun(exportDir, id, names, isCore, timeoutMs = 60000) {
   return new Promise((resolve) => {
     execFile(process.execPath, [SCORE, "--child", exportDir, String(id), JSON.stringify(names), isCore ? "1" : "0"],
@@ -240,7 +248,7 @@ async function reproduces(plan, cfg, kind, name, scratch, ws) {
   try {
     const { manifest } = await buildPlan(plan, cfg, join(scratch, "b"), ws);
     const ex = runExport(join(scratch, "b/bundle.hbc"), join(scratch, "e"));
-    if (!ex.ok) return kind === "export-crash";
+    if (!ex.ok) return kind === "export-crash" && crashSig(ex.log) === name;
     const res = await checkExport(join(scratch, "e"), manifest, vmTruth(join(scratch, "b/headless.hbc"), cfg.hbc));
     if (kind === "hermes-vs-node") return res.engineDiv.some((f) => f.fn.name === name);
     return res.failures.some((f) => f.kind === kind && (!f.fn || !name || f.fn.name === name || (f.fns || []).some((x) => x.name === name)));
@@ -252,11 +260,14 @@ async function reproduces(plan, cfg, kind, name, scratch, ws) {
 /** ddmin-lite: functions first (halving), then parts of the survivor. */
 async function minimise(planAll, failure, cfg, scratch, ws, budget = 14) {
   let tries = 0;
-  const target = failure.fn ? failure.fn.name : null;
+  const target = failure.kind === "export-crash" ? failure.sig : failure.fn ? failure.fn.name : null;
   let fns = failure.fn ? planAll.filter((f) => f.name === target) : planAll.filter((f) => failure.fns.some((x) => x.name === f.name));
   fns = fns.map((f) => ({ ...f, mod: 0 }));
   const check = async (p) => { tries++; return reproduces(p, cfg, failure.kind, target, scratch, ws); };
   if (!(await check(fns))) return { ok: false, tries, plan: fns };
+  // A crash that reproduces with no generated code at all is in the fixed
+  // torture core (or the toolchain), not in a generated shape.
+  if (failure.kind === "export-crash" && (await check([]))) return { ok: true, tries, plan: [] };
   while (fns.length > 1 && tries < budget) { // halve the function set
     const a = fns.slice(0, fns.length >> 1), b = fns.slice(fns.length >> 1);
     if (await check(a)) fns = a; else if (await check(b)) fns = b; else break;
@@ -276,7 +287,10 @@ const slug = (s) => s.replace(/[^A-Za-z0-9_.-]+/g, "_").slice(0, 80);
 
 function clusterOf(f, plan) {
   if (f.kind.startsWith("core:")) return `app-fuzz:${f.kind}:${f.core}`;
-  if (f.kind === "export-crash") return `app-fuzz:export-crash:${slug((f.error || "").replace(/\d+/g, "N").slice(0, 60))}`;
+  if (f.kind === "export-crash") {
+    const shapes = plan.length && plan.length < 4 ? ":" + [...new Set(plan.flatMap((p) => p.parts.map((x) => x.t)))].sort().join("+") : "";
+    return `app-fuzz:export-crash:${f.sig}${shapes}`;
+  }
   const shapes = [...new Set(plan.flatMap((p) => p.parts.map((x) => x.t)))].sort();
   const err = f.kind === "stub" ? ":" + f.error.split(",")[0] : "";
   return `app-fuzz:${f.kind}${err}:${shapes.join("+")}`;
@@ -314,7 +328,7 @@ async function runSeed(seed, o, cov, seenClusters) {
   row.exportLogCodes = logCodes;
   let res;
   if (!ex.ok) {
-    res = { failures: [{ kind: "export-crash", error: ex.error, fns: plan }], modules: [], junk: { total: 0, pass: 0 }, core: { total: 0, pass: 0 } };
+    res = { failures: [{ kind: "export-crash", sig: crashSig(ex.log), error: crashSig(ex.log), fns: plan }], modules: [], junk: { total: 0, pass: 0 }, core: { total: 0, pass: 0 } };
   } else {
     t0 = Date.now();
     res = await checkExport(join(dir, "export"), manifest, vmTruth(join(dir, "build/headless.hbc"), cfg.hbc));
@@ -341,7 +355,7 @@ async function runSeed(seed, o, cov, seenClusters) {
     const f = fs[0];
     let cluster = c0, min = null, repro = null;
     const isCore = f.kind.startsWith("core:");
-    if (o.minimise && !isCore && f.kind !== "export-crash" && !seenClusters.has(c0)) {
+    if (o.minimise && !isCore && !seenClusters.has(c0)) {
       const scratch = join(dir, "min");
       min = await minimise(plan, f, cfg, scratch, ws);
       if (min.ok) {
@@ -352,12 +366,14 @@ async function runSeed(seed, o, cov, seenClusters) {
           // Re-build the minimal case once more so its artifacts are kept.
           const { manifest: mm } = await buildPlan(min.plan, cfg, join(scratch, "b"), ws);
           runExport(join(scratch, "b/bundle.hbc"), join(scratch, "e"));
-          const jm = mm.junk[0].module;
-          cpSync(join(scratch, "b/source", jm), join(repro, "source.js"));
-          const exp = JSON.parse(readFileSync(join(scratch, "e/EXPORT.json"), "utf8"));
-          const id = Object.entries(mm.moduleIds).find(([, p]) => p === jm)?.[0];
-          const em = exp.modules.find((m) => m.id === Number(id));
-          if (em) cpSync(join(scratch, "e", em.path), join(repro, "exported.js"));
+          const jm = mm.junk[0]?.module;
+          if (jm) cpSync(join(scratch, "b/source", jm), join(repro, "source.js"));
+          try {
+            const exp = JSON.parse(readFileSync(join(scratch, "e/EXPORT.json"), "utf8"));
+            const id = Object.entries(mm.moduleIds).find(([, p]) => p === jm)?.[0];
+            const em = exp.modules.find((m) => m.id === Number(id));
+            if (em) cpSync(join(scratch, "e", em.path), join(repro, "exported.js"));
+          } catch { /* export crashed: no tree */ }
           cpSync(join(scratch, "b/headless.hbc"), join(repro, "headless.hbc"));
           writeFileSync(join(repro, "repro.json"), JSON.stringify({ cluster, kind: f.kind, cfg, plan: min.plan, expected: mm.junk.map((j) => ({ name: j.name, expected: j.expected, arg: entryArg(j.name) })), truth: res.truth, want: f.want, got: f.got, decompiled: f.decompiled, error: f.error, tries: min.tries }, null, 1) + "\n");
         } else repro = null;
