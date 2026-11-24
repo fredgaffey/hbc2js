@@ -1,0 +1,352 @@
+; hbc2js disassembly of 460-finally-dedup-live-scratch/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=5 strings=22 globalCodeIndex=0
+function #0 "global"  params=1 frame=18 env=0 flags=dbg,overflowed  @0x000001d8 size=275
+  0000  DeclareGlobalVar     s14 "mix"
+  0005  DeclareGlobalVar     s19 "seedList"
+  000a  DeclareGlobalVar     s17 "scratchInFinally"
+  000f  DeclareGlobalVar     s18 "scratchInFinallyFallthrough"
+  0014  DeclareGlobalVar     s5 "a"
+  0019  DeclareGlobalVar     s10 "b"
+  001e  DeclareGlobalVar     s11 "i"
+  0023  GetGlobalObject      r4
+  0025  LoadConstUndefined   r3
+  0027  CreateClosure        r5, r3, f1 "mix"
+  002c  PutByIdLoose         r4, r5, #c0, s14 "mix"
+  0032  CreateClosure        r5, r3, f2 "seedList"
+  0037  PutByIdLoose         r4, r5, #c1, s19 "seedList"
+  003d  CreateClosure        r5, r3, f3 "scratchInFinally"
+  0042  PutByIdLoose         r4, r5, #c2, s17 "scratchInFinally"
+  0048  CreateClosure        r5, r3, f4 "scratchInFinallyFallthrough"
+  004d  PutByIdLoose         r4, r5, #c3, s18 "scratchInFinallyFallthrough"
+  0053  NewArray             r5, 0
+  0057  PutByIdLoose         r4, r5, #c4, s5 "a"
+  005d  NewArray             r5, 0
+  0061  PutByIdLoose         r4, r5, #c5, s10 "b"
+  0067  LoadConstZero        r1
+  0069  PutByIdLoose         r4, r1, #c6, s11 "i"
+  006f  GetByIdShort         r5, r4, #c0, s11 "i"
+  0074  LoadConstUInt8       r2, 16
+  0077  LoadConstUInt8       r1, 37
+  007a  JNotLess             L2, r5, r2
+L1:
+  007e  GetByIdShort         r7, r4, #c1, s5 "a"
+  0083  GetByIdShort         r6, r7, #c2, s16 "push"
+  0088  GetByIdShort         r5, r4, #c3, s17 "scratchInFinally"
+  008d  GetByIdShort         r8, r4, #c0, s11 "i"
+  0092  Mul                  r0, r8, r1
+  0096  Call2                r5, r5, r3, r0
+  009b  Call2                r5, r6, r7, r5
+  00a0  GetByIdShort         r7, r4, #c4, s10 "b"
+  00a5  GetByIdShort         r6, r7, #c2, s16 "push"
+  00aa  GetByIdShort         r5, r4, #c5, s18 "scratchInFinallyFallthrough"
+  00af  GetByIdShort         r8, r4, #c0, s11 "i"
+  00b4  Mul                  r0, r8, r1
+  00b8  Call2                r5, r5, r3, r0
+  00bd  Call2                r5, r6, r7, r5
+  00c2  GetByIdShort         r5, r4, #c0, s11 "i"
+  00c7  Inc                  r5, r5
+  00ca  PutByIdLoose         r4, r5, #c6, s11 "i"
+  00d0  GetByIdShort         r5, r4, #c0, s11 "i"
+  00d5  JLess                L1, r5, r2
+L2:
+  00d9  TryGetById           r6, r4, #c6, s15 "print"
+  00df  GetByIdShort         r8, r4, #c1, s5 "a"
+  00e4  GetByIdShort         r5, r8, #c7, s13 "join"
+  00e9  LoadConstString      r7, s0 ","
+  00ed  Call2                r5, r5, r8, r7
+  00f2  Call2                r5, r6, r3, r5
+  00f7  TryGetById           r5, r4, #c6, s15 "print"
+  00fd  GetByIdShort         r6, r4, #c4, s10 "b"
+  0102  GetByIdShort         r4, r6, #c7, s13 "join"
+  0107  Call2                r4, r4, r6, r7
+  010c  Call2                r4, r5, r3, r4
+  0111  Ret                  r4
+
+function #1 "mix"  params=3 frame=15 env=0 flags=dbg,overflowed  @0x000002eb size=47
+  0000  GetGlobalObject      r1
+  0002  TryGetById           r3, r1, #c0, s8 "Math"
+  0008  GetByIdShort         r2, r3, #c1, s12 "imul"
+  000d  LoadParam            r4, 2
+  0010  LoadParam            r1, 1
+  0013  BitXor               r1, r1, r4
+  0017  LoadConstInt         r0, 16777619
+  001d  Call3                r1, r2, r3, r1, r0
+  0023  LoadConstUInt8       r0, 7
+  0026  Add                  r1, r1, r0
+  002a  ToInt32              r0, r1
+  002d  Ret                  r0
+
+function #2 "seedList"  params=3 frame=21 env=0 flags=dbg,overflowed  @0x0000031a size=67
+  0000  LoadParam            r10, 1
+  0003  LoadParam            r9, 2
+  0006  NewArray             r8, 0
+  000a  LoadConstZero        r0
+  000c  Less                 r7, r0, r9
+  0010  LoadConstUInt8       r3, 7
+  0013  LoadConstUInt8       r4, 97
+  0016  LoadConstUInt8       r5, 13
+  0019  LoadConstUInt8       r6, 1
+  001c  JmpFalse             L2, r7
+L1:
+  001f  GetByIdShort         r11, r8, #c0, s16 "push"
+  0024  Mul                  r2, r10, r3
+  0028  MulN                 r1, r0, r5
+  002c  AddN                 r1, r2, r1
+  0030  Mod                  r1, r1, r4
+  0034  Call2                r11, r11, r8, r1
+  0039  AddN                 r0, r0, r6
+  003d  JLess                L1, r0, r9
+L2:
+  0041  Ret                  r8
+
+function #3 "scratchInFinally"  params=2 frame=22 env=0 flags=exc,dbg,overflowed  @0x0000035d size=310
+  .try T1..T2 -> L3 ; handler 0
+  .try T1..T3 -> L9 ; handler 1
+  .try T4..T5 -> L7 ; handler 2
+  0000  LoadParam            r4, 1
+  0003  LoadConstUndefined   r6
+  0005  LoadConstUndefined   r0
+  0007  ToInt32              r2, r4
+  000a  Mov                  r0, r2
+  000d  GetGlobalObject      r5
+  000f  GetByIdShort         r3, r5, #c0, s19 "seedList"
+  0014  LoadConstUInt8       r1, 6
+  0017  Call3                r3, r3, r6, r4, r1
+  001d  TryGetById           r4, r5, #c1, s9 "Set"
+  0023  CreateThisForNew     r8, r4, 2
+  0027  NewArrayWithBuffer   r13, 2, 2, lit@0x0000
+  002f  Mov                  r14, r8
+  0032  Construct            r7, r4, 2
+  0036  LoadConstZero        r1
+  0038  URshift              r2, r2, r1
+  003c  LoadConstUInt8       r4, 4
+  003f  Mod                  r2, r2, r4
+  0043  JStrictEqual         L1, r1, r2
+  0047  LoadConstString      r10, s3 "qmno"
+  004b  GetByIdShort         r9, r10, #c3, s21 "slice"
+  0050  LoadConstUInt8       r2, 2
+  0053  Call3                r2, r9, r10, r1, r2
+  0059  Jmp                  L5
+T1:
+L1:
+  005b  Mov                  r10, r0
+  005e  LoadConstUInt8       r9, 3
+  0061  URshift              r9, r10, r9
+  0065  LoadConstUInt8       r11, 5
+  0068  Mod                  r10, r9, r11
+  006c  LoadConstUInt8       r9, 2
+  006f  JLessN               L2, r10, r9
+  0073  GetByIdShort         r10, r5, #c4, s14 "mix"
+  0078  Mov                  r9, r0
+  007b  Call3                r0, r10, r6, r9, r11
+  0081  Jmp                  L4
+L2:
+  0083  TryGetById           r11, r5, #c5, s7 "Error"
+  0089  CreateThisForNew     r10, r11, 2
+  008d  LoadConstString      r13, s1 "e49"
+  0091  Mov                  r14, r10
+  0094  Construct            r9, r11, 2
+  0098  SelectObject         r9, r10, r9
+  009c  Throw                r9
+T2:
+L3:
+  009e  Catch                r9
+  00a0  GetByIdShort         r11, r5, #c4, s14 "mix"
+  00a5  Mov                  r10, r0
+  00a8  GetByIdShort         r9, r9, #c6, s4 "message"
+  00ad  GetByIdShort         r9, r9, #c7, s6 "length"
+  00b2  Call3                r0, r11, r6, r10, r9
+T3:
+L4:
+  00b8  GetByIdShort         r10, r3, #c8, s16 "push"
+  00bd  LoadConstUInt8       r9, 29
+  00c0  Call2                r9, r10, r3, r9
+  00c5  LoadConstString      r2, s3 "qmno"
+L5:
+  00c9  SelectObject         r9, r8, r7
+  00cd  GetByIdShort         r8, r5, #c4, s14 "mix"
+  00d2  Mov                  r7, r0
+  00d5  GetByIdShort         r9, r9, #c9, s20 "size"
+  00da  GetByIdShort         r2, r2, #c7, s6 "length"
+  00df  Add                  r2, r9, r2
+  00e3  Call3                r0, r8, r6, r7, r2
+  00e9  GetByIdShort         r2, r3, #c3, s21 "slice"
+  00ee  Call3                r7, r2, r3, r1, r4
+  00f4  Mov                  r2, r7
+  00f7  IteratorBegin        r4, r2
+L6:
+  00fa  Mov                  r7, r2
+  00fd  IteratorNext         r9, r4, r7
+  0101  Mov                  r7, r4
+  0104  JStrictEqual         L8, r7, r6
+T4:
+  0108  GetByIdShort         r8, r5, #c4, s14 "mix"
+  010d  Mov                  r7, r0
+  0110  Call3                r0, r8, r6, r7, r9
+  0116  Jmp                  L6
+T5:
+L7:
+  0118  Catch                r2
+  011a  IteratorClose        r4, 1
+  011d  Throw                r2
+L8:
+  011f  URshift              r0, r0, r1
+  0123  Ret                  r0
+L9:
+  0125  Catch                r0
+  0127  GetByIdShort         r2, r3, #c8, s16 "push"
+  012c  LoadConstUInt8       r1, 29
+  012f  Call2                r1, r2, r3, r1
+  0134  Throw                r0
+
+function #4 "scratchInFinallyFallthrough"  params=2 frame=24 env=0 flags=exc,dbg,overflowed  @0x00000493 size=498
+  .try T1..T2 -> L8 ; handler 0
+  .try T1..T3 -> L15 ; handler 1
+  .try T4..T5 -> L13 ; handler 2
+  0000  LoadParam            r11, 1
+  0003  LoadConstUndefined   r6
+  0005  LoadConstUndefined   r0
+  0007  ToInt32              r2, r11
+  000a  Mov                  r0, r2
+  000d  GetGlobalObject      r5
+  000f  GetByIdShort         r1, r5, #c0, s19 "seedList"
+  0014  LoadConstUInt8       r12, 6
+  0017  Call3                r3, r1, r6, r11, r12
+  001d  TryGetById           r4, r5, #c1, s9 "Set"
+  0023  CreateThisForNew     r8, r4, 2
+  0027  NewArrayWithBuffer   r15, 2, 2, lit@0x0000
+  002f  Mov                  r16, r8
+  0032  Construct            r7, r4, 2
+  0036  LoadConstZero        r1
+  0038  URshift              r2, r2, r1
+  003c  LoadConstUInt8       r4, 4
+  003f  Mod                  r2, r2, r4
+  0043  JStrictEqualLong     L6, r1, r2
+  004a  LoadConstUInt8       r10, 2
+  004d  JStrictEqual         L1, r10, r2
+  0051  LoadConstString      r9, s3 "qmno"
+  0055  GetByIdShort         r2, r9, #c3, s21 "slice"
+  005a  Call3                r2, r2, r9, r1, r10
+  0060  JmpLong              L11
+L1:
+  0065  Mov                  r9, r0
+  0068  URshift              r9, r9, r1
+  006c  Mod                  r9, r9, r12
+  0070  LoadConstUInt8       r12, 1
+  0073  JStrictEqual         L5, r12, r9
+  0077  JStrictEqual         L2, r10, r9
+  007b  LoadConstUInt8       r10, 3
+  007e  JStrictEqual         L3, r10, r9
+  0082  LoadConstString      r2, s3 "qmno"
+  0086  JStrictEqual         L4, r4, r9
+  008a  JmpLong              L11
+L2:
+  008f  GetByIdShort         r12, r5, #c4, s14 "mix"
+  0094  Mov                  r10, r0
+  0097  GetByIndex           r9, r3, 0
+  009b  ToInt32              r9, r9
+  009e  Call3                r0, r12, r6, r10, r9
+L3:
+  00a4  Mov                  r10, r0
+  00a7  LoadConstUInt8       r9, 60
+  00aa  Mul                  r11, r11, r9
+  00ae  LoadConstInt         r9, 292
+  00b4  Mod                  r9, r11, r9
+  00b8  Add                  r9, r10, r9
+  00bc  ToInt32              r0, r9
+L4:
+  00bf  GetByIdShort         r10, r3, #c5, s16 "push"
+  00c4  Mov                  r11, r0
+  00c7  LoadConstUInt8       r9, 58
+  00ca  Add                  r11, r11, r9
+  00ce  LoadConstUInt8       r9, 247
+  00d1  Mod                  r9, r11, r9
+  00d5  Call2                r9, r10, r3, r9
+  00da  LoadConstString      r2, s3 "qmno"
+  00de  JmpLong              L11
+L5:
+  00e3  GetByIdShort         r10, r3, #c5, s16 "push"
+  00e8  Mov                  r11, r0
+  00eb  LoadConstUInt8       r9, 94
+  00ee  Add                  r11, r11, r9
+  00f2  LoadConstUInt8       r9, 215
+  00f5  Mod                  r9, r11, r9
+  00f9  Call2                r9, r10, r3, r9
+  00fe  LoadConstString      r2, s3 "qmno"
+  0102  JmpLong              L11
+T1:
+L6:
+  0107  Mov                  r10, r0
+  010a  LoadConstUInt8       r9, 3
+  010d  URshift              r9, r10, r9
+  0111  LoadConstUInt8       r11, 5
+  0114  Mod                  r10, r9, r11
+  0118  LoadConstUInt8       r9, 2
+  011b  JLessN               L7, r10, r9
+  011f  GetByIdShort         r10, r5, #c4, s14 "mix"
+  0124  Mov                  r9, r0
+  0127  Call3                r0, r10, r6, r9, r11
+  012d  Jmp                  L10
+L7:
+  012f  TryGetById           r11, r5, #c6, s7 "Error"
+  0135  CreateThisForNew     r10, r11, 2
+  0139  LoadConstString      r15, s1 "e49"
+  013d  Mov                  r16, r10
+  0140  Construct            r9, r11, 2
+  0144  SelectObject         r9, r10, r9
+  0148  Throw                r9
+T2:
+L8:
+  014a  Catch                r12
+  014c  GetByIdShort         r11, r5, #c4, s14 "mix"
+  0151  Mov                  r10, r0
+  0154  TryGetById           r9, r5, #c6, s7 "Error"
+  015a  InstanceOf           r13, r12, r9
+  015e  LoadConstUInt8       r9, 1
+  0161  JmpFalse             L9, r13
+  0164  GetByIdShort         r12, r12, #c7, s4 "message"
+  0169  GetByIdShort         r9, r12, #c8, s6 "length"
+L9:
+  016e  Call3                r0, r11, r6, r10, r9
+T3:
+L10:
+  0174  GetByIdShort         r10, r3, #c5, s16 "push"
+  0179  LoadConstUInt8       r9, 29
+  017c  Call2                r9, r10, r3, r9
+  0181  LoadConstString      r2, s3 "qmno"
+L11:
+  0185  SelectObject         r9, r8, r7
+  0189  GetByIdShort         r8, r5, #c4, s14 "mix"
+  018e  Mov                  r7, r0
+  0191  GetByIdShort         r9, r9, #c9, s20 "size"
+  0196  GetByIdShort         r2, r2, #c8, s6 "length"
+  019b  Add                  r2, r9, r2
+  019f  Call3                r0, r8, r6, r7, r2
+  01a5  GetByIdShort         r2, r3, #c3, s21 "slice"
+  01aa  Call3                r7, r2, r3, r1, r4
+  01b0  Mov                  r2, r7
+  01b3  IteratorBegin        r4, r2
+L12:
+  01b6  Mov                  r7, r2
+  01b9  IteratorNext         r9, r4, r7
+  01bd  Mov                  r7, r4
+  01c0  JStrictEqual         L14, r7, r6
+T4:
+  01c4  GetByIdShort         r8, r5, #c4, s14 "mix"
+  01c9  Mov                  r7, r0
+  01cc  Call3                r0, r8, r6, r7, r9
+  01d2  Jmp                  L12
+T5:
+L13:
+  01d4  Catch                r2
+  01d6  IteratorClose        r4, 1
+  01d9  Throw                r2
+L14:
+  01db  URshift              r0, r0, r1
+  01df  Ret                  r0
+L15:
+  01e1  Catch                r0
+  01e3  GetByIdShort         r2, r3, #c5, s16 "push"
+  01e8  LoadConstUInt8       r1, 29
+  01eb  Call2                r1, r2, r3, r1
+  01f0  Throw                r0
