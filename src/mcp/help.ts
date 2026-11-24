@@ -8,12 +8,12 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** The six deep topics; `tldr` is
+/** The deep topics; `tldr` is
  *  also what a topic-less call to `help` returns (plus this list), and what
  *  the `hbc2js://docs/index` resource returns too -- one function,
  *  `loadHelpTopic`, serves all three call sites so there is one behavior to
  *  keep in sync, not three. */
-export const HELP_TOPICS = ["tldr", "tools", "workflow", "examples", "limits", "glossary"] as const;
+export const HELP_TOPICS = ["tldr", "tools", "workflow", "examples", "limits", "glossary", "boot"] as const;
 export type HelpTopic = (typeof HELP_TOPICS)[number];
 
 export function isHelpTopic(topic: string): topic is HelpTopic {

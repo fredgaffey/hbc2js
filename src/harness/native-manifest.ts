@@ -114,7 +114,10 @@ export function bundleEvidence(text: string): { required: Set<string>; spec: Set
   // A decompiled original (`.hbc` input) hoists the name into a register
   // first (\`L="RNCAsyncStorage",R=b.TurboModuleRegistry.get(L)\`); fold
   // that back into the literal call so the rules below see one shape.
-  const source = text.replace(HOISTED_NAME, (_m, _reg: string, name: string, call: string) => `${call}("${name}")`);
+  // Likewise an assignment in the argument: \`requireOptionalNativeModule)(O="ExpoUpdates")\`.
+  const source = text
+    .replace(HOISTED_NAME, (_m, _reg: string, name: string, call: string) => `${call}("${name}")`)
+    .replace(ASSIGNED_ARG, (_m, call: string, name: string) => `${call}(${name})`);
   LOOKUP.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = LOOKUP.exec(source)) !== null) {
@@ -143,6 +146,9 @@ export function bundleEvidence(text: string): { required: Set<string>; spec: Set
     if (/\|\|\s*(?:\(\s*[\w$]+\s*=\s*)?[\w$.()]*$/.test(before) && /^\s*[;:,)}]/.test(after) && !/^\s*\)\s*,\s*[\w$]+\s*\|\|/.test(after)) required.add(name);
     // Last expression of the factory: `...('X')},<id>,[` (Metro), or the
     // `...('X')}` end of a factory body without Metro's trailer.
+    // Decompiled, the factory ends \`…("X");return _.default=p,c},551,[269]\`.
+    const tail = source.slice(m.index + m[0].length, m.index + m[0].length + 80);
+    if (!inTry && /^\s*;\s*return\b[^;{}()]*\}\s*,\s*-?\d+\s*,\s*\[/.test(tail) && !/(?:\|\||&&|\?\?|!=|==)\s*[^,;=]*$/.test(before)) spec.add(name);
     if (!inTry && /^\s*\}\s*(?:,\s*\d+\s*,\s*\[|\)|$)/.test(after) && !/(?:\|\||&&|\?\?|!=|==)\s*[^,;=]*$/.test(before)) spec.add(name);
   }
   // A library that falls back to a throwing Proxy when its module is
@@ -173,6 +179,7 @@ export function bundleEvidence(text: string): { required: Set<string>; spec: Set
   }
   return { required, spec };
 }
+const ASSIGNED_ARG = /(\b(?:getEnforcing|get|requireNativeModule\)?|requireOptionalNativeModule\)?))\(\s*[\w$]+\s*=\s*("[A-Z][\w$]*")\s*\)/g;
 const HOISTED_NAME = /(?<![\w$.])([\w$]+)="([A-Z][\w$]*)",([\w$]+=[\w$.()[\]]*\.(?:getEnforcing|get))\(\1\)/g;
 const UNGUARDED_BIND = /(?<![\w$.])([\w$]+)\s*=\s*[\w$.()[\]]*\.NativeModules\.([A-Z][\w$]*)\s*[;,]/g;
 const IS_NULL_MSG = /NativeModule\.([A-Z][\w$]*) is null\. To fix/g;

@@ -80,3 +80,13 @@ test("0.1.2 apps: an Expo-built app reads an embedded app config (expo-linking t
   // A bare app that never reads expoConfig keeps the bare default.
   assert.equal(deriveNativeManifest(src.replace("default.expoConfig", "default.sessionId")).present.ExponentConstants!.manifest, null);
 });
+
+test("0.1.2 apps: a decompiled library spec module (`…(\"X\");return _.default=p,c},id,[`) is present; an assigned-argument optional probe is not", () => {
+  const src = [
+    `__d(function(g,r,i,a,m,e,d){Object.defineProperty(_,"__esModule",{value:!0});var c=void 0;_.default=c;var p=(0,t(v[0]).requireOptionalNativeModule)("ExponentConstants");return _.default=p,c},551,[269]);`,
+    `__d(function(g,r,i,a,m,e,d){var O=A[2];O=(0,(O=S(O)).requireOptionalNativeModule)(O="ExpoUpdates"),E=O;return c},552,[269]);`,
+  ].join("\n");
+  const m = deriveNativeManifest(src);
+  assert.ok("ExponentConstants" in m.present);
+  assert.ok(!("ExpoUpdates" in m.present));
+});

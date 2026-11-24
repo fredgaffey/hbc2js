@@ -3445,7 +3445,10 @@ Fetch a prebuilt Hermes VM (and hermesc) with a pinned 'npm pack' of the same
 packages tools/get-hermesc.sh uses (npm verifies the tarball integrity). Needed
 by 'equiv --boot'. Installs to ${userVmDir()} (override: XDG_CACHE_HOME).
 Explicit only: hbc2js never downloads anything on its own. Default version: 96.
-VMs for versions the prebuilt route cannot reach: tools/build-hermes-vm.sh <version>.
+A prebuilt VM exists only for v84 and v96 (v96: facebook/hermes v0.13.0 release,
+sha256-pinned, macOS and Linux x64); for 94/98/99 it installs hermesc and says
+so. 'equiv --boot' runs source mode under any VM, so v96 serves every app.
+Same-version VMs for the others: tools/build-hermes-vm.sh <version>.
 `;
   if (argv.includes("--help") || argv.includes("-h")) {
     process.stdout.write(SETUP_USAGE);
