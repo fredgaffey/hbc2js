@@ -269,13 +269,30 @@ function dirMode(dir: string, outDir: string, app: string, hbc: number, argv: st
   console.log(JSON.stringify(summary));
 }
 
+/** `--from-js <decompiled.js>`: re-run the static checks over a previous
+ *  run's output without decompiling again; W_* rows and the summary's
+ *  decompile fields are carried over from <out>/findings.jsonl / summary.json. */
+function fromJs(file: string, outDir: string, app: string, argv: string[]): void {
+  for (let i = 0; i < argv.length; i++) if (argv[i] === "--host-from") addHostFrom(readFileSync(argv[i + 1]!, "utf8"));
+  const prev = JSON.parse(readFileSync(join(outDir, "summary.json"), "utf8"));
+  const warns = readFileSync(join(outDir, "findings.jsonl"), "utf8").split("\n").filter((l) => l.includes('"check":"WARN"'));
+  const fs = staticFindings(readFileSync(file, "utf8"), app, prev.hbc);
+  writeFileSync(join(outDir, "findings.jsonl"), [...fs.map((f) => JSON.stringify(f)), ...warns].join("\n") + "\n");
+  const byCheck: Record<string, number> = { WARN: warns.length };
+  for (const f of fs) byCheck[f.check] = (byCheck[f.check] ?? 0) + 1;
+  const summary = { ...prev, findings: byCheck, reanalysedFrom: file };
+  writeFileSync(join(outDir, "summary.json"), JSON.stringify(summary, null, 2) + "\n");
+  console.log(JSON.stringify({ app, findings: byCheck }));
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const flag = (k: string): string | undefined => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
   const input = argv[0];
   const outDir = flag("--out");
-  if ((!input && !argv.includes("--dir")) || !outDir) { console.error("usage: static.ts <app.hbc> --out <dir> [--app L] [--workers N] [--host-from bundle.js]..."); process.exit(2); }
+  if ((!input && !argv.includes("--dir") && !argv.includes("--from-js")) || !outDir) { console.error("usage: static.ts <app.hbc> --out <dir> [--app L] [--workers N] [--host-from bundle.js]..."); process.exit(2); }
   const app = flag("--app") ?? input;
+  if (flag("--from-js") !== undefined) return fromJs(flag("--from-js")!, outDir, app, argv);
   if (flag("--dir") !== undefined) return dirMode(flag("--dir")!, outDir, app, Number(flag("--hbc") ?? 0), argv);
   const workers = Number(flag("--workers") ?? "1");
   mkdirSync(outDir, { recursive: true });
