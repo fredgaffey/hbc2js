@@ -378,6 +378,14 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   files.set(".gitignore", buildGitignore());
 
   const bundleSha256 = createHash("sha256").update(bytes).digest("hex");
+  if (splitResult.modules.length === 0) {
+    // 0.1.2 corpus a02 (a Re.Pack/rspack build): no Metro `__d(...)` module
+    // registrations at all, so the tree is empty. Say so instead of exporting
+    // an empty app that silently "succeeds".
+    const detail = "the bundle registers no Metro modules (no __d(...) calls in its global function); it may come from another bundler (e.g. Re.Pack/rspack), which export does not split";
+    unresolved.push({ kind: "no-metro-modules", detail });
+    process.stderr.write(`hbc2js export: warning: ${detail}\n`);
+  }
   if (splitResult.entryModuleId === null) {
     unresolved.push({ kind: "no-entry-module", detail: "MODULES.json's entry could not be resolved from the bundle's global function" });
   } else if (entryPath === null) {
