@@ -668,11 +668,21 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
     };
   }
 
+  // String module ids (a custom createModuleIdFactory; corpus a10): the
+  // static scan (src/deps/dscan.ts numberRegistrations) numbers them by first
+  // registration among string-id registrations; number them the same way, in
+  // __d call order, so the probe reports the ids the export uses.
+  var __hbcStrIds = new Map();
+  function probeId(id) {
+    if (typeof id !== "string") return id;
+    if (!__hbcStrIds.has(id)) __hbcStrIds.set(id, __hbcStrIds.size);
+    return __hbcStrIds.get(id);
+  }
   function wrapMetro(name, fn) {
     if (name === "__d") {
       return function (factory, id, deps) {
         callRecord("__d", [enc(id), deps === undefined ? "[]" : enc(deps)], undefined);
-        return fn(wrapFactory(factory, id), id, deps);
+        return fn(wrapFactory(factory, probeId(id)), id, deps);
       };
     }
     if (name === "__r") {

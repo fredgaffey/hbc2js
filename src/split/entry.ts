@@ -9,8 +9,23 @@ import type { Instruction } from "../disasm/decode.ts";
 import { writtenRegisters } from "../cfg/reg-effects.ts";
 
 type RegVal = number | "top";
-const constLoaded = (insn: Instruction): RegVal => {
+/** String module ids (dscan `numberRegistrations`, corpus a10): a startup
+ *  `__r("<id>")` names a module by its raw string id, which reads as the
+ *  synthetic numeric id the registrations were given. */
+export interface StringModuleIds {
+  /** Raw string id -> synthetic module id. */
+  readonly ids: ReadonlyMap<string, number>;
+  /** The bundle's string table (a LoadConstString operand -> its text). */
+  readonly stringOf: (stringId: number) => string | undefined;
+}
+const constLoaded = (insn: Instruction, sids?: StringModuleIds): RegVal => {
   if (insn.name === "LoadConstZero") return 0;
+  if (sids !== undefined && (insn.name === "LoadConstString" || insn.name === "LoadConstStringLongIndex")) {
+    const op = insn.operands.find((o) => o.role === "string");
+    const text = op !== undefined ? sids.stringOf(op.value) : undefined;
+    const v = text !== undefined ? sids.ids.get(text) : undefined;
+    return v ?? "top";
+  }
   if (/^LoadConst(UInt8|Int|Double)$/.test(insn.name)) {
     const v = insn.operands[1]?.value;
     return typeof v === "number" && Number.isInteger(v) ? v : "top";
@@ -25,7 +40,7 @@ const constLoaded = (insn: Instruction): RegVal => {
  *  write under a structured `if` that every path still crosses from a truly
  *  conditional one: Expensify's fn#0 writes r3 = 65535, then 0 on both arms
  *  of a branch, and the final `__r(r3)` must read 0 (export-boot apps). */
-export function constRegisterBefore(cfg: FunctionCfg, end: number, reg: number): number | undefined {
+export function constRegisterBefore(cfg: FunctionCfg, end: number, reg: number, sids?: StringModuleIds): number | undefined {
   let at: { block: number; index: number } | undefined;
   for (const b of cfg.blocks) b.instructions.forEach((insn, i) => {
     if (insn.offset < end && (at === undefined || insn.offset > cfg.blocks[at.block]!.instructions[at.index]!.offset)) at = { block: b.id, index: i };
@@ -35,7 +50,7 @@ export function constRegisterBefore(cfg: FunctionCfg, end: number, reg: number):
   const inState = new Map<number, RegVal>();
   const flow = (id: number, v: RegVal, upTo = Infinity): RegVal => {
     const ins = cfg.blocks[id]!.instructions;
-    for (let i = 0; i < Math.min(ins.length, upTo); i++) if (writtenRegisters(ins[i]!).includes(reg)) v = constLoaded(ins[i]!);
+    for (let i = 0; i < Math.min(ins.length, upTo); i++) if (writtenRegisters(ins[i]!).includes(reg)) v = constLoaded(ins[i]!, sids);
     return v;
   };
   // Before the entry block runs, a register is undefined: not an id.
@@ -63,7 +78,7 @@ export function constRegisterBefore(cfg: FunctionCfg, end: number, reg: number):
  *  the entry id `0` of a Metro bundle's final `__r(0)` is the case that matters
  *  (export-boot L4). A register with any other or differing assignment is left
  *  out. */
-function singleConstRegisters(globalBody: readonly Stmt[]): Map<string, number> {
+function singleConstRegisters(globalBody: readonly Stmt[], sids?: StringModuleIds): Map<string, number> {
   const fnOf = (s: Stmt): number | undefined => (s as { readonly origin?: { readonly fn?: number } }).origin?.fn;
   const own = globalBody.map(fnOf).find((f) => f !== undefined);
   // Writes in document order, each marked conditional when it sits under
@@ -81,7 +96,7 @@ function singleConstRegisters(globalBody: readonly Stmt[]): Map<string, number> 
       if (fnOf(st) !== undefined && fnOf(st) !== own) continue;
       const at = assignedIdent(st);
       if (at !== null) {
-        const v = at.value.k === "lit" && /^-?\d+$/.test(at.value.text) ? Number(at.value.text) : "mixed";
+        const v = at.value.k === "lit" ? (litModuleId(at.value.text, sids) ?? "mixed") : "mixed";
         const list = writes.get(at.name) ?? [];
         list.push({ v, cond });
         writes.set(at.name, list);
@@ -105,21 +120,28 @@ function singleConstRegisters(globalBody: readonly Stmt[]): Map<string, number> 
   }
   return out;
 }
+/** A literal's module id: an integer, or (string-id bundles) a quoted string
+ *  id the registrations numbered. */
+function litModuleId(text: string, sids?: StringModuleIds): number | undefined {
+  if (/^-?\d+$/.test(text)) return Number(text);
+  if (sids === undefined || !/^"[^"\\]*"$/.test(text)) return undefined;
+  return sids.ids.get(text.slice(1, -1));
+}
 function assignedIdent(s: Stmt): { readonly name: string; readonly value: Expr } | null {
   if (s.k === "init") return { name: s.name, value: s.value };
   if (s.k === "expr" && s.expr.k === "assign" && s.expr.target.k === "ident") return { name: s.expr.target.name, value: s.expr.value };
   return null;
 }
 
-export function resolveEntryModuleId(globalBody: readonly Stmt[], cfg?: FunctionCfg): number | null {
-  const ids = resolveStartupModuleIds(globalBody, cfg);
+export function resolveEntryModuleId(globalBody: readonly Stmt[], cfg?: FunctionCfg, sids?: StringModuleIds): number | null {
+  const ids = resolveStartupModuleIds(globalBody, cfg, sids);
   return ids.length > 0 ? ids[ids.length - 1]! : null;
 }
 
 /** Every top-level `<globalObj>.__r(<literal id>)` call, in order: Metro's
  *  run-before-main modules (e.g. RN's InitializeCore) followed by the entry
  *  module (spec 33 L1: an export must run all of them, not just the last). */
-export function resolveStartupModuleIds(globalBody: readonly Stmt[], cfg?: FunctionCfg): number[] {
+export function resolveStartupModuleIds(globalBody: readonly Stmt[], cfg?: FunctionCfg, sids?: StringModuleIds): number[] {
   const regs = new Map<string, Tag>();
   const noParams = new Set<string>();
   const ids: number[] = [];
@@ -138,14 +160,19 @@ export function resolveStartupModuleIds(globalBody: readonly Stmt[], cfg?: Funct
       const reg = /^r(\d+)$/.exec(arr.elements[0]!.name);
       const origin = (at as { readonly origin?: { readonly end?: number } }).origin;
       if (cfg !== undefined && reg !== null && origin?.end !== undefined) {
-        const v = constRegisterBefore(cfg, origin.end, Number(reg[1]));
+        const v = constRegisterBefore(cfg, origin.end, Number(reg[1]), sids);
         if (v !== undefined) { ids.push(v); return; }
       }
-      consts ??= singleConstRegisters(globalBody);
+      consts ??= singleConstRegisters(globalBody, sids);
       const v = consts.get(arr.elements[0]!.name);
       if (v !== undefined) { ids.push(v); return; }
     }
-    const argTag = classify(arr.elements[0]!, regs, noParams);
+    const el = arr.elements[0]!;
+    if (sids !== undefined && el.k === "lit") {
+      const v = litModuleId(el.text, sids);
+      if (v !== undefined) { ids.push(v); return; }
+    }
+    const argTag = classify(el, regs, noParams);
     if (argTag.kind === "num") ids.push(argTag.value);
   };
 
