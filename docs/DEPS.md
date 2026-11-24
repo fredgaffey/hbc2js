@@ -263,6 +263,24 @@ hbc2js deps <bundle.hbc|app.apk> [--out <dir>] [--confirm] [--confirm-cache] [--
    verified directly against a pre-hint-tier copy of `report.ts`, satisfying
    the D17d gate):
 
+   **Probe gate (0.1.2, `src/deps/optional-probes.ts`).** Libraries feature-detect
+   their optional peers (`TurboModuleRegistry.get("RNEdgeToEdge") != null`,
+   `UIManager.getViewManagerConfig("RNCMaskedView")`, `globalThis.expo?.modules?.
+   ExpoFontLoader`), so the string is in the bundle whether or not the peer is
+   installed. A bare RN 0.88 app with no Expo at all produced `expo`, `expo-asset`,
+   `expo-constants`, `expo-font`, `react-native-edge-to-edge` and
+   `@react-native-masked-view/masked-view` hints this way. Rules: every `expo` /
+   `expo-*` guess or hint needs `DepsReport.expoRuntime` (expo-modules-core itself in the
+   bundle: the `__expo_module_name__` marker, the `ExpoModulesCore` TurboModule, or
+   its index exports `requireNativeViewManager`+`CodedError`+`SharedObject`;
+   `version-evidence.ts`), and `expo` itself is implied only by that; masked-view
+   and edge-to-edge need a non-string corroborating evidence kind (edge-to-edge is
+   also accepted when `expoRuntime` is set, being an Expo SDK hard dependency).
+   Rejected candidates are listed in `suppressedGuesses` with reason
+   `no-expo-runtime` / `optional-probe`. RN 0.73 production bundles drop the
+   ReactNativeVersion module; the RN version is then read from react-native's own
+   `package.json` literal (`rnVersionFromPackageJsonLiteral`).
+
    | App | Hints | False positives (by name) |
    |---|---|---|
    | `rn-template-0.72` (release + `-g`) | 0 | 0 |
