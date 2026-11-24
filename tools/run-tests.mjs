@@ -7,6 +7,10 @@
 // gate still ran. Flags starting with `-` are passed through to `node --test`.
 import { spawnSync } from "node:child_process";
 
+// Hang guards: --test-timeout fails any single test after 10 min (slowest legit file ~200s under
+// load); the preload gives every sync child_process call a default timeout.
+const NODE_FLAGS = ["--import", "./tools/test/default-timeouts.mjs", "--test-timeout=600000"];
+
 const GATE_GLOBS = [
   "tests/gate/**/*.test.ts", "tests/artifact/**/*.test.ts", "tests/project/**/*.test.ts",
   "tests/projdb/**/*.test.ts", "tests/secrets/**/*.test.ts", "tests/security/**/*.test.ts",
@@ -24,11 +28,11 @@ const args = process.argv.slice(2);
 // Test hook: print the plan instead of running it.
 const dry = process.env.HBC2JS_RUN_TESTS_DRY === "1";
 const plan = args.length > 0
-  ? [[process.execPath, ["--test", ...args], { HBC2JS_E2E_DEFER: "1" }]]
+  ? [[process.execPath, [...NODE_FLAGS, "--test", ...args], { HBC2JS_E2E_DEFER: "1" }]]
   : [
       ["npm", ["run", "typecheck"], {}],
-      [process.execPath, ["--test", ...GATE_GLOBS], { HBC2JS_E2E_DEFER: "1" }],
-      [process.execPath, ["--test", "tests/gate/ui/e2e-smoke.test.ts"], {}],
+      [process.execPath, [...NODE_FLAGS, "--test", ...GATE_GLOBS], { HBC2JS_E2E_DEFER: "1" }],
+      [process.execPath, [...NODE_FLAGS, "--test", "tests/gate/ui/e2e-smoke.test.ts"], {}],
     ];
 if (dry) {
   for (const [cmd, a] of plan) console.log([cmd === process.execPath ? "node" : cmd, ...a].join(" "));

@@ -511,3 +511,10 @@ busy, a stranger's server is never reused) and `HBC2JS_E2E_ROOT` (kept, not
 deleted). Under heavy concurrent load a spec can still time out on CPU
 starvation; that is a timing flake, not a collision. Gate test:
 `tests/gate/ui/e2e-select.test.ts`.
+
+## Dev speed: hang guards, worktrees, affected tests
+
+- **Hang guards.** Every `node --test` entry (`npm test`, `tools/run-tests.mjs`, the `test:*` scripts) runs with `--test-timeout=600000` and `--import ./tools/test/default-timeouts.mjs`. The shim gives every `execFileSync`/`spawnSync`/`execSync` without an explicit `timeout` a default of 180 s (`HBC2JS_SYNC_CHILD_TIMEOUT_MS`, 0 disables) and `SIGKILL`, so a wedged child (a hermesc blocked on stdin once cost a gate 43 minutes) fails one test quickly. Guarded by `tests/gate/tooling/child-timeouts.test.ts`. Slowest legitimate test file under load is about 200 s.
+- **New worktree.** `tools/wt-new.sh <name> [base]` creates `~/hbc2js/wt/<name>` on a new branch and symlinks every gitignored input present in the main checkout (derived from `git status --ignored`: `node_modules`, `ui/node_modules`, `tools/hermesc`, `tools/hermes-vm`, gitignored fixture bundles). `dist/`, `local/` and `ui/test-results/` are deliberately not linked. `tools/wt-check.sh` reports (exit 1) any that are missing in the current worktree.
+- **Affected tests.** `npm run test:affected [base] [--dry] [--fast]` maps changes vs `base` (default `main`, plus working tree and untracked files) to tests through the static import graph and path mentions in test files, plus name matches; it falls back to the full gate for `package.json`, tsconfig, `tools/run-tests.mjs`, `tools/test/`, `tests/support/`, CI files, or any src/tools file it cannot map. Because tests spawn the CLI, a `src/` change usually maps to most tests; `--fast` ignores path-mention edges into `src/` (less safe). Docs/tools/test-only changes map narrowly. It does not typecheck.
+- **Profile.** `node --test --test-reporter=./tools/test/durations-reporter.mjs` writes per-file wall times to `$HBC2JS_DURATIONS_OUT`.

@@ -33,7 +33,7 @@ const APP = `var c = 1; for (var w = 0; w < 19; w++) { c = (c * 31 + w) % 100000
 function compile(hermesc: string, js: string): Uint8Array {
   const dir = mkdtempSync(join(tmpdir(), "hbc2js-recall-bar-"));
   try {
-    execFileSync(hermesc, ["-O", "-emit-binary", `-out=${join(dir, "o.hbc")}`, "-"], { input: js });
+    execFileSync(hermesc, ["-O", "-emit-binary", `-out=${join(dir, "o.hbc")}`, "-"], { input: js, timeout: 60_000, killSignal: "SIGKILL" });
     return new Uint8Array(readFileSync(join(dir, "o.hbc")));
   } finally {
     rmSync(dir, { recursive: true, force: true });
