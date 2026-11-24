@@ -186,6 +186,43 @@ const CREATE_CLOSURE_OPS: ReadonlySet<string> = new Set([
   "CreateAsyncClosure", "CreateAsyncClosureLongIndex",
 ]);
 
+/** The layout's helper functions, over its final `parentOf` (they only
+ *  read it), so a layout rebuilt from transferred data (`presetEmitLayout`)
+ *  gets the same functions. */
+function layoutFunctions(parentOf: ReadonlyMap<number, number | null>) {
+  const isAncestor = (candidate: number, of: number): boolean => {
+    let cur: number | null = of;
+    const seen = new Set<number>();
+    while (cur !== null && !seen.has(cur)) {
+      if (cur === candidate) return true;
+      seen.add(cur);
+      cur = parentOf.get(cur) ?? null;
+    }
+    return false;
+  };
+  /** Ancestor-or-self chain of `f`, self first and outermost last; cycle-safe. */
+  const chainUp = (f: number): number[] => {
+    const out: number[] = [];
+    const seen = new Set<number>();
+    let cur: number | null = f;
+    while (cur !== null && !seen.has(cur)) {
+      seen.add(cur);
+      out.push(cur);
+      cur = parentOf.get(cur) ?? null;
+    }
+    return out;
+  };
+  const copyNameOf = (fn: number, copy: number): string => (copy === 0 ? fnName(fn) : `${fnName(fn)}__c${copy}`);
+  /** `outer ∘ inner`: a copy nested inside another copy's subtree. */
+  const composeRemap = (outer: ReadonlyMap<number, number> | undefined, inner: ReadonlyMap<number, number>): ReadonlyMap<number, number> => {
+    if (outer === undefined) return inner;
+    const out = new Map<number, number>(outer);
+    for (const [from, to] of inner) out.set(from, outer.get(to) ?? to);
+    return out;
+  };
+  return { isAncestor, chainUp, copyNameOf, composeRemap };
+}
+
 /** The whole-bundle closure-placement layout `emitModule` derives from the
  *  env graph before emitting anything. It depends only on `analysis` (never
  *  on `EmitOptions`), so it is computed once per analysis and shared by every
@@ -215,28 +252,7 @@ function buildEmitLayout(analysis: ModuleAnalysis) {
     }
     parentOf.set(i, envGraph.nodes[env]!.ownerFunction);
   }
-  const isAncestor = (candidate: number, of: number): boolean => {
-    let cur: number | null = of;
-    const seen = new Set<number>();
-    while (cur !== null && !seen.has(cur)) {
-      if (cur === candidate) return true;
-      seen.add(cur);
-      cur = parentOf.get(cur) ?? null;
-    }
-    return false;
-  };
-  /** Ancestor-or-self chain of `f`, self first and outermost last; cycle-safe. */
-  const chainUp = (f: number): number[] => {
-    const out: number[] = [];
-    const seen = new Set<number>();
-    let cur: number | null = f;
-    while (cur !== null && !seen.has(cur)) {
-      seen.add(cur);
-      out.push(cur);
-      cur = parentOf.get(cur) ?? null;
-    }
-    return out;
-  };
+  const { isAncestor, chainUp, copyNameOf, composeRemap } = layoutFunctions(parentOf);
 
   // F24-5 (docs/BUGS.md `class-recover-orphan-methods`) — a
   // function that captures NOTHING is not an orphan. `closureEnvOf(f) === null`
@@ -496,7 +512,6 @@ function buildEmitLayout(analysis: ModuleAnalysis) {
     }
   }
 
-  const copyNameOf = (fn: number, copy: number): string => (copy === 0 ? fnName(fn) : `${fnName(fn)}__c${copy}`);
   /** siteKey(creator, offset) -> the `_fn…` name that site must emit. */
   const closureNameAt = new Map<string, string>();
   /** siteKey -> the copy that site creates, for both the name and the remap. */
@@ -601,13 +616,6 @@ function buildEmitLayout(analysis: ModuleAnalysis) {
     for (const f of members) if (!idx.has(f)) run(f);
   }
 
-  /** `outer ∘ inner`: a copy nested inside another copy's subtree. */
-  const composeRemap = (outer: ReadonlyMap<number, number> | undefined, inner: ReadonlyMap<number, number>): ReadonlyMap<number, number> => {
-    if (outer === undefined) return inner;
-    const out = new Map<number, number>(outer);
-    for (const [from, to] of inner) out.set(from, outer.get(to) ?? to);
-    return out;
-  };
 
   // Break any cycle (never observed, but a cycle would be an infinite emission).
   for (const [child] of parentOf) {
@@ -818,6 +826,24 @@ function buildEmitLayout(analysis: ModuleAnalysis) {
 
 type EmitLayout = ReturnType<typeof buildEmitLayout>;
 const EMIT_LAYOUT = new WeakMap<ModuleAnalysis, EmitLayout>();
+/** The plain-data part of an analysis's emit layout (no functions), for
+ *  `v8.serialize` -- serialize it TOGETHER with the env graph so the
+ *  `ClosureCopy` objects it shares with `envGraph.closureCopies` stay shared. */
+export type EmitLayoutTransfer = Omit<EmitLayout, "isAncestor" | "chainUp" | "copyNameOf" | "composeRemap">;
+
+export function emitLayoutTransfer(analysis: ModuleAnalysis): EmitLayoutTransfer {
+  const { isAncestor: _a, chainUp: _c, copyNameOf: _n, composeRemap: _r, ...data } = emitLayoutFor(analysis);
+  return data;
+}
+
+/** Installs a transferred layout (computed by another thread for the same
+ *  module) as `analysis`'s layout, so `emitModule` never builds it -- building
+ *  it reads the CFG of every environment-owning function, which a render
+ *  worker would otherwise pay for (time and memory) on top of its own share. */
+export function presetEmitLayout(analysis: ModuleAnalysis, data: EmitLayoutTransfer): void {
+  EMIT_LAYOUT.set(analysis, { ...data, ...layoutFunctions(data.parentOf) });
+}
+
 function emitLayoutFor(analysis: ModuleAnalysis): EmitLayout {
   let layout = EMIT_LAYOUT.get(analysis);
   if (layout === undefined) EMIT_LAYOUT.set(analysis, (layout = buildEmitLayout(analysis)));

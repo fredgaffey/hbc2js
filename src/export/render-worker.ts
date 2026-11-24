@@ -10,6 +10,8 @@ import { parentPort, workerData } from "node:worker_threads";
 import { analyseModule } from "../cfg/index.ts";
 import { envGraphFromTransfer } from "../cfg/env-graph.ts";
 import type { EnvGraphTransfer } from "../cfg/env-graph.ts";
+import { presetEmitLayout } from "../emit/index.ts";
+import type { EmitLayoutTransfer } from "../emit/index.ts";
 import { parseHbc } from "../parse/module.ts";
 import { renderReadableOutcome } from "./tiers.ts";
 import type { RenderJob, RenderWorkerData, RenderWorkerReply } from "./render-pool.ts";
@@ -23,11 +25,11 @@ function post(reply: RenderWorkerReply): void {
 
 parentPort!.on("message", (jobs: readonly RenderJob[]) => {
   try {
-    analysis ??= analyseModule(
-      parseHbc(new Uint8Array(data.bytes)),
-      { strictEnv: false },
-      { envGraph: envGraphFromTransfer(deserialize(new Uint8Array(data.envGraph)) as EnvGraphTransfer), releaseDecoded: true },
-    );
+    if (analysis === undefined) {
+      const shared = deserialize(new Uint8Array(data.envGraph)) as { envGraph: EnvGraphTransfer; layout: EmitLayoutTransfer };
+      analysis = analyseModule(parseHbc(new Uint8Array(data.bytes)), { strictEnv: false }, { envGraph: envGraphFromTransfer(shared.envGraph), releaseDecoded: true });
+      presetEmitLayout(analysis, shared.layout);
+    }
     const results = jobs.map((job) => ({
       moduleId: job.moduleId,
       outcome: renderReadableOutcome({ ...job, analysis: analysis! }),
