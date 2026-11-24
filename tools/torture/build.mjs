@@ -277,7 +277,7 @@ export async function build(opts) {
   sh(hc.path, ["-emit-binary", "-O", "-output-source-map", "-out", join(ws, "bundle.hbc"), join(ws, "bundle.js")], ws);
   timings.hermescMs = ms(t0);
   sh(hc.path, ["-emit-binary", "-O", "-out", join(ws, "headless.hbc"), join(ws, "headless.js.bundle")], ws);
-  sh(process.execPath, [join(ws, "node_modules/react-native/scripts/compose-source-maps.js"),
+  sh(process.execPath, ["--max-old-space-size=" + (functions > 20000 ? 16384 : 4096), join(ws, "node_modules/react-native/scripts/compose-source-maps.js"),
     join(ws, "bundle.js.map"), join(ws, "bundle.hbc.map"), "-o", join(out, "bundle.map")], ws);
   for (const f of ["bundle.hbc", "bundle.js", "bundle.js.map", "headless.hbc"]) cpSync(join(ws, f), join(out, f));
   if (functions <= 10000) cpSync(join(ws, "src"), join(out, "source/src"), { recursive: true });
