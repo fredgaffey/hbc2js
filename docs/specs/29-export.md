@@ -292,7 +292,14 @@ in the manifest:
   source expo version and sha256 recorded per SDK) pins name-only deps and
   overrides conflicting signature versions (e.g. reanimated 3.19.5 -> 4.2.1 under
   SDK 55), with the reason in the dependency's `note`; reanimated >= 4 also gets
-  its `react-native-worklets` peer. Bundle-evidenced versions are never
+  its `react-native-worklets` peer. A name-only dependency the Expo table does not
+  pin (every bare-RN app, and non-table packages) is pinned from
+  `src/export/rn-compat.json` (`tools/gen-rn-compat.mjs`, npm registry packuments):
+  the newest version whose declared `react-native` peer range admits the detected
+  RN, else the newest version published by the end of that RN minor line; the
+  evidence is the dependency's `note`, the source stays `deps-*-name-only`. `expo*`
+  packages are reported only with expo-modules-core evidence (docs/DEPS.md, probe
+  gate). Bundle-evidenced versions are never
   overridden. A bundle using react-navigation's 7.x-only static API
   (`createStaticNavigation`) replaces 6.x signature versions of the
   `@react-navigation/*` packages with `^7.0.0`. EXPORT.json's `dependencies.<pkg>.source` records the
