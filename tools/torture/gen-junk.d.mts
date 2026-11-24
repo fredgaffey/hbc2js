@@ -7,7 +7,7 @@ export interface JunkFunction {
   readonly level: number;
   readonly callees: readonly string[];
   readonly arg: number;
-  readonly form: "function" | "arrow";
+  readonly form: "function" | "arrow" | "async";
 }
 export interface JunkModule {
   readonly path: string;
@@ -20,4 +20,4 @@ export interface JunkResult {
   readonly modules: JunkModule[];
 }
 export function entryArg(name: string): number;
-export function generateJunk(seed: string | number, count: number, opts?: { perModule?: number; modulesPerDir?: number }): JunkResult;
+export function generateJunk(seed: string | number, count: number, opts?: { perModule?: number; modulesPerDir?: number; hard?: boolean }): JunkResult;

@@ -41,7 +41,7 @@ async function runModuleChild(exportDir, id, names, isCore) {
       try {
         const f = ns[n];
         if (typeof f !== "function") { results[n] = { status: "missing" }; continue; }
-        const v = isCore ? await f() : f(entryArg(n));
+        const v = isCore ? await f() : await f(entryArg(n));
         results[n] = { status: "ok", value: v };
       } catch (e) {
         results[n] = { status: "threw", error: String(e && e.message || e).slice(0, 200) };

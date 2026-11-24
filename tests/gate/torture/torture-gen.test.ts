@@ -82,3 +82,31 @@ test("build: metroModuleIds maps __d chunks to sources in bundle order", () => {
   const map = { sources: ["__prelude__", "/ws/node_modules/metro-runtime/src/polyfills/require.js", "/ws/index.js", "/ws/node_modules/@scope/pkg/lib/x.js"] };
   assert.deepEqual(metroModuleIds(bundle, map, ws), { 0: "index.js", 7: "node_modules/@scope/pkg/lib/x.js" });
 });
+
+test("gen-junk --hard: opt-in, deterministic, default bytes unchanged, safe, every function terminates in Node", async () => {
+  const plain: Gen = generateJunk("1", N);
+  const a: Gen = generateJunk("1", N, { hard: true });
+  assert.equal(digest(a), digest(generateJunk("1", N, { hard: true })));
+  assert.notEqual(digest(a), digest(plain));
+  assert.ok(a.functions.length > N && a.functions.some((f) => f.form === "async"), "hard adds async leaves");
+  const src = a.files.filter(([rel]) => rel !== "src/junk/_rt.js").map(([, c]) => c).join("\n");
+  for (const bad of [/\beval\b/, /\bFunction\s*\(/, /\brequire\s*\(/, /\bimport\s*\(/, /\bfetch\b/, /setTimeout|setInterval/, /while\s*\(\s*true/, /\bfor\s*\(\s*;/]) {
+    assert.doesNotMatch(src, bad, `hard junk must not contain ${bad}`);
+  }
+  const dir = mkdtempSync(join(tmpdir(), "hbc2js-torture-hard-"));
+  try {
+    for (const [rel, content] of a.files) {
+      mkdirSync(dirname(join(dir, rel)), { recursive: true });
+      writeFileSync(join(dir, rel), content);
+    }
+    writeFileSync(join(dir, "package.json"), '{"type":"module"}\n');
+    for (const f of a.functions) {
+      const ns = await import(pathToFileURL(join(dir, f.module)).href);
+      const v = await ns[f.name](entryArg(f.name));
+      assert.ok(Number.isInteger(v) && v >= 0 && v <= 0xffffffff, `${f.name} returns a uint32`);
+      assert.equal(await ns[f.name](entryArg(f.name)), v, `${f.name} is deterministic`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
