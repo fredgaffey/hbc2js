@@ -1,7 +1,7 @@
 // docs/specs/35-agent-harness.md Part 1, acceptance 1-3: `--evidence` on the
 // four spec-34 machine calls. Without the flag the output is byte-identical to
 // the golden pinned under tests/fixtures/agent/machine-no-evidence/ (the only
-// masked field is `node` in the version reply: it is the running Node version).
+// masked fields are `node`, the running Node version, and `hbc2js`, the package version, which changes every release).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -19,14 +19,16 @@ function cli(args: readonly string[]): { status: number | null; stdout: string }
   return { status: r.status, stdout: r.stdout };
 }
 const gold = (n: string): string => readFileSync(join(GOLD, n), "utf8");
-const maskNode = (s: string): string => s.replace(/"node":"[^"]*"/, '"node":"X"');
+// `node` is the running Node version and `hbc2js` the package version (it
+// changes every release by design), so both are masked; everything else is pinned.
+const maskNode = (s: string): string => s.replace(/"node": ?"[^"]*"/, '"node":"X"').replace(/"hbc2js": ?"[^"]*"/, '"hbc2js":"X"');
 
 test("evidence 1: the four machine calls without --evidence are byte-identical to the pinned golden", () => {
   assert.equal(maskNode(cli(["--version", "--json"]).stdout), maskNode(gold("version.json")));
-  assert.equal(cli(["--info", F, "--json"]).stdout, gold("info.json"));
-  assert.equal(cli(["modules", F, "--json"]).stdout, gold("modules.json"));
-  assert.equal(cli(["decompile", F, "--fn", "1", "--json"]).stdout, gold("function-fn.json"));
-  assert.equal(cli(["decompile", F, "--module", "0", "--json"]).stdout, gold("function-module.json"));
+  assert.equal(maskNode(cli(["--info", F, "--json"]).stdout), maskNode(gold("info.json")));
+  assert.equal(maskNode(cli(["modules", F, "--json"]).stdout), maskNode(gold("modules.json")));
+  assert.equal(maskNode(cli(["decompile", F, "--fn", "1", "--json"]).stdout), maskNode(gold("function-fn.json")));
+  assert.equal(maskNode(cli(["decompile", F, "--module", "0", "--json"]).stdout), maskNode(gold("function-module.json")));
 });
 
 test("evidence 1b: with --evidence every pre-existing field is unchanged (deep-equal after deleting evidence)", () => {
@@ -39,12 +41,12 @@ test("evidence 1b: with --evidence every pre-existing field is unchanged (deep-e
     const j = JSON.parse(cli(args).stdout);
     assert.ok(j.evidence !== undefined, args.join(" "));
     delete j.evidence;
-    assert.deepEqual(j, JSON.parse(gold(g)));
+    assert.deepEqual({ ...j, hbc2js: "X" }, { ...JSON.parse(gold(g)), hbc2js: "X" });
   }
   const v = JSON.parse(cli(["--version", "--json", "--evidence"]).stdout);
   assert.equal(v.evidence.provenance.producer, "hbc2js");
   delete v.evidence;
-  assert.deepEqual({ ...v, node: "X" }, { ...JSON.parse(gold("version.json")), node: "X" });
+  assert.deepEqual({ ...v, node: "X", hbc2js: "X" }, { ...JSON.parse(gold("version.json")), node: "X", hbc2js: "X" });
 });
 
 test("evidence 2: info labels functionCount and version observed; function labels source derived; provenance.input.sha256 matches input.sha256", () => {
