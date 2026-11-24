@@ -16,7 +16,7 @@ function plan(args: readonly string[]): string[] {
 
 test("run-tests: path arguments select exactly those files (no typecheck, no full gate)", () => {
   const p = plan(["tests/gate/docs/test-count.test.ts"]);
-  assert.deepEqual(p, ["node --test tests/gate/docs/test-count.test.ts"]);
+  assert.deepEqual(p, ["node --import ./tools/test/default-timeouts.mjs --test-timeout=600000 --test tests/gate/docs/test-count.test.ts"]);
 });
 
 test("run-tests: no arguments runs typecheck, the full gate, then the e2e smoke file", () => {
