@@ -413,7 +413,7 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
     entryModule: splitResult.entryModuleId,
     appName: appName.name,
     appNameSource: appName.source,
-    reactNative: { version: rn.version, source: rn.source, consistentWithHbc: rn.consistentWithHbc, expectedRange: rn.expectedRange },
+    reactNative: { version: rn.version, source: rn.source, consistentWithHbc: rn.consistentWithHbc, expectedRange: rn.expectedRange, ...(rn.note === undefined ? {} : { note: rn.note }) },
     dependencies,
     modules: modulesForManifest,
     substitutions: plan.substitutions,

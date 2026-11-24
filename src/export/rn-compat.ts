@@ -11,6 +11,7 @@ interface PackageEntry {
 interface Table {
   readonly generatedOn: string;
   readonly rn: Readonly<Record<string, string>>; // "0.73" -> release date of that minor's last patch
+  readonly rnReact?: Readonly<Record<string, readonly [string, string]>>; // "0.78" -> [newest patch, its `react` peer range]
   readonly packages: Readonly<Record<string, PackageEntry>>;
 }
 let cache: Table | null = null;
@@ -109,4 +110,45 @@ export function rnCompatPin(pkg: string, rnVersion: string): RnPin | null {
   for (const [ym, v] of entry.months) if (ym <= month) byTime = v;
   if (byTime === null) return null;
   return { version: byTime, note: `newest version published by ${month} (end of the RN ${minor} line); declares no react-native peer range admitting ${rnVersion} (rn-compat.json, npm registry, ${t.generatedOn})` };
+}
+
+const minorOf = (v: string): string => v.split(".").slice(0, 2).join(".");
+function rnReactRows(): [string, string, string][] {
+  // [minor, newest patch, react peer range], ascending; drops the 1000.x placeholder line.
+  return Object.entries(table().rnReact ?? {})
+    .filter(([m]) => /^0\./.test(m))
+    .map(([m, [v, r]]) => [m, v, r] as [string, string, string])
+    .sort((a, b) => cmpVer(parseVer(a[1])!, parseVer(b[1])!));
+}
+
+/** The `react` peer range react-native `rnVersion`'s minor line declares (its newest patch), or null if unknown. */
+export function rnReactPeer(rnVersion: string): string | null {
+  return table().rnReact?.[minorOf(rnVersion)]?.[1] ?? null;
+}
+
+/** Whether react `reactVersion` installs beside react-native `rnVersion` (true when the table does not know the RN line). */
+export function reactFitsRn(reactVersion: string, rnVersion: string): boolean {
+  const range = rnReactPeer(rnVersion);
+  return range === null || parseVer(reactVersion) === null || satisfies(reactVersion, range);
+}
+
+/** The react-native release (newest patch of its minor) whose `react` peer admits
+ *  `reactVersion`, nearest by minor to `near` (ties: the older line), optionally
+ *  limited to `[minMinor, maxMinor]`. Null when no line admits it. */
+export function rnForReact(reactVersion: string, near: string | null, minMinor?: number, maxMinor?: number): RnPin | null {
+  const nearMinor = near !== null ? Number(minorOf(near).split(".")[1]) : null;
+  let best: [string, string, string] | null = null;
+  let bestDist = Infinity;
+  for (const row of rnReactRows()) {
+    const minor = Number(row[0].split(".")[1]);
+    if ((minMinor !== undefined && minor < minMinor) || (maxMinor !== undefined && minor > maxMinor)) continue;
+    if (!satisfies(reactVersion, row[2])) continue;
+    const dist = nearMinor === null ? -minor : Math.abs(minor - nearMinor);
+    if (dist < bestDist) {
+      best = row;
+      bestDist = dist;
+    }
+  }
+  if (best === null) return null;
+  return { version: best[1], note: `react ${reactVersion} needs RN whose react peer admits it; RN ${best[0]} declares react ${best[2]} (rn-compat.json rnReact, npm registry, ${table().generatedOn})` };
 }

@@ -4,7 +4,7 @@
 // not derivable from the bundle at all).
 import type { DepsReport } from "../deps/report.ts";
 import { expoCompatRange, expoSdkReactNative } from "./expo-compat.ts";
-import { rnCompatPin } from "./rn-compat.ts";
+import { reactFitsRn, rnCompatPin, rnForReact, rnReactPeer } from "./rn-compat.ts";
 import { tierConfidenceScore } from "./substitute.ts";
 import { newestRnVersionForHbc } from "../deps/report.ts";
 
@@ -72,6 +72,20 @@ export interface ReactNativeVersionResult {
   readonly source: "flag" | "bundle-string" | "deps-signature-match" | "hbc-range";
   readonly consistentWithHbc: boolean | null;
   readonly expectedRange: string | null;
+  /** Set when the detected version was moved to agree with stronger evidence (the bundle's own react version). */
+  readonly note?: string;
+}
+
+/** The react version the bundle's own constants carry, if any. */
+function bundleReactVersion(report: DepsReport): string | null {
+  const r = report.confirmedDeps.find((d) => d.package === "react" && d.versionEvidence === "bundle-string");
+  return r?.version ?? null;
+}
+
+/** "RN 0.72.x-0.87.x" -> [72, 87]. */
+function expectedMinorBounds(range: string | null): [number, number] | null {
+  const m = range !== null ? /0\.(\d+)\.x(?:\s*-\s*0\.(\d+)\.x)?/.exec(range) : null;
+  return m !== null ? [Number(m[1]), Number(m[2] ?? m[1])] : null;
 }
 
 /** §4.3: RN version in priority order — `--rn-version`, then
@@ -82,6 +96,24 @@ export function resolveReactNativeVersion(report: DepsReport, override: string |
     return { version: override, source: "flag", consistentWithHbc: report.reactNativeVersionConsistentWithHbc, expectedRange: report.reactNativeVersionExpectedRange };
   }
   if (report.reactNativeVersion !== null) {
+    // A signature-matched RN is weaker than the bundle's own react version
+    // constant: when the two cannot install together (npm ERESOLVE, e.g. react
+    // 19 beside RN 0.73's react@18.2.0 peer), move RN to the nearest line whose
+    // react peer admits the bundle's react.
+    const react = bundleReactVersion(report);
+    if (report.reactNativeVersionSource !== "bundle-string" && react !== null && !reactFitsRn(react, report.reactNativeVersion)) {
+      const bounds = expectedMinorBounds(report.reactNativeVersionExpectedRange);
+      const moved = rnForReact(react, report.reactNativeVersion, bounds?.[0], bounds?.[1]) ?? rnForReact(react, report.reactNativeVersion);
+      if (moved !== null) {
+        return {
+          version: moved.version,
+          source: "deps-signature-match",
+          consistentWithHbc: report.reactNativeVersionConsistentWithHbc,
+          expectedRange: report.reactNativeVersionExpectedRange,
+          note: `signature match ${report.reactNativeVersion} declares react ${rnReactPeer(report.reactNativeVersion)}, which excludes the bundle's react ${react}; ${moved.note}`,
+        };
+      }
+    }
     return {
       version: report.reactNativeVersion,
       // A signature-DB nearest match is NOT a confirmation: only the bundle's own
@@ -205,6 +237,17 @@ export function exportDependencies(report: DepsReport, rnVersion: string | null)
         out[name] = pin !== null ? { ...d, version: pin.version, note: pin.note } : { ...d, note: "unpinned: no version evidence and no compatibility table for this package" };
       }
     }
+  }
+  // react and react-native are peers of each other's line: keep the RN entry on
+  // the resolved RN, and move a weaker-evidenced react onto RN's react peer.
+  const rnDep = out["react-native"];
+  if (rnVersion !== null && rnDep !== undefined && rnDep.version !== rnVersion && rnDep.level !== "bundle-string") {
+    out["react-native"] = { ...rnDep, version: rnVersion, versionDerived: true, note: `signature version ${rnDep.version} replaced by the resolved react-native ${rnVersion} (EXPORT.json reactNative)` };
+  }
+  const reactDep = out["react"];
+  const reactPeer = rnVersion !== null ? rnReactPeer(rnVersion) : null;
+  if (reactDep !== undefined && reactPeer !== null && reactDep.level !== "bundle-string" && !(reactDep.version !== "*" && reactFitsRn(reactDep.version, rnVersion!))) {
+    out["react"] = { ...reactDep, version: reactPeer, versionDerived: true, note: `react-native ${rnVersion} declares peer react ${reactPeer}; ${reactDep.version} would not install beside it` };
   }
   // reanimated >= 4 hard-requires react-native-worklets as a peer; without it
   // `npm install` fails with ERESOLVE (or pulls a worklets built for another RN).

@@ -50,6 +50,14 @@ for (const [v, t] of Object.entries(rnDoc.time)) {
   const minor = v.split(".").slice(0, 2).join(".");
   if (rn[minor] === undefined || t > rn[minor]) rn[minor] = t.slice(0, 10);
 }
+// rnReact: per RN minor, its newest stable patch and that patch's `react` peer
+// range -- export resolves react and react-native jointly against it (a
+// react 19 bundle cannot install beside RN 0.73's `react@18.2.0` peer).
+const rnReact = {};
+for (const v of Object.keys(rnDoc.versions).filter((x) => STABLE.test(x)).sort(cmp)) {
+  const range = rnDoc.versions[v].peerDependencies?.react;
+  if (range !== undefined) rnReact[v.split(".").slice(0, 2).join(".")] = [v, range];
+}
 
 const packages = {};
 let next = 0;
@@ -78,7 +86,7 @@ async function worker() {
 await Promise.all(Array.from({ length: 6 }, worker));
 
 const sorted = Object.fromEntries(Object.entries(packages).sort(([a], [b]) => (a < b ? -1 : 1)));
-const body = { generatedOn: new Date().toISOString().slice(0, 10), source: "registry.npmjs.org packuments (peerDependencies, time)", sha256: createHash("sha256").update(JSON.stringify([rn, sorted])).digest("hex"), rn, packages: sorted };
+const body = { generatedOn: new Date().toISOString().slice(0, 10), source: "registry.npmjs.org packuments (peerDependencies, time)", sha256: createHash("sha256").update(JSON.stringify([rn, sorted])).digest("hex"), rn, rnReact, packages: sorted };
 const dest = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "export", "rn-compat.json");
 writeFileSync(dest, `${JSON.stringify(body)}\n`);
 console.log(`wrote ${dest}: ${Object.keys(sorted).length} packages of ${names.length}`);
