@@ -458,4 +458,17 @@ test("private-fields lift rule: an install becomes a field initialiser only when
   // A literal behind only register copies still lifts.
   out = run([setReg("r2", lit("0")), install(lit("1"))]);
   assert.deepEqual(out.initExpr, lit("1"));
+  // ...also from inside a labelled block, behind another field's guard.
+  const guard: Any = {
+    k: "if",
+    test: { k: "bin", op: "!==", left: { k: "call", callee: { k: "member", obj: id("Reflect"), prop: lit("getOwnPropertyDescriptor"), computed: false }, args: [{ k: "this" }, id("_e0_9")] }, right: lit("undefined") },
+    then: [{ k: "expr", expr: { k: "call", callee: id("__hbc_b_throwTypeError"), args: [lit('"Cannot initialize private field twice."')] } }],
+    else: [],
+  };
+  out = run([guard, { k: "labeled", label: "L0", body: [setReg("r2", lit("0")), install(lit("1")), { k: "break", label: "L0" }] }]);
+  assert.deepEqual(out.initExpr, lit("1"));
+  assert.doesNotMatch(JSON.stringify(out.body), /defineProperty/, "the nested install is removed with the lift");
+  // ...but not from under an `if`.
+  out = run([{ k: "if", test: id("c"), then: [install(lit("1"))], else: [] }]);
+  assert.deepEqual(out.initExpr, id("undefined"));
 });

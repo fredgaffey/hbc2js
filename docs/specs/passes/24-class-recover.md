@@ -589,10 +589,11 @@ lifted into `#x = <init>` only when both hold (`liftable` in
 1. **Closed.** The resolved initialiser reads no name the constructor binds or
    assigns -- registers, parameters, nested declarations, any env slot it
    writes -- and no `arguments`, `super` or `new.target`.
-2. **Ordered.** The install sits directly in the constructor body, and between
-   the constructor's start (or its `super(...)` call) and the install there is
-   nothing with an effect: only declarations, plain stores of a literal, name
-   or `this`, and other private installs of such a value. The store the value
+2. **Ordered.** The install sits in the constructor body or in labelled blocks
+   nested in it (never under an `if` or loop), and between the constructor's
+   start (or its `super(...)` call) and the install there is nothing with an
+   effect: only declarations, plain stores of a literal, name or `this`, other
+   private installs of such a value and their double-init guards. The store the value
    came from counts only if it is claimed (deleted with the install); an
    unclaimed source would be evaluated twice.
 

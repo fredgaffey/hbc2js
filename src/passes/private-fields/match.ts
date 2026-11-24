@@ -641,10 +641,10 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
   if (installStmt !== null && initExpr !== null && installValue !== null) {
     const install = installStmt;
     const claim = pendingClaim;
-    const withoutClaim = claim === null ? stmts : stmts.filter((t) => t !== claim);
+    const withoutClaim = claim === null ? stmts : dropThroughLabels(stmts, claim);
     if (liftable(withoutClaim, install, initExpr, body, params)) {
       // A real field initialiser: the install and the store it consumed go.
-      stmts = withoutClaim.filter((t) => t !== install);
+      stmts = dropThroughLabels(withoutClaim, install);
     } else {
       // Keep the value where the constructor computes it: declare `#x;` (an
       // `undefined` initialiser) and assign it in place, `this.#x = v;`. The
@@ -661,6 +661,22 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
   return { body: finalBody, initExpr };
 }
 
+/** `list` without `target`, which sits in it or in labelled blocks nested in
+ *  it (the only nesting `liftable` lifts out of). */
+function dropThroughLabels(list: readonly Stmt[], target: Stmt): readonly Stmt[] {
+  let changed = false;
+  const out: Stmt[] = [];
+  for (const t of list) {
+    if (t === target) { changed = true; continue; }
+    if (t.k === "labeled") {
+      const body = dropThroughLabels(t.body, target);
+      if (body !== t.body) { changed = true; out.push({ ...t, body }); continue; }
+    }
+    out.push(t);
+  }
+  return changed ? out : list;
+}
+
 /** A constructor's field install may become a class-field initialiser only
  *  when moving its value out of the constructor changes nothing (spec 24
  *  section 1.7.2):
@@ -670,20 +686,33 @@ export function foldInBody(body: readonly Stmt[], envName: string, displayName: 
  *     and no `arguments`/`super`/`new.target` -- a field initialiser runs in
  *     the class scope, where a constructor register does not exist (the
  *     `#e = new r3()` miscompile, docs/BUGS.md 2026-11-24).
- *  2. Ordered: the install sits directly in the constructor body (not under
- *     an `if`/label/loop), and nothing between the constructor's start (or
+ *  2. Ordered: the install sits in the constructor body or in labelled
+ *     blocks nested in it (never under an `if`/loop), and nothing between the constructor's start (or
  *     its `super(...)` call, after which a derived class's fields are
  *     initialised) and the install has an effect: only declarations, plain
- *     register copies of a literal/name/`this`, and other private installs of
- *     such a value. A field initialiser runs before the rest of the
+ *     register copies of a literal/name/`this`, other private installs of
+ *     such a value and their double-init guards. A field initialiser runs before the rest of the
  *     constructor body, so any effectful statement ahead of the install
  *     would otherwise swap order with the initialiser.
  *
  *  `stmts` is the folded body with the consumed value store already removed
  *  (the store is part of the initialiser when lifted). */
 function liftable(stmts: readonly Stmt[], install: Stmt, init: Expr, ctor: readonly Stmt[], params: readonly string[]): boolean {
-  const at = stmts.indexOf(install);
-  if (at < 0) return false;
+  // The lists from the constructor body down to the install, entering only
+  // labelled blocks (straight-line code: the install is reached whenever
+  // everything ahead of it in each list ran without a `break`).
+  const path: { readonly list: readonly Stmt[]; readonly at: number }[] = [];
+  const find = (list: readonly Stmt[]): boolean => {
+    for (let i = 0; i < list.length; i++) {
+      const t = list[i]!;
+      if (t === install || (t.k === "labeled" && find(t.body))) {
+        path.unshift({ list, at: i });
+        return true;
+      }
+    }
+    return false;
+  };
+  if (!find(stmts)) return false;
   const local = new Set<string>(params);
   local.add("arguments");
   walk(ctor, {
@@ -706,21 +735,33 @@ function liftable(stmts: readonly Stmt[], install: Stmt, init: Expr, ctor: reado
     },
   });
   if (!closed) return false;
-  const inertValue = (v: Expr): boolean => v.k === "lit" || v.k === "ident" || v.k === "this";
+  // A brand test on `this` (`Reflect.getOwnPropertyDescriptor(this, k) !==
+  // undefined`, the double-init guard's test when hermesc stores it first)
+  // reads nothing user-visible: `this` is never a proxy during construction.
+  const inertValue = (v: Expr): boolean => v.k === "lit" || v.k === "ident" || v.k === "this" || (hasOwnCall(v) !== null && hasOwnCall(v)![0]!.k === "this");
   const isSuperCall = (v: Expr): boolean => v.k === "call" && v.callee.k === "lit" && v.callee.text === "super";
-  for (let j = at - 1; j >= 0; j--) {
-    const t = stmts[j]!;
-    if (t.k === "comment" || t.k === "directive" || t.k === "decl") continue;
-    const store = simpleStore(t);
-    if (store !== null && isSuperCall(store.value)) return true;
-    if (t.k === "expr" && isSuperCall(t.expr)) return true;
-    if (store !== null && inertValue(store.value)) continue;
-    if (t.k === "expr") {
-      const args = objectCall(t.expr, "defineProperty");
-      const value = args !== null && args.length === 3 && isIdent(args[1]!) ? privateInstallValue(args) : null;
-      if (value !== null && inertValue(value)) continue;
+  // hermesc's double-init guard of another field (`if (<brand test on this>)
+  // { throwTypeError("Cannot initialize private field twice."); ... }`):
+  // during construction it never throws and reads nothing user-visible.
+  const isGuard = (t: Stmt): boolean => t.k === "if" && t.else.length === 0 && (isIdent(t.test) || hasOwnCall(t.test) !== null) && JSON.stringify(t.then).includes("Cannot initialize private field twice.");
+  // Innermost list first: walk back from the install, then from each
+  // enclosing labelled block, to the constructor start or a `super(...)`.
+  for (let level = path.length - 1; level >= 0; level--) {
+    const { list, at } = path[level]!;
+    for (let j = at - 1; j >= 0; j--) {
+      const t = list[j]!;
+      if (t.k === "comment" || t.k === "directive" || t.k === "decl" || isGuard(t)) continue;
+      const store = simpleStore(t);
+      if (store !== null && isSuperCall(store.value)) return true;
+      if (t.k === "expr" && isSuperCall(t.expr)) return true;
+      if (store !== null && inertValue(store.value)) continue;
+      if (t.k === "expr") {
+        const args = objectCall(t.expr, "defineProperty");
+        const value = args !== null && args.length === 3 && isIdent(args[1]!) ? privateInstallValue(args) : null;
+        if (value !== null && inertValue(value)) continue;
+      }
+      return false;
     }
-    return false;
   }
   return true;
 }
