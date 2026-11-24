@@ -1,0 +1,3 @@
+got k!1
+err Error: bad k
+42
