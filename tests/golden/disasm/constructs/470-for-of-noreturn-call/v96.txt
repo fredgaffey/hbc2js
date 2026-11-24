@@ -1,91 +1,98 @@
 ; hbc2js disassembly of 470-for-of-noreturn-call/v96.hbc
-; version=96 layout=C opcodeTable=hbc96 functions=5 strings=45 globalCodeIndex=0
-function #0 "global"  params=1 frame=18 env=0 flags=exc,dbg  @0x000002d0 size=325
-  .try T1..T2 -> L2 ; handler 0
+; version=96 layout=C opcodeTable=hbc96 functions=6 strings=46 globalCodeIndex=0
+function #0 "global"  params=1 frame=15 env=0 flags=dbg  @0x000002ec size=276
   0000  DeclareGlobalVar     s31 "api"
-  0005  DeclareGlobalVar     s40 "out"
+  0005  DeclareGlobalVar     s41 "out"
   000a  DeclareGlobalVar     s28 "lists"
   000f  DeclareGlobalVar     s23 "i"
-  0014  CreateEnvironment    r0
-  0016  CreateClosure        r0, r0, f1 ""
-  001b  LoadConstUndefined   r2
-  001d  Call1                r1, r0, r2
-  0021  GetGlobalObject      r0
-  0023  PutById              r0, r1, #c1, s31 "api"
-  0029  NewArray             r1, 0
-  002d  PutById              r0, r1, #c2, s40 "out"
-  0033  NewArray             r1, 6
-  0037  NewArrayWithBuffer   r3, 4, 4, lit@0x0001
-  003f  PutOwnByIndex        r1, r3, 0
-  0043  NewArrayWithBuffer   r3, 3, 3, lit@0x000b
-  004b  PutOwnByIndex        r1, r3, 1
-  004f  NewArray             r3, 0
-  0053  PutOwnByIndex        r1, r3, 2
-  0057  NewArrayWithBuffer   r3, 1, 1, lit@0x000f
-  005f  PutOwnByIndex        r1, r3, 3
-  0063  NewArrayWithBuffer   r3, 4, 4, lit@0x0011
-  006b  PutOwnByIndex        r1, r3, 4
-  006f  NewArrayWithBuffer   r3, 2, 2, lit@0x0017
-  0077  PutOwnByIndex        r1, r3, 5
-  007b  PutById              r0, r1, #c3, s28 "lists"
-  0081  LoadConstZero        r1
-  0083  PutById              r0, r1, #c4, s23 "i"
-  0089  GetByIdShort         r3, r0, #c1, s23 "i"
-  008e  GetByIdShort         r1, r0, #c2, s28 "lists"
-  0093  GetByIdShort         r1, r1, #c3, s24 "length"
-  0098  LoadConstString      r4, s7 ":"
-  009c  JNotLessLong         L4, r3, r1
-T1:
+  0014  DeclareGlobalVar     s36 "attempt"
+  0019  CreateEnvironment    r1
+  001b  CreateClosure        r2, r1, f1 "attempt"
+  0020  GetGlobalObject      r0
+  0022  PutById              r0, r2, #c1, s36 "attempt"
+  0028  CreateClosure        r1, r1, f2 ""
+  002d  LoadConstUndefined   r2
+  002f  Call1                r1, r1, r2
+  0033  PutById              r0, r1, #c2, s31 "api"
+  0039  NewArray             r1, 0
+  003d  PutById              r0, r1, #c3, s41 "out"
+  0043  NewArray             r1, 6
+  0047  NewArrayWithBuffer   r3, 4, 4, lit@0x0001
+  004f  PutOwnByIndex        r1, r3, 0
+  0053  NewArrayWithBuffer   r3, 3, 3, lit@0x000b
+  005b  PutOwnByIndex        r1, r3, 1
+  005f  NewArray             r3, 0
+  0063  PutOwnByIndex        r1, r3, 2
+  0067  NewArrayWithBuffer   r3, 1, 1, lit@0x000f
+  006f  PutOwnByIndex        r1, r3, 3
+  0073  NewArrayWithBuffer   r3, 4, 4, lit@0x0011
+  007b  PutOwnByIndex        r1, r3, 4
+  007f  NewArrayWithBuffer   r3, 2, 2, lit@0x0017
+  0087  PutOwnByIndex        r1, r3, 5
+  008b  PutById              r0, r1, #c4, s28 "lists"
+  0091  LoadConstZero        r1
+  0093  PutById              r0, r1, #c5, s23 "i"
+  0099  GetByIdShort         r3, r0, #c1, s23 "i"
+  009e  GetByIdShort         r1, r0, #c2, s28 "lists"
+  00a3  GetByIdShort         r1, r1, #c3, s24 "length"
+  00a8  JNotLess             L2, r3, r1
 L1:
-  00a3  GetByIdShort         r5, r0, #c4, s40 "out"
-  00a8  GetByIdShort         r3, r5, #c5, s43 "push"
-  00ad  TryGetById           r6, r0, #c6, s34 "String"
-  00b3  GetByIdShort         r8, r0, #c7, s31 "api"
-  00b8  GetByIdShort         r7, r8, #c8, s35 "checkNames"
-  00bd  GetByIdShort         r9, r0, #c2, s28 "lists"
-  00c2  GetByIdShort         r1, r0, #c1, s23 "i"
-  00c7  GetByVal             r1, r9, r1
-  00cb  Call2                r1, r7, r8, r1
-  00d0  Call2                r1, r6, r2, r1
-  00d5  Call2                r1, r3, r5, r1
-T2:
-  00da  Jmp                  L3
+  00ac  GetByIdShort         r4, r0, #c4, s41 "out"
+  00b1  GetByIdShort         r3, r4, #c5, s44 "push"
+  00b6  GetByIdShort         r5, r0, #c6, s36 "attempt"
+  00bb  GetByIdShort         r6, r0, #c2, s28 "lists"
+  00c0  GetByIdShort         r1, r0, #c1, s23 "i"
+  00c5  GetByVal             r1, r6, r1
+  00c9  Call2                r1, r5, r2, r1
+  00ce  Call2                r1, r3, r4, r1
+  00d3  GetByIdShort         r1, r0, #c1, s23 "i"
+  00d8  Inc                  r1, r1
+  00db  PutById              r0, r1, #c5, s23 "i"
+  00e1  GetByIdShort         r3, r0, #c1, s23 "i"
+  00e6  GetByIdShort         r1, r0, #c2, s28 "lists"
+  00eb  GetByIdShort         r1, r1, #c3, s24 "length"
+  00f0  JLess                L1, r3, r1
 L2:
-  00dc  Catch                r1
-  00de  GetByIdShort         r5, r0, #c4, s40 "out"
-  00e3  GetByIdShort         r3, r5, #c5, s43 "push"
-  00e8  GetByIdShort         r6, r1, #c9, s38 "constructor"
-  00ed  GetByIdShort         r6, r6, #c10, s20 "name"
-  00f2  Add                  r6, r6, r4
-  00f6  GetByIdShort         r1, r1, #c11, s36 "message"
-  00fb  Add                  r1, r6, r1
-  00ff  Call2                r1, r3, r5, r1
-L3:
-  0104  GetByIdShort         r1, r0, #c1, s23 "i"
-  0109  Inc                  r1, r1
-  010c  PutById              r0, r1, #c4, s23 "i"
-  0112  GetByIdShort         r3, r0, #c1, s23 "i"
-  0117  GetByIdShort         r1, r0, #c2, s28 "lists"
-  011c  GetByIdShort         r1, r1, #c3, s24 "length"
-  0121  JLess                L1, r3, r1
-L4:
-  0125  TryGetById           r1, r0, #c12, s41 "print"
-  012b  GetByIdShort         r4, r0, #c4, s40 "out"
-  0130  GetByIdShort         r3, r4, #c13, s39 "join"
-  0135  LoadConstString      r0, s4 ","
-  0139  Call2                r0, r3, r4, r0
-  013e  Call2                r0, r1, r2, r0
-  0143  Ret                  r0
+  00f4  TryGetById           r1, r0, #c7, s42 "print"
+  00fa  GetByIdShort         r4, r0, #c4, s41 "out"
+  00ff  GetByIdShort         r3, r4, #c8, s40 "join"
+  0104  LoadConstString      r0, s4 ","
+  0108  Call2                r0, r3, r4, r0
+  010d  Call2                r0, r1, r2, r0
+  0112  Ret                  r0
 
-function #1 ""  params=1 frame=4 env=5 flags=strict,dbg  @0x00000415 size=78
+function #1 "attempt"  params=2 frame=12 env=0 flags=exc,dbg  @0x00000400 size=66
+  .try T1..T2 -> L1 ; handler 0
+  0000  LoadParam            r0, 1
+T1:
+  0003  GetGlobalObject      r1
+  0005  TryGetById           r2, r1, #c1, s34 "String"
+  000b  GetByIdShort         r3, r1, #c2, s31 "api"
+  0010  GetByIdShort         r1, r3, #c3, s37 "checkNames"
+  0015  Call2                r1, r1, r3, r0
+  001a  LoadConstUndefined   r0
+  001c  Call2                r0, r2, r0, r1
+T2:
+  0021  Ret                  r0
+L1:
+  0023  Catch                r0
+  0025  GetByIdShort         r1, r0, #c4, s39 "constructor"
+  002a  GetByIdShort         r2, r1, #c5, s20 "name"
+  002f  LoadConstString      r1, s7 ":"
+  0033  Add                  r1, r2, r1
+  0037  GetByIdShort         r0, r0, #c6, s38 "message"
+  003c  Add                  r0, r1, r0
+  0040  Ret                  r0
+
+function #2 ""  params=1 frame=4 env=5 flags=strict,dbg  @0x00000442 size=78
   0000  CreateEnvironment    r1
-  0002  CreateClosure        r0, r1, f2 "fail"
+  0002  CreateClosure        r0, r1, f3 "fail"
   0007  StoreToEnvironment   r1, 3, r0
-  000b  CreateClosure        r0, r1, f3 "addUnique"
+  000b  CreateClosure        r0, r1, f4 "addUnique"
   0010  StoreToEnvironment   r1, 4, r0
   0014  GetGlobalObject      r0
   0016  TryGetById           r0, r0, #c1, s32 "Object"
-  001c  GetByIdShort         r0, r0, #c2, s42 "prototype"
+  001c  GetByIdShort         r0, r0, #c2, s43 "prototype"
   0021  GetByIdShort         r0, r0, #c3, s26 "hasOwnProperty"
   0026  StoreToEnvironment   r1, 0, r0
   002a  NewObject            r0
@@ -96,26 +103,26 @@ function #1 ""  params=1 frame=4 env=5 flags=strict,dbg  @0x00000415 size=78
   0039  PutNewOwnByIdShort   r0, r2, s30 "Map"
   003d  StoreToEnvironment   r1, 2, r0
   0041  NewObject            r0
-  0043  CreateClosure        r1, r1, f4 "checkNames"
-  0048  PutNewOwnByIdShort   r0, r1, s35 "checkNames"
+  0043  CreateClosure        r1, r1, f5 "checkNames"
+  0048  PutNewOwnByIdShort   r0, r1, s37 "checkNames"
   004c  Ret                  r0
 
-function #2 "fail"  params=2 frame=12 env=0 flags=strict,dbg  @0x00000463 size=53
+function #3 "fail"  params=2 frame=12 env=0 flags=strict,dbg  @0x00000490 size=53
   0000  GetGlobalObject      r0
   0002  TryGetById           r2, r0, #c1, s29 "TypeError"
   0008  TryGetById           r0, r0, #c2, s27 "HermesInternal"
-  000e  GetByIdShort         r3, r0, #c3, s37 "concat"
+  000e  GetByIdShort         r3, r0, #c3, s35 "concat"
   0013  LoadConstString      r1, s6 "bad name: "
   0017  LoadParam            r0, 1
   001a  Call2                r4, r3, r1, r0
-  001f  GetByIdShort         r1, r2, #c4, s42 "prototype"
+  001f  GetByIdShort         r1, r2, #c4, s43 "prototype"
   0024  CreateThis           r1, r1, r2
   0028  Mov                  r5, r1
   002b  Construct            r0, r2, 2
   002f  SelectObject         r0, r1, r0
   0033  Throw                r0
 
-function #3 "addUnique"  params=3 frame=15 env=0 flags=strict,dbg  @0x00000498 size=74
+function #4 "addUnique"  params=3 frame=15 env=0 flags=strict,dbg  @0x000004c5 size=74
   0000  LoadParam            r2, 1
   0003  LoadParam            r1, 2
   0006  GetByIdShort         r0, r2, #c1, s25 "has"
@@ -125,7 +132,7 @@ function #3 "addUnique"  params=3 frame=15 env=0 flags=strict,dbg  @0x00000498 s
   0016  LoadFromEnvironment  r4, r0, 3
   001a  GetGlobalObject      r0
   001c  TryGetById           r0, r0, #c2, s27 "HermesInternal"
-  0022  GetByIdShort         r5, r0, #c3, s37 "concat"
+  0022  GetByIdShort         r5, r0, #c3, s35 "concat"
   0027  LoadConstString      r3, s1 "duplicate '"
   002b  LoadConstString      r0, s2 "'"
   002f  Call3                r3, r5, r3, r1, r0
@@ -137,14 +144,14 @@ L1:
   0046  LoadConstUndefined   r0
   0048  Ret                  r0
 
-function #4 "checkNames"  params=2 frame=24 env=0 flags=strict,exc,dbg  @0x000004e2 size=190
+function #5 "checkNames"  params=2 frame=24 env=0 flags=strict,exc,dbg  @0x0000050f size=190
   .try T1..T2 -> L5 ; handler 0
   0000  LoadConstUndefined   r8
   0002  LoadConstUndefined   r0
   0004  LoadConstUndefined   r9
   0006  GetGlobalObject      r7
   0008  TryGetById           r1, r7, #c1, s33 "Set"
-  000e  GetByIdShort         r2, r1, #c2, s42 "prototype"
+  000e  GetByIdShort         r2, r1, #c2, s43 "prototype"
   0013  CreateThis           r2, r2, r1
   0017  Mov                  r17, r2
   001a  Construct            r1, r1, 1
@@ -180,7 +187,7 @@ L2:
   0081  LoadFromEnvironment  r11, r5, 3
   0085  Mov                  r12, r9
   0088  TryGetById           r10, r7, #c4, s27 "HermesInternal"
-  008e  GetByIdShort         r10, r10, #c5, s37 "concat"
+  008e  GetByIdShort         r10, r10, #c5, s35 "concat"
   0093  Call3                r10, r10, r4, r12, r3
   0099  Call2                r10, r11, r8, r10
 L3:
@@ -196,5 +203,5 @@ L5:
   00b2  IteratorClose        r2, 1
   00b5  Throw                r1
 L6:
-  00b7  GetByIdShort         r0, r0, #c6, s44 "size"
+  00b7  GetByIdShort         r0, r0, #c6, s45 "size"
   00bc  Ret                  r0

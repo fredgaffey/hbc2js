@@ -29,13 +29,14 @@ var api = (function () {
   }
   return { checkNames: checkNames };
 })();
-var out = [];
-var lists = [["a", "bb", 3, "ccc"], ["x", "Map", "y"], [], ["Object"], ["q", null, "rr", "q"], ["k", "kk"]];
-for (var i = 0; i < lists.length; i++) {
+function attempt(list) {
   try {
-    out.push(String(api.checkNames(lists[i])));
+    return String(api.checkNames(list));
   } catch (e) {
-    out.push(e.constructor.name + ":" + e.message);
+    return e.constructor.name + ":" + e.message;
   }
 }
+var out = [];
+var lists = [["a", "bb", 3, "ccc"], ["x", "Map", "y"], [], ["Object"], ["q", null, "rr", "q"], ["k", "kk"]];
+for (var i = 0; i < lists.length; i++) out.push(attempt(lists[i]));
 print(out.join(","));
