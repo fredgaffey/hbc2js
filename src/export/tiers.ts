@@ -18,6 +18,7 @@
 import type { ModuleAnalysis } from "../cfg/types.ts";
 import type { OverlayStore } from "../name-overlay/store.ts";
 import { renderModuleReadable } from "../split/render-module.ts";
+import type { SubtreeJob, SubtreeOptions, SubtreeResult } from "../emit/index.ts";
 import type { ExportTier } from "./index.ts";
 
 /** `src/split/index.ts`'s own marker text for a factory `decompileAllBodies`
@@ -72,18 +73,50 @@ export type ReadableOutcome =
 
 export type ReadableRenderOptions = Omit<RenderModuleTieredOptions, "flatText">;
 
-/** Rung 1 for a non-`flat` requested tier. Never throws. */
-export function renderReadableOutcome(opts: ReadableRenderOptions): ReadableOutcome {
+function readableRender(opts: ReadableRenderOptions, subtrees: SubtreeOptions | undefined): ReturnType<typeof renderModuleReadable> {
+  const target = targetReadableTier(opts.requestedTier, opts.rendersJsx);
+  return renderModuleReadable(opts.analysis, opts.factoryFn!, opts.moduleId, {
+    tier: target,
+    passes: target === "jsx" ? { optIn: ["jsx-recover"] } : {},
+    strictEnv: false,
+    moduleName: opts.moduleName,
+    ...(opts.store !== undefined ? { store: opts.store } : {}),
+    ...(subtrees !== undefined ? { subtrees } : {}),
+  });
+}
+
+/** Rung 1's nested emissions, for rendering one large module across
+ *  workers (spec 29 §12): every nested function for which `descend` is false
+ *  becomes a job (`renderReadableSubtree`); `null` when the module cannot be
+ *  split (no factory, or the walk itself failed -- render it whole). */
+export function probeReadableSubtrees(opts: ReadableRenderOptions, descend: (fn: number) => boolean): readonly SubtreeJob[] | null {
+  if (opts.factoryFn === null) return null;
+  try {
+    return readableRender(opts, { descend }).subtreeJobs ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** One job of `probeReadableSubtrees`; `null` when it threw (the assembly
+ *  then emits that function in place and fails or stubs exactly as the
+ *  whole render would). */
+export function renderReadableSubtree(opts: ReadableRenderOptions, job: SubtreeJob): SubtreeResult | null {
+  try {
+    return readableRender(opts, { root: job }).subtree ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Rung 1 for a non-`flat` requested tier. Never throws. With `subtrees`,
+ *  nested emissions matching a result are spliced in (`emitModule`'s
+ *  `subtrees.results`); the code is the same either way. */
+export function renderReadableOutcome(opts: ReadableRenderOptions, subtrees?: SubtreeOptions): ReadableOutcome {
   const target = targetReadableTier(opts.requestedTier, opts.rendersJsx);
   if (opts.factoryFn === null) return { ok: false, reason: "module has no resolved factory function index" };
   try {
-    const out = renderModuleReadable(opts.analysis, opts.factoryFn, opts.moduleId, {
-      tier: target,
-      passes: target === "jsx" ? { optIn: ["jsx-recover"] } : {},
-      strictEnv: false,
-      moduleName: opts.moduleName,
-      ...(opts.store !== undefined ? { store: opts.store } : {}),
-    });
+    const out = readableRender(opts, subtrees);
     return { ok: true, code: out.code, tier: target, helpersUsed: out.helpersUsed };
   } catch (e) {
     return { ok: false, reason: e instanceof Error ? e.message : String(e) };

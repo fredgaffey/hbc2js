@@ -49,7 +49,64 @@ export interface EmitOptions {
   readonly astPasses?: (fn: Stmt, cfg: FunctionCfg) => { readonly fn: Stmt; readonly diagnostics: readonly Diagnostic[] };
   readonly onlyFunction?: number;
   readonly returnAnnotations?: boolean;
+  /** Function-granularity parallel rendering of one scoped module (spec 29
+   *  §12, `src/export/render-pool.ts`), with `onlyFunction`. See
+   *  `SubtreeOptions`. */
+  readonly subtrees?: SubtreeOptions;
 }
+
+/** The exact inputs of one nested function's emission inside a scoped
+ *  render: the function, its copy context, and the set of functions being
+ *  emitted around it (`active`, insertion order kept). Everything else it
+ *  reads is the analysis, read-only. */
+export interface SubtreeJob {
+  readonly index: number;
+  readonly path: string;
+  readonly remap: readonly (readonly [number, number])[] | null;
+  readonly name: string | null;
+  readonly hosted: readonly string[] | null;
+  readonly active: readonly number[];
+}
+
+/** One nested function's emitted subtree plus every side effect its
+ *  emission had on the render's shared state, in order, so splicing it in
+ *  leaves that state exactly as emitting it in place would have. */
+export interface SubtreeResult {
+  readonly key: string;
+  readonly stmt: Stmt;
+  readonly helpers: readonly string[];
+  readonly diagnostics: readonly Diagnostic[];
+  readonly stubbed: number;
+  readonly instances: readonly string[];
+  readonly emitted: readonly number[];
+  readonly pendingDeleted: readonly string[];
+  readonly activeAfter: readonly number[];
+}
+
+export interface SubtreeOptions {
+  /** Probe: walk the render's nesting without emitting. A nested function
+   *  for which `descend` is true is entered (its own decompile runs, its
+   *  children are visited); every other one is recorded as a job and not
+   *  emitted. The render then stops; `emitModule` returns `subtreeJobs`. */
+  readonly descend?: (index: number) => boolean;
+  /** Emit exactly this one job and return its `SubtreeResult`. */
+  readonly root?: SubtreeJob;
+  /** Assembly: a nested emission whose inputs match a result's key (and
+   *  whose instances were not emitted yet) splices the result in instead
+   *  of emitting. Anything else is emitted in place, so a miss only costs
+   *  time. */
+  readonly results?: ReadonlyMap<string, SubtreeResult>;
+  /** Counts spliced results and misses (for tracing). */
+  readonly stats?: { hits: number; misses: number };
+}
+
+/** `SubtreeJob`'s identity: two emissions with equal keys are the same
+ *  computation. */
+export function subtreeKey(job: SubtreeJob): string {
+  return JSON.stringify([job.index, job.path, job.remap, job.name, job.hosted, job.active]);
+}
+
+class ProbeStop extends Error {}
 
 export interface LineMapEntry {
   readonly line: number;
@@ -63,6 +120,10 @@ export interface EmitResult {
   readonly lineMap: readonly LineMapEntry[];
   readonly diagnostics: readonly Diagnostic[];
   readonly stubbedFunctions: number;
+  /** `subtrees.descend` (probe): the nested emissions left to jobs. */
+  readonly subtreeJobs?: readonly SubtreeJob[];
+  /** `subtrees.root`: that job's result. */
+  readonly subtree?: SubtreeResult;
 }
 
 function stubFor(analysis: ModuleAnalysis, index: number, err: Hbc2jsError): Stmt {
@@ -850,6 +911,36 @@ function emitLayoutFor(analysis: ModuleAnalysis): EmitLayout {
   return layout;
 }
 
+/** Each function's bytecode size plus that of every function the emit
+ *  layout nests inside it: a cost estimate for `subtrees` splitting. */
+export function nestedBytecodeSizes(analysis: ModuleAnalysis): Map<number, number> {
+  const { childrenOf } = emitLayoutFor(analysis);
+  const fns = analysis.module.functions;
+  const out = new Map<number, number>();
+  const sizeOf = (root: number): number => {
+    const known = out.get(root);
+    if (known !== undefined) return known;
+    // Iterative post-order: nesting can be deeper than the JS stack.
+    const stack: [number, boolean][] = [[root, false]];
+    while (stack.length > 0) {
+      const [f, done] = stack.pop()!;
+      if (out.has(f)) continue;
+      const kids = childrenOf.get(f) ?? [];
+      if (done) {
+        let n = fns[f]?.header.bytecodeSizeInBytes ?? 0;
+        for (const k of kids) n += out.get(k) ?? 0;
+        out.set(f, n);
+        continue;
+      }
+      stack.push([f, true]);
+      for (const k of kids) if (!out.has(k)) stack.push([k, false]);
+    }
+    return out.get(root)!;
+  };
+  for (let i = 0; i < fns.length; i++) sizeOf(i);
+  return out;
+}
+
 export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): EmitResult {
   const mod = analysis.module;
   const provenanceComments = opts.provenanceComments ?? true;
@@ -927,6 +1018,50 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
       active.delete(index);
     }
   };
+  const sub = opts.subtrees;
+  const probeJobs: SubtreeJob[] = [];
+  const jobOf = (index: number, ctx: CopyCtx): SubtreeJob => ({
+    index,
+    path: ctx.path,
+    remap: ctx.remap === undefined ? null : [...ctx.remap],
+    name: ctx.name ?? null,
+    hosted: ctx.hosted === undefined ? null : [...ctx.hosted],
+    active: [...active],
+  });
+  /** Every nested emission (never the render's own target) goes through
+   *  here: the probe records or descends, the assembly splices results. */
+  const emitChild = (index: number, ctx: CopyCtx): Stmt => {
+    if (sub === undefined) return emitOne(index, ctx);
+    if (sub.descend !== undefined) {
+      if (!sub.descend(index)) {
+        probeJobs.push(jobOf(index, ctx));
+        return { k: "comment", text: "probe" };
+      }
+      try {
+        return emitOne(index, ctx);
+      } catch (e) {
+        if (e instanceof ProbeStop) return { k: "comment", text: "probe" };
+        throw e;
+      }
+    }
+    if (sub.results !== undefined) {
+      const r = sub.results.get(subtreeKey(jobOf(index, ctx)));
+      if (r !== undefined && !r.instances.some((i) => emittedInstances.has(i))) {
+        for (const i of r.instances) emittedInstances.add(i);
+        for (const f of r.emitted) emitted.add(f);
+        for (const k of r.pendingDeleted) pendingCopies.delete(k);
+        for (const h of r.helpers) usedHelpers.add(h);
+        for (const d of r.diagnostics) diagnostics.push(d);
+        stubbedFunctions += r.stubbed;
+        active.clear();
+        for (const a of r.activeAfter) active.add(a);
+        if (sub.stats !== undefined) sub.stats.hits++;
+        return r.stmt;
+      }
+      if (sub.stats !== undefined) sub.stats.misses++;
+    }
+    return emitOne(index, ctx);
+  };
   const emitBody = (index: number, ctx: CopyCtx): Stmt => {
     let cfg: FunctionCfg | undefined;
     // Per-function isolation (docs/BUGS.md integration/E_EMIT_UNSUPPORTED):
@@ -979,14 +1114,14 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
       const inlined = new Map<number, Stmt>();
       for (const child of kids) {
         if (perCreatorFns.has(child)) continue; // emitted in each creator, below
-        const body = emitOne(child, childCtx);
+        const body = emitChild(child, childCtx);
         if (inlineFunctions.has(child) && body.k === "func") inlined.set(child, body);
         else hoisted.push(body);
       }
       // fix-closure-identity-2: this function's own instance of a closure
       // several functions create (see `perCreatorInline`).
       for (const g of perCreatorInline.get(index) ?? []) {
-        const body = emitOne(g, { ...childCtx, path: `${ctx.path}/${index}m` });
+        const body = emitChild(g, { ...childCtx, path: `${ctx.path}/${index}m` });
         if (body.k === "func") inlined.set(g, body);
         else hoisted.push(body);
       }
@@ -994,7 +1129,7 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
       // remap, and are hoisted like any other child.
       for (const extra of extrasHere) {
         pendingCopies.delete(`${extra.fn}#${extra.copy.index}`);
-        const body = emitOne(extra.fn, {
+        const body = emitChild(extra.fn, {
           path: `${ctx.path}/${index}c${extra.fn}_${extra.copy.index}`,
           remap: composeRemap(ctx.remap, extra.copy.envRemap),
           name: extra.name,
@@ -1046,7 +1181,7 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
           const isExtra = copy !== undefined && copy.index > 0;
           if (isExtra) pendingCopies.delete(`${g}#${copy.index}`);
           hoisted.push(
-            emitOne(g, {
+            emitChild(g, {
               path: `${ctx.path}/${index}t${g}_${copy?.index ?? 0}`,
               remap: isExtra ? composeRemap(ctx.remap, copy.envRemap) : ctx.remap,
               hosted,
@@ -1055,6 +1190,9 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
           );
         }
       }
+      // Probe: this function's nested emissions are all visited; its own
+      // emission is not wanted.
+      if (sub?.descend !== undefined) throw new ProbeStop();
       let returnAnnotation: string | undefined;
       if (opts.returnAnnotations !== false) {
         const isAsync = isAsyncFunction(analysis, index);
@@ -1154,6 +1292,39 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
         extras.push(name);
       }
       hosted = new Set<string>([...inherited, ...extras]);
+    }
+    if (sub?.root !== undefined) {
+      const root = sub.root;
+      active.clear();
+      for (const a of root.active) active.add(a);
+      const pendingBefore = new Set(pendingCopies);
+      const diagnosticsBefore = diagnostics.length;
+      const stmt = emitOne(root.index, {
+        path: root.path,
+        remap: root.remap === null ? undefined : new Map(root.remap),
+        ...(root.name !== null ? { name: root.name } : {}),
+        ...(root.hosted !== null ? { hosted: new Set(root.hosted) } : {}),
+      });
+      const subtree: SubtreeResult = {
+        key: subtreeKey(root),
+        stmt,
+        helpers: [...usedHelpers],
+        diagnostics: diagnostics.slice(diagnosticsBefore),
+        stubbed: stubbedFunctions,
+        instances: [...emittedInstances],
+        emitted: [...emitted],
+        pendingDeleted: [...pendingBefore].filter((k) => !pendingCopies.has(k)),
+        activeAfter: [...active],
+      };
+      return { code: "", helpersUsed: [], lineMap: [], diagnostics, stubbedFunctions, subtree };
+    }
+    if (sub?.descend !== undefined) {
+      try {
+        emitOne(target, { path: "", remap: undefined, hosted });
+      } catch (e) {
+        if (!(e instanceof ProbeStop)) throw e;
+      }
+      return { code: "", helpersUsed: [], lineMap: [], diagnostics, stubbedFunctions, subtreeJobs: probeJobs };
     }
     const node = emitOne(target, { path: "", remap: undefined, hosted });
     const prelude = helperPrelude(usedHelpers);
