@@ -26,3 +26,9 @@ export function progress(message: string): void {
   process.stderr.write(`${label}: ${message} [+${sec(now - lastAt)}s, ${sec(now - startedAt)}s]\n`);
   lastAt = now;
 }
+
+/** Whether progress lines are on (a worker thread that runs part of a
+ *  command mirrors the main thread's setting; see src/export/deps-worker.ts). */
+export function progressEnabled(): boolean {
+  return enabled;
+}

@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
-import { progress } from "../util/progress.ts";
+import { progress, progressEnabled } from "../util/progress.ts";
+import { Worker } from "node:worker_threads";
+import { siblingWorkerPath } from "../util/worker-path.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { ErrorCode, Hbc2jsError } from "../errors.ts";
@@ -16,6 +18,7 @@ import { rewriteModuleFile, wrapReadableModule } from "./rewrite.ts";
 import { renderModuleTiered, tieredFromOutcome } from "./tiers.ts";
 import type { ReadableOutcome } from "./tiers.ts";
 import { planRenderWorkers, renderModulesInPool } from "./render-pool.ts";
+import { resolveWorkerCount } from "../parallel/pool.ts";
 import type { RenderJob } from "./render-pool.ts";
 import type { ExportManifestModule, ExportManifestUnresolved } from "./manifest.ts";
 import { buildExportManifest } from "./manifest.ts";
@@ -64,6 +67,31 @@ export interface ExportResult {
   readonly manifest: Record<string, unknown>;
 }
 
+function runDepsOnWorker(bundlePath: string): Promise<DepsReport> {
+  return new Promise((resolve, reject) => {
+    const w = new Worker(siblingWorkerPath("deps-worker", import.meta.url), { workerData: { bundlePath, progress: progressEnabled() } });
+    let settled = false;
+    w.once("message", (msg: { ok: true; report: DepsReport } | { ok: false; message: string; code?: string }) => {
+      settled = true;
+      if (msg.ok) resolve(msg.report);
+      else if (msg.code !== undefined && (Object.values(ErrorCode) as string[]).includes(msg.code)) {
+        // Same class and exit code as an in-process failure; the message is
+        // already formatted by the worker's Hbc2jsError.
+        const e = new Hbc2jsError(msg.code as ErrorCode, "");
+        e.message = msg.message;
+        reject(e);
+      } else reject(new Error(msg.message));
+      void w.terminate();
+    });
+    w.once("error", (e) => {
+      if (!settled) (settled = true), reject(e);
+    });
+    w.once("exit", (code) => {
+      if (!settled) (settled = true), reject(new Error(`hbc2js export: deps worker exited with code ${code}`));
+    });
+  });
+}
+
 /** `hbc2js export <bundle.hbc> --out <dir>` (spec 29 §2-§4). Builds the
  *  whole file map in memory; write it with `writeExportResult`. */
 export async function exportProject(bundlePath: string, opts: ExportOptions = {}): Promise<ExportResult> {
@@ -79,6 +107,10 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   // per module (`renderModuleTiered` -> `renderModuleReadable`, lane item 4)
   // instead of one whole-bundle pass-ladder emit -- so one bad function's
   // pass-ladder failure downgrades ONLY that module, never the whole run.
+  // With more than one thread available the offline deps stage runs on a
+  // worker, overlapping the split (it re-reads the bundle itself).
+  const depsInWorker = opts.depsReport === undefined && resolveWorkerCount(opts.workers) > 1 ? runDepsOnWorker(bundlePath) : undefined;
+  depsInWorker?.catch(() => undefined); // awaited below; never an unhandled rejection meanwhile
   progress("splitting the bundle into modules (decompiling every function)");
   const splitResult = splitProject(new Uint8Array(bytes), { moduleName });
 
@@ -88,8 +120,8 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   // has a `--confirm`ed report. This is a second, cheap bytecode-inventory
   // scan (`buildInventory`), not a second full decompile — `splitProject`
   // above remains the one expensive parse.
-  progress(`split: ${splitResult.modules.length} modules; ${opts.depsReport !== undefined ? "using the supplied deps report" : "running deps (offline)"}`);
-  const report: DepsReport = opts.depsReport ?? (await runDeps(bundlePath, { offline: true })).report;
+  progress(`split: ${splitResult.modules.length} modules; ${opts.depsReport !== undefined ? "using the supplied deps report" : depsInWorker !== undefined ? "waiting for deps (offline, running alongside the split)" : "running deps (offline)"}`);
+  const report: DepsReport = opts.depsReport ?? (depsInWorker !== undefined ? await depsInWorker : (await runDeps(bundlePath, { offline: true })).report);
 
   // §7.1/§7.2's own inputs (`DepEdge[]`, `rendersJsx`) -- reuses
   // `splitResult.module`/`.analysis` (`analyseForArtifact`), no second parse.
