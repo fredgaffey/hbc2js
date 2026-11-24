@@ -3,7 +3,7 @@
 // look at it, plus the toolchain table §4.3 requires (the build toolchain is
 // not derivable from the bundle at all).
 import type { DepsReport } from "../deps/report.ts";
-import { expoCompatRange, expoSdkReactNative } from "./expo-compat.ts";
+import { expoCompatRange, expoSdkExpoVersion, expoSdkReactNative } from "./expo-compat.ts";
 import { reactFitsRn, rnCompatPin, rnForReact, rnReactPeer } from "./rn-compat.ts";
 import { tierConfidenceScore } from "./substitute.ts";
 import { newestRnVersionForHbc } from "../deps/report.ts";
@@ -254,6 +254,15 @@ export function exportDependencies(report: DepsReport, rnVersion: string | null)
       }
     }
   }
+  // `expo` itself is not in its own bundledNativeModules.json, so a signature
+  // version survived even when the RN pins another SDK (corpus a10: expo
+  // 52.0.28 beside SDK 55's expo-* ranges; a06: 51.0.29 under RN 0.83). The
+  // table was read from one `expo` release: pin exactly that one.
+  const expoDep = out["expo"];
+  const expoVersion = useTable ? expoSdkExpoVersion(sdk!) : null;
+  if (expoDep !== undefined && expoVersion !== null && expoDep.level !== "bundle-string" && expoDep.version !== expoVersion) {
+    out["expo"] = { ...expoDep, version: expoVersion, versionDerived: true, note: `${expoDep.versionDerived ? "no version evidence" : `signature version ${expoDep.version}`}; Expo SDK ${sdk} (the detected RN's SDK) is expo ${expoVersion}, the release the SDK table was read from` };
+  }
   // Every RN app needs react-native and react themselves; a bundle whose deps
   // pass matched neither (corpus a02: 48k functions, no confirmed deps) still
   // gets them, or `npx react-native bundle` has no `bundle` command at all.
@@ -312,7 +321,19 @@ export function buildPackageJson(opts: {
     },
     dependencies,
     devDependencies: TOOLCHAIN_FOR_RN(opts.rnVersion),
+    // Every package in the tree sees the app's own react / react-native: a
+    // dependency whose (often optional) peer range names another line no
+    // longer fails `npm install` with ERESOLVE (corpus a06: ai@2.2.32's
+    // optional peer react ^18.2.0 beside RN 0.83's react 19).
+    ...frameworkOverrides(dependencies),
   };
+}
+
+/** npm `overrides` pinning react and react-native, wherever they appear in
+ *  the tree (peer edges included), to the root's own spec (`$name`). */
+export function frameworkOverrides(dependencies: Readonly<Record<string, string>>): { overrides?: Record<string, string> } {
+  const names = ["react", "react-native"].filter((n) => dependencies[n] !== undefined);
+  return names.length === 0 ? {} : { overrides: Object.fromEntries(names.map((n) => [n, "$" + n])) };
 }
 
 export function buildAppJson(name: string): Record<string, unknown> {

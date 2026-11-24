@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const PINS = { 50: "50.0.21", 51: "51.0.39", 52: "52.0.49", 53: "53.0.27", 54: "54.0.38", 55: "55.0.5" };
+const PINS = { 50: "50.0.21", 51: "51.0.39", 52: "52.0.49", 53: "53.0.27", 54: "54.0.38", 55: "55.0.32" };
 const out = {};
 for (const [sdk, ver] of Object.entries(PINS)) {
   const dir = mkdtempSync(join(tmpdir(), "expo-pack-"));

@@ -25,3 +25,9 @@ export function expoCompatRange(sdk: number, pkg: string): string | null {
 export function expoSdkReactNative(sdk: number): string | null {
   return table()[String(sdk)]?.modules["react-native"] ?? null;
 }
+
+/** The `expo` package version the SDK's table was read from (its latest patch
+ *  when generated): the table's ranges are consistent with that release. */
+export function expoSdkExpoVersion(sdk: number): string | null {
+  return table()[String(sdk)]?.expoVersion ?? null;
+}

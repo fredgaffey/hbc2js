@@ -84,3 +84,17 @@ test("an RN known from the bundle's own constants pulls a weaker react onto its 
   assert.equal(deps["react"]!.version, "^18.2.0");
   assert.match(deps["react"]!.note!, /peer react \^18\.2\.0/);
 });
+
+test("corpus a08: a wildcard react-native peer admits only versions published by the end of the RN line", () => {
+  // RN 0.66.4: the newest reanimated / gesture-handler / react-navigation
+  // declare peer react-native `*`; picking them gave reanimated 4.2.2 and
+  // @react-navigation/native 7.5.2 (peer react >= 18.2) beside react 17.
+  for (const pkg of ["react-native-reanimated", "react-native-gesture-handler", "@react-navigation/native", "@react-native-async-storage/async-storage"]) {
+    const pin = rnCompatPin(pkg, "0.66.4");
+    assert.ok(pin !== null, pkg);
+    const major = Number(pin.version.split(".")[0]);
+    const limit: Record<string, number> = { "react-native-reanimated": 2, "react-native-gesture-handler": 2, "@react-navigation/native": 6, "@react-native-async-storage/async-storage": 2 }; // 2.x declares >=0.65 <1.0 itself
+    assert.ok(major <= limit[pkg]!, `${pkg} ${pin.version} (${pin.note})`);
+  }
+  assert.match(rnCompatPin("@react-navigation/native", "0.83.2")?.version ?? "", /^7\./); // a modern RN keeps the 7.x line
+});
