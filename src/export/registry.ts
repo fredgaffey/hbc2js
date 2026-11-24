@@ -93,6 +93,10 @@ export function buildRegistryJs(substitutions: ReadonlyMap<number, string> = new
   lines.push(`  var requireFn = function (depId) { return r(depId); };`);
   lines.push(`  requireFn.importDefault = importDefault;`);
   lines.push(`  requireFn.importAll = importAll;`);
+  // A plain call, as Metro's require makes it: a sloppy factory's `this` is
+  // then the global object (a UMD polyfill installs onto it). `entry.factory(...)`
+  // would bind `this` to the registry entry (docs/BUGS.md, BlueWallet TextDecoder).
+  lines.push(`  var factory = entry.factory;`);
   if (instrument) {
     // Spec 33 §4(b): the boot-proof probe, keyed by ORIGINAL module id. A
     // host that defines \`__HBC_BOOT_PROBE__\` (the headless boot proof)
@@ -102,7 +106,7 @@ export function buildRegistryJs(substitutions: ReadonlyMap<number, string> = new
     lines.push(`  if (__hbc_probe !== null) __hbc_probe("enter", id);`);
     lines.push(`  var __hbc_t0 = __hbc_now();`);
     lines.push(`  try {`);
-    lines.push(`    entry.factory(globalThis, requireFn, importDefault, importAll, mod, mod.exports, entry.deps);`);
+    lines.push(`    factory(globalThis, requireFn, importDefault, importAll, mod, mod.exports, entry.deps);`);
     lines.push(`  } catch (e) {`);
     lines.push(`    if (__hbc_probe !== null) __hbc_probe("throw", id, e);`);
     lines.push(`    throw e;`);
@@ -118,7 +122,7 @@ export function buildRegistryJs(substitutions: ReadonlyMap<number, string> = new
     lines.push(`    if (__hbc_ring.length >= __HBC_BOOT_RING_CAPACITY__) __hbc_flushBootTimings();`);
     lines.push(`  }`);
   } else {
-    lines.push(`  entry.factory(globalThis, requireFn, importDefault, importAll, mod, mod.exports, entry.deps);`);
+    lines.push(`  factory(globalThis, requireFn, importDefault, importAll, mod, mod.exports, entry.deps);`);
   }
   lines.push(`  return mod.exports;`);
   lines.push(`}`);

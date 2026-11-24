@@ -81,7 +81,10 @@ function buildLoaderIndexJs(modules: readonly SplitModuleInfo[], resolvedEntry: 
   lines.push(`  var requireFn = function (depId) { return __r(depId); };`);
   lines.push(`  requireFn.importDefault = __hbc_importDefault;`);
   lines.push(`  requireFn.importAll = __hbc_importAll;`);
-  lines.push(`  entry.factory(globalThis, requireFn, __hbc_importDefault, __hbc_importAll, mod, mod.exports, entry.deps);`);
+  // A plain call (Metro's protocol): a sloppy factory's `this` is the global
+  // object, not the loader entry (docs/BUGS.md, BlueWallet TextDecoder).
+  lines.push(`  var factory = entry.factory;`);
+  lines.push(`  factory(globalThis, requireFn, __hbc_importDefault, __hbc_importAll, mod, mod.exports, entry.deps);`);
   lines.push(`  // Optional test/instrumentation hook (tests/gate/split/loadable.test.ts):`);
   lines.push(`  // a no-op unless something defines it before requiring index.js.`);
   lines.push(`  if (typeof globalThis.__hbc_split_onModuleRun === "function") globalThis.__hbc_split_onModuleRun(id);`);

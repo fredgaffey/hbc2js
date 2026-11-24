@@ -39,9 +39,9 @@ test("T7: --instrument=modules wraps registry.js's factory call with a timer int
     assert.match(registry, /console\.log/, "flush does not go through console.log");
 
     // The timer must actually straddle the real factory call -- one clock
-    // read, the unchanged `entry.factory(...)` call, another clock read --
+    // read, the unchanged plain `factory(...)` call, another clock read --
     // never a rewritten/replaced factory invocation.
-    const factoryCallAt = registry.indexOf("entry.factory(globalThis, requireFn, importDefault, importAll, mod, mod.exports, entry.deps);");
+    const factoryCallAt = registry.indexOf("  factory(globalThis, requireFn, importDefault, importAll, mod, mod.exports, entry.deps);");
     assert.ok(factoryCallAt >= 0, "entry.factory(...) call site is unchanged (semantics must not move)");
     const beforeClockAt = registry.lastIndexOf("__hbc_now()", factoryCallAt);
     const afterClockAt = registry.indexOf("__hbc_now()", factoryCallAt + 1);
