@@ -26,7 +26,7 @@ test("app-fuzz gen: same seed byte-identical, different seed differs, configs de
 test("app-fuzz gen: every template is reachable and parts render independently", () => {
   const seen = new Set(planShapes("cov", 400).flatMap((f) => f.parts.map((p) => p.t)));
   assert.deepEqual([...seen].sort(), [...TEMPLATE_NAMES].sort());
-  const [f] = planShapes("ind", 1, { size: 3 });
+  const f = planShapes("ind", 1, { size: 3 })[0]!;
   assert.ok(f.parts.length >= 3);
   const full = renderFunction(f.name, f.parts).src;
   const dropped = renderFunction(f.name, f.parts.slice(1)).src;
