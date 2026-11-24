@@ -1,0 +1,877 @@
+; hbc2js disassembly of 500-try-ladder-deep/v94.hbc
+; version=94 layout=C opcodeTable=hbc94 functions=4 strings=38 globalCodeIndex=0
+function #0 "global"  params=1 frame=15 env=0 flags=dbg  @0x00000214 size=152
+  0000  DeclareGlobalVar     s26 "steps"
+  0005  DeclareGlobalVar     s28 "run"
+  000a  CreateEnvironment    r1
+  000c  CreateGeneratorClosure r2, r1, f1 "steps"
+  0011  GetGlobalObject      r0
+  0013  PutById              r0, r2, #c1, s26 "steps"
+  0019  CreateClosure        r1, r1, f3 "run"
+  001e  PutById              r0, r1, #c2, s28 "run"
+  0024  TryGetById           r3, r0, #c1, s34 "print"
+  002a  GetByIdShort         r4, r0, #c2, s28 "run"
+  002f  LoadConstUndefined   r2
+  0031  LoadConstInt         r1, -1
+  0037  Call3                r1, r4, r2, r1, r1
+  003d  Call2                r1, r3, r2, r1
+  0042  TryGetById           r3, r0, #c1, s34 "print"
+  0048  GetByIdShort         r5, r0, #c2, s28 "run"
+  004d  LoadConstUInt8       r4, 4
+  0050  LoadConstUInt8       r1, 7
+  0053  Call3                r1, r5, r2, r4, r1
+  0059  Call2                r1, r3, r2, r1
+  005e  TryGetById           r3, r0, #c1, s34 "print"
+  0064  GetByIdShort         r5, r0, #c2, s28 "run"
+  0069  LoadConstUInt8       r4, 19
+  006c  LoadConstUInt8       r1, 1
+  006f  Call3                r1, r5, r2, r4, r1
+  0075  Call2                r1, r3, r2, r1
+  007a  TryGetById           r1, r0, #c1, s34 "print"
+  0080  GetByIdShort         r4, r0, #c2, s28 "run"
+  0085  LoadConstUInt8       r3, 10
+  0088  LoadConstUInt8       r0, 20
+  008b  Call3                r0, r4, r2, r3, r0
+  0091  Call2                r0, r1, r2, r0
+  0096  Ret                  r0
+
+function #1 "steps"  params=2 frame=1 env=0 flags=nc  @0x000002ac size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f2 "?anon_0_steps"
+  0007  Ret                  r0
+
+function #2 "?anon_0_steps"  params=2 frame=16 env=0 flags=exc,dbg  @0x000002b5 size=1981
+  .try T1..T2 -> L4 ; handler 0
+  .try T3..T4 -> L4 ; handler 1
+  .try T5..T6 -> L9 ; handler 2
+  .try T7..T8 -> L9 ; handler 3
+  .try T9..T10 -> L14 ; handler 4
+  .try T11..T12 -> L14 ; handler 5
+  .try T13..T14 -> L19 ; handler 6
+  .try T15..T16 -> L19 ; handler 7
+  .try T17..T18 -> L24 ; handler 8
+  .try T19..T20 -> L24 ; handler 9
+  .try T21..T22 -> L29 ; handler 10
+  .try T23..T24 -> L29 ; handler 11
+  .try T25..T26 -> L34 ; handler 12
+  .try T27..T28 -> L34 ; handler 13
+  .try T29..T30 -> L39 ; handler 14
+  .try T31..T32 -> L39 ; handler 15
+  .try T33..T34 -> L44 ; handler 16
+  .try T35..T36 -> L44 ; handler 17
+  .try T37..T38 -> L49 ; handler 18
+  .try T39..T40 -> L49 ; handler 19
+  .try T41..T42 -> L54 ; handler 20
+  .try T43..T44 -> L54 ; handler 21
+  .try T45..T46 -> L59 ; handler 22
+  .try T47..T48 -> L59 ; handler 23
+  .try T49..T50 -> L64 ; handler 24
+  .try T51..T52 -> L64 ; handler 25
+  .try T53..T54 -> L69 ; handler 26
+  .try T55..T56 -> L69 ; handler 27
+  .try T57..T58 -> L74 ; handler 28
+  .try T59..T60 -> L74 ; handler 29
+  .try T61..T62 -> L79 ; handler 30
+  .try T63..T64 -> L79 ; handler 31
+  .try T65..T66 -> L84 ; handler 32
+  .try T67..T68 -> L84 ; handler 33
+  .try T69..T70 -> L89 ; handler 34
+  .try T71..T72 -> L89 ; handler 35
+  .try T73..T74 -> L94 ; handler 36
+  .try T75..T76 -> L94 ; handler 37
+  .try T77..T78 -> L99 ; handler 38
+  .try T79..T80 -> L99 ; handler 39
+  0000  StartGenerator
+  0001  LoadParam            r4, 1
+  0004  LoadConstUndefined   r1
+  0006  ResumeGenerator      r0, r2
+  0009  JmpTrueLong          L101, r2
+  000f  NewArray             r1, 0
+T1:
+  0013  Mov                  r6, r1
+  0016  GetByIdShort         r5, r6, #c1, s36 "push"
+  001b  LoadConstZero        r3
+  001d  SaveGenerator        L1
+  001f  Ret                  r3
+L1:
+  0021  ResumeGenerator      r2, r7
+  0024  JmpTrue              L3, r7
+  0027  Call2                r5, r5, r6, r2
+  002c  JStrictEqual         L2, r4, r3
+T2:
+  0030  Jmp                  L5
+T3:
+L2:
+  0032  GetGlobalObject      r3
+  0034  TryGetById           r6, r3, #c2, s27 "Error"
+  003a  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  003f  CreateThis           r5, r3, r6
+  0043  LoadConstString      r8, s5 "f0"
+  0047  Mov                  r9, r5
+  004a  Construct            r3, r6, 2
+  004e  SelectObject         r3, r5, r3
+  0052  Throw                r3
+T4:
+L3:
+  0054  CompleteGenerator
+  0055  Ret                  r2
+L4:
+  0057  Catch                r2
+  0059  Mov                  r5, r1
+  005c  GetByIdShort         r3, r5, #c1, s36 "push"
+  0061  GetByIdShort         r6, r2, #c4, s33 "message"
+  0066  LoadConstString      r2, s4 "c"
+  006a  Add                  r2, r2, r6
+  006e  Call2                r2, r3, r5, r2
+T5:
+L5:
+  0073  Mov                  r6, r1
+  0076  GetByIdShort         r5, r6, #c1, s36 "push"
+  007b  LoadConstUInt8       r3, 1
+  007e  SaveGenerator        L6
+  0080  Ret                  r3
+L6:
+  0082  ResumeGenerator      r2, r7
+  0085  JmpTrue              L8, r7
+  0088  Call2                r5, r5, r6, r2
+  008d  JStrictEqual         L7, r4, r3
+T6:
+  0091  Jmp                  L10
+T7:
+L7:
+  0093  GetGlobalObject      r3
+  0095  TryGetById           r6, r3, #c2, s27 "Error"
+  009b  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  00a0  CreateThis           r5, r3, r6
+  00a4  LoadConstString      r8, s6 "f1"
+  00a8  Mov                  r9, r5
+  00ab  Construct            r3, r6, 2
+  00af  SelectObject         r3, r5, r3
+  00b3  Throw                r3
+T8:
+L8:
+  00b5  CompleteGenerator
+  00b6  Ret                  r2
+L9:
+  00b8  Catch                r2
+  00ba  Mov                  r5, r1
+  00bd  GetByIdShort         r3, r5, #c1, s36 "push"
+  00c2  GetByIdShort         r6, r2, #c4, s33 "message"
+  00c7  LoadConstString      r2, s4 "c"
+  00cb  Add                  r2, r2, r6
+  00cf  Call2                r2, r3, r5, r2
+T9:
+L10:
+  00d4  Mov                  r6, r1
+  00d7  GetByIdShort         r5, r6, #c1, s36 "push"
+  00dc  LoadConstUInt8       r3, 2
+  00df  SaveGenerator        L11
+  00e1  Ret                  r3
+L11:
+  00e3  ResumeGenerator      r2, r7
+  00e6  JmpTrue              L13, r7
+  00e9  Call2                r5, r5, r6, r2
+  00ee  JStrictEqual         L12, r4, r3
+T10:
+  00f2  Jmp                  L15
+T11:
+L12:
+  00f4  GetGlobalObject      r3
+  00f6  TryGetById           r6, r3, #c2, s27 "Error"
+  00fc  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  0101  CreateThis           r5, r3, r6
+  0105  LoadConstString      r8, s17 "f2"
+  0109  Mov                  r9, r5
+  010c  Construct            r3, r6, 2
+  0110  SelectObject         r3, r5, r3
+  0114  Throw                r3
+T12:
+L13:
+  0116  CompleteGenerator
+  0117  Ret                  r2
+L14:
+  0119  Catch                r2
+  011b  Mov                  r5, r1
+  011e  GetByIdShort         r3, r5, #c1, s36 "push"
+  0123  GetByIdShort         r6, r2, #c4, s33 "message"
+  0128  LoadConstString      r2, s4 "c"
+  012c  Add                  r2, r2, r6
+  0130  Call2                r2, r3, r5, r2
+T13:
+L15:
+  0135  Mov                  r6, r1
+  0138  GetByIdShort         r5, r6, #c1, s36 "push"
+  013d  LoadConstUInt8       r3, 3
+  0140  SaveGenerator        L16
+  0142  Ret                  r3
+L16:
+  0144  ResumeGenerator      r2, r7
+  0147  JmpTrue              L18, r7
+  014a  Call2                r5, r5, r6, r2
+  014f  JStrictEqual         L17, r4, r3
+T14:
+  0153  Jmp                  L20
+T15:
+L17:
+  0155  GetGlobalObject      r3
+  0157  TryGetById           r6, r3, #c2, s27 "Error"
+  015d  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  0162  CreateThis           r5, r3, r6
+  0166  LoadConstString      r8, s18 "f3"
+  016a  Mov                  r9, r5
+  016d  Construct            r3, r6, 2
+  0171  SelectObject         r3, r5, r3
+  0175  Throw                r3
+T16:
+L18:
+  0177  CompleteGenerator
+  0178  Ret                  r2
+L19:
+  017a  Catch                r2
+  017c  Mov                  r5, r1
+  017f  GetByIdShort         r3, r5, #c1, s36 "push"
+  0184  GetByIdShort         r6, r2, #c4, s33 "message"
+  0189  LoadConstString      r2, s4 "c"
+  018d  Add                  r2, r2, r6
+  0191  Call2                r2, r3, r5, r2
+T17:
+L20:
+  0196  Mov                  r6, r1
+  0199  GetByIdShort         r5, r6, #c1, s36 "push"
+  019e  LoadConstUInt8       r3, 4
+  01a1  SaveGenerator        L21
+  01a3  Ret                  r3
+L21:
+  01a5  ResumeGenerator      r2, r7
+  01a8  JmpTrue              L23, r7
+  01ab  Call2                r5, r5, r6, r2
+  01b0  JStrictEqual         L22, r4, r3
+T18:
+  01b4  Jmp                  L25
+T19:
+L22:
+  01b6  GetGlobalObject      r3
+  01b8  TryGetById           r6, r3, #c2, s27 "Error"
+  01be  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  01c3  CreateThis           r5, r3, r6
+  01c7  LoadConstString      r8, s19 "f4"
+  01cb  Mov                  r9, r5
+  01ce  Construct            r3, r6, 2
+  01d2  SelectObject         r3, r5, r3
+  01d6  Throw                r3
+T20:
+L23:
+  01d8  CompleteGenerator
+  01d9  Ret                  r2
+L24:
+  01db  Catch                r2
+  01dd  Mov                  r5, r1
+  01e0  GetByIdShort         r3, r5, #c1, s36 "push"
+  01e5  GetByIdShort         r6, r2, #c4, s33 "message"
+  01ea  LoadConstString      r2, s4 "c"
+  01ee  Add                  r2, r2, r6
+  01f2  Call2                r2, r3, r5, r2
+T21:
+L25:
+  01f7  Mov                  r6, r1
+  01fa  GetByIdShort         r5, r6, #c1, s36 "push"
+  01ff  LoadConstUInt8       r3, 5
+  0202  SaveGenerator        L26
+  0204  Ret                  r3
+L26:
+  0206  ResumeGenerator      r2, r7
+  0209  JmpTrue              L28, r7
+  020c  Call2                r5, r5, r6, r2
+  0211  JStrictEqual         L27, r4, r3
+T22:
+  0215  Jmp                  L30
+T23:
+L27:
+  0217  GetGlobalObject      r3
+  0219  TryGetById           r6, r3, #c2, s27 "Error"
+  021f  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  0224  CreateThis           r5, r3, r6
+  0228  LoadConstString      r8, s20 "f5"
+  022c  Mov                  r9, r5
+  022f  Construct            r3, r6, 2
+  0233  SelectObject         r3, r5, r3
+  0237  Throw                r3
+T24:
+L28:
+  0239  CompleteGenerator
+  023a  Ret                  r2
+L29:
+  023c  Catch                r2
+  023e  Mov                  r5, r1
+  0241  GetByIdShort         r3, r5, #c1, s36 "push"
+  0246  GetByIdShort         r6, r2, #c4, s33 "message"
+  024b  LoadConstString      r2, s4 "c"
+  024f  Add                  r2, r2, r6
+  0253  Call2                r2, r3, r5, r2
+T25:
+L30:
+  0258  Mov                  r6, r1
+  025b  GetByIdShort         r5, r6, #c1, s36 "push"
+  0260  LoadConstUInt8       r3, 6
+  0263  SaveGenerator        L31
+  0265  Ret                  r3
+L31:
+  0267  ResumeGenerator      r2, r7
+  026a  JmpTrue              L33, r7
+  026d  Call2                r5, r5, r6, r2
+  0272  JStrictEqual         L32, r4, r3
+T26:
+  0276  Jmp                  L35
+T27:
+L32:
+  0278  GetGlobalObject      r3
+  027a  TryGetById           r6, r3, #c2, s27 "Error"
+  0280  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  0285  CreateThis           r5, r3, r6
+  0289  LoadConstString      r8, s21 "f6"
+  028d  Mov                  r9, r5
+  0290  Construct            r3, r6, 2
+  0294  SelectObject         r3, r5, r3
+  0298  Throw                r3
+T28:
+L33:
+  029a  CompleteGenerator
+  029b  Ret                  r2
+L34:
+  029d  Catch                r2
+  029f  Mov                  r5, r1
+  02a2  GetByIdShort         r3, r5, #c1, s36 "push"
+  02a7  GetByIdShort         r6, r2, #c4, s33 "message"
+  02ac  LoadConstString      r2, s4 "c"
+  02b0  Add                  r2, r2, r6
+  02b4  Call2                r2, r3, r5, r2
+T29:
+L35:
+  02b9  Mov                  r6, r1
+  02bc  GetByIdShort         r5, r6, #c1, s36 "push"
+  02c1  LoadConstUInt8       r3, 7
+  02c4  SaveGenerator        L36
+  02c6  Ret                  r3
+L36:
+  02c8  ResumeGenerator      r2, r7
+  02cb  JmpTrue              L38, r7
+  02ce  Call2                r5, r5, r6, r2
+  02d3  JStrictEqual         L37, r4, r3
+T30:
+  02d7  Jmp                  L40
+T31:
+L37:
+  02d9  GetGlobalObject      r3
+  02db  TryGetById           r6, r3, #c2, s27 "Error"
+  02e1  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  02e6  CreateThis           r5, r3, r6
+  02ea  LoadConstString      r8, s22 "f7"
+  02ee  Mov                  r9, r5
+  02f1  Construct            r3, r6, 2
+  02f5  SelectObject         r3, r5, r3
+  02f9  Throw                r3
+T32:
+L38:
+  02fb  CompleteGenerator
+  02fc  Ret                  r2
+L39:
+  02fe  Catch                r2
+  0300  Mov                  r5, r1
+  0303  GetByIdShort         r3, r5, #c1, s36 "push"
+  0308  GetByIdShort         r6, r2, #c4, s33 "message"
+  030d  LoadConstString      r2, s4 "c"
+  0311  Add                  r2, r2, r6
+  0315  Call2                r2, r3, r5, r2
+T33:
+L40:
+  031a  Mov                  r6, r1
+  031d  GetByIdShort         r5, r6, #c1, s36 "push"
+  0322  LoadConstUInt8       r3, 8
+  0325  SaveGenerator        L41
+  0327  Ret                  r3
+L41:
+  0329  ResumeGenerator      r2, r7
+  032c  JmpTrue              L43, r7
+  032f  Call2                r5, r5, r6, r2
+  0334  JStrictEqual         L42, r4, r3
+T34:
+  0338  Jmp                  L45
+T35:
+L42:
+  033a  GetGlobalObject      r3
+  033c  TryGetById           r6, r3, #c2, s27 "Error"
+  0342  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  0347  CreateThis           r5, r3, r6
+  034b  LoadConstString      r8, s23 "f8"
+  034f  Mov                  r9, r5
+  0352  Construct            r3, r6, 2
+  0356  SelectObject         r3, r5, r3
+  035a  Throw                r3
+T36:
+L43:
+  035c  CompleteGenerator
+  035d  Ret                  r2
+L44:
+  035f  Catch                r2
+  0361  Mov                  r5, r1
+  0364  GetByIdShort         r3, r5, #c1, s36 "push"
+  0369  GetByIdShort         r6, r2, #c4, s33 "message"
+  036e  LoadConstString      r2, s4 "c"
+  0372  Add                  r2, r2, r6
+  0376  Call2                r2, r3, r5, r2
+T37:
+L45:
+  037b  Mov                  r6, r1
+  037e  GetByIdShort         r5, r6, #c1, s36 "push"
+  0383  LoadConstUInt8       r3, 9
+  0386  SaveGenerator        L46
+  0388  Ret                  r3
+L46:
+  038a  ResumeGenerator      r2, r7
+  038d  JmpTrue              L48, r7
+  0390  Call2                r5, r5, r6, r2
+  0395  JStrictEqual         L47, r4, r3
+T38:
+  0399  Jmp                  L50
+T39:
+L47:
+  039b  GetGlobalObject      r3
+  039d  TryGetById           r6, r3, #c2, s27 "Error"
+  03a3  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  03a8  CreateThis           r5, r3, r6
+  03ac  LoadConstString      r8, s24 "f9"
+  03b0  Mov                  r9, r5
+  03b3  Construct            r3, r6, 2
+  03b7  SelectObject         r3, r5, r3
+  03bb  Throw                r3
+T40:
+L48:
+  03bd  CompleteGenerator
+  03be  Ret                  r2
+L49:
+  03c0  Catch                r2
+  03c2  Mov                  r5, r1
+  03c5  GetByIdShort         r3, r5, #c1, s36 "push"
+  03ca  GetByIdShort         r6, r2, #c4, s33 "message"
+  03cf  LoadConstString      r2, s4 "c"
+  03d3  Add                  r2, r2, r6
+  03d7  Call2                r2, r3, r5, r2
+T41:
+L50:
+  03dc  Mov                  r6, r1
+  03df  GetByIdShort         r5, r6, #c1, s36 "push"
+  03e4  LoadConstUInt8       r3, 10
+  03e7  SaveGenerator        L51
+  03e9  Ret                  r3
+L51:
+  03eb  ResumeGenerator      r2, r7
+  03ee  JmpTrue              L53, r7
+  03f1  Call2                r5, r5, r6, r2
+  03f6  JStrictEqual         L52, r4, r3
+T42:
+  03fa  Jmp                  L55
+T43:
+L52:
+  03fc  GetGlobalObject      r3
+  03fe  TryGetById           r6, r3, #c2, s27 "Error"
+  0404  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  0409  CreateThis           r5, r3, r6
+  040d  LoadConstString      r8, s7 "f10"
+  0411  Mov                  r9, r5
+  0414  Construct            r3, r6, 2
+  0418  SelectObject         r3, r5, r3
+  041c  Throw                r3
+T44:
+L53:
+  041e  CompleteGenerator
+  041f  Ret                  r2
+L54:
+  0421  Catch                r2
+  0423  Mov                  r5, r1
+  0426  GetByIdShort         r3, r5, #c1, s36 "push"
+  042b  GetByIdShort         r6, r2, #c4, s33 "message"
+  0430  LoadConstString      r2, s4 "c"
+  0434  Add                  r2, r2, r6
+  0438  Call2                r2, r3, r5, r2
+T45:
+L55:
+  043d  Mov                  r6, r1
+  0440  GetByIdShort         r5, r6, #c1, s36 "push"
+  0445  LoadConstUInt8       r3, 11
+  0448  SaveGenerator        L56
+  044a  Ret                  r3
+L56:
+  044c  ResumeGenerator      r2, r7
+  044f  JmpTrue              L58, r7
+  0452  Call2                r5, r5, r6, r2
+  0457  JStrictEqual         L57, r4, r3
+T46:
+  045b  Jmp                  L60
+T47:
+L57:
+  045d  GetGlobalObject      r3
+  045f  TryGetById           r6, r3, #c2, s27 "Error"
+  0465  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  046a  CreateThis           r5, r3, r6
+  046e  LoadConstString      r8, s8 "f11"
+  0472  Mov                  r9, r5
+  0475  Construct            r3, r6, 2
+  0479  SelectObject         r3, r5, r3
+  047d  Throw                r3
+T48:
+L58:
+  047f  CompleteGenerator
+  0480  Ret                  r2
+L59:
+  0482  Catch                r2
+  0484  Mov                  r5, r1
+  0487  GetByIdShort         r3, r5, #c1, s36 "push"
+  048c  GetByIdShort         r6, r2, #c4, s33 "message"
+  0491  LoadConstString      r2, s4 "c"
+  0495  Add                  r2, r2, r6
+  0499  Call2                r2, r3, r5, r2
+T49:
+L60:
+  049e  Mov                  r6, r1
+  04a1  GetByIdShort         r5, r6, #c1, s36 "push"
+  04a6  LoadConstUInt8       r3, 12
+  04a9  SaveGenerator        L61
+  04ab  Ret                  r3
+L61:
+  04ad  ResumeGenerator      r2, r7
+  04b0  JmpTrue              L63, r7
+  04b3  Call2                r5, r5, r6, r2
+  04b8  JStrictEqual         L62, r4, r3
+T50:
+  04bc  Jmp                  L65
+T51:
+L62:
+  04be  GetGlobalObject      r3
+  04c0  TryGetById           r6, r3, #c2, s27 "Error"
+  04c6  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  04cb  CreateThis           r5, r3, r6
+  04cf  LoadConstString      r8, s9 "f12"
+  04d3  Mov                  r9, r5
+  04d6  Construct            r3, r6, 2
+  04da  SelectObject         r3, r5, r3
+  04de  Throw                r3
+T52:
+L63:
+  04e0  CompleteGenerator
+  04e1  Ret                  r2
+L64:
+  04e3  Catch                r2
+  04e5  Mov                  r5, r1
+  04e8  GetByIdShort         r3, r5, #c1, s36 "push"
+  04ed  GetByIdShort         r6, r2, #c4, s33 "message"
+  04f2  LoadConstString      r2, s4 "c"
+  04f6  Add                  r2, r2, r6
+  04fa  Call2                r2, r3, r5, r2
+T53:
+L65:
+  04ff  Mov                  r6, r1
+  0502  GetByIdShort         r5, r6, #c1, s36 "push"
+  0507  LoadConstUInt8       r3, 13
+  050a  SaveGenerator        L66
+  050c  Ret                  r3
+L66:
+  050e  ResumeGenerator      r2, r7
+  0511  JmpTrue              L68, r7
+  0514  Call2                r5, r5, r6, r2
+  0519  JStrictEqual         L67, r4, r3
+T54:
+  051d  Jmp                  L70
+T55:
+L67:
+  051f  GetGlobalObject      r3
+  0521  TryGetById           r6, r3, #c2, s27 "Error"
+  0527  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  052c  CreateThis           r5, r3, r6
+  0530  LoadConstString      r8, s10 "f13"
+  0534  Mov                  r9, r5
+  0537  Construct            r3, r6, 2
+  053b  SelectObject         r3, r5, r3
+  053f  Throw                r3
+T56:
+L68:
+  0541  CompleteGenerator
+  0542  Ret                  r2
+L69:
+  0544  Catch                r2
+  0546  Mov                  r5, r1
+  0549  GetByIdShort         r3, r5, #c1, s36 "push"
+  054e  GetByIdShort         r6, r2, #c4, s33 "message"
+  0553  LoadConstString      r2, s4 "c"
+  0557  Add                  r2, r2, r6
+  055b  Call2                r2, r3, r5, r2
+T57:
+L70:
+  0560  Mov                  r6, r1
+  0563  GetByIdShort         r5, r6, #c1, s36 "push"
+  0568  LoadConstUInt8       r3, 14
+  056b  SaveGenerator        L71
+  056d  Ret                  r3
+L71:
+  056f  ResumeGenerator      r2, r7
+  0572  JmpTrue              L73, r7
+  0575  Call2                r5, r5, r6, r2
+  057a  JStrictEqual         L72, r4, r3
+T58:
+  057e  Jmp                  L75
+T59:
+L72:
+  0580  GetGlobalObject      r3
+  0582  TryGetById           r6, r3, #c2, s27 "Error"
+  0588  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  058d  CreateThis           r5, r3, r6
+  0591  LoadConstString      r8, s11 "f14"
+  0595  Mov                  r9, r5
+  0598  Construct            r3, r6, 2
+  059c  SelectObject         r3, r5, r3
+  05a0  Throw                r3
+T60:
+L73:
+  05a2  CompleteGenerator
+  05a3  Ret                  r2
+L74:
+  05a5  Catch                r2
+  05a7  Mov                  r5, r1
+  05aa  GetByIdShort         r3, r5, #c1, s36 "push"
+  05af  GetByIdShort         r6, r2, #c4, s33 "message"
+  05b4  LoadConstString      r2, s4 "c"
+  05b8  Add                  r2, r2, r6
+  05bc  Call2                r2, r3, r5, r2
+T61:
+L75:
+  05c1  Mov                  r6, r1
+  05c4  GetByIdShort         r5, r6, #c1, s36 "push"
+  05c9  LoadConstUInt8       r3, 15
+  05cc  SaveGenerator        L76
+  05ce  Ret                  r3
+L76:
+  05d0  ResumeGenerator      r2, r7
+  05d3  JmpTrue              L78, r7
+  05d6  Call2                r5, r5, r6, r2
+  05db  JStrictEqual         L77, r4, r3
+T62:
+  05df  Jmp                  L80
+T63:
+L77:
+  05e1  GetGlobalObject      r3
+  05e3  TryGetById           r6, r3, #c2, s27 "Error"
+  05e9  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  05ee  CreateThis           r5, r3, r6
+  05f2  LoadConstString      r8, s12 "f15"
+  05f6  Mov                  r9, r5
+  05f9  Construct            r3, r6, 2
+  05fd  SelectObject         r3, r5, r3
+  0601  Throw                r3
+T64:
+L78:
+  0603  CompleteGenerator
+  0604  Ret                  r2
+L79:
+  0606  Catch                r2
+  0608  Mov                  r5, r1
+  060b  GetByIdShort         r3, r5, #c1, s36 "push"
+  0610  GetByIdShort         r6, r2, #c4, s33 "message"
+  0615  LoadConstString      r2, s4 "c"
+  0619  Add                  r2, r2, r6
+  061d  Call2                r2, r3, r5, r2
+T65:
+L80:
+  0622  Mov                  r6, r1
+  0625  GetByIdShort         r5, r6, #c1, s36 "push"
+  062a  LoadConstUInt8       r3, 16
+  062d  SaveGenerator        L81
+  062f  Ret                  r3
+L81:
+  0631  ResumeGenerator      r2, r7
+  0634  JmpTrue              L83, r7
+  0637  Call2                r5, r5, r6, r2
+  063c  JStrictEqual         L82, r4, r3
+T66:
+  0640  Jmp                  L85
+T67:
+L82:
+  0642  GetGlobalObject      r3
+  0644  TryGetById           r6, r3, #c2, s27 "Error"
+  064a  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  064f  CreateThis           r5, r3, r6
+  0653  LoadConstString      r8, s13 "f16"
+  0657  Mov                  r9, r5
+  065a  Construct            r3, r6, 2
+  065e  SelectObject         r3, r5, r3
+  0662  Throw                r3
+T68:
+L83:
+  0664  CompleteGenerator
+  0665  Ret                  r2
+L84:
+  0667  Catch                r2
+  0669  Mov                  r5, r1
+  066c  GetByIdShort         r3, r5, #c1, s36 "push"
+  0671  GetByIdShort         r6, r2, #c4, s33 "message"
+  0676  LoadConstString      r2, s4 "c"
+  067a  Add                  r2, r2, r6
+  067e  Call2                r2, r3, r5, r2
+T69:
+L85:
+  0683  Mov                  r6, r1
+  0686  GetByIdShort         r5, r6, #c1, s36 "push"
+  068b  LoadConstUInt8       r3, 17
+  068e  SaveGenerator        L86
+  0690  Ret                  r3
+L86:
+  0692  ResumeGenerator      r2, r7
+  0695  JmpTrue              L88, r7
+  0698  Call2                r5, r5, r6, r2
+  069d  JStrictEqual         L87, r4, r3
+T70:
+  06a1  Jmp                  L90
+T71:
+L87:
+  06a3  GetGlobalObject      r3
+  06a5  TryGetById           r6, r3, #c2, s27 "Error"
+  06ab  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  06b0  CreateThis           r5, r3, r6
+  06b4  LoadConstString      r8, s14 "f17"
+  06b8  Mov                  r9, r5
+  06bb  Construct            r3, r6, 2
+  06bf  SelectObject         r3, r5, r3
+  06c3  Throw                r3
+T72:
+L88:
+  06c5  CompleteGenerator
+  06c6  Ret                  r2
+L89:
+  06c8  Catch                r2
+  06ca  Mov                  r5, r1
+  06cd  GetByIdShort         r3, r5, #c1, s36 "push"
+  06d2  GetByIdShort         r6, r2, #c4, s33 "message"
+  06d7  LoadConstString      r2, s4 "c"
+  06db  Add                  r2, r2, r6
+  06df  Call2                r2, r3, r5, r2
+T73:
+L90:
+  06e4  Mov                  r6, r1
+  06e7  GetByIdShort         r5, r6, #c1, s36 "push"
+  06ec  LoadConstUInt8       r3, 18
+  06ef  SaveGenerator        L91
+  06f1  Ret                  r3
+L91:
+  06f3  ResumeGenerator      r2, r7
+  06f6  JmpTrue              L93, r7
+  06f9  Call2                r5, r5, r6, r2
+  06fe  JStrictEqual         L92, r4, r3
+T74:
+  0702  Jmp                  L95
+T75:
+L92:
+  0704  GetGlobalObject      r3
+  0706  TryGetById           r6, r3, #c2, s27 "Error"
+  070c  GetByIdShort         r3, r6, #c3, s35 "prototype"
+  0711  CreateThis           r5, r3, r6
+  0715  LoadConstString      r8, s15 "f18"
+  0719  Mov                  r9, r5
+  071c  Construct            r3, r6, 2
+  0720  SelectObject         r3, r5, r3
+  0724  Throw                r3
+T76:
+L93:
+  0726  CompleteGenerator
+  0727  Ret                  r2
+L94:
+  0729  Catch                r2
+  072b  Mov                  r5, r1
+  072e  GetByIdShort         r3, r5, #c1, s36 "push"
+  0733  GetByIdShort         r6, r2, #c4, s33 "message"
+  0738  LoadConstString      r2, s4 "c"
+  073c  Add                  r2, r2, r6
+  0740  Call2                r2, r3, r5, r2
+T77:
+L95:
+  0745  Mov                  r6, r1
+  0748  GetByIdShort         r5, r6, #c1, s36 "push"
+  074d  LoadConstUInt8       r3, 19
+  0750  SaveGenerator        L96
+  0752  Ret                  r3
+L96:
+  0754  ResumeGenerator      r2, r7
+  0757  JmpTrue              L98, r7
+  075a  Call2                r5, r5, r6, r2
+  075f  JStrictEqual         L97, r4, r3
+T78:
+  0763  Jmp                  L100
+T79:
+L97:
+  0765  GetGlobalObject      r3
+  0767  TryGetById           r5, r3, #c2, s27 "Error"
+  076d  GetByIdShort         r3, r5, #c3, s35 "prototype"
+  0772  CreateThis           r4, r3, r5
+  0776  LoadConstString      r8, s16 "f19"
+  077a  Mov                  r9, r4
+  077d  Construct            r3, r5, 2
+  0781  SelectObject         r3, r4, r3
+  0785  Throw                r3
+T80:
+L98:
+  0787  CompleteGenerator
+  0788  Ret                  r2
+L99:
+  078a  Catch                r2
+  078c  Mov                  r4, r1
+  078f  GetByIdShort         r3, r4, #c1, s36 "push"
+  0794  GetByIdShort         r5, r2, #c4, s33 "message"
+  0799  LoadConstString      r2, s4 "c"
+  079d  Add                  r2, r2, r5
+  07a1  Call2                r2, r3, r4, r2
+L100:
+  07a6  Mov                  r3, r1
+  07a9  GetByIdShort         r2, r3, #c5, s32 "join"
+  07ae  LoadConstString      r1, s1 ","
+  07b2  Call2                r1, r2, r3, r1
+  07b7  CompleteGenerator
+  07b8  Ret                  r1
+L101:
+  07ba  CompleteGenerator
+  07bb  Ret                  r0
+
+function #3 "run"  params=3 frame=20 env=0 flags=dbg  @0x00000a72 size=127
+  0000  LoadParam            r7, 2
+  0003  LoadConstUInt8       r5, 3
+  0006  GetGlobalObject      r4
+  0008  LoadConstString      r3, s3 "p"
+  000c  GetByIdShort         r2, r4, #c1, s26 "steps"
+  0011  LoadConstUndefined   r1
+  0013  LoadParam            r0, 1
+  0016  Call2                r2, r2, r1, r0
+  001b  GetByIdShort         r0, r2, #c2, s30 "next"
+  0020  Call1                r0, r0, r2
+  0024  GetByIdShort         r1, r0, #c3, s29 "done"
+  0029  LoadConstZero        r6
+  002b  JmpTrue              L4, r1
+L1:
+  002e  Inc                  r6, r6
+  0031  JStrictEqual         L2, r6, r7
+  0035  GetByIdShort         r8, r2, #c2, s30 "next"
+  003a  Mul                  r1, r6, r5
+  003e  Call2                r8, r8, r2, r1
+  0043  Jmp                  L3
+L2:
+  0045  GetByIdShort         r9, r2, #c4, s31 "throw"
+  004a  TryGetById           r11, r4, #c5, s27 "Error"
+  0050  GetByIdShort         r1, r11, #c6, s35 "prototype"
+  0055  CreateThis           r10, r1, r11
+  0059  Add                  r12, r3, r6
+  005d  Mov                  r13, r10
+  0060  Construct            r1, r11, 2
+  0064  SelectObject         r1, r10, r1
+  0068  Call2                r8, r9, r2, r1
+L3:
+  006d  GetByIdShort         r1, r8, #c3, s29 "done"
+  0072  Mov                  r0, r8
+  0075  JmpFalse             L1, r1
+L4:
+  0078  GetByIdShort         r0, r0, #c7, s37 "value"
+  007d  Ret                  r0

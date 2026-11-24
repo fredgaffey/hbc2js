@@ -19,6 +19,7 @@ import { writtenRegisters } from "../cfg/reg-effects.ts";
 import { argSlotBase } from "./semantics.ts";
 import { resolveShapes } from "./shapes.ts";
 import { reconstructIifes } from "./iife-reconstruct.ts";
+import { guardedTry } from "./try-ladder.ts";
 
 export interface FunctionEmitter {
   readonly analysis: ModuleAnalysis;
@@ -970,6 +971,11 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
         const needsBinding = range !== undefined || node.shape?.bindsExc !== false;
         if (needsBinding) handler.push(assign(id(EXC_VALUE), id(excParam)));
         lowerTree(node.handler, handler);
+        if (range !== undefined) {
+          // A deep nest of guarded regions prints as one try (src/emit/try-ladder.ts).
+          out.push(guardedTry(block, excParam, { k: "logical", op: "&&", left: bin(">=", id(PC_VAR), num(range[0])), right: bin("<=", id(PC_VAR), num(range[1])) }, handler.slice(1)));
+          return;
+        }
         out.push({ k: "try", block, param: needsBinding ? excParam : null, handler });
         return;
       }
