@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck -- triage tool over untyped @babel/traverse paths; run by node type stripping, not part of the typed build
 // Decompiler bug sweep, static half (docs/SWEEP-2026-11-24.md).
 //
 // Decompiles a whole bundle once and checks EVERY function of the output
@@ -291,7 +292,7 @@ async function main(): Promise<void> {
   const input = argv[0];
   const outDir = flag("--out");
   if ((!input && !argv.includes("--dir") && !argv.includes("--from-js")) || !outDir) { console.error("usage: static.ts <app.hbc> --out <dir> [--app L] [--workers N] [--host-from bundle.js]..."); process.exit(2); }
-  const app = flag("--app") ?? input;
+  const app = flag("--app") ?? input ?? "app";
   if (flag("--from-js") !== undefined) return fromJs(flag("--from-js")!, outDir, app, argv);
   if (flag("--dir") !== undefined) return dirMode(flag("--dir")!, outDir, app, Number(flag("--hbc") ?? 0), argv);
   const workers = Number(flag("--workers") ?? "1");

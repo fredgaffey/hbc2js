@@ -1,4 +1,4 @@
-// sweep 2026-11-24, BlueWallet hbc99 fn#22959: a destructuring default value
+// sweep 2026-11-24, q7 (bench input-q7) hbc99 fn#22959: a destructuring default value
 // built from several registers; the folded pattern default reads `let`
 // registers declared later in the function (TDZ ReferenceError).
 "use strict";

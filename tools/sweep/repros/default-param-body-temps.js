@@ -1,4 +1,4 @@
-// sweep 2026-11-24, BlueWallet hbc99 fn#20119: a sloppy-mode default
+// sweep 2026-11-24, q7 (bench input-q7) hbc99 fn#20119: a sloppy-mode default
 // parameter with a multi-step initialiser, captured by a closure; the folded
 // `(a1, r2 = (T = ..., arr2 = [T], arr2))` assigns names that are declared in
 // the body, so in sloppy code they leak to the global object (and in strict
