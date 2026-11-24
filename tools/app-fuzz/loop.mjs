@@ -124,17 +124,36 @@ function childRun(exportDir, id, names, isCore, timeoutMs = 60000) {
   });
 }
 
+/** Hermes VM for an HBC version, if present (tools/hermes-vm/v<N>, built by
+ *  tools/build-hermes-vm.sh, or $HBC2JS_APPFUZZ_HERMES_<N>). */
+export function hermesVmFor(v) {
+  return [process.env[`HBC2JS_APPFUZZ_HERMES_${v}`], join(ROOT, `tools/hermes-vm/v${v}/bin/hermes`), join(ROOT, `tools/hermes-vm/build-${v}/bin/hermes`)]
+    .find((p) => p && existsSync(p)) || null;
+}
+
+/** Run headless.hbc in the VM: { core: {name: v}, junk: {"path#name": v} } or null. */
+function vmTruth(hbcPath, v) {
+  const vm = hermesVmFor(v);
+  if (!vm) return null;
+  try { return JSON.parse(execFileSync(vm, [hbcPath], { timeout: 120000, maxBuffer: 64 * 1024 * 1024 }).toString().trim().split("\n").pop()); }
+  catch (e) { return { error: String(e.message).slice(0, 200) }; }
+}
+
 const CODE_RE = /\b([WE]_[A-Z0-9_]{3,})\b/g;
 
 /** Static checks + checksum oracle over one export. Returns per-module
  *  features and per-function/core failures. */
-async function checkExport(exportDir, manifest) {
+async function checkExport(exportDir, manifest, vm = null) {
   const { parse } = await import("@babel/parser");
   const { freeIdentifiers } = await import("../export-check/free-idents.mjs");
   const exp = JSON.parse(readFileSync(join(exportDir, "EXPORT.json"), "utf8"));
   const byId = new Map(exp.modules.map((m) => [m.id, m]));
   const pathToId = new Map(Object.entries(manifest.moduleIds).map(([id, p]) => [p, Number(id)]));
-  const res = { syntaxErrors: 0, files: 0, codes: {}, tiers: {}, modules: [], failures: [], core: { total: 0, pass: 0 }, junk: { total: 0, pass: 0 } };
+  // Truth for the decompiled code is what the bytecode computes: the Hermes
+  // VM when available, else the Node truth (flagged unverified). A Node vs
+  // Hermes disagreement is recorded separately (never a decompiler bug).
+  const vmOk = vm && !vm.error && vm.junk;
+  const res = { truth: vmOk ? "hermes-vm" : "node-unverified", engineDiv: [], syntaxErrors: 0, files: 0, codes: {}, tiers: {}, modules: [], failures: [], core: { total: 0, pass: 0 }, junk: { total: 0, pass: 0 } };
   // Syntax over every exported app/vendor module file.
   const srcRoot = join(exportDir, "src");
   const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(join(d, e.name)) : e.name.endsWith(".js") ? [join(d, e.name)] : []);
@@ -186,10 +205,12 @@ async function checkExport(exportDir, manifest) {
       res.junk.total++;
       const g = got[f.name] || { status: "missing" };
       let st = g.status;
-      if (st === "ok") st = g.value === f.expected ? "pass" : "wrong-value";
+      const want = vmOk && typeof vm.junk[f.module + "#" + f.name] === "number" ? vm.junk[f.module + "#" + f.name] : f.expected;
+      if (vmOk && want !== f.expected) { features.add("engine-divergence"); res.engineDiv.push({ kind: "hermes-vs-node", module: path, fn: f, got: want, decompiled: g.value }); }
+      if (st === "ok") st = g.value === want ? "pass" : "wrong-value";
       if (st === "pass") { res.junk.pass++; continue; }
       features.add("fail:" + st);
-      res.failures.push({ kind: st, module: path, exportPath: em.path, fn: f, got: g.value, error: g.error });
+      res.failures.push({ kind: st, module: path, exportPath: em.path, fn: f, got: g.value, want, error: g.error });
     }
     res.modules.push({ path, shapes, features: [...features] });
   }
@@ -203,7 +224,8 @@ async function checkExport(exportDir, manifest) {
     for (const c of cs) {
       res.core.total++;
       const g = got[c.name] || { status: "missing" };
-      const st = g.status === "ok" ? (JSON.stringify(g.value) === JSON.stringify(c.expected) ? "pass" : "wrong-value") : g.status;
+      const want = vmOk && vm.core && c.name in vm.core ? vm.core[c.name] : c.expected;
+      const st = g.status === "ok" ? (JSON.stringify(g.value) === JSON.stringify(want) ? "pass" : "wrong-value") : g.status;
       if (st === "pass") res.core.pass++;
       else res.failures.push({ kind: "core:" + st, core: c.name, module: path, error: g.error });
     }
@@ -219,7 +241,8 @@ async function reproduces(plan, cfg, kind, name, scratch, ws) {
     const { manifest } = await buildPlan(plan, cfg, join(scratch, "b"), ws);
     const ex = runExport(join(scratch, "b/bundle.hbc"), join(scratch, "e"));
     if (!ex.ok) return kind === "export-crash";
-    const res = await checkExport(join(scratch, "e"), manifest);
+    const res = await checkExport(join(scratch, "e"), manifest, vmTruth(join(scratch, "b/headless.hbc"), cfg.hbc));
+    if (kind === "hermes-vs-node") return res.engineDiv.some((f) => f.fn.name === name);
     return res.failures.some((f) => f.kind === kind && (!f.fn || !name || f.fn.name === name || (f.fns || []).some((x) => x.name === name)));
   } catch (e) {
     return false; // build failure in a reduced case: not a reproduction
@@ -259,7 +282,7 @@ function clusterOf(f, plan) {
   return `app-fuzz:${f.kind}${err}:${shapes.join("+")}`;
 }
 
-const KIND_OF = { "wrong-value": "miscompile", threw: "miscompile", timeout: "miscompile", "load-failed": "crash", missing: "miscompile", syntax: "syntax", "free-ident": "free-ident", stub: "stub", "module-not-exported": "other", "export-crash": "crash" };
+const KIND_OF = { "hermes-vs-node": "other", "wrong-value": "miscompile", threw: "miscompile", timeout: "miscompile", "load-failed": "crash", missing: "miscompile", syntax: "syntax", "free-ident": "free-ident", stub: "stub", "module-not-exported": "other", "export-crash": "crash" };
 
 function addFinding(o, row) {
   if (!existsSync(o.findings)) return null;
@@ -294,7 +317,11 @@ async function runSeed(seed, o, cov, seenClusters) {
     res = { failures: [{ kind: "export-crash", error: ex.error, fns: plan }], modules: [], junk: { total: 0, pass: 0 }, core: { total: 0, pass: 0 } };
   } else {
     t0 = Date.now();
-    res = await checkExport(join(dir, "export"), manifest);
+    res = await checkExport(join(dir, "export"), manifest, vmTruth(join(dir, "build/headless.hbc"), cfg.hbc));
+    row.truth = res.truth;
+    row.engineDivergences = res.engineDiv.length;
+    // Engine divergences: one finding per seed+shape set, minimised like the rest.
+    res.failures.push(...res.engineDiv);
     row.t.check = ms(t0);
   }
   row.junk = res.junk; row.core = res.core; row.syntaxErrors = res.syntaxErrors; row.files = res.files;
@@ -332,7 +359,7 @@ async function runSeed(seed, o, cov, seenClusters) {
           const em = exp.modules.find((m) => m.id === Number(id));
           if (em) cpSync(join(scratch, "e", em.path), join(repro, "exported.js"));
           cpSync(join(scratch, "b/headless.hbc"), join(repro, "headless.hbc"));
-          writeFileSync(join(repro, "repro.json"), JSON.stringify({ cluster, kind: f.kind, cfg, plan: min.plan, expected: mm.junk.map((j) => ({ name: j.name, expected: j.expected, arg: entryArg(j.name) })), got: f.got, error: f.error, tries: min.tries }, null, 1) + "\n");
+          writeFileSync(join(repro, "repro.json"), JSON.stringify({ cluster, kind: f.kind, cfg, plan: min.plan, expected: mm.junk.map((j) => ({ name: j.name, expected: j.expected, arg: entryArg(j.name) })), truth: res.truth, want: f.want, got: f.got, decompiled: f.decompiled, error: f.error, tries: min.tries }, null, 1) + "\n");
         } else repro = null;
       }
       rmSync(scratch, { recursive: true, force: true });
@@ -343,7 +370,7 @@ async function runSeed(seed, o, cov, seenClusters) {
     const summary = `${f.kind} in ${fnName || f.module || "?"} (${fs.length}x this seed)${f.error ? ": " + String(f.error).slice(0, 120) : ""}`;
     row.findings.push({ cluster, kind: f.kind, count: fs.length, minimised: !!(min && min.ok), parts: min && min.ok ? min.plan[0].parts.length : null, repro, novel });
     if (novel || !isCore) {
-      addFinding(o, { cluster, summary, app: `appfuzz-${o.profile}-${seed}`, hbc: cfg.hbc, kind: KIND_OF[f.kind.replace(/^core:/, "")] || "other", severity: /wrong-value|threw|syntax/.test(f.kind) ? "high" : "medium", repro: repro || undefined, detail: JSON.stringify({ cfg, fn: fnName, got: f.got, expected: f.fn && f.fn.expected, shapes: f.fn && f.fn.shapes }) });
+      addFinding(o, { cluster, summary, app: `appfuzz-${o.profile}-${seed}`, hbc: cfg.hbc, kind: KIND_OF[f.kind.replace(/^core:/, "")] || "other", severity: f.kind === "hermes-vs-node" ? "low" : /wrong-value|threw|syntax/.test(f.kind) ? "high" : "medium", repro: repro || undefined, detail: JSON.stringify({ cfg, truth: res.truth, fn: fnName, got: f.got, want: f.want, nodeExpected: f.fn && f.fn.expected, decompiled: f.decompiled, shapes: f.fn && f.fn.shapes }) });
     }
   }
   row.t.minimise = ms(t0);
@@ -355,11 +382,11 @@ async function runSeed(seed, o, cov, seenClusters) {
 
 function summary(root) {
   const rows = readFileSync(join(root, "seeds.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
-  const lines = ["| profile | seed | hbc | min | obf | fns | junk pass | core pass | syntax err files | build s | export s | check s | min s | clusters |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"];
+  const lines = ["| profile | seed | hbc | min | obf | fns | junk pass | core pass | truth | hermes!=node | syntax err files | build s | export s | check s | min s | clusters |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"];
   const clusters = new Map();
   for (const r of rows) {
     const t = (k) => (r.t?.[k] != null ? (r.t[k] / 1000).toFixed(0) : "-");
-    lines.push(`| ${r.profile} | ${r.seed} | ${r.hbc} | ${r.minify ? "y" : ""} | ${r.obfuscate ? "y" : ""} | ${r.functions} | ${r.junk ? `${r.junk.pass}/${r.junk.total}` : r.buildError ? "BUILD-FAIL" : "-"} | ${r.core ? `${r.core.pass}/${r.core.total}` : "-"} | ${r.syntaxErrors ?? "-"} | ${t("build")} | ${t("export")} | ${t("check")} | ${t("minimise")} | ${(r.findings || []).length} |`);
+    lines.push(`| ${r.profile} | ${r.seed} | ${r.hbc} | ${r.minify ? "y" : ""} | ${r.obfuscate ? "y" : ""} | ${r.functions} | ${r.junk ? `${r.junk.pass}/${r.junk.total}` : r.buildError ? "BUILD-FAIL" : "-"} | ${r.core ? `${r.core.pass}/${r.core.total}` : "-"} | ${r.truth === "hermes-vm" ? "vm" : "node"} | ${r.engineDivergences ?? "-"} | ${r.syntaxErrors ?? "-"} | ${t("build")} | ${t("export")} | ${t("check")} | ${t("minimise")} | ${(r.findings || []).length} |`);
     for (const f of r.findings || []) {
       const c = clusters.get(f.cluster) || { n: 0, seeds: new Set(), hbc: new Set(), repro: null, kind: f.kind };
       c.n += f.count; c.seeds.add(r.seed); c.hbc.add(r.hbc); c.repro ||= f.repro;
@@ -408,7 +435,7 @@ async function main() {
     const t0 = Date.now();
     const row = await runSeed(s, o, cov, seenClusters);
     saveCoverage(o.root, cov);
-    console.log(`[${o.profile} ${s}] hbc${row.hbc}${row.minify ? " min" : ""} junk ${row.junk ? row.junk.pass + "/" + row.junk.total : row.buildError ? "BUILD-FAIL " + row.buildError.slice(0, 80) : "-"} core ${row.core ? row.core.pass + "/" + row.core.total : "-"} syntaxErr ${row.syntaxErrors ?? "-"} findings ${(row.findings || []).map((f) => f.cluster + (f.novel ? "*" : "")).join(" ")} ${(ms(t0) / 1000).toFixed(0)}s`);
+    console.log(`[${o.profile} ${s}] hbc${row.hbc}${row.minify ? " min" : ""} ${row.truth === "hermes-vm" ? "vm" : "node"} junk ${row.junk ? row.junk.pass + "/" + row.junk.total : row.buildError ? "BUILD-FAIL " + row.buildError.slice(0, 80) : "-"} core ${row.core ? row.core.pass + "/" + row.core.total : "-"} syntaxErr ${row.syntaxErrors ?? "-"} findings ${(row.findings || []).map((f) => f.cluster + (f.novel ? "*" : "")).join(" ")} ${(ms(t0) / 1000).toFixed(0)}s`);
   }
 }
 
