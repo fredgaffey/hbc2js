@@ -931,8 +931,8 @@ export function bootTrace(bundleSourceIn: string, opts: BootTraceOptions = {}): 
         const why = `hermesc could not compile the prelude+bundle: ${excerpt(c.stderr !== "" ? c.stderr : String(c.error ?? c.status))}`;
         return { trace: { kind: "full", records: [] }, reachedEnd: false, bootError: null, vm, ran: false, why };
       }
-      raw = runHermes(vm.path, hbc, { timeout, bytecode: true });
-    } else raw = runHermes(vm.path, file, { timeout, bytecode: false, quiet: true });
+      raw = runHermes(vm.path, hbc, { timeout, bytecode: true, memoryLimitMb: bootVmMemoryMb() });
+    } else raw = runHermes(vm.path, file, { timeout, bytecode: false, quiet: true, memoryLimitMb: bootVmMemoryMb() });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -991,6 +991,16 @@ export function compareBootTraces(a: BootTraceResult, b: BootTraceResult): BootC
   return { verdict: cmp.verdict, why: cmp.why, cmp };
 }
 
+/** The boot VM's address-space cap in MiB: \`HBC2JS_BOOT_VM_MEMORY_MB\`
+ *  (0 = uncapped), default 16384. One pathological decompile once drove the
+ *  original side past 22 GB and into the kernel OOM killer; capped, it fails
+ *  alone and the verdict says why (noTraceReason). */
+export function bootVmMemoryMb(): number {
+  const v = process.env.HBC2JS_BOOT_VM_MEMORY_MB;
+  const n = v === undefined || v === "" ? NaN : Number(v);
+  return Number.isFinite(n) && n >= 0 ? n : 16384;
+}
+
 /** Why a VM run left no trace, never an empty string: the exit status or
  *  signal (a kernel OOM kill is a bare SIGKILL with no output), the timeout
  *  flag, and the tail of whatever it printed. */
@@ -999,6 +1009,7 @@ export function noTraceReason(raw: { readonly timedOut: boolean; readonly status
   if (raw.timedOut) parts.push("timed out");
   if (raw.signal !== undefined && raw.signal !== null) parts.push(`killed by ${raw.signal}${raw.signal === "SIGKILL" ? " (out of memory? check the kernel log)" : ""}`);
   if (raw.status !== undefined && raw.status !== null) parts.push(`exit status ${raw.status}`);
+  if (/\bOOM\b|out of memory|Cannot allocate memory/i.test(raw.stderr)) parts.push(`ran out of memory (VM cap ${bootVmMemoryMb()} MiB, HBC2JS_BOOT_VM_MEMORY_MB)`);
   const out = raw.stderr !== "" ? raw.stderr : raw.stdout;
   parts.push(out.trim() === "" ? "no output" : `output tail: ${out.trim().slice(-400)}`);
   return parts.join("; ");
