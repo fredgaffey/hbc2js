@@ -1009,43 +1009,16 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
       return out;
     };
     const copied = new Set(closureCopies.keys());
-    /** The copied functions that create `fn`, directly or through a chain of
-     *  creators that are not copied themselves (corpus a03, zustand's inlined
-     *  `toThenable`: copied `f` creates `then`, which creates `f` again over
-     *  an environment `then` owns -- `f` creates itself one hop removed). */
-    const copiedCreatorsMemo = new Map<number, ReadonlySet<number>>();
-    const copiedCreators = (fn: number): ReadonlySet<number> => {
-      const memo = copiedCreatorsMemo.get(fn);
-      if (memo !== undefined) return memo;
-      const out = new Set<number>();
-      const seen = new Set<number>([fn]);
-      const work = [fn];
-      while (work.length > 0) {
-        const cur = work.pop()!;
-        for (const key of closureCreationSites.get(cur)?.keys() ?? []) {
-          const c = Number(key.slice(0, key.indexOf(":")));
-          if (copied.has(c)) out.add(c);
-          else if (!seen.has(c)) {
-            seen.add(c);
-            work.push(c);
-          }
-        }
-      }
-      copiedCreatorsMemo.set(fn, out);
-      return out;
-    };
     const succ = new Map<number, Set<number>>();
     for (const g of copied) {
-      for (const c of copiedCreators(g)) {
+      for (const key of closureCreationSites.get(g)?.keys() ?? []) {
+        const c = Number(key.slice(0, key.indexOf(":")));
+        if (!copied.has(c)) continue;
         let set = succ.get(c);
         if (set === undefined) succ.set(c, (set = new Set()));
         set.add(g);
       }
     }
-    /** `owner` is `f` or one of the functions `f` creates through uncopied
-     *  creators -- an environment it owns has a fresh instance per instance
-     *  of `f`, so a copy over it would nest inside itself. */
-    const ownedWithin = (owner: number, f: number): boolean => owner === f || (!copied.has(owner) && copiedCreators(owner).has(f));
     // Tarjan's SCC over the copied functions' "creates" relation.
     const index = new Map<number, number>();
     const low = new Map<number, number>();
@@ -1082,7 +1055,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
       // Only where copies are impossible: some member captures an environment
       // it creates itself (the captured and the fresh instance share a name).
       // Other recursion groups keep spec 05 §6's per-instance copies.
-      if (!comp.some((f) => closureCopies.get(f)!.some((c) => ownedWithin(drafts[c.env]!.ownerFunction, f)))) continue;
+      if (!comp.some((f) => closureCopies.get(f)!.some((c) => drafts[c.env]!.ownerFunction === f))) continue;
       const picks = new Map<number, { env0: EnvNodeId; parent: EnvNodeId }>();
       for (const f of comp) {
         const envs = closureCopies.get(f)!.map((c) => c.env);
