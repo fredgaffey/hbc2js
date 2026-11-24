@@ -11,6 +11,7 @@
 // `ix_module_deps` tables `loadIndexRowsFromDb` (`src/projdb/artifact-read.ts`)
 // builds its `modulesIndex` from, JSONL-backed reads the same
 // `index/modules.json` file `ArtifactService` reads.
+import { siblingWorkerPath } from "../util/worker-path.ts";
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { Worker } from "node:worker_threads";
@@ -116,7 +117,7 @@ export function listModules(artifactDir: string): ModuleListResult {
   return result;
 }
 
-const LEADS_WORKER_URL = new URL("../workers/leads-worker.ts", import.meta.url);
+const LEADS_WORKER_URL = siblingWorkerPath("../workers/leads-worker", import.meta.url);
 
 const leadsCache = new WeakMap<ArtifactService, ReturnType<McpResources["leads"]>>();
 const leadsComputing = new WeakSet<ArtifactService>();

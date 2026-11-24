@@ -1,5 +1,6 @@
 // src/ui-server/segregation.ts — `GET /api/segregation`, the name-recovery
 // view of the module catalogue (docs/UI.md route table).
+import { siblingWorkerPath } from "../util/worker-path.ts";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { Worker } from "node:worker_threads";
@@ -233,7 +234,7 @@ function toCacheEntry(result: SegregationResult): SegCacheEntry {
   return { modules: result.modules, depsApplied: result.depsApplied };
 }
 
-const WORKER_URL = new URL("../workers/segregate-worker.ts", import.meta.url);
+const WORKER_URL = siblingWorkerPath("../workers/segregate-worker", import.meta.url);
 
 /** Runs `segregationOf(artifactDir, deps, depsApplied)` on a
  *  `node:worker_threads` worker (`src/workers/segregate-worker.ts`) so the

@@ -4,8 +4,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { repoRoot } from "../../support/paths.ts";
 
 const root = repoRoot();
@@ -144,4 +145,77 @@ test("npm pack --dry-run contains the skill, agent docs and every runtime-read a
   // Every docs/ path SKILL.md cites must be packed.
   const skill = readFileSync(join(root, ".claude", "skills", "hbc2js", "SKILL.md"), "utf8");
   for (const m of skill.matchAll(/`(docs\/[A-Za-z0-9_./-]+\.md)`/g)) assert.ok(files.has(m[1]!), `SKILL.md cites ${m[1]} which is not packed`);
+});
+
+// 0.1.2 corpus benchmark: dist/export/offline-babel-transformer.cjs was not
+// built (a hand-kept asset list), so `equiv --boot` from the npm package failed
+// "the export does not bundle offline". Every file src/ reads at runtime by a
+// path relative to its own module must land in dist (via tsc for .ts, via
+// tools/copy-build-assets.mjs for anything else) or, when it resolves outside
+// src/, in package.json `files`. Dev-checkout-only references are listed.
+const DEV_CHECKOUT_ONLY = new Set([
+  "ui/dist", // `hbc2js ui` serves a 404 page with a build hint when absent
+  "tests/fixtures/constructs", // fuzzgen corpus, dev tooling only
+]);
+
+function runtimeRefs(): { from: string; target: string }[] {
+  const refs: { from: string; target: string }[] = [];
+  const strArgs = (list: string) => [...list.matchAll(/"([^"]*)"/g)].map((m) => m[1]!);
+  for (const f of tsFiles(join(root, "src"))) {
+    if (f.includes(".test.")) continue;
+    const text = readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const dir = dirname(f);
+    const here = new Set(["dirname(fileURLToPath(import.meta.url))"]);
+    for (const m of text.matchAll(/const (\w+) = dirname\(fileURLToPath\(import\.meta\.url\)\)/g)) here.add(m[1]!);
+    for (const m of text.matchAll(/new URL\(\s*"(\.{1,2}\/[^"]*)",\s*import\.meta\.url\s*\)/g)) refs.push({ from: f, target: resolve(dir, m[1]!) });
+    for (const m of text.matchAll(/siblingWorkerPath\(\s*"([^"]+)",\s*import\.meta\.url\s*\)/g)) refs.push({ from: f, target: resolve(dir, `${m[1]!}.ts`) });
+    for (const h of here) {
+      const esc = h.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      for (const m of text.matchAll(new RegExp(`join\\(${esc},((?:\\s*"[^"]*"\\s*,?)+)\\)`, "g"))) refs.push({ from: f, target: resolve(dir, ...strArgs(m[1]!)) });
+    }
+  }
+  return refs;
+}
+
+test("npm package: every file src/ loads at runtime by path is built into dist or packed", () => {
+  const out = mkdtempSync(join(tmpdir(), "hbc2js-assets-"));
+  try {
+    const cp = spawnSync(process.execPath, [join(root, "tools", "copy-build-assets.mjs"), "--out", out], { encoding: "utf8" });
+    assert.equal(cp.status, 0, cp.stderr);
+    const r = spawnSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], { cwd: root, encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    const packed = (JSON.parse(r.stdout) as { files: { path: string }[] }[])[0]!.files.map((f) => f.path);
+    const refs = runtimeRefs();
+    assert.ok(refs.some((x) => x.target.endsWith("offline-babel-transformer.cjs")), "scanner must see the offline transformer");
+    const bad: string[] = [];
+    const srcRoot = join(root, "src");
+    for (const { from, target } of refs) {
+      const who = relative(root, from);
+      if (target.startsWith(srcRoot + "/")) {
+        const rel = relative(srcRoot, target);
+        if (!existsSync(target)) bad.push(`${who} -> src/${rel} does not exist`);
+        else if (rel.endsWith(".ts")) continue; // compiled by tsc (literal .ts URLs: next test)
+        else if (!existsSync(join(out, rel))) bad.push(`${who} -> src/${rel} is not copied into dist by tools/copy-build-assets.mjs`);
+        continue;
+      }
+      // Outside src/: dist sits at the same depth, so the path is package-relative.
+      const rel = relative(root, target);
+      if (rel === "") continue; // the package root itself
+      if ([...DEV_CHECKOUT_ONLY].some((d) => rel === d || rel.startsWith(d + "/"))) continue;
+      if (!packed.some((p) => p === rel || p.startsWith(rel + "/"))) bad.push(`${who} -> ${rel} is not in the npm tarball`);
+    }
+    assert.deepEqual(bad, [], "runtime-read files missing from the built package");
+    assert.ok(packed.length > 0 && pkg.files.includes("dist"));
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("npm package: no module loads a sibling by a literal .ts URL (dist ships .js)", () => {
+  const bad: string[] = [];
+  for (const f of tsFiles(join(root, "src"))) {
+    if (f.includes(".test.")) continue;
+    if (/new URL\(\s*"[^"]*\.ts",\s*import\.meta\.url/.test(readFileSync(f, "utf8"))) bad.push(relative(root, f));
+  }
+  assert.deepEqual(bad, []);
 });
