@@ -19,7 +19,11 @@ export function match(node: Stmt, ctx: PassContext): TryShapeMatch | null {
   if (node.cfgBlock < 0) return null; // dispatch-nest (P2, §4.4)
 
   const guardRedundant = isGuardRedundant(node, ctx);
-  const handlerReads = handlerReadsCatchRegister(node, ctx);
+  // The `Catch` write itself stays in the handler (`rN = __exc`), so the
+  // binding is needed whenever the exception value is read anywhere: inside
+  // the handler, or after it when hermesc allocated the catch register to a
+  // variable the handler assigns (`catch (e) { x = e; }` -> `Catch rX`).
+  const handlerReads = handlerReadsCatchRegister(node, ctx) || catchRegisterLiveAfterHandler(node, ctx);
 
   if (!guardRedundant && handlerReads) return null; // nothing-to-say: neither annotation applies
 
@@ -80,6 +84,43 @@ function handlerReadsCatchRegister(node: TryNode, ctx: PassContext): boolean {
     if (structured.graph.blocks[b]?.block === null) continue;
     const insns = instructionsOf(structured, b) ?? [];
     for (const insn of insns) if (instructionReadsRegister(insn, node.catchRegister)) return true;
+  }
+  return false;
+}
+
+/**
+ * Sweep 2026-11-26 (in-paramless-catch): is `node.catchRegister` read on some
+ * path that leaves the handler subtree before the register is written again?
+ * Forward walk over normal and exception edges from the handler's exits; a
+ * block reached through an exception edge is conservatively treated as
+ * reachable from anywhere in its predecessor.
+ */
+export function catchRegisterLiveAfterHandler(node: TryNode, ctx: PassContext): boolean {
+  const structured = ctx.structured!;
+  const regions = structured.graph.cfg.regions;
+  const reg = node.catchRegister;
+  const inHandler = new Set(blocksOf(node.handler));
+  const excSuccs = (b: number): number[] => regions.filter((r) => r.bodyBlocks.has(b)).map((r) => r.handlerBlock);
+  const work: number[] = [];
+  for (const b of inHandler) {
+    for (const e of structured.graph.blocks[b]?.succs ?? []) if (!inHandler.has(e.to)) work.push(e.to);
+    for (const h of excSuccs(b)) if (!inHandler.has(h)) work.push(h);
+  }
+  const seen = new Set<number>();
+  while (work.length > 0) {
+    const b = work.pop()!;
+    if (seen.has(b)) continue;
+    seen.add(b);
+    let killed = false;
+    for (const insn of instructionsOf(structured, b) ?? []) {
+      if (instructionReadsRegister(insn, reg)) return true;
+      if (writtenRegisters(insn).includes(reg)) {
+        killed = true;
+        break;
+      }
+    }
+    for (const h of excSuccs(b)) work.push(h);
+    if (!killed) for (const e of structured.graph.blocks[b]?.succs ?? []) work.push(e.to);
   }
   return false;
 }

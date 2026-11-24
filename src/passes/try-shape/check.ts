@@ -29,7 +29,7 @@ export function check(before: Stmt, after: Stmt, ctx: PassContext): CheckResult 
   if (region === undefined) return { ok: false, reason: "try-shape checked a region that no longer exists" };
   const guardRedundant = reWalkGuardRedundant(before as TryNode, ctx);
   if (guardRedundant !== (after.shape.guard === "redundant")) return { ok: false, reason: "re-walked guard predicate disagrees with the annotation" };
-  const handlerReads = reScanHandlerReadsCatchRegister(before as TryNode, ctx);
+  const handlerReads = reScanHandlerReadsCatchRegister(before as TryNode, ctx) || reWalkCatchRegisterLiveAfter(before as TryNode, ctx);
   if (handlerReads !== after.shape.bindsExc) return { ok: false, reason: "re-scanned catch-register read disagrees with the annotation" };
 
   return { ok: true };
@@ -70,6 +70,35 @@ function reScanHandlerReadsCatchRegister(node: TryNode, ctx: PassContext): boole
         if (i === 0 && written.includes(op.value)) continue;
         return true;
       }
+    }
+  }
+  return false;
+}
+
+/** Second, separately written liveness walk for `match`'s
+ *  `catchRegisterLiveAfterHandler`: breadth-first, from every block outside
+ *  the handler that a handler block can reach by a normal or exception edge. */
+function reWalkCatchRegisterLiveAfter(node: TryNode, ctx: PassContext): boolean {
+  const s = ctx.structured!;
+  const handler = new Set(blocksOf(node.handler));
+  const next = (b: number): number[] => [...(s.graph.blocks[b]?.succs ?? []).map((e) => e.to), ...s.graph.cfg.regions.filter((r) => r.bodyBlocks.has(b)).map((r) => r.handlerBlock)];
+  const queue = [...new Set([...handler].flatMap(next).filter((b) => !handler.has(b)))];
+  const visited = new Set(queue);
+  for (let i = 0; i < queue.length; i++) {
+    const b = queue[i]!;
+    let live = true;
+    for (const insn of instructionsOf(s, b) ?? []) {
+      const writes = writtenRegisters(insn);
+      if (insn.operands.some((op, k) => op.role === "reg" && op.value === node.catchRegister && (k !== 0 || !writes.includes(node.catchRegister)))) return true;
+      if (writes.includes(node.catchRegister)) {
+        live = false;
+        break;
+      }
+    }
+    const succ = live ? next(b) : s.graph.cfg.regions.filter((r) => r.bodyBlocks.has(b)).map((r) => r.handlerBlock);
+    for (const n of succ) if (!visited.has(n)) {
+      visited.add(n);
+      queue.push(n);
     }
   }
   return false;
