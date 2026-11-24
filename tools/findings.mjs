@@ -113,7 +113,7 @@ function sweepKind(check, sig) {
     case "PARSE": return ["syntax", "high"];
     case "FREE": return ["free-ident", /@|:<name>/.test(sig) && sig.includes("<name>") ? "medium" : "high"];
     case "TDZ": return ["miscompile", "high"];
-    case "NEVER-WRITTEN": case "READ-BEFORE-WRITE": return ["miscompile", "medium"];
+    case "NEVER-WRITTEN": case "READ-BEFORE-WRITE": return ["miscompile", sig.endsWith(":deref") ? "high" : "low"];
     case "STUB": return ["stub", "medium"];
     case "FACTORY": case "CALL": return [sig.includes("ReferenceError") ? "crash" : "miscompile", "high"];
     case "WARN": return ["other", "low"];

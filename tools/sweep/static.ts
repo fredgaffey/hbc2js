@@ -137,6 +137,18 @@ export function staticFindings(code: string, app: string, hbc: number): Finding[
     }
     return s;
   };
+  /** How an uninitialised read is used: `deref` throws a TypeError at run
+   *  time if reached (member object, callee, `new`, spread, for-of source);
+   *  `copy` only moves `undefined` along (often a dead copy Hermes itself has). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const useOf = (p: any): string => {
+    const par = p.parentPath?.node; const k = p.key;
+    if (!par) return "copy";
+    if ((par.type === "MemberExpression" || par.type === "OptionalMemberExpression") && k === "object") return "deref";
+    if ((par.type === "CallExpression" || par.type === "NewExpression") && k === "callee") return "deref";
+    if (par.type === "SpreadElement" || ((par.type === "ForOfStatement" || par.type === "ForInStatement") && k === "right")) return "deref";
+    return "copy";
+  };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const inLoopBelow = (p: any, stop: any): boolean => {
     for (let q = p.parentPath; q && q !== stop; q = q.parentPath) if (q.isLoop()) return true;
@@ -189,7 +201,7 @@ export function staticFindings(code: string, app: string, hbc: number): Finding[
         const writes = b.constantViolations as any[];
         if (reads.length === 0) continue;
         if (writes.length === 0) {
-          add(fnAt(reads[0]), "NEVER-WRITTEN", `${nameShape(name)}@${ctxShape(reads[0])}`, name, reads[0].node.loc?.start.line);
+          add(fnAt(reads[0]), "NEVER-WRITTEN", `${nameShape(name)}@${ctxShape(reads[0])}:${useOf(reads[0])}`, name, reads[0].node.loc?.start.line);
           continue;
         }
         const firstWrite = Math.min(...writes.map((w) => w.node.start));
@@ -198,7 +210,7 @@ export function staticFindings(code: string, app: string, hbc: number): Finding[
           if (ownerFn(r) !== declOwner) continue; // closure: runs later
           if (inLoopBelow(r, declOwner)) continue; // back edge may write first
           if (writes.some((w: any) => ownerFn(w) !== declOwner)) break; // a closure may write first
-          add(fnAt(r), "READ-BEFORE-WRITE", `${nameShape(name)}@${ctxShape(r)}`, name, r.node.loc?.start.line);
+          add(fnAt(r), "READ-BEFORE-WRITE", `${nameShape(name)}@${ctxShape(r)}:${useOf(r)}`, name, r.node.loc?.start.line);
           break;
         }
       }
