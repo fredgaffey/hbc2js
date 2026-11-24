@@ -18,6 +18,35 @@ export interface VersionEvidence {
   /** The bundle uses react-navigation's static-config API (`createStaticNavigation`
    *  / `createComponentForStaticNavigation`), which exists only in 7.x. */
   readonly reactNavigation7?: true;
+  /** The bundle carries expo-modules-core itself (its index exports, the
+   *  `__expo_module_name__` marker, or the `ExpoModulesCore` native module): the
+   *  only real evidence that Expo packages are installed. A bare `expo.modules.X`
+   *  / `NativeModules.ExponentConstants` read is a feature probe (vector-icons,
+   *  react-navigation, reanimated all do it) and proves nothing. */
+  readonly expoRuntime?: true;
+}
+
+/** expo-modules-core is in the bundle iff some module's string constants carry its
+ *  own fingerprint: the `__expo_module_name__` class marker, the
+ *  `ExpoModulesCore` TurboModule name, or its index's export names. */
+export function expoRuntimeFromStrings(stringSets: Iterable<readonly string[]>): boolean {
+  for (const strings of stringSets) {
+    if (strings.includes("__expo_module_name__") || strings.includes("ExpoModulesCore")) return true;
+    if (strings.includes("requireNativeViewManager") && strings.includes("CodedError") && strings.includes("SharedObject")) return true;
+  }
+  return false;
+}
+
+/** `react-native`'s own `package.json` (RN <= 0.7x bundles it: `{name, version,
+ *  description, ...}` as one object literal). The `version` string is the exact RN
+ *  version, readable even when the ReactNativeVersion module was tree-shaken out
+ *  (RN 0.73 production bundles). Pure over the literal's decoded key/value pairs. */
+export function rnVersionFromPackageJsonLiteral(entries: ReadonlyMap<string, string>): string | null {
+  if (entries.get("name") !== "react-native") return null;
+  const v = entries.get("version");
+  if (v === undefined || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(v)) return null;
+  if (!entries.has("description") && !entries.has("repository")) return null;
+  return v;
 }
 
 export interface InstructionLike {
@@ -75,7 +104,8 @@ export function reactVersionFromStrings(stringSets: Iterable<readonly string[]>)
 /** Older RN builds (<= 0.72 shape) emit `{major: 0, minor: 72, patch: 17, ...}`
  *  as one `NewObjectWithBuffer*`: keys and numeric values live in the literal
  *  buffers, not in register loads. */
-function rnVersionFromObjectBuffer(mod: HbcModule, insns: readonly Instruction[]): string | null {
+type Lit = { readonly kind: string; readonly value?: number; readonly stringId?: number } | null;
+function* objectLiterals(mod: HbcModule, insns: readonly Instruction[]): Generator<{ keys: readonly string[]; vals: readonly Lit[] }> {
   for (const insn of insns) {
     if (!insn.name.startsWith("NewObjectWithBuffer")) continue;
     const o = insn.operands;
@@ -96,9 +126,15 @@ function rnVersionFromObjectBuffer(mod: HbcModule, insns: readonly Instruction[]
       continue;
     }
     if (!keys || !vals) continue;
+    yield { keys, vals };
+  }
+}
+
+function rnVersionFromObjectBuffer(mod: HbcModule, insns: readonly Instruction[]): string | null {
+  for (const { keys, vals } of objectLiterals(mod, insns)) {
     const got = new Map<string, number>();
     keys.forEach((k, i) => {
-      const v = vals![i];
+      const v = vals[i];
       if (VERSION_KEYS.has(k) && v && (v.kind === "integer" || v.kind === "number") && typeof v.value === "number") got.set(k, v.value);
     });
     if (got.size === 3) return `${got.get("major")}.${got.get("minor")}.${got.get("patch")}`;
@@ -106,8 +142,29 @@ function rnVersionFromObjectBuffer(mod: HbcModule, insns: readonly Instruction[]
   return null;
 }
 
+function rnVersionFromPackageJson(mod: HbcModule, insns: readonly Instruction[]): string | null {
+  for (const { keys, vals } of objectLiterals(mod, insns)) {
+    if (!keys.includes("name") || !keys.includes("version")) continue;
+    const entries = new Map<string, string>();
+    keys.forEach((k, i) => {
+      const v = vals[i];
+      if (v && v.kind === "string" && typeof v.stringId === "number") {
+        try {
+          entries.set(k, mod.strings.get(v.stringId));
+        } catch {
+          /* unreadable string id: skip the member */
+        }
+      } else if (v) entries.set(k, "");
+    });
+    const found = rnVersionFromPackageJsonLiteral(entries);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
 export function detectVersionEvidence(mod: HbcModule, modules: readonly { readonly stringConstants: readonly string[]; readonly functionIndices: readonly number[] }[]): VersionEvidence {
-  const out: { reactNative?: string; react?: string; reactNavigation7?: true } = {};
+  const out: { reactNative?: string; react?: string; reactNavigation7?: true; expoRuntime?: true } = {};
+  if (expoRuntimeFromStrings(modules.map((m) => m.stringConstants))) out.expoRuntime = true;
   if (modules.some((m) => m.stringConstants.includes("createComponentForStaticNavigation") || m.stringConstants.includes("createStaticNavigation"))) out.reactNavigation7 = true;
   const react = reactVersionFromStrings(modules.map((m) => m.stringConstants));
   if (react !== null) out.react = react;
@@ -135,5 +192,22 @@ export function detectVersionEvidence(mod: HbcModule, modules: readonly { readon
       }
     }
   }
+  for (const m of modules) {
+    if (!m.stringConstants.includes("react-native") || !m.stringConstants.includes("version")) continue;
+    for (const fi of m.functionIndices) {
+      let insns: readonly Instruction[];
+      try {
+        insns = decodeFunction(mod, fi).instructions as readonly Instruction[];
+      } catch {
+        continue;
+      }
+      const v = rnVersionFromPackageJson(mod, insns);
+      if (v !== null) {
+        out.reactNative = v;
+        return out;
+      }
+    }
+  }
   return out;
 }
+

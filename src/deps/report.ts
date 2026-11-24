@@ -6,6 +6,7 @@ import type { BundleSummary } from "./bundles.ts";
 import type { ConfidenceTier, MatchReport } from "./match.ts";
 import type { Evidence, ModuleGuess } from "./guess.ts";
 import { isHintEligibleEvidence } from "./guess.ts";
+import { probeVerdict } from "./optional-probes.ts";
 import type { ConfirmResult } from "./confirm.ts";
 import type { ClassificationReport } from "./classify.ts";
 import type { NativeChannelReport } from "../native/native-deps.ts";
@@ -56,7 +57,7 @@ export interface SuppressedGuess {
   readonly package: string;
   readonly confidence: number;
   readonly evidence: readonly string[];
-  readonly reason: "single-evidence-kind" | "below-confidence-floor" | "npm-search-only" | "db-match-negative";
+  readonly reason: "single-evidence-kind" | "below-confidence-floor" | "npm-search-only" | "db-match-negative" | "no-expo-runtime" | "optional-probe";
 }
 
 export interface HintedDep {
@@ -101,6 +102,8 @@ export interface DepsReport {
   readonly reactVersion?: string | null;
   /** True when the bundle uses react-navigation's 7.x-only static-config API. */
   readonly reactNavigationApi7?: boolean;
+  /** expo-modules-core itself is in the bundle (the evidence bar for every `expo*` package). */
+  readonly expoRuntime?: boolean;
   /** null when no react-native version was detected at all; otherwise
    *  whether `reactNativeVersion` falls inside the RN release range the
    *  parsed HBC bytecode version is actually known to ship (F4,
@@ -401,6 +404,7 @@ export function buildReport(input: string, matchReport: MatchReport, guesses: re
     bestGuessByModule.set(g.factoryFunctionIndex, best.package);
     for (const e of best.evidence) addGuess(best.package, best.version, best.confidence, 1, e.kind, `${e.kind}: ${e.detail}`);
   }
+  const expoRuntime = versionEvidence.expoRuntime === true;
   const guessedDeps: GuessedDep[] = [];
   const hintedDeps: HintedDep[] = [];
   const suppressedGuesses: SuppressedGuess[] = [];
@@ -408,7 +412,9 @@ export function buildReport(input: string, matchReport: MatchReport, guesses: re
     const row = { package: pkg, version: v.version, confidence: v.confidence, modules: v.modules, evidence: [...v.evidence] };
     const nonSearchKinds = [...v.kinds].filter((k) => k !== "npm-search");
     let reason: SuppressedGuess["reason"] | null = null;
-    if (dbNegative.has(pkg)) reason = "db-match-negative";
+    const probe = probeVerdict(pkg, v.kinds, expoRuntime);
+    if (probe !== null) reason = probe;
+    else if (dbNegative.has(pkg)) reason = "db-match-negative";
     else if (nonSearchKinds.length === 0) reason = "npm-search-only";
     else if (v.kinds.size < 2) {
       const [soleKind] = nonSearchKinds;
@@ -421,11 +427,12 @@ export function buildReport(input: string, matchReport: MatchReport, guesses: re
     if (reason === null) guessedDeps.push(row);
     else suppressedGuesses.push({ package: pkg, confidence: v.confidence, evidence: row.evidence, reason });
   }
-  // `expo` itself has no native-module name of its own in a bundle, but any
-  // Expo SDK module (expo-*, ExpoModulesCore) requires it.
+  // `expo` itself has no native-module name of its own in a bundle. It is
+  // implied only by real Expo evidence: expo-modules-core in the bundle (a
+  // bare native-module/probe string never gets here, see `probeVerdict`).
   const expoModules = [...confirmedDeps.map((d) => d.package), ...guessedDeps.map((d) => d.package), ...hintedDeps.map((d) => d.package)].filter((n) => n.startsWith("expo-"));
-  if (expoModules.length > 0 && !confirmedPackageNames.has("expo") && !guessedDeps.some((d) => d.package === "expo") && !hintedDeps.some((d) => d.package === "expo")) {
-    hintedDeps.push({ package: "expo", version: null, confidence: 0.7, evidenceKind: "dependency-edge", evidence: [`required by ${expoModules.length} detected Expo SDK module(s): ${expoModules.slice(0, 4).join(", ")}`] });
+  if (expoRuntime && !confirmedPackageNames.has("expo") && !guessedDeps.some((d) => d.package === "expo") && !hintedDeps.some((d) => d.package === "expo")) {
+    hintedDeps.push({ package: "expo", version: null, confidence: 0.7, evidenceKind: "dependency-edge", evidence: [expoModules.length > 0 ? `expo-modules-core is in the bundle; required by ${expoModules.length} detected Expo SDK module(s): ${expoModules.slice(0, 4).join(", ")}` : "expo-modules-core is in the bundle"] });
   }
   guessedDeps.sort((a, b) => b.confidence - a.confidence);
   hintedDeps.sort((a, b) => b.confidence - a.confidence);
@@ -513,6 +520,7 @@ export function buildReport(input: string, matchReport: MatchReport, guesses: re
     reactNativeVersionSource,
     reactVersion: versionEvidence.react ?? null,
     ...(versionEvidence.reactNavigation7 === true ? { reactNavigationApi7: true } : {}),
+    ...(expoRuntime ? { expoRuntime: true } : {}),
     reactNativeVersionConsistentWithHbc: rnReconcile.consistent,
     reactNativeVersionExpectedRange: rnReconcile.expectedRange,
     confirmedDeps,
