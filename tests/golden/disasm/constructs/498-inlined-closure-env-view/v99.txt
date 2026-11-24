@@ -1,0 +1,171 @@
+; hbc2js disassembly of 498-inlined-closure-env-view/v99.hbc
+; version=99 layout=E opcodeTable=hbc99-mar2026 functions=7 strings=18 globalCodeIndex=0
+function #0 "global"  params=1 frame=20 env=0 flags=strict,dbg,overflowed  @0x000001b8 size=380
+  0000  DeclareGlobalVar     s17 "sink"
+  0005  DeclareGlobalVar     s10 "M"
+  000a  DeclareGlobalVar     s13 "init"
+  000f  DeclareGlobalVar     s8 "h"
+  0014  DeclareGlobalVar     s14 "out"
+  0019  DeclareGlobalVar     s9 "h2"
+  001e  GetGlobalObject      r4
+  0020  LoadConstUndefined   r2
+  0022  CreateClosure        r5, r2, f1 "M"
+  0027  PutByIdStrict        r4, r5, #c0, s10 "M"
+  002d  NewObject            r5
+  002f  PutByIdStrict        r4, r5, #c1, s17 "sink"
+  0035  GetByIdShort         r5, r4, #c0, s10 "M"
+  003a  LoadConstUInt8       r0, 5
+  003d  Call2                r5, r5, r2, r0
+  0042  PutByIdStrict        r4, r5, #c2, s13 "init"
+  0048  GetByIdShort         r5, r4, #c1, s13 "init"
+  004d  LoadConstUInt8       r0, 3
+  0050  Call2                r5, r5, r2, r0
+  0055  PutByIdStrict        r4, r5, #c3, s8 "h"
+  005b  GetByIdShort         r5, r4, #c2, s17 "sink"
+  0060  GetByIdShort         r6, r5, #c3, s11 "c"
+  0065  GetByIdShort         r5, r6, #c4, s4 "f"
+  006a  LoadConstUInt8       r1, 2
+  006d  LoadConstUInt8       r0, 1
+  0070  Call3                r6, r5, r6, r0, r1
+  0076  NewArray             r5, 2
+  007a  DefineOwnInDenseArray r5, r6, 0
+  007e  GetByIdShort         r6, r4, #c2, s17 "sink"
+  0083  GetByIdShort         r7, r6, #c3, s11 "c"
+  0088  GetByIdShort         r6, r7, #c5, s6 "g"
+  008d  Call1                r6, r6, r7
+  0091  DefineOwnInDenseArray r5, r6, 1
+  0095  PutByIdStrict        r4, r5, #c4, s14 "out"
+  009b  GetByIdShort         r5, r4, #c2, s17 "sink"
+  00a0  LoadConstNull        r3
+  00a2  PutByIdStrict        r5, r3, #c5, s11 "c"
+  00a8  GetByIdShort         r5, r4, #c6, s8 "h"
+  00ad  Call1                r5, r5, r2
+  00b1  GetByIdShort         r8, r4, #c7, s14 "out"
+  00b6  GetByIdShort         r7, r8, #c8, s16 "push"
+  00bb  GetByIdShort         r5, r4, #c2, s17 "sink"
+  00c0  GetByIdShort         r6, r5, #c3, s11 "c"
+  00c5  GetByIdShort         r5, r6, #c4, s4 "f"
+  00ca  Call1                r6, r5, r6
+  00ce  GetByIdShort         r5, r4, #c2, s17 "sink"
+  00d3  GetByIdShort         r9, r5, #c3, s11 "c"
+  00d8  GetByIdShort         r5, r9, #c5, s6 "g"
+  00dd  Call1                r5, r5, r9
+  00e1  Call3                r5, r7, r8, r6, r5
+  00e7  GetByIdShort         r5, r4, #c1, s13 "init"
+  00ec  LoadConstUInt8       r1, 10
+  00ef  Call2                r5, r5, r2, r1
+  00f4  PutByIdStrict        r4, r5, #c6, s9 "h2"
+  00fa  GetByIdShort         r8, r4, #c7, s14 "out"
+  00ff  GetByIdShort         r7, r8, #c8, s16 "push"
+  0104  GetByIdShort         r5, r4, #c2, s17 "sink"
+  0109  GetByIdShort         r6, r5, #c3, s11 "c"
+  010e  GetByIdShort         r5, r6, #c4, s4 "f"
+  0113  Call2                r6, r5, r6, r0
+  0118  GetByIdShort         r5, r4, #c2, s17 "sink"
+  011d  GetByIdShort         r9, r5, #c3, s11 "c"
+  0122  GetByIdShort         r5, r9, #c5, s6 "g"
+  0127  Call1                r5, r5, r9
+  012b  Call3                r5, r7, r8, r6, r5
+  0131  GetByIdShort         r5, r4, #c6, s8 "h"
+  0136  Call1                r5, r5, r2
+  013a  GetByIdShort         r7, r4, #c7, s14 "out"
+  013f  GetByIdShort         r6, r7, #c8, s16 "push"
+  0144  GetByIdShort         r5, r4, #c2, s17 "sink"
+  0149  GetByIdShort         r8, r5, #c3, s11 "c"
+  014e  GetByIdShort         r5, r8, #c5, s6 "g"
+  0153  Call1                r5, r5, r8
+  0157  Call2                r5, r6, r7, r5
+  015c  TryGetById           r5, r4, #c9, s15 "print"
+  0162  GetByIdShort         r7, r4, #c7, s14 "out"
+  0167  GetByIdShort         r6, r7, #c10, s12 "join"
+  016c  LoadConstString      r4, s0 ","
+  0170  Call2                r4, r6, r7, r4
+  0175  Call2                r4, r5, r2, r4
+  017a  Ret                  r4
+
+function #1 "M"  params=2 frame=3 env=0 flags=strict  @0x00000334 size=29
+  0000  CreateFunctionEnvironment r0, 1
+  0003  CreateFunctionEnvironment r1, 1
+  0006  LoadParam            r2, 1
+  0009  StoreToEnvironment   r1, 0, r2
+  000d  CreateClosure        r1, r1, f3 "o"
+  0012  StoreToEnvironment   r0, 0, r1
+  0016  CreateClosure        r0, r0, f2 "init"
+  001b  Ret                  r0
+
+function #2 "init"  params=2 frame=14 env=0 flags=strict,dbg,overflowed  @0x00000351 size=111
+  0000  CreateTopLevelEnvironment r0, 2
+  0006  LoadParam            r2, 1
+  0009  StoreToEnvironment   r0, 0, r2
+  000d  GetParentEnvironment r1, 0
+  0010  LoadFromEnvironment  r3, r1, 0
+  0014  StoreToEnvironment   r0, 1, r3
+  0018  GetGlobalObject      r1
+  001a  GetByIdShort         r4, r1, #c0, s17 "sink"
+  001f  GetByIdShort         r4, r4, #c1, s5 "flag"
+  0024  JmpTrue              L2, r4
+  0027  JmpTypeOfIs          L1, r3, 128
+  002f  LoadConstString      r5, s1 "Trying to call a non-function"
+  0033  CallBuiltin          r4, b44 "throwTypeError", 2
+L1:
+  0037  GetClosureEnvironment r3, r3
+  003a  CreateEnvironment    r3, r3, 1
+  0041  StoreToEnvironment   r3, 0, r2
+  0045  GetByIdShort         r2, r1, #c0, s17 "sink"
+  004a  NewObjectWithBuffer  r1, sh0(numProps=2), lit@0x0000
+  0050  CreateClosure        r4, r3, f5 "f"
+  0055  PutOwnBySlotIdx      r1, r4, 0
+  0059  CreateClosure        r3, r3, f6 "g"
+  005e  PutOwnBySlotIdx      r1, r3, 1
+  0062  PutByIdStrict        r2, r1, #c0, s11 "c"
+L2:
+  0068  CreateClosure        r0, r0, f4 "h"
+  006d  Ret                  r0
+
+function #3 "o"  params=2 frame=0 env=0 flags=strict  @0x000003c0 size=0
+
+function #4 "h"  params=1 frame=14 env=0 flags=strict,dbg,overflowed  @0x000003c0 size=95
+  0000  GetGlobalObject      r1
+  0002  GetByIdShort         r2, r1, #c0, s17 "sink"
+  0007  GetByIdShort         r2, r2, #c1, s5 "flag"
+  000c  JmpTrue              L2, r2
+  000f  GetParentEnvironment r2, 0
+  0012  LoadFromEnvironment  r3, r2, 1
+  0016  LoadFromEnvironment  r2, r2, 0
+  001a  JmpTypeOfIs          L1, r3, 128
+  0022  LoadConstString      r5, s1 "Trying to call a non-function"
+  0026  CallBuiltin          r4, b44 "throwTypeError", 2
+L1:
+  002a  GetClosureEnvironment r3, r3
+  002d  CreateEnvironment    r3, r3, 1
+  0034  StoreToEnvironment   r3, 0, r2
+  0038  GetByIdShort         r2, r1, #c0, s17 "sink"
+  003d  NewObjectWithBuffer  r1, sh0(numProps=2), lit@0x0000
+  0043  CreateClosure        r4, r3, f5 "f"
+  0048  PutOwnBySlotIdx      r1, r4, 0
+  004c  CreateClosure        r3, r3, f6 "g"
+  0051  PutOwnBySlotIdx      r1, r3, 1
+  0055  PutByIdStrict        r2, r1, #c0, s11 "c"
+L2:
+  005b  LoadConstUndefined   r0
+  005d  Ret                  r0
+
+function #5 "f"  params=1 frame=13 env=0 flags=strict,dbg,overflowed  @0x0000041f size=35
+  0000  LoadConstZero        r4
+  0002  CallBuiltin          r1, b47 "copyRestArgs", 2
+  0006  GetParentEnvironment r2, 1
+  0009  LoadFromEnvironment  r3, r2, 0
+  000d  GetParentEnvironment r2, 0
+  0010  LoadFromEnvironment  r2, r2, 0
+  0014  Add                  r2, r3, r2
+  0018  GetByIdShort         r1, r1, #c0, s7 "length"
+  001d  Add                  r1, r2, r1
+  0021  Ret                  r1
+
+function #6 "g"  params=1 frame=2 env=0 flags=strict,dbg,overflowed  @0x00000442 size=20
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r1, r0, 0
+  0007  GetParentEnvironment r0, 1
+  000a  LoadFromEnvironment  r0, r0, 0
+  000e  Add                  r0, r1, r0
+  0012  Ret                  r0

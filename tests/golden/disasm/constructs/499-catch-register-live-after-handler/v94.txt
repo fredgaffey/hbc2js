@@ -1,0 +1,103 @@
+; hbc2js disassembly of 499-catch-register-live-after-handler/v94.hbc
+; version=94 layout=C opcodeTable=hbc94 functions=7 strings=13 globalCodeIndex=0
+function #0 "global"  params=1 frame=17 env=0 flags=strict,dbg  @0x00000174 size=185
+  0000  DeclareGlobalVar     s10 "out"
+  0005  DeclareGlobalVar     s7 "f"
+  000a  DeclareGlobalVar     s9 "k"
+  000f  CreateEnvironment    r1
+  0011  CreateClosure        r2, r1, f1 "f"
+  0016  GetGlobalObject      r0
+  0018  PutById              r0, r2, #c1, s7 "f"
+  001e  CreateClosure        r2, r1, f2 "k"
+  0023  PutById              r0, r2, #c2, s9 "k"
+  0029  NewArray             r2, 0
+  002d  PutById              r0, r2, #c3, s10 "out"
+  0033  GetByIdShort         r6, r0, #c1, s10 "out"
+  0038  GetByIdShort         r5, r6, #c2, s12 "push"
+  003d  GetByIdShort         r4, r0, #c3, s7 "f"
+  0042  LoadConstUndefined   r2
+  0044  CreateClosure        r3, r1, f3 ""
+  0049  Call2                r4, r4, r2, r3
+  004e  GetByIdShort         r7, r0, #c3, s7 "f"
+  0053  CreateClosure        r3, r1, f4 ""
+  0058  Call2                r3, r7, r2, r3
+  005d  Call3                r3, r5, r6, r4, r3
+  0063  GetByIdShort         r5, r0, #c1, s10 "out"
+  0068  GetByIdShort         r4, r5, #c2, s12 "push"
+  006d  GetByIdShort         r7, r0, #c4, s9 "k"
+  0072  CreateClosure        r6, r1, f5 ""
+  0077  LoadConstUInt8       r3, 2
+  007a  Call3                r3, r7, r2, r6, r3
+  0080  GetByIdShort         r7, r0, #c4, s9 "k"
+  0085  CreateClosure        r6, r1, f6 ""
+  008a  LoadConstUInt8       r1, 1
+  008d  Call3                r1, r7, r2, r6, r1
+  0093  Call3                r1, r4, r5, r3, r1
+  0099  TryGetById           r1, r0, #c5, s11 "print"
+  009f  GetByIdShort         r4, r0, #c1, s10 "out"
+  00a4  GetByIdShort         r3, r4, #c6, s8 "join"
+  00a9  LoadConstString      r0, s1 ","
+  00ad  Call2                r0, r3, r4, r0
+  00b2  Call2                r0, r1, r2, r0
+  00b7  Ret                  r0
+
+function #1 "f"  params=2 frame=10 env=0 flags=strict,exc,dbg  @0x0000022d size=17
+  .try T1..T2 -> L1 ; handler 0
+  0000  LoadConstZero        r0
+T1:
+  0002  LoadParam            r2, 1
+  0005  LoadConstUndefined   r1
+  0007  Call1                r0, r2, r1
+T2:
+  000b  Jmp                  L2
+L1:
+  000d  Catch                r0
+L2:
+  000f  Ret                  r0
+
+function #2 "k"  params=3 frame=12 env=0 flags=strict,exc,dbg  @0x0000023e size=51
+  .try T1..T2 -> L1 ; handler 0
+  0000  LoadConstUndefined   r3
+  0002  LoadConstUndefined   r1
+T1:
+  0004  LoadParam            r2, 1
+  0007  LoadParam            r0, 2
+  000a  Call2                r1, r2, r3, r0
+T2:
+  000f  Jmp                  L2
+L1:
+  0011  Catch                r1
+L2:
+  0013  Mov                  r0, r1
+  0016  TypeOf               r2, r0
+  0019  LoadConstString      r0, s6 "string"
+  001d  JStrictEqual         L3, r2, r0
+  0021  Mov                  r0, r1
+  0024  Jmp                  L4
+L3:
+  0026  Mov                  r2, r1
+  0029  LoadConstString      r1, s5 "caught:"
+  002d  Add                  r0, r1, r2
+L4:
+  0031  Ret                  r0
+
+function #3 ""  params=1 frame=1 env=0 flags=strict,dbg  @0x00000271 size=6
+  0000  LoadConstString      r0, s4 "boom"
+  0004  Throw                r0
+
+function #4 ""  params=1 frame=1 env=0 flags=strict  @0x00000277 size=5
+  0000  LoadConstUInt8       r0, 4
+  0003  Ret                  r0
+
+function #5 ""  params=2 frame=2 env=0 flags=strict,dbg  @0x0000027c size=18
+  0000  LoadParam            r0, 1
+  0003  LoadConstUInt8       r1, 1
+  0006  JGreater             L1, r0, r1
+  000a  Ret                  r0
+L1:
+  000c  LoadConstString      r0, s2 "big"
+  0010  Throw                r0
+
+function #6 ""  params=2 frame=1 env=0 flags=strict  @0x0000028e size=5
+  0000  LoadParam            r0, 1
+  0003  Ret                  r0

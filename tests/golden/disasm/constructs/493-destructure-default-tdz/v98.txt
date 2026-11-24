@@ -1,0 +1,55 @@
+; hbc2js disassembly of 493-destructure-default-tdz/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=2 strings=13 globalCodeIndex=0
+function #0 "global"  params=1 frame=15 env=0 flags=strict,dbg,overflowed  @0x00000168 size=75
+  0000  DeclareGlobalVar     s6 "split"
+  0005  GetGlobalObject      r1
+  0007  LoadConstUndefined   r0
+  0009  CreateClosure        r2, r0, f1 "split"
+  000e  PutByIdStrict        r1, r2, #c0, s6 "split"
+  0014  TryGetById           r3, r1, #c0, s10 "print"
+  001a  GetByIdShort         r2, r1, #c1, s6 "split"
+  001f  LoadConstString      r4, s3 "s"
+  0023  Call2                r2, r2, r0, r4
+  0028  Call2                r2, r3, r0, r2
+  002d  TryGetById           r2, r1, #c0, s10 "print"
+  0033  GetByIdShort         r3, r1, #c1, s6 "split"
+  0038  NewObjectWithBuffer  r1, sh0(numProps=1), lit@0x0000
+  003e  Call3                r1, r3, r0, r4, r1
+  0044  Call2                r1, r2, r0, r1
+  0049  Ret                  r1
+
+function #1 "split"  params=2 frame=16 env=0 flags=strict,dbg,overflowed  @0x000001b3 size=121
+  0000  LoadParam            r4, 2
+  0003  LoadConstUndefined   r1
+  0005  JStrictNotEqual      L1, r4, r1
+  0009  NewObject            r4
+L1:
+  000b  GetByIdShort         r3, r4, #c0, s9 "passphrase"
+  0010  JStrictNotEqual      L2, r3, r1
+  0014  LoadConstString      r3, s0 ""
+L2:
+  0018  GetByIdShort         r2, r4, #c1, s11 "threshold"
+  001d  JStrictNotEqual      L3, r2, r1
+  0021  LoadConstUInt8       r2, 1
+L3:
+  0024  GetByIdShort         r5, r4, #c2, s5 "groups"
+  0029  JStrictNotEqual      L4, r5, r1
+  002d  NewArray             r4, 1
+  0031  NewArrayWithBuffer   r6, 3, 3, lit@0x0005
+  0039  DefineOwnInDenseArray r4, r6, 0
+  003d  Mov                  r5, r4
+L4:
+  0040  LoadParam            r6, 1
+  0043  NewArray             r4, 4
+  0047  DefineOwnInDenseArray r4, r6, 0
+  004b  DefineOwnInDenseArray r4, r3, 1
+  004f  DefineOwnInDenseArray r4, r2, 2
+  0053  GetGlobalObject      r2
+  0055  TryGetById           r3, r2, #c3, s7 "JSON"
+  005b  GetByIdShort         r2, r3, #c4, s12 "stringify"
+  0060  Call2                r2, r2, r3, r5
+  0065  DefineOwnInDenseArray r4, r2, 3
+  0069  GetByIdShort         r3, r4, #c5, s8 "join"
+  006e  LoadConstString      r2, s4 "|"
+  0072  Call2                r2, r3, r4, r2
+  0077  Ret                  r2

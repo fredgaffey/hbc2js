@@ -1,0 +1,178 @@
+; hbc2js disassembly of 490-orphan-multisite-closure/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=9 strings=23 globalCodeIndex=0
+function #0 "global"  params=1 frame=18 env=0 flags=dbg,overflowed  @0x00000248 size=228
+  0000  DeclareGlobalVar     s10 "__hbc_registry"
+  0005  DeclareGlobalVar     s8 "__hbc_cache"
+  000a  DeclareGlobalVar     s6 "__d"
+  000f  DeclareGlobalVar     s11 "__r"
+  0014  DeclareGlobalVar     s21 "m1"
+  0019  GetGlobalObject      r2
+  001b  LoadConstUndefined   r1
+  001d  CreateClosure        r3, r1, f1 "__d"
+  0022  PutByIdLoose         r2, r3, #c0, s6 "__d"
+  0028  CreateClosure        r3, r1, f2 "__r"
+  002d  PutByIdLoose         r2, r3, #c1, s11 "__r"
+  0033  NewObject            r3
+  0035  PutByIdLoose         r2, r3, #c2, s10 "__hbc_registry"
+  003b  NewObject            r3
+  003d  PutByIdLoose         r2, r3, #c3, s8 "__hbc_cache"
+  0043  GetByIdShort         r5, r2, #c0, s6 "__d"
+  0048  LoadConstZero        r0
+  004a  NewArray             r4, 0
+  004e  CreateFunctionEnvironment r3, 0
+  0051  CreateClosure        r3, r3, f3 ""
+  0056  Call4                r3, r5, r1, r3, r0, r4
+  005d  GetByIdShort         r5, r2, #c0, s6 "__d"
+  0062  LoadConstUInt8       r0, 1
+  0065  NewArrayWithBuffer   r4, 1, 1, lit@0x0000
+  006d  CreateClosure        r3, r1, f4 ""
+  0072  Call4                r3, r5, r1, r3, r0, r4
+  0079  GetByIdShort         r3, r2, #c1, s11 "__r"
+  007e  Call2                r3, r3, r1, r0
+  0083  PutByIdLoose         r2, r3, #c4, s21 "m1"
+  0089  TryGetById           r4, r2, #c2, s22 "print"
+  008f  GetByIdShort         r3, r2, #c3, s21 "m1"
+  0094  GetByIdShort         r3, r3, #c4, s16 "count"
+  0099  Call2                r3, r4, r1, r3
+  009e  TryGetById           r4, r2, #c2, s22 "print"
+  00a4  GetByIdShort         r6, r2, #c3, s21 "m1"
+  00a9  GetByIdShort         r5, r6, #c5, s15 "both"
+  00ae  NewArrayWithBuffer   r3, 2, 2, lit@0x0005
+  00b6  Call2                r3, r5, r6, r3
+  00bb  Call2                r3, r4, r1, r3
+  00c0  TryGetById           r3, r2, #c2, s22 "print"
+  00c6  GetByIdShort         r5, r2, #c3, s21 "m1"
+  00cb  GetByIdShort         r4, r5, #c5, s15 "both"
+  00d0  NewArrayWithBuffer   r2, 2, 2, lit@0x000e
+  00d8  Call2                r2, r4, r5, r2
+  00dd  Call2                r2, r3, r1, r2
+  00e2  Ret                  r2
+
+function #1 "__d"  params=4 frame=4 env=0 flags=dbg,overflowed  @0x0000032c size=38
+  0000  GetGlobalObject      r1
+  0002  GetByIdShort         r3, r1, #c0, s10 "__hbc_registry"
+  0007  NewObjectWithBuffer  r2, sh0(numProps=2), lit@0x0016
+  000d  LoadParam            r1, 1
+  0010  PutOwnBySlotIdx      r2, r1, 0
+  0014  LoadParam            r1, 3
+  0017  PutOwnBySlotIdx      r2, r1, 1
+  001b  LoadParam            r1, 2
+  001e  PutByValLoose        r3, r1, r2
+  0022  LoadConstUndefined   r0
+  0024  Ret                  r0
+
+function #2 "__r"  params=2 frame=25 env=0 flags=dbg,overflowed  @0x00000352 size=110
+  0000  LoadParam            r2, 1
+  0003  GetGlobalObject      r1
+  0005  GetByIdShort         r3, r1, #c0, s8 "__hbc_cache"
+  000a  GetByVal             r3, r3, r2
+  000e  JmpTrue              L1, r3
+  0011  GetByIdShort         r3, r1, #c1, s10 "__hbc_registry"
+  0016  GetByVal             r9, r3, r2
+  001a  NewObjectWithBuffer  r3, sh1(numProps=1), lit@0x0017
+  0020  NewObject            r4
+  0022  PutOwnBySlotIdx      r3, r4, 0
+  0026  GetByIdShort         r4, r1, #c0, s8 "__hbc_cache"
+  002b  PutByValLoose        r4, r2, r3
+  002f  GetByIdShort         r8, r9, #c2, s19 "factory"
+  0034  TryGetById           r16, r1, #c3, s5 "globalThis"
+  003a  GetByIdShort         r15, r1, #c4, s11 "__r"
+  003f  GetByIdShort         r11, r3, #c5, s18 "exports"
+  0044  GetByIdShort         r10, r9, #c6, s7 "deps"
+  0049  Mov                  r17, r9
+  004c  LoadConstNull        r14
+  004e  LoadConstNull        r13
+  0050  Mov                  r12, r3
+  0053  Call                 r4, r8, 8
+  0057  GetByIdShort         r3, r3, #c5, s18 "exports"
+  005c  Ret                  r3
+L1:
+  005e  GetByIdShort         r1, r1, #c0, s8 "__hbc_cache"
+  0063  GetByVal             r1, r1, r2
+  0067  GetByIdShort         r1, r1, #c5, s18 "exports"
+  006c  Ret                  r1
+
+function #3 ""  params=8 frame=16 env=0 flags=strict,dbg,overflowed  @0x000003c0 size=90
+  0000  GetParentEnvironment r2, 0
+  0003  LoadParam            r3, 6
+  0006  CreateClosure        r4, r2, f6 "all"
+  000b  PutByIdStrict        r3, r4, #c0, s12 "all"
+  0011  CreateClosure        r2, r2, f7 ""
+  0016  PutByIdStrict        r3, r2, #c1, s17 "twice"
+  001c  NewArrayWithBuffer   r5, 2, 2, lit@0x0005
+  0024  GetByIdShort         r4, r5, #c0, s9 "every"
+  0029  LoadConstUndefined   r0
+  002b  CreateClosure        r2, r0, f5 ""
+  0030  Call2                r2, r4, r5, r2
+  0035  JmpFalse             L1, r2
+  0038  NewArrayWithBuffer   r6, 1, 1, lit@0x0020
+  0040  GetByIdShort         r5, r6, #c0, s9 "every"
+  0045  CreateClosure        r4, r0, f5 ""
+  004a  Call2                r4, r5, r6, r4
+  004f  Not                  r2, r4
+L1:
+  0052  PutByIdStrict        r3, r2, #c2, s14 "atLoad"
+  0058  Ret                  r0
+
+function #4 ""  params=8 frame=15 env=0 flags=strict,dbg,overflowed  @0x0000041a size=74
+  0000  CreateFunctionEnvironment r1, 1
+  0003  LoadParam            r2, 6
+  0006  LoadParam            r3, 7
+  0009  GetByIndex           r4, r3, 0
+  000d  LoadConstUndefined   r0
+  000f  LoadParam            r3, 2
+  0012  Call2                r3, r3, r0, r4
+  0017  StoreToEnvironment   r1, 0, r3
+  001b  NewArrayWithBuffer   r5, 4, 4, lit@0x0018
+  0023  GetByIdShort         r4, r5, #c0, s20 "filter"
+  0028  CreateClosure        r3, r0, f5 ""
+  002d  Call2                r3, r4, r5, r3
+  0032  GetByIdShort         r3, r3, #c1, s13 "length"
+  0037  PutByIdStrict        r2, r3, #c0, s16 "count"
+  003d  CreateClosure        r1, r1, f8 ""
+  0042  PutByIdStrict        r2, r1, #c1, s15 "both"
+  0048  Ret                  r0
+
+function #5 ""  params=2 frame=3 env=0 flags=strict,dbg,overflowed  @0x00000464 size=22
+  0000  LoadParam            r2, 1
+  0003  TypeOfIs             r0, r2, 32
+  0008  JmpTypeOfIs          L1, r2, 479
+  0010  StrictEq             r0, r2, r2
+L1:
+  0014  Ret                  r0
+
+function #6 "all"  params=2 frame=13 env=0 flags=strict,dbg,overflowed  @0x0000047a size=22
+  0000  LoadParam            r3, 1
+  0003  GetByIdShort         r2, r3, #c0, s9 "every"
+  0008  LoadConstUndefined   r0
+  000a  CreateClosure        r1, r0, f5 ""
+  000f  Call2                r1, r2, r3, r1
+  0014  Ret                  r1
+
+function #7 ""  params=3 frame=14 env=0 flags=strict,dbg,overflowed  @0x00000490 size=52
+  0000  LoadParam            r3, 1
+  0003  LoadParam            r4, 2
+  0006  GetByIdShort         r2, r3, #c0, s9 "every"
+  000b  LoadConstUndefined   r0
+  000d  CreateClosure        r1, r0, f5 ""
+  0012  Call2                r2, r2, r3, r1
+  0017  LoadConstString      r1, s1 ":"
+  001b  Add                  r2, r2, r1
+  001f  GetByIdShort         r3, r4, #c0, s9 "every"
+  0024  CreateClosure        r1, r0, f5 ""
+  0029  Call2                r1, r3, r4, r1
+  002e  Add                  r1, r2, r1
+  0032  Ret                  r1
+
+function #8 ""  params=2 frame=14 env=0 flags=strict,dbg,overflowed  @0x000004c4 size=48
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r0, r0, 0
+  0007  GetByIdShort         r3, r0, #c0, s17 "twice"
+  000c  NewArrayWithBuffer   r2, 1, 1, lit@0x0011
+  0014  LoadParam            r1, 1
+  0017  Call3                r2, r3, r0, r1, r2
+  001d  LoadConstString      r1, s1 ":"
+  0021  Add                  r1, r2, r1
+  0025  GetByIdShort         r0, r0, #c1, s14 "atLoad"
+  002a  Add                  r0, r1, r0
+  002e  Ret                  r0

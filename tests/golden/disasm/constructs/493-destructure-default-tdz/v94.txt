@@ -1,0 +1,60 @@
+; hbc2js disassembly of 493-destructure-default-tdz/v94.hbc
+; version=94 layout=C opcodeTable=hbc94 functions=2 strings=13 globalCodeIndex=0
+function #0 "global"  params=1 frame=15 env=0 flags=strict,dbg  @0x0000015c size=80
+  0000  DeclareGlobalVar     s6 "split"
+  0005  CreateEnvironment    r0
+  0007  CreateClosure        r1, r0, f1 "split"
+  000c  GetGlobalObject      r0
+  000e  PutById              r0, r1, #c1, s6 "split"
+  0014  TryGetById           r3, r0, #c1, s10 "print"
+  001a  GetByIdShort         r1, r0, #c2, s6 "split"
+  001f  LoadConstUndefined   r2
+  0021  LoadConstString      r4, s3 "s"
+  0025  Call2                r1, r1, r2, r4
+  002a  Call2                r1, r3, r2, r1
+  002f  TryGetById           r1, r0, #c1, s10 "print"
+  0035  GetByIdShort         r3, r0, #c2, s6 "split"
+  003a  NewObject            r0
+  003c  LoadConstUInt8       r5, 2
+  003f  PutNewOwnByIdShort   r0, r5, s11 "threshold"
+  0043  Call3                r0, r3, r2, r4, r0
+  0049  Call2                r0, r1, r2, r0
+  004e  Ret                  r0
+
+function #1 "split"  params=2 frame=14 env=0 flags=strict,dbg  @0x000001ac size=127
+  0000  LoadParam            r3, 2
+  0003  LoadConstString      r0, s0 ""
+  0007  LoadConstUInt8       r4, 1
+  000a  LoadConstUndefined   r2
+  000c  JStrictNotEqual      L1, r3, r2
+  0010  NewObject            r3
+L1:
+  0012  GetByIdShort         r1, r3, #c1, s9 "passphrase"
+  0017  JStrictNotEqual      L2, r1, r2
+  001b  Mov                  r1, r0
+L2:
+  001e  GetByIdShort         r0, r3, #c2, s11 "threshold"
+  0023  JStrictNotEqual      L3, r0, r2
+  0027  Mov                  r0, r4
+L3:
+  002a  GetByIdShort         r3, r3, #c3, s5 "groups"
+  002f  JStrictNotEqual      L4, r3, r2
+  0033  NewArray             r2, 1
+  0037  NewArrayWithBuffer   r4, 3, 3, lit@0x0001
+  003f  PutOwnByIndex        r2, r4, 0
+  0043  Mov                  r3, r2
+L4:
+  0046  NewArray             r2, 4
+  004a  LoadParam            r4, 1
+  004d  PutOwnByIndex        r2, r4, 0
+  0051  PutOwnByIndex        r2, r1, 1
+  0055  PutOwnByIndex        r2, r0, 2
+  0059  GetGlobalObject      r0
+  005b  TryGetById           r1, r0, #c4, s7 "JSON"
+  0061  GetByIdShort         r0, r1, #c5, s12 "stringify"
+  0066  Call2                r0, r0, r1, r3
+  006b  PutOwnByIndex        r2, r0, 3
+  006f  GetByIdShort         r1, r2, #c6, s8 "join"
+  0074  LoadConstString      r0, s4 "|"
+  0078  Call2                r0, r1, r2, r0
+  007d  Ret                  r0

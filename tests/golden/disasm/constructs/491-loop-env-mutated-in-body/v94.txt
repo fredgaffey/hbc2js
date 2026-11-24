@@ -1,0 +1,135 @@
+; hbc2js disassembly of 491-loop-env-mutated-in-body/v94.hbc
+; version=94 layout=C opcodeTable=hbc94 functions=8 strings=11 globalCodeIndex=0
+function #0 "global"  params=1 frame=13 env=0 flags=dbg  @0x00000170 size=72
+  0000  DeclareGlobalVar     s10 "scan"
+  0005  CreateEnvironment    r0
+  0007  CreateClosure        r1, r0, f1 "scan"
+  000c  GetGlobalObject      r0
+  000e  PutById              r0, r1, #c1, s10 "scan"
+  0014  TryGetById           r3, r0, #c1, s8 "print"
+  001a  GetByIdShort         r4, r0, #c2, s10 "scan"
+  001f  LoadConstUndefined   r2
+  0021  LoadConstUInt8       r1, 3
+  0024  Call2                r1, r4, r2, r1
+  0029  Call2                r1, r3, r2, r1
+  002e  TryGetById           r1, r0, #c1, s8 "print"
+  0034  GetByIdShort         r3, r0, #c2, s10 "scan"
+  0039  LoadConstUInt8       r0, 12
+  003c  Call2                r0, r3, r2, r0
+  0041  Call2                r0, r1, r2, r0
+  0046  Ret                  r0
+
+function #1 "scan"  params=2 frame=18 env=4 flags=dbg  @0x000001b8 size=173
+  0000  CreateEnvironment    r0
+  0002  LoadConstUndefined   r5
+  0004  LoadConstUInt8       r7, 5
+  0007  LoadConstZero        r4
+  0009  LoadConstUInt8       r3, 10
+  000c  LoadConstUInt8       r2, 3
+  000f  LoadParam            r1, 1
+  0012  ToInt32              r1, r1
+  0015  CreateClosure        r6, r0, f2 "_loop"
+  001a  StoreNPToEnvironment r0, 0, r1
+  001e  NewArray             r1, 0
+  0022  StoreToEnvironment   r0, 1, r1
+  0026  StoreNPToEnvironment r0, 2, r4
+L1:
+  002a  LoadFromEnvironment  r1, r0, 2
+  002e  Call2                r1, r6, r5, r1
+  0033  LoadFromEnvironment  r1, r0, 2
+  0037  Inc                  r1, r1
+  003a  StoreToEnvironment   r0, 2, r1
+  003e  JLess                L1, r1, r7
+  0042  CreateClosure        r1, r0, f4 "_loop2"
+  0047  NewArray             r6, 0
+  004b  StoreToEnvironment   r0, 3, r6
+  004f  LoadConstZero        r4
+L2:
+  0051  Call3                r6, r1, r5, r4, r3
+  0057  Inc                  r4, r4
+  005a  Dec                  r3, r3
+  005d  JLess                L2, r4, r2
+  0061  LoadFromEnvironment  r3, r0, 1
+  0065  GetByIdShort         r2, r3, #c1, s7 "map"
+  006a  CreateClosure        r1, r0, f6 ""
+  006f  Call2                r2, r2, r3, r1
+  0074  GetByIdShort         r1, r2, #c2, s6 "join"
+  0079  LoadConstString      r3, s2 ","
+  007d  Call2                r2, r1, r2, r3
+  0082  LoadConstString      r1, s1 " "
+  0086  Add                  r1, r2, r1
+  008a  LoadFromEnvironment  r4, r0, 3
+  008e  GetByIdShort         r2, r4, #c1, s7 "map"
+  0093  CreateClosure        r0, r0, f7 ""
+  0098  Call2                r2, r2, r4, r0
+  009d  GetByIdShort         r0, r2, #c2, s6 "join"
+  00a2  Call2                r0, r0, r2, r3
+  00a7  Add                  r0, r1, r0
+  00ab  Ret                  r0
+
+function #2 "_loop"  params=2 frame=14 env=1 flags=dbg  @0x00000265 size=61
+  0000  CreateEnvironment    r0
+  0002  LoadParam            r3, 1
+  0005  StoreToEnvironment   r0, 0, r3
+  0009  GetEnvironment       r1, 0
+  000c  LoadFromEnvironment  r5, r1, 1
+  0010  GetByIdShort         r4, r5, #c1, s9 "push"
+  0015  CreateClosure        r2, r0, f3 ""
+  001a  Call2                r2, r4, r5, r2
+  001f  LoadConstUInt8       r2, 3
+  0022  JStrictNotEqual      L1, r3, r2
+  0026  LoadFromEnvironment  r2, r0, 0
+  002a  Inc                  r2, r2
+  002d  StoreToEnvironment   r0, 0, r2
+L1:
+  0031  LoadFromEnvironment  r0, r0, 0
+  0035  StoreToEnvironment   r1, 2, r0
+  0039  LoadConstUndefined   r0
+  003b  Ret                  r0
+
+function #3 ""  params=1 frame=4 env=0 flags=dbg  @0x000002a2 size=35
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r2, r0, 0
+  0007  GetEnvironment       r1, 1
+  000a  LoadFromEnvironment  r3, r1, 0
+  000e  LoadConstUInt8       r1, 7
+  0011  BitAnd               r1, r3, r1
+  0015  Mul                  r1, r2, r1
+  0019  LoadFromEnvironment  r0, r0, 0
+  001d  Add                  r0, r1, r0
+  0021  Ret                  r0
+
+function #4 "_loop2"  params=3 frame=11 env=2 flags=dbg  @0x000002c5 size=42
+  0000  CreateEnvironment    r0
+  0002  LoadParam            r1, 1
+  0005  StoreToEnvironment   r0, 0, r1
+  0009  LoadParam            r1, 2
+  000c  StoreToEnvironment   r0, 1, r1
+  0010  GetEnvironment       r1, 0
+  0013  LoadFromEnvironment  r2, r1, 3
+  0017  GetByIdShort         r1, r2, #c1, s9 "push"
+  001c  CreateClosure        r0, r0, f5 ""
+  0021  Call2                r0, r1, r2, r0
+  0026  LoadConstUndefined   r0
+  0028  Ret                  r0
+
+function #5 ""  params=1 frame=3 env=0 flags=dbg  @0x000002ef size=24
+  0000  GetEnvironment       r0, 0
+  0003  LoadFromEnvironment  r2, r0, 0
+  0007  LoadConstUInt8       r1, 100
+  000a  Mul                  r1, r2, r1
+  000e  LoadFromEnvironment  r0, r0, 1
+  0012  Add                  r0, r1, r0
+  0016  Ret                  r0
+
+function #6 ""  params=2 frame=9 env=0 flags=dbg  @0x00000307 size=11
+  0000  LoadParam            r1, 1
+  0003  LoadConstUndefined   r0
+  0005  Call1                r0, r1, r0
+  0009  Ret                  r0
+
+function #7 ""  params=2 frame=9 env=0 flags=dbg  @0x00000307 size=11
+  0000  LoadParam            r1, 1
+  0003  LoadConstUndefined   r0
+  0005  Call1                r0, r1, r0
+  0009  Ret                  r0

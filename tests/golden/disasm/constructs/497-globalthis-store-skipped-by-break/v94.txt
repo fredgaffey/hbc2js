@@ -1,0 +1,432 @@
+; hbc2js disassembly of 497-globalthis-store-skipped-by-break/v94.hbc
+; version=94 layout=C opcodeTable=hbc94 functions=10 strings=39 globalCodeIndex=0
+function #0 "global"  params=1 frame=24 env=0 flags=dbg  @0x0000030c size=249
+  0000  DeclareGlobalVar     s19 "RT"
+  0005  DeclareGlobalVar     s8 "ex"
+  000a  DeclareGlobalVar     s34 "o"
+  000f  DeclareGlobalVar     s10 "x"
+  0014  DeclareGlobalVar     s26 "factory"
+  0019  CreateEnvironment    r1
+  001b  GetGlobalObject      r0
+  001d  LoadConstUInt8       r3, 40
+  0020  CreateClosure        r2, r1, f1 "factory"
+  0025  PutById              r0, r2, #c1, s26 "factory"
+  002b  NewObject            r2
+  002d  CreateClosure        r4, r1, f7 "mix"
+  0032  PutNewOwnByIdShort   r2, r4, s33 "mix"
+  0036  CreateClosure        r4, r1, f8 "seedList"
+  003b  PutNewOwnByIdShort   r2, r4, s14 "seedList"
+  003f  PutById              r0, r2, #c2, s19 "RT"
+  0045  NewObject            r2
+  0047  PutById              r0, r2, #c3, s8 "ex"
+  004d  GetByIdShort         r9, r0, #c1, s26 "factory"
+  0052  TryGetById           r16, r0, #c2, s6 "globalThis"
+  0058  GetByIdShort         r2, r0, #c3, s8 "ex"
+  005d  NewObject            r7
+  005f  PutNewOwnByIdShort   r7, r2, s9 "exports"
+  0063  GetByIdShort         r11, r0, #c3, s8 "ex"
+  0068  LoadConstUndefined   r2
+  006a  CreateClosure        r15, r1, f9 ""
+  006f  NewArrayWithBuffer   r10, 4, 4, lit@0x0000
+  0077  LoadConstUndefined   r17
+  0079  LoadConstNull        r14
+  007b  LoadConstNull        r13
+  007d  Mov                  r12, r7
+  0080  Call                 r1, r9, 8
+  0084  NewArray             r1, 0
+  0088  PutById              r0, r1, #c4, s34 "o"
+  008e  LoadConstZero        r1
+  0090  PutById              r0, r1, #c5, s10 "x"
+  0096  GetByIdShort         r1, r0, #c4, s10 "x"
+  009b  JNotLess             L2, r1, r3
+L1:
+  009f  GetByIdShort         r5, r0, #c5, s34 "o"
+  00a4  GetByIdShort         r4, r5, #c6, s35 "push"
+  00a9  GetByIdShort         r7, r0, #c3, s8 "ex"
+  00ae  GetByIdShort         r6, r7, #c7, s18 "parseHarborMeadow_mn"
+  00b3  GetByIdShort         r1, r0, #c4, s10 "x"
+  00b8  Call2                r1, r6, r7, r1
+  00bd  Call2                r1, r4, r5, r1
+  00c2  GetByIdShort         r1, r0, #c4, s10 "x"
+  00c7  Inc                  r1, r1
+  00ca  PutById              r0, r1, #c5, s10 "x"
+  00d0  GetByIdShort         r1, r0, #c4, s10 "x"
+  00d5  JLess                L1, r1, r3
+L2:
+  00d9  TryGetById           r1, r0, #c8, s24 "print"
+  00df  GetByIdShort         r4, r0, #c5, s34 "o"
+  00e4  GetByIdShort         r3, r4, #c9, s30 "join"
+  00e9  LoadConstString      r0, s1 " "
+  00ed  Call2                r0, r3, r4, r0
+  00f2  Call2                r0, r1, r2, r0
+  00f7  Ret                  r0
+
+function #1 "factory"  params=8 frame=2 env=3 flags=strict,dbg  @0x00000405 size=43
+  0000  CreateEnvironment    r0
+  0002  LoadParam            r1, 2
+  0005  StoreToEnvironment   r0, 0, r1
+  0009  LoadParam            r1, 7
+  000c  StoreToEnvironment   r0, 1, r1
+  0010  CreateClosure        r1, r0, f2 "helper"
+  0015  StoreToEnvironment   r0, 2, r1
+  0019  CreateClosure        r1, r0, f3 "parseHarborMeadow_mn"
+  001e  LoadParam            r0, 6
+  0021  PutById              r0, r1, #c1, s18 "parseHarborMeadow_mn"
+  0027  LoadConstUndefined   r0
+  0029  Ret                  r0
+
+function #2 "helper"  params=2 frame=2 env=0 flags=strict,dbg  @0x00000430 size=22
+  0000  LoadParam            r1, 1
+  0003  LoadConstUInt8       r0, 7
+  0006  Mul                  r1, r1, r0
+  000a  LoadConstInt         r0, 1013
+  0010  Mod                  r0, r1, r0
+  0014  Ret                  r0
+
+function #3 "parseHarborMeadow_mn"  params=2 frame=42 env=0 flags=strict,exc,dbg  @0x00000446 size=1058
+  .try T1..T2 -> L6 ; handler 0
+  .try T3..T4 -> L12 ; handler 1
+  0000  LoadParam            r14, 1
+  0003  LoadConstUndefined   r11
+  0005  LoadConstUInt8       r6, 3
+  0008  LoadConstZero        r1
+  000a  LoadConstUInt8       r18, 15
+  000d  LoadConstUInt8       r17, 1
+  0010  LoadConstInt         r16, -5
+  0016  LoadConstUInt8       r15, 4
+  0019  GetGlobalObject      r13
+  001b  LoadConstUInt8       r12, 53
+  001e  LoadConstUInt8       r10, 6
+  0021  CreateEnvironment    r8
+  0023  LoadConstUndefined   r4
+  0025  LoadConstUndefined   r2
+  0027  LoadConstUndefined   r23
+  0029  LoadConstUndefined   r24
+  002b  ToInt32              r7, r14
+  002e  Mov                  r4, r7
+  0031  GetEnvironment       r0, 0
+  0034  LoadFromEnvironment  r5, r0, 0
+  0038  LoadFromEnvironment  r3, r0, 1
+  003c  GetByVal             r3, r3, r6
+  0040  Call2                r5, r5, r11, r3
+  0045  GetByIdShort         r3, r5, #c1, s14 "seedList"
+  004a  LoadConstUInt8       r21, 5
+  004d  Call3                r9, r3, r5, r14, r21
+  0053  LoadConstUInt8       r20, 2
+  0056  Mod                  r5, r14, r20
+  005a  NewObject            r3
+  005c  PutNewOwnByIdShort   r3, r5, s25 "alpha"
+  0060  LoadConstString      r5, s2 "cd"
+  0064  PutNewOwnByIdShort   r3, r5, s21 "tag"
+  0068  Mov                  r2, r3
+  006b  TryGetById           r3, r13, #c2, s17 "Map"
+  0071  GetByIdShort         r5, r3, #c3, s15 "prototype"
+  0076  CreateThis           r5, r5, r3
+  007a  Mov                  r35, r5
+  007d  Construct            r3, r3, 1
+  0081  SelectObject         r5, r5, r3
+  0085  TryGetById           r22, r13, #c4, s20 "Set"
+  008b  GetByIdShort         r3, r22, #c3, s15 "prototype"
+  0090  CreateThis           r19, r3, r22
+  0094  NewArrayWithBuffer   r34, 2, 2, lit@0x0012
+  009c  Mov                  r35, r19
+  009f  Construct            r3, r22, 2
+  00a3  SelectObject         r3, r19, r3
+  00a7  URshift              r7, r7, r1
+  00ab  Mod                  r7, r7, r6
+  00af  JStrictEqual         L1, r1, r7
+  00b3  JStrictEqualLong     L7, r17, r7
+  00ba  Mov                  r19, r4
+  00bd  LoadConstUInt8       r7, 11
+  00c0  Mul                  r22, r14, r7
+  00c4  LoadConstUInt8       r7, 74
+  00c7  Mod                  r7, r22, r7
+  00cb  Add                  r7, r19, r7
+  00cf  ToInt32              r4, r7
+  00d2  LoadConstZero        r7
+  00d4  JmpLong              L8
+L1:
+  00d9  Mov                  r19, r5
+  00dc  IteratorBegin        r22, r19
+L2:
+  00df  IteratorNext         r26, r22, r19
+  00e3  Mov                  r25, r22
+  00e6  JStrictEqual         L7, r25, r11
+T1:
+  00ea  Mov                  r28, r26
+  00ed  IteratorBegin        r25, r28
+  00f0  LoadConstUndefined   r26
+  00f2  LoadConstUndefined   r27
+  00f4  IteratorNext         r29, r25, r28
+  00f8  Mov                  r30, r25
+  00fb  StrictEq             r30, r30, r11
+  00ff  Mov                  r26, r30
+  0102  JmpTrue              L3, r30
+  0105  Mov                  r27, r29
+L3:
+  0108  Mov                  r23, r27
+  010b  LoadConstUndefined   r27
+  010d  Mov                  r29, r26
+  0110  JmpTrue              L4, r29
+  0113  IteratorNext         r28, r25, r28
+  0117  Mov                  r29, r25
+  011a  StrictEq             r29, r29, r11
+  011e  Mov                  r26, r29
+  0121  JmpTrue              L4, r29
+  0124  Mov                  r27, r28
+L4:
+  0127  Mov                  r24, r27
+  012a  JmpTrue              L5, r26
+  012d  IteratorClose        r25, 0
+L5:
+  0130  LoadFromEnvironment  r26, r0, 0
+  0134  LoadFromEnvironment  r25, r0, 1
+  0138  GetByVal             r25, r25, r6
+  013c  Call2                r28, r26, r11, r25
+  0141  GetByIdShort         r27, r28, #c5, s33 "mix"
+  0146  Mov                  r26, r4
+  0149  Mov                  r29, r23
+  014c  Mov                  r25, r24
+  014f  Add                  r25, r29, r25
+  0153  Call3                r4, r27, r28, r26, r25
+T2:
+  0159  Jmp                  L2
+L6:
+  015b  Catch                r19
+  015d  IteratorClose        r22, 1
+  0160  Throw                r19
+L7:
+  0162  Mov                  r19, r4
+  0165  URshift              r19, r19, r6
+  0169  Mod                  r19, r19, r21
+  016d  LoadConstZero        r7
+  016f  JNotLessN            L8, r19, r20
+  0173  GetByIdShort         r20, r9, #c6, s37 "sort"
+  0178  CreateClosure        r19, r8, f4 ""
+  017d  Call2                r19, r20, r9, r19
+  0182  LoadFromEnvironment  r20, r0, 0
+  0186  LoadFromEnvironment  r19, r0, 1
+  018a  GetByVal             r19, r19, r6
+  018e  Call2                r22, r20, r11, r19
+  0193  GetByIdShort         r21, r22, #c5, s33 "mix"
+  0198  Mov                  r20, r4
+  019b  GetByVal             r19, r9, r1
+  019f  ToInt32              r19, r19
+  01a2  Call3                r4, r21, r22, r20, r19
+  01a8  LoadConstZero        r7
+L8:
+  01aa  Mov                  r20, r2
+  01ad  GetByIdShort         r19, r20, #c7, s31 "list"
+  01b2  JmpTrue              L9, r19
+  01b5  NewArray             r19, 0
+L9:
+  01b9  NewArray             r21, 1
+  01bd  Mov                  r34, r21
+  01c0  Mov                  r33, r19
+  01c3  LoadConstZero        r32
+  01c5  CallBuiltin          r19, b46 "arraySpread", 4
+  01c9  Mov                  r24, r4
+  01cc  BitAnd               r22, r24, r18
+  01d0  PutOwnByVal          r21, r22, r19, 1
+  01d5  Add                  r19, r19, r17
+  01d9  GetByIdShort         r19, r21, #c8, s36 "slice"
+  01de  Call2                r19, r19, r21, r16
+  01e3  PutById              r20, r19, #c1, s31 "list"
+  01e9  LoadFromEnvironment  r21, r0, 0
+  01ed  LoadFromEnvironment  r20, r0, 1
+  01f1  GetByVal             r19, r20, r6
+  01f5  Call2                r23, r21, r11, r19
+  01fa  GetByIdShort         r22, r23, #c5, s33 "mix"
+  01ff  Mov                  r19, r2
+  0202  GetByIdShort         r19, r19, #c7, s31 "list"
+  0207  GetByIdShort         r19, r19, #c9, s29 "length"
+  020c  Call3                r22, r22, r23, r24, r19
+  0212  Mov                  r4, r22
+  0215  GetByIdShort         r23, r9, #c10, s23 "map"
+  021a  CreateClosure        r19, r8, f5 ""
+  021f  Call2                r24, r23, r9, r19
+  0224  GetByIdShort         r23, r24, #c11, s27 "filter"
+  0229  CreateClosure        r19, r8, f6 ""
+  022e  Call2                r19, r23, r24, r19
+  0233  GetByVal             r20, r20, r6
+  0237  Call2                r21, r21, r11, r20
+  023c  GetByIdShort         r20, r21, #c5, s33 "mix"
+  0241  GetByIdShort         r19, r19, #c9, s29 "length"
+  0246  Call3                r4, r20, r21, r22, r19
+  024c  Inc                  r7, r7
+  024f  JLessLong            L8, r7, r15
+  0256  LoadFromEnvironment  r8, r0, 0
+  025a  LoadFromEnvironment  r7, r0, 1
+  025e  GetByVal             r7, r7, r6
+  0262  Call2                r16, r8, r11, r7
+  0267  GetByIdShort         r15, r16, #c5, s33 "mix"
+  026c  Mov                  r8, r4
+  026f  GetByIdShort         r7, r9, #c9, s29 "length"
+  0274  Call3                r7, r15, r16, r8, r7
+  027a  Mov                  r4, r7
+  027d  BitAnd               r7, r7, r6
+  0281  LoadConstZero        r8
+  0283  JStrictEqualLong     L14, r7, r6
+L10:
+  028a  Inc                  r8, r8
+  028d  LoadFromEnvironment  r15, r0, 0
+  0291  LoadFromEnvironment  r7, r0, 1
+  0295  GetByVal             r7, r7, r6
+  0299  Call2                r17, r15, r11, r7
+  029e  GetByIdShort         r16, r17, #c5, s33 "mix"
+  02a3  Mov                  r15, r4
+  02a6  TryGetById           r18, r13, #c12, s12 "Math"
+  02ac  GetByIdShort         r7, r18, #c13, s28 "imul"
+  02b1  Call3                r18, r7, r18, r15, r12
+  02b7  LShift               r7, r14, r10
+  02bb  BitXor               r7, r18, r7
+  02bf  Call3                r4, r16, r17, r15, r7
+  02c5  GetByIdShort         r7, r9, #c8, s36 "slice"
+  02ca  Call3                r16, r7, r9, r1, r6
+  02d0  Mov                  r7, r16
+  02d3  IteratorBegin        r15, r7
+L11:
+  02d6  IteratorNext         r21, r15, r7
+  02da  Mov                  r16, r15
+  02dd  JStrictEqual         L13, r16, r11
+T3:
+  02e1  LoadFromEnvironment  r17, r0, 0
+  02e5  LoadFromEnvironment  r16, r0, 1
+  02e9  GetByVal             r18, r16, r6
+  02ed  Call2                r20, r17, r11, r18
+  02f2  GetByIdShort         r19, r20, #c5, s33 "mix"
+  02f7  Mov                  r18, r4
+  02fa  Call3                r19, r19, r20, r18, r21
+  0300  Mov                  r4, r19
+  0303  GetByVal             r16, r16, r6
+  0307  Call2                r18, r17, r11, r16
+  030c  GetByIdShort         r17, r18, #c5, s33 "mix"
+  0311  TryGetById           r21, r13, #c14, s16 "JSON"
+  0317  GetByIdShort         r20, r21, #c15, s32 "stringify"
+  031c  Mov                  r16, r2
+  031f  Call2                r16, r20, r21, r16
+  0324  GetByIdShort         r16, r16, #c9, s29 "length"
+  0329  Call3                r4, r17, r18, r19, r16
+T4:
+  032f  Jmp                  L11
+L12:
+  0331  Catch                r7
+  0333  IteratorClose        r15, 1
+  0336  Throw                r7
+L13:
+  0338  JNotLess             L14, r8, r6
+  033c  Mov                  r7, r4
+  033f  BitAnd               r7, r7, r6
+  0343  JStrictNotEqualLong  L10, r7, r6
+L14:
+  034a  LoadFromEnvironment  r8, r0, 0
+  034e  LoadFromEnvironment  r7, r0, 1
+  0352  GetByVal             r9, r7, r6
+  0356  Call2                r14, r8, r11, r9
+  035b  GetByIdShort         r13, r14, #c5, s33 "mix"
+  0360  Mov                  r12, r4
+  0363  LoadFromEnvironment  r10, r0, 2
+  0367  LoadConstInt         r0, 1023
+  036d  BitAnd               r15, r12, r0
+  0371  LoadConstUInt8       r9, 19
+  0374  AddN                 r9, r15, r9
+  0378  Call2                r9, r10, r11, r9
+  037d  Call3                r9, r13, r14, r12, r9
+  0383  Mov                  r4, r9
+  0386  GetByVal             r7, r7, r6
+  038a  Call2                r8, r8, r11, r7
+  038f  GetByIdShort         r7, r8, #c5, s33 "mix"
+  0394  BitAnd               r12, r9, r0
+  0398  LoadConstUInt8       r0, 13
+  039b  AddN                 r0, r12, r0
+  039f  Call2                r0, r10, r11, r0
+  03a4  Call3                r0, r7, r8, r9, r0
+  03aa  Mov                  r4, r0
+  03ad  Mov                  r4, r2
+  03b0  GetByIdShort         r2, r4, #c16, s22 "gamma"
+  03b5  ToInt32              r7, r2
+  03b8  LoadConstUInt8       r2, 91
+  03bb  AddN                 r2, r7, r2
+  03bf  PutById              r4, r2, #c2, s22 "gamma"
+  03c5  LoadConstString      r4, s5 "pearpear"
+  03c9  GetByIdShort         r2, r4, #c17, s38 "split"
+  03ce  LoadConstString      r7, s0 ""
+  03d2  Call2                r4, r2, r4, r7
+  03d7  GetByIdShort         r2, r4, #c18, s13 "reverse"
+  03dc  Call1                r4, r2, r4
+  03e0  GetByIdShort         r2, r4, #c19, s30 "join"
+  03e5  Call2                r7, r2, r4, r7
+  03ea  GetByIdShort         r4, r7, #c8, s36 "slice"
+  03ef  LoadConstUInt8       r2, 21
+  03f2  Call3                r7, r4, r7, r1, r2
+  03f8  GetByIdShort         r4, r5, #c20, s11 "set"
+  03fd  LoadConstUInt8       r2, 7
+  0400  BitAnd               r2, r0, r2
+  0404  GetByIdShort         r7, r7, #c9, s29 "length"
+  0409  GetByIdShort         r3, r3, #c21, s7 "size"
+  040e  Add                  r3, r7, r3
+  0412  AddN                 r2, r6, r2
+  0416  Call3                r2, r4, r5, r2, r3
+  041c  URshift              r0, r0, r1
+  0420  Ret                  r0
+
+function #4 ""  params=3 frame=2 env=0 flags=strict,dbg,nc  @0x00000868 size=12
+  0000  LoadParam            r1, 1
+  0003  LoadParam            r0, 2
+  0006  Sub                  r0, r1, r0
+  000a  Ret                  r0
+
+function #5 ""  params=2 frame=2 env=0 flags=strict,dbg,nc  @0x00000874 size=19
+  0000  LoadParam            r1, 1
+  0003  LoadConstUInt8       r0, 61
+  0006  Mul                  r1, r1, r0
+  000a  LoadConstUInt8       r0, 5
+  000d  Mod                  r0, r1, r0
+  0011  Ret                  r0
+
+function #6 ""  params=2 frame=2 env=0 flags=strict,dbg,nc  @0x00000887 size=12
+  0000  LoadParam            r1, 1
+  0003  LoadConstUInt8       r0, 1
+  0006  BitAnd               r0, r1, r0
+  000a  Ret                  r0
+
+function #7 "mix"  params=3 frame=14 env=0 flags=dbg  @0x00000893 size=50
+  0000  GetGlobalObject      r0
+  0002  TryGetById           r4, r0, #c1, s12 "Math"
+  0008  GetByIdShort         r3, r4, #c2, s28 "imul"
+  000d  LoadParam            r0, 2
+  0010  ToInt32              r1, r0
+  0013  LoadParam            r0, 1
+  0016  BitXor               r0, r0, r1
+  001a  LoadConstZero        r1
+  001c  URshift              r2, r0, r1
+  0020  LoadConstInt         r0, 16777619
+  0026  Call3                r0, r3, r4, r2, r0
+  002c  URshift              r0, r0, r1
+  0030  Ret                  r0
+
+function #8 "seedList"  params=3 frame=17 env=0 flags=dbg  @0x000008c5 size=61
+  0000  LoadParam            r5, 1
+  0003  LoadParam            r4, 2
+  0006  LoadConstUInt8       r2, 3
+  0009  LoadConstUInt8       r1, 97
+  000c  NewArray             r0, 0
+  0010  LoadConstZero        r3
+  0012  JNotLess             L2, r3, r4
+L1:
+  0016  GetByIdShort         r7, r0, #c1, s35 "push"
+  001b  Add                  r6, r3, r2
+  001f  Mul                  r8, r5, r6
+  0023  Mul                  r6, r3, r3
+  0027  Add                  r6, r8, r6
+  002b  Mod                  r6, r6, r1
+  002f  Call2                r6, r7, r0, r6
+  0034  Inc                  r3, r3
+  0037  JLess                L1, r3, r4
+L2:
+  003b  Ret                  r0
+
+function #9 ""  params=2 frame=1 env=0 flags=dbg  @0x00000902 size=9
+  0000  GetGlobalObject      r0
+  0002  GetByIdShort         r0, r0, #c1, s19 "RT"
+  0007  Ret                  r0

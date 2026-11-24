@@ -1,0 +1,241 @@
+; hbc2js disassembly of 495-generator-yield-switch-fallthrough-try/v94.hbc
+; version=94 layout=C opcodeTable=hbc94 functions=5 strings=21 globalCodeIndex=0
+function #0 "global"  params=1 frame=18 env=0 flags=exc,dbg  @0x000001cc size=122
+  .try T1..T2 -> L2 ; handler 0
+  0000  DeclareGlobalVar     s15 "mix"
+  0005  DeclareGlobalVar     s9 "gen"
+  000a  DeclareGlobalVar     s18 "run"
+  000f  CreateEnvironment    r0
+  0011  LoadConstUndefined   r5
+  0013  GetGlobalObject      r4
+  0015  LoadConstString      r3, s2 ": "
+  0019  CreateClosure        r1, r0, f1 "mix"
+  001e  PutById              r4, r1, #c1, s15 "mix"
+  0024  CreateGeneratorClosure r1, r0, f2 "gen"
+  0029  PutById              r4, r1, #c2, s9 "gen"
+  002f  CreateClosure        r0, r0, f4 "run"
+  0034  PutById              r4, r0, #c3, s18 "run"
+  003a  LoadConstUndefined   r0
+  003c  NewArrayWithBuffer   r1, 9, 9, lit@0x0000
+  0044  IteratorBegin        r2, r1
+L1:
+  0047  IteratorNext         r9, r2, r1
+  004b  Mov                  r6, r2
+  004e  JStrictEqual         L3, r6, r5
+T1:
+  0052  TryGetById           r7, r4, #c1, s16 "print"
+  0058  Add                  r8, r9, r3
+  005c  GetByIdShort         r6, r4, #c2, s18 "run"
+  0061  Call2                r6, r6, r5, r9
+  0066  Add                  r6, r8, r6
+  006a  Call2                r0, r7, r5, r6
+T2:
+  006f  Jmp                  L1
+L2:
+  0071  Catch                r1
+  0073  IteratorClose        r2, 1
+  0076  Throw                r1
+L3:
+  0078  Ret                  r0
+
+function #1 "mix"  params=3 frame=2 env=0 flags=dbg  @0x00000246 size=25
+  0000  LoadParam            r1, 1
+  0003  LoadConstUInt8       r0, 31
+  0006  Mul                  r1, r1, r0
+  000a  LoadParam            r0, 2
+  000d  BitXor               r1, r1, r0
+  0011  LoadConstZero        r0
+  0013  URshift              r0, r1, r0
+  0017  Ret                  r0
+
+function #2 "gen"  params=3 frame=1 env=0 flags=nc  @0x0000025f size=9
+  0000  CreateEnvironment    r0
+  0002  CreateGenerator      r0, r0, f3 "?anon_0_gen"
+  0007  Ret                  r0
+
+function #3 "?anon_0_gen"  params=3 frame=23 env=0 flags=exc,dbg  @0x00000268 size=391
+  .try T1..T2 -> L16 ; handler 0
+  .try T3..T4 -> L16 ; handler 1
+  0000  StartGenerator
+  0001  LoadParam            r4, 1
+  0004  LoadConstUInt8       r13, 32
+  0007  LoadConstUndefined   r5
+  0009  LoadConstUndefined   r3
+  000b  LoadConstUndefined   r2
+  000d  LoadConstUndefined   r1
+  000f  ResumeGenerator      r0, r6
+  0012  JmpTrueLong          L18, r6
+  0018  LoadParam            r1, 2
+  001b  LoadConstUndefined   r2
+  001d  LoadConstUndefined   r3
+  001f  LoadConstUInt8       r8, 7
+  0022  BitAnd               r2, r4, r8
+  0026  LoadConstUInt8       r6, 5
+  0029  Mod                  r7, r4, r6
+  002d  NewObject            r6
+  002f  PutNewOwnByIdShort   r6, r7, s13 "k"
+  0033  LoadConstNull        r9
+  0035  PutNewOwnByIdShort   r6, r9, s20 "z"
+  0039  Mov                  r3, r6
+T1:
+  003c  Mov                  r6, r2
+  003f  JmpTrue              L1, r6
+  0042  LoadConstUInt8       r2, 1
+L1:
+  0045  Mov                  r7, r3
+  0048  GetByIdShort         r6, r7, #c1, s20 "z"
+  004d  JNotEqual            L2, r6, r9
+  0051  LoadConstUInt8       r6, 6
+  0054  PutById              r7, r6, #c1, s20 "z"
+L2:
+  005a  LoadConstUInt8       r6, 4
+  005d  Mod                  r7, r4, r6
+  0061  LoadConstString      r6, s13 "k"
+  0065  Add                  r7, r6, r7
+  0069  LoadConstString      r6, s6 "k0"
+  006d  JStrictEqual         L6, r6, r7
+  0071  LoadConstString      r6, s7 "k1"
+  0075  JStrictEqual         L3, r6, r7
+  0079  LoadConstString      r6, s8 "k2"
+  007d  JStrictEqual         L3, r6, r7
+  0081  GetGlobalObject      r6
+  0083  GetByIdShort         r10, r6, #c2, s15 "mix"
+  0088  Mov                  r7, r1
+  008b  LoadConstInt         r6, 813
+  0091  Call3                r1, r10, r5, r7, r6
+L3:
+  0097  Mov                  r6, r2
+  009a  JmpTrue              L4, r6
+  009d  LoadConstUInt8       r2, 2
+L4:
+  00a0  Mov                  r7, r3
+  00a3  GetByIdShort         r6, r7, #c1, s20 "z"
+  00a8  JNotEqual            L5, r6, r9
+  00ac  LoadConstUInt8       r6, 3
+  00af  PutById              r7, r6, #c1, s20 "z"
+L5:
+  00b5  JmpLong              L14
+L6:
+  00ba  Mov                  r7, r2
+  00bd  LoadConstUInt8       r6, 47
+  00c0  BitXor               r7, r7, r6
+  00c4  LoadConstInt         r6, 296
+  00ca  JLessN               L8, r7, r6
+  00ce  Mov                  r6, r2
+  00d1  JmpTrue              L7, r6
+  00d4  LoadConstUInt8       r2, 1
+L7:
+  00d7  Mov                  r6, r3
+  00da  GetByIdShort         r3, r6, #c1, s20 "z"
+  00df  JNotEqualLong        L14, r3, r9
+  00e6  LoadConstUInt8       r3, 3
+  00e9  PutById              r6, r3, #c1, s20 "z"
+  00ef  JmpLong              L14
+L8:
+  00f4  LoadConstUInt8       r3, 42
+  00f7  BitXor               r4, r4, r3
+  00fb  LoadConstUInt8       r3, 40
+  00fe  JLessN               L13, r4, r3
+  0102  GetGlobalObject      r3
+  0104  GetByIdShort         r7, r3, #c2, s15 "mix"
+  0109  Mov                  r6, r1
+  010c  LoadConstUInt8       r11, 1
+  010f  BitAnd               r10, r6, r11
+  0113  Mov                  r3, r13
+  0116  JmpFalse             L9, r10
+  0119  Mov                  r12, r1
+  011c  LoadConstInt         r10, 736
+  0122  Mov                  r3, r13
+  0125  JGreater             L9, r12, r10
+  0129  Mov                  r10, r1
+  012c  Sub                  r3, r10, r11
+L9:
+  0130  SaveGenerator        L10
+  0132  Ret                  r3
+L10:
+  0134  ResumeGenerator      r3, r10
+  0137  JmpTrue              L12, r10
+  013a  Mov                  r4, r3
+  013d  JNotEqual            L11, r3, r9
+  0141  Mov                  r4, r8
+L11:
+  0144  Call3                r1, r7, r5, r6, r4
+  014a  Jmp                  L14
+T2:
+L12:
+  014c  CompleteGenerator
+  014d  Ret                  r3
+T3:
+L13:
+  014f  GetGlobalObject      r3
+  0151  GetByIdShort         r4, r3, #c2, s15 "mix"
+  0156  Mov                  r3, r1
+  0159  Mov                  r6, r2
+  015c  LoadConstUInt8       r2, 12
+  015f  Mul                  r6, r6, r2
+  0163  LoadConstUInt8       r2, 8
+  0166  AddN                 r2, r6, r2
+  016a  Call3                r1, r4, r5, r3, r2
+L14:
+  0170  Jmp                  L15
+  0172  Catch                r2
+T4:
+L15:
+  0174  Jmp                  L17
+L16:
+  0176  Catch                r2
+L17:
+  0178  Mov                  r2, r1
+  017b  LoadConstZero        r1
+  017d  URshift              r1, r2, r1
+  0181  CompleteGenerator
+  0182  Ret                  r1
+L18:
+  0184  CompleteGenerator
+  0185  Ret                  r0
+
+function #4 "run"  params=2 frame=22 env=0 flags=dbg  @0x000003ef size=166
+  0000  LoadParam            r2, 1
+  0003  GetGlobalObject      r8
+  0005  LoadConstUndefined   r7
+  0007  LoadConstUInt8       r6, 3
+  000a  LoadConstUInt8       r5, 1
+  000d  LoadConstUInt8       r4, 5
+  0010  GetByIdShort         r1, r8, #c1, s9 "gen"
+  0015  ToInt32              r0, r2
+  0018  Call3                r3, r1, r7, r2, r0
+  001e  NewArray             r2, 0
+  0022  GetByIdShort         r0, r3, #c2, s10 "next"
+  0027  Call1                r0, r0, r3
+  002b  GetByIdShort         r10, r0, #c3, s11 "done"
+  0030  Mov                  r1, r0
+  0033  LoadConstZero        r9
+  0035  Mov                  r0, r1
+  0038  JmpTrue              L2, r10
+L1:
+  003b  GetByIdShort         r11, r2, #c4, s17 "push"
+  0040  TryGetById           r12, r8, #c5, s12 "String"
+  0046  GetByIdShort         r10, r1, #c6, s19 "value"
+  004b  Call2                r10, r12, r7, r10
+  0050  Call2                r10, r11, r2, r10
+  0055  GetByIdShort         r11, r3, #c2, s10 "next"
+  005a  Mul                  r10, r9, r6
+  005e  AddN                 r10, r10, r5
+  0062  Call2                r10, r11, r3, r10
+  0067  Inc                  r9, r9
+  006a  GetByIdShort         r11, r10, #c3, s11 "done"
+  006f  Mov                  r0, r10
+  0072  JmpTrue              L2, r11
+  0075  Mov                  r1, r10
+  0078  Mov                  r0, r1
+  007b  JLess                L1, r9, r4
+L2:
+  007f  GetByIdShort         r1, r2, #c4, s17 "push"
+  0084  GetByIdShort         r3, r0, #c6, s19 "value"
+  0089  LoadConstString      r0, s4 "done "
+  008d  Add                  r0, r0, r3
+  0091  Call2                r0, r1, r2, r0
+  0096  GetByIdShort         r1, r2, #c7, s14 "join"
+  009b  LoadConstString      r0, s1 ","
+  009f  Call2                r0, r1, r2, r0
+  00a4  Ret                  r0

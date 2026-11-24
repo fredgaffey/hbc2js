@@ -1,0 +1,102 @@
+; hbc2js disassembly of 494-default-param-body-temps/v99.hbc
+; version=99 layout=E opcodeTable=hbc99-mar2026 functions=5 strings=22 globalCodeIndex=0
+function #0 "global"  params=1 frame=13 env=0 flags=dbg,overflowed  @0x000001ec size=101
+  0000  DeclareGlobalVar     s15 "deps"
+  0005  DeclareGlobalVar     s20 "req"
+  000a  DeclareGlobalVar     s16 "obj"
+  000f  GetGlobalObject      r1
+  0011  LoadConstUndefined   r0
+  0013  CreateClosure        r2, r0, f1 "req"
+  0018  PutByIdLoose         r1, r2, #c0, s20 "req"
+  001e  NewArrayWithBuffer   r2, 2, 2, lit@0x0000
+  0026  PutByIdLoose         r1, r2, #c1, s15 "deps"
+  002c  NewObjectWithBuffer  r2, sh0(numProps=2), lit@0x0009
+  0032  CreateClosure        r3, r0, f2 "value"
+  0037  PutOwnBySlotIdx      r2, r3, 0
+  003b  PutByIdLoose         r1, r2, #c2, s16 "obj"
+  0041  GetByIdShort         r3, r1, #c0, s16 "obj"
+  0046  GetByIdShort         r2, r3, #c1, s21 "value"
+  004b  LoadConstString      r1, s6 "a"
+  004f  Call2                r3, r2, r3, r1
+  0054  GetByIdShort         r2, r3, #c2, s19 "then"
+  0059  CreateClosure        r1, r0, f3 ""
+  005e  Call2                r1, r2, r3, r1
+  0063  Ret                  r1
+
+function #1 "req"  params=2 frame=4 env=0 flags=dbg,overflowed  @0x00000251 size=32
+  0000  NewObjectWithBuffer  r1, sh1(numProps=1), lit@0x0009
+  0006  NewObjectWithBuffer  r2, sh2(numProps=1), lit@0x0009
+  000c  LoadConstUInt8       r0, 1
+  000f  LoadParam            r3, 1
+  0012  Add                  r3, r3, r0
+  0016  PutOwnBySlotIdx      r2, r3, 0
+  001a  PutOwnBySlotIdx      r1, r2, 0
+  001e  Ret                  r1
+
+function #2 "value"  params=2 frame=14 env=0 flags=dbg,overflowed  @0x00000271 size=101
+  0000  CreateFunctionEnvironment r1, 3
+  0003  LoadParam            r2, 1
+  0006  StoreToEnvironment   r1, 0, r2
+  000a  LoadParam            r3, 2
+  000d  LoadConstUndefined   r0
+  000f  JStrictNotEqual      L1, r3, r0
+  0013  GetGlobalObject      r2
+  0015  GetByIdShort         r4, r2, #c0, s20 "req"
+  001a  GetByIdShort         r2, r2, #c1, s15 "deps"
+  001f  GetByIndex           r2, r2, 1
+  0023  Call2                r2, r4, r0, r2
+  0028  GetByIdShort         r2, r2, #c2, s7 "Transaction"
+  002d  GetByIdShort         r4, r2, #c3, s13 "SIGHASH_ALL"
+  0032  NewArray             r2, 1
+  0036  DefineOwnInDenseArray r2, r4, 0
+  003a  Mov                  r3, r2
+L1:
+  003d  LoadThisNS           r2
+  003f  StoreToEnvironment   r1, 1, r3
+  0043  StoreToEnvironment   r1, 2, r2
+  0047  GetGlobalObject      r2
+  0049  TryGetById           r3, r2, #c4, s12 "Promise"
+  004f  CreateThisForNew     r2, r3, 5
+  0053  CreateClosure        r5, r1, f4 ""
+  0058  Mov                  r6, r2
+  005b  Construct            r1, r3, 2
+  005f  SelectObject         r1, r2, r1
+  0063  Ret                  r1
+
+function #3 ""  params=2 frame=16 env=0 flags=dbg,overflowed  @0x000002d6 size=80
+  0000  GetGlobalObject      r4
+  0002  TryGetById           r2, r4, #c0, s18 "print"
+  0008  LoadConstUndefined   r0
+  000a  LoadParam            r1, 1
+  000d  Call2                r1, r2, r0, r1
+  0012  TryGetById           r2, r4, #c0, s18 "print"
+  0018  TryGetById           r1, r4, #c1, s10 "globalThis"
+  001e  GetByIdShort         r1, r1, #c2, s13 "SIGHASH_ALL"
+  0023  TryGetById           r3, r4, #c1, s10 "globalThis"
+  0029  GetByIdShort         r3, r3, #c3, s14 "arr2"
+  002e  TryGetById           r4, r4, #c4, s11 "HermesInternal"
+  0034  GetByIdShort         r5, r4, #c5, s8 "concat"
+  0039  LoadConstString      r4, s1 " "
+  003d  TypeOf               r3, r3
+  0040  TypeOf               r1, r1
+  0043  Call3                r1, r5, r1, r4, r3
+  0049  Call2                r1, r2, r0, r1
+  004e  Ret                  r0
+
+function #4 ""  params=2 frame=14 env=0 flags=dbg,overflowed  @0x00000326 size=62
+  0000  GetParentEnvironment r1, 0
+  0003  LoadFromEnvironment  r2, r1, 2
+  0007  GetByIdShort         r3, r2, #c0, s9 "tag"
+  000c  LoadFromEnvironment  r2, r1, 0
+  0010  Add                  r3, r3, r2
+  0014  LoadFromEnvironment  r4, r1, 1
+  0018  GetByIdShort         r2, r4, #c1, s17 "join"
+  001d  LoadConstString      r1, s2 "/"
+  0021  Call2                r2, r2, r4, r1
+  0026  LoadConstString      r1, s3 ":"
+  002a  Add                  r1, r3, r1
+  002e  Add                  r2, r1, r2
+  0032  LoadConstUndefined   r0
+  0034  LoadParam            r1, 1
+  0037  Call2                r1, r1, r0, r2
+  003c  Ret                  r0

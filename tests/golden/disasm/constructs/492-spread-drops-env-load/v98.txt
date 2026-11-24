@@ -1,0 +1,179 @@
+; hbc2js disassembly of 492-spread-drops-env-load/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=11 strings=34 globalCodeIndex=0
+function #0 "global"  params=1 frame=18 env=0 flags=dbg,overflowed  @0x00000310 size=291
+  0000  DeclareGlobalVar     s28 "make"
+  0005  DeclareGlobalVar     s32 "wrap"
+  000a  DeclareGlobalVar     s9 "r"
+  000f  DeclareGlobalVar     s27 "jsx"
+  0014  DeclareGlobalVar     s26 "screen"
+  0019  DeclareGlobalVar     s31 "show"
+  001e  DeclareGlobalVar     s25 "s"
+  0023  GetGlobalObject      r5
+  0025  LoadConstUndefined   r0
+  0027  CreateClosure        r1, r0, f1 "make"
+  002c  PutByIdLoose         r5, r1, #c0, s28 "make"
+  0032  CreateClosure        r1, r0, f2 "wrap"
+  0037  PutByIdLoose         r5, r1, #c1, s32 "wrap"
+  003d  CreateClosure        r1, r0, f3 "screen"
+  0042  PutByIdLoose         r5, r1, #c2, s26 "screen"
+  0048  CreateClosure        r1, r0, f4 "show"
+  004d  PutByIdLoose         r5, r1, #c3, s31 "show"
+  0053  GetByIdShort         r2, r5, #c0, s28 "make"
+  0058  NewObjectWithBuffer  r1, sh0(numProps=2), lit@0x0000
+  005e  NewArrayWithBuffer   r3, 2, 2, lit@0x0001
+  0066  PutOwnBySlotIdx      r1, r3, 0
+  006a  NewArrayWithBuffer   r3, 2, 2, lit@0x000a
+  0072  PutOwnBySlotIdx      r1, r3, 1
+  0076  Call2                r1, r2, r0, r1
+  007b  PutByIdLoose         r5, r1, #c4, s9 "r"
+  0081  TryGetById           r2, r5, #c1, s14 "print"
+  0087  TryGetById           r4, r5, #c2, s12 "JSON"
+  008d  GetByIdShort         r3, r4, #c3, s33 "stringify"
+  0092  GetByIdShort         r1, r5, #c4, s9 "r"
+  0097  Call2                r1, r3, r4, r1
+  009c  Call2                r1, r2, r0, r1
+  00a1  CreateClosure        r1, r0, f5 "jsx"
+  00a6  PutByIdLoose         r5, r1, #c5, s27 "jsx"
+  00ac  GetByIdShort         r3, r5, #c5, s26 "screen"
+  00b1  NewObject            r2
+  00b3  NewObjectWithBuffer  r1, sh1(numProps=2), lit@0x0013
+  00b9  Call3                r2, r3, r0, r1, r2
+  00bf  NewObjectWithBuffer  r1, sh2(numProps=1), lit@0x0018
+  00c5  Call2                r1, r2, r0, r1
+  00ca  PutByIdLoose         r5, r1, #c6, s25 "s"
+  00d0  TryGetById           r2, r5, #c1, s14 "print"
+  00d6  TryGetById           r4, r5, #c2, s12 "JSON"
+  00dc  GetByIdShort         r3, r4, #c3, s33 "stringify"
+  00e1  GetByIdShort         r7, r5, #c6, s25 "s"
+  00e6  GetByIdShort         r6, r7, #c7, s23 "header"
+  00eb  NewObjectWithBuffer  r1, sh3(numProps=1), lit@0x001b
+  00f1  Call2                r6, r6, r7, r1
+  00f6  NewArray             r1, 2
+  00fa  DefineOwnInDenseArray r1, r6, 0
+  00fe  GetByIdShort         r7, r5, #c6, s25 "s"
+  0103  GetByIdShort         r6, r7, #c8, s10 "renderTabBar"
+  0108  NewObjectWithBuffer  r5, sh4(numProps=1), lit@0x0020
+  010e  Call2                r5, r6, r7, r5
+  0113  DefineOwnInDenseArray r1, r5, 1
+  0117  Call2                r1, r3, r4, r1
+  011c  Call2                r1, r2, r0, r1
+  0121  Ret                  r1
+
+function #1 "make"  params=2 frame=12 env=0 flags=dbg,overflowed  @0x00000433 size=47
+  0000  CreateFunctionEnvironment r0, 2
+  0003  LoadParam            r1, 1
+  0006  GetByIdShort         r2, r1, #c0, s20 "outputs"
+  000b  StoreToEnvironment   r0, 0, r2
+  000f  NewObjectWithBuffer  r2, sh3(numProps=1), lit@0x001b
+  0015  StoreToEnvironment   r0, 1, r2
+  0019  GetByIdShort         r2, r1, #c1, s24 "inputs"
+  001e  GetByIdShort         r1, r2, #c2, s29 "map"
+  0023  CreateClosure        r0, r0, f6 ""
+  0028  Call2                r0, r1, r2, r0
+  002d  Ret                  r0
+
+function #2 "wrap"  params=2 frame=1 env=0 flags=none  @0x00000462 size=5
+  0000  LoadParam            r0, 1
+  0003  Ret                  r0
+
+function #3 "screen"  params=3 frame=2 env=0 flags=none  @0x00000467 size=24
+  0000  CreateFunctionEnvironment r0, 2
+  0003  LoadParam            r1, 1
+  0006  StoreToEnvironment   r0, 0, r1
+  000a  LoadParam            r1, 2
+  000d  StoreToEnvironment   r0, 1, r1
+  0011  CreateClosure        r0, r0, f7 ""
+  0016  Ret                  r0
+
+function #4 "show"  params=2 frame=1 env=0 flags=none  @0x00000462 size=5
+  0000  LoadParam            r0, 1
+  0003  Ret                  r0
+
+function #5 "jsx"  params=3 frame=2 env=0 flags=none  @0x0000047f size=20
+  0000  NewArray             r0, 2
+  0004  LoadParam            r1, 1
+  0007  DefineOwnInDenseArray r0, r1, 0
+  000b  LoadParam            r1, 2
+  000e  DefineOwnInDenseArray r0, r1, 1
+  0012  Ret                  r0
+
+function #6 ""  params=3 frame=16 env=0 flags=dbg,overflowed  @0x00000493 size=70
+  0000  GetParentEnvironment r4, 0
+  0003  CreateTopLevelEnvironment r3, 1
+  0009  LoadParam            r1, 2
+  000c  StoreToEnvironment   r3, 0, r1
+  0010  GetGlobalObject      r1
+  0012  GetByIdShort         r2, r1, #c0, s32 "wrap"
+  0017  NewObject            r1
+  0019  LoadFromEnvironment  r6, r4, 1
+  001d  Mov                  r7, r1
+  0020  CallBuiltin          r5, b46 "copyDataProperties", 3
+  0024  LoadFromEnvironment  r5, r4, 0
+  0028  GetByIdShort         r4, r5, #c1, s29 "map"
+  002d  CreateClosure        r3, r3, f8 ""
+  0032  Call2                r3, r4, r5, r3
+  0037  DefineOwnById        r1, r3, #c0, 30
+  003d  LoadConstUndefined   r0
+  003f  Call2                r1, r2, r0, r1
+  0044  Ret                  r1
+
+function #7 ""  params=2 frame=3 env=0 flags=dbg,overflowed  @0x000004d9 size=44
+  0000  CreateFunctionEnvironment r1, 1
+  0003  LoadParam            r0, 1
+  0006  GetByIdShort         r0, r0, #c0, s11 "TabBar"
+  000b  StoreToEnvironment   r1, 0, r0
+  000f  NewObjectWithBuffer  r0, sh5(numProps=2), lit@0x0000
+  0015  GetParentEnvironment r2, 0
+  0018  CreateClosure        r2, r2, f9 "header"
+  001d  PutOwnBySlotIdx      r0, r2, 0
+  0021  CreateClosure        r1, r1, f10 "renderTabBar"
+  0026  PutOwnBySlotIdx      r0, r1, 1
+  002a  Ret                  r0
+
+function #8 ""  params=2 frame=2 env=0 flags=dbg,overflowed  @0x00000505 size=16
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r1, r0, 0
+  0007  LoadParam            r0, 1
+  000a  Add                  r0, r0, r1
+  000e  Ret                  r0
+
+function #9 "header"  params=2 frame=15 env=0 flags=dbg,overflowed  @0x00000515 size=52
+  0000  GetGlobalObject      r3
+  0002  GetByIdShort         r2, r3, #c0, s31 "show"
+  0007  NewObject            r1
+  0009  LoadParam            r5, 1
+  000c  Mov                  r6, r1
+  000f  CallBuiltin          r4, b46 "copyDataProperties", 3
+  0013  TryGetById           r4, r3, #c1, s6 "Boolean"
+  0019  GetParentEnvironment r3, 0
+  001c  LoadFromEnvironment  r3, r3, 1
+  0020  LoadConstUndefined   r0
+  0022  Call2                r3, r4, r0, r3
+  0027  DefineOwnById        r1, r3, #c0, 7
+  002d  Call2                r1, r2, r0, r1
+  0032  Ret                  r1
+
+function #10 "renderTabBar"  params=2 frame=17 env=0 flags=dbg,overflowed  @0x00000549 size=92
+  0000  GetGlobalObject      r2
+  0002  GetByIdShort         r4, r2, #c0, s27 "jsx"
+  0007  GetParentEnvironment r2, 0
+  000a  LoadFromEnvironment  r3, r2, 0
+  000e  NewObject            r2
+  0010  LoadParam            r7, 1
+  0013  Mov                  r8, r2
+  0016  CallBuiltin          r5, b46 "copyDataProperties", 3
+  001a  LoadConstTrue        r1
+  001c  DefineOwnById        r2, r1, #c0, 21
+  0022  GetParentEnvironment r5, 1
+  0025  LoadFromEnvironment  r5, r5, 0
+  0029  GetByIdShort         r6, r5, #c1, s18 "content"
+  002e  DefineOwnById        r2, r6, #c1, 19
+  0034  GetByIdShort         r5, r5, #c2, s15 "tab"
+  0039  DefineOwnById        r2, r5, #c2, 16
+  003f  LoadConstUInt8       r0, 20
+  0042  DefineOwnById        r2, r0, #c3, 13
+  0048  LoadConstString      r5, s4 "ltr"
+  004c  DefineOwnById        r2, r5, #c4, 22
+  0052  LoadConstUndefined   r1
+  0054  Call3                r2, r4, r1, r3, r2
+  005a  Ret                  r2
