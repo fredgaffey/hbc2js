@@ -71,7 +71,7 @@ const ind = (s, pad) => s.split("\n").map((l) => (l ? pad + l : l)).join("\n");
 // ---------------------------------------------------------------- cfg mix --
 // Random structured control flow with a context stack so every break /
 // continue / throw is legal and terminates.
-function cfgGen(r, s, { maxDepth, budget }) {
+function cfgGen(r, s, { maxDepth, budget, yields = false }) {
   let n = 0;
   let left = budget;
   const v = () => `${["x", "h", "c" + s + "_0"][r.int(3)]}`;
@@ -119,7 +119,7 @@ function cfgGen(r, s, { maxDepth, budget }) {
   }
   function stmt(ctx, depth) {
     left--;
-    const k = depth >= maxDepth ? 0 : r.int(11);
+    const k = depth >= maxDepth ? (yields && r.int(3) === 0 ? 10 : 0) : r.int(11);
     const id = n++;
     const L = r.int(4) === 0 ? `L${s}_${id}` : null;
     switch (k) {
@@ -179,7 +179,8 @@ function cfgGen(r, s, { maxDepth, budget }) {
       case 9: { // ternary / logical assignment chain
         return `c${s}_0 ||= ${r.int(5)};\nc${s}_0 &&= ${expr()};\no${s}.z ??= ${r.int(9)};\nh = mix(h, ${cond()} ? (${cond()} ? ${expr()} : ${r.int(9)}) : ${expr()});`;
       }
-      case 10: { // closure capturing the current state
+      case 10: { // closure capturing the current state (or a yield in generator mode)
+        if (yields && r.int(2)) return r.int(3) ? `h = mix(h, (yield ${expr()}) ?? ${r.int(9)});` : `yield* [${r.int(9)}, h & 255];`;
         return `fs${s}.push(((q) => () => q + c${s}_0)(${expr()}));`;
       }
       default:
@@ -576,12 +577,81 @@ const fib${s} = (n, memo = new Map()) => n < 2 ? n : memo.get(n) ?? (memo.set(n,
   const ws = new WeakMap(); const key = {}; ws.set(key, x);
   h = mix(h, ws.get(key) + (ws.has({}) ? 1 : 0));
 }` }),
+
+  genCfg: (r, s) => {
+    const body = cfgGen(r, s, { maxDepth: 3 + r.int(3), budget: 10 + r.int(16), yields: true });
+    return {
+      pre: `function* gc${s}(x, h) {\n${ind(body, "  ")}\n  return h >>> 0;\n}`,
+      body: `{
+  const it = gc${s}(x, h);
+  let st = it.next(), k = 0;
+  while (!st.done && k < 200) { h = mix(h, st.value); st = it.next(k++ % ${2 + r.int(5)} ? k : undefined); }
+  h = mix(h, st.done ? st.value : 1);
+}` };
+  },
+
+  bigSwitch: (r, s) => {
+    const n = 8 + r.int(40);
+    const base = r.int(3) ? 0 : r.int(100) - 50;
+    const cases = [];
+    for (let i = 0; i < n; i++) {
+      if (r.int(6) === 0) continue; // holes
+      const body = r.int(4) === 0 ? `h = mix(h, ${r.int(1000)});` : r.int(3) === 0 ? `h = mix(h, ${i}); break;` : `h = mix(h, x * ${i + 1}); break;`;
+      cases.push(`case ${base + i}: ${body}`);
+    }
+    return { body: `for (let i = 0; i < ${3 + r.int(5)}; i++) {
+  switch ((x + i * ${1 + r.int(7)}) % ${n + 2} + ${base}) {
+${ind(cases.join("\n"), "    ")}
+    default: h = mix(h, ${r.int(77)});
+  }
+}` };
+  },
+
+  literals: (r, s) => {
+    const lit = (d) => {
+      const k = r.int(d > 2 ? 4 : 7);
+      if (k === 0) return String(r.int(2000) - 1000);
+      if (k === 1) return `'${["", "a", "b c", "\\u00e9", "x".repeat(r.int(20))][r.int(5)]}'`;
+      if (k === 2) return ["null", "true", "false", "0.25", "-0", "1e300"][r.int(6)];
+      if (k === 3) return `x % ${2 + r.int(9)}`;
+      if (k <= 5) { const n = r.int(12); return `[${Array.from({ length: n }, () => lit(d + 1)).join(", ")}]`; }
+      const n = r.int(8); return `{ ${Array.from({ length: n }, (_, i) => `${[`a${i}`, `b${i}`, `'c-d${i}'`, `${i}`, `${10 + i}`, `k${i}`][r.int(6)]}: ${lit(d + 1)}`).join(", ")} }`;
+    };
+    return { body: `{
+  const L = [${Array.from({ length: 3 + r.int(6) }, () => lit(0)).join(", ")}];
+  h = mix(h, sh(JSON.stringify(L)));
+  const L2 = [${Array.from({ length: 20 + r.int(60) }, () => r.int(300)).join(", ")}];
+  h = mix(h, L2.reduce((a, b) => (a * 31 + b) | 0, x));
+}` };
+  },
+
+  manyArgs: (r, s) => {
+    const n = 10 + r.int(30);
+    const ps = Array.from({ length: n }, (_, i) => `p${i}${r.int(4) === 0 ? " = " + i : ""}`);
+    const args = Array.from({ length: n - r.int(3) }, (_, i) => (r.int(3) ? `x + ${i}` : `${i}`));
+    return {
+      pre: `function ma${s}(${ps.join(", ")}) {\n  let t = 0;\n${Array.from({ length: n }, (_, i) => `  t = (t * 7 + (p${i} | 0)) | 0;`).join("\n")}\n  return t;\n}`,
+      body: `h = mix(h, ma${s}(${args.join(", ")}));\nh = mix(h, ma${s}.call(null, ${args.slice(0, 5).join(", ")}));`,
+    };
+  },
+
+  forIn: (r, s) => ({ body: `{
+  const proto = { inh${s}: 1, 7: 'p' };
+  const o = Object.create(proto);
+  o.b = 2; o[3] = 'x'; o.a = x % 9; o[1] = 4; o['-1'] = 5;
+  Object.defineProperty(o, 'hid', { value: 9, enumerable: false });
+  for (const k in o) { h = mix(h, sh(k)); if (k === '${["a", "b", "3"][r.int(3)]}') continue; h = mix(h, typeof o[k] === 'number' ? o[k] : 1); }
+  const arr = [5, , 7]; arr.extra = 1;
+  for (const k in arr) h = mix(h, sh(k));
+  delete o.b;
+  h = mix(h, ('b' in o) * 2 + ('inh${s}' in o) * 4 + Object.keys(o).length);
+}` }),
 };
 
 export const TEMPLATE_NAMES = Object.keys(TEMPLATES);
 
 /** Default weights: random control flow dominates, the rest share. */
-export const DEFAULT_WEIGHTS = Object.fromEntries(TEMPLATE_NAMES.map((t) => [t, t === "cfg" ? 6 : t === "cfgDeep" ? 3 : 1]));
+export const DEFAULT_WEIGHTS = Object.fromEntries(TEMPLATE_NAMES.map((t) => [t, t === "cfg" ? 5 : t === "cfgDeep" || t === "genCfg" ? 3 : 1]));
 
 function weightedPick(r, weights) {
   const names = TEMPLATE_NAMES.filter((t) => (weights[t] ?? 0) > 0);
