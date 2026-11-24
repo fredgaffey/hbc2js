@@ -3,7 +3,9 @@
 // look at it, plus the toolchain table §4.3 requires (the build toolchain is
 // not derivable from the bundle at all).
 import type { DepsReport } from "../deps/report.ts";
-import { newestRnVersionForHbc, packageJsonDependencies } from "../deps/report.ts";
+import { expoCompatRange, expoSdkReactNative } from "./expo-compat.ts";
+import { tierConfidenceScore } from "./substitute.ts";
+import { newestRnVersionForHbc } from "../deps/report.ts";
 
 export interface AppNameResult {
   readonly name: string;
@@ -66,7 +68,7 @@ export function recoverAppName(
 
 export interface ReactNativeVersionResult {
   readonly version: string | null;
-  readonly source: "flag" | "deps-confirmed" | "hbc-range";
+  readonly source: "flag" | "bundle-string" | "deps-signature-match" | "hbc-range";
   readonly consistentWithHbc: boolean | null;
   readonly expectedRange: string | null;
 }
@@ -81,7 +83,9 @@ export function resolveReactNativeVersion(report: DepsReport, override: string |
   if (report.reactNativeVersion !== null) {
     return {
       version: report.reactNativeVersion,
-      source: "deps-confirmed",
+      // A signature-DB nearest match is NOT a confirmation: only the bundle's own
+      // version constants are evidence of the version.
+      source: report.reactNativeVersionSource === "bundle-string" ? "bundle-string" : "deps-signature-match",
       consistentWithHbc: report.reactNativeVersionConsistentWithHbc,
       expectedRange: report.reactNativeVersionExpectedRange,
     };
@@ -107,18 +111,34 @@ export function isModernRnToolchain(rnVersion: string | null): boolean {
   return minor !== null && minor >= 73;
 }
 
+function rnMinor(rnVersion: string | null): number | null {
+  const m = rnVersion !== null ? /^(\d+)\.(\d+)/.exec(rnVersion) : null;
+  return m !== null ? Number(m[2]) : null;
+}
+
+/** The `@react-native-community/cli` and `metro` lines RN ships against, by
+ *  RN minor (RN 0.83 bundles with cli 20 / metro 0.83; the old 13 / 0.80 pair
+ *  cannot drive it). */
+function cliAndMetroFor(minor: number | null): { readonly cli: string; readonly metro: string } {
+  if (minor !== null && minor >= 81) return { cli: "^20.0.0", metro: "^0.83.0" };
+  if (minor === 80) return { cli: "^19.0.0", metro: "^0.82.0" };
+  if (minor === 79) return { cli: "^18.0.0", metro: "^0.82.0" };
+  return { cli: "^13.0.0", metro: "^0.80.0" };
+}
+
 export function TOOLCHAIN_FOR_RN(rnVersion: string | null): Record<string, string> {
   const modern = isModernRnToolchain(rnVersion);
+  const tool = cliAndMetroFor(rnMinor(rnVersion));
   const common = {
     "@babel/core": "^7.25.0",
-    "@react-native-community/cli": "^13.0.0",
+    "@react-native-community/cli": tool.cli,
   };
   if (modern) {
     return {
       ...common,
       "@react-native/babel-preset": rnVersion!,
       "@react-native/metro-config": rnVersion!,
-      metro: "^0.80.0",
+      metro: tool.metro,
     };
   }
   return {
@@ -129,12 +149,84 @@ export function TOOLCHAIN_FOR_RN(rnVersion: string | null): Record<string, strin
   };
 }
 
+/** Expo SDK major that ships with a given RN minor (Expo pins one RN per SDK). */
+export function expoSdkForRn(rnVersion: string | null): number | null {
+  const minor = rnMinor(rnVersion);
+  const table: Readonly<Record<number, number>> = { 73: 50, 74: 51, 76: 52, 79: 53, 81: 54, 83: 55 };
+  return minor === null ? null : (table[minor] ?? null);
+}
+
+export type ExportDepLevel = "confirmed" | "bundle-string" | "guessed" | "hint" | "native-channel" | "peer";
+export interface ExportDep {
+  readonly version: string;
+  readonly level: ExportDepLevel;
+  readonly confidence: number | null;
+  /** True when the version is a placeholder/derived pin rather than evidence of this package's own version. */
+  readonly versionDerived: boolean;
+  /** Why the version differs from (or is not backed by) the signature evidence. */
+  readonly note?: string;
+}
+
+const NAV_7_PACKAGES = new Set(["native", "stack", "bottom-tabs", "native-stack", "drawer", "core", "routers", "material-top-tabs"]);
+
+/** Every dependency package.json should carry, with the evidence level of each:
+ *  confirmed (signature match / bundle version constant), then guessed, hinted
+ *  and native-channel detections, which a build still needs even though only
+ *  their name (not their version) is evidenced. Unknown versions: Expo SDK
+ *  packages get the SDK line matching the RN version, everything else `*`. */
+export function exportDependencies(report: DepsReport, rnVersion: string | null): Record<string, ExportDep> {
+  const out: Record<string, ExportDep> = {};
+  const sdk = expoSdkForRn(rnVersion);
+  // Never let the Expo table contradict the detected RN: use it only when the
+  // SDK's own react-native pin is the detected RN's minor line.
+  const sdkRn = sdk === null ? null : expoSdkReactNative(sdk);
+  const useTable = sdk !== null && sdkRn !== null && rnMinor(sdkRn) === rnMinor(rnVersion);
+  for (const d of report.confirmedDeps) {
+    out[d.package] = { version: d.version, level: d.versionEvidence === "bundle-string" ? "bundle-string" : "confirmed", confidence: tierConfidenceScore(d.confidence), versionDerived: false };
+  }
+  const add = (name: string, version: string | null, level: ExportDepLevel, confidence: number | null): void => {
+    if (out[name] !== undefined) return;
+    out[name] = { version: version ?? "*", level, confidence, versionDerived: version === null };
+  };
+  for (const g of report.guessedDeps) add(g.package, g.version, "guessed", g.confidence);
+  for (const h of report.hintedDeps) add(h.package, h.version, "hint", h.confidence);
+  for (const n of report.nativeChannel?.deps ?? []) add(n.package, null, "native-channel", null);
+
+  for (const [name, d] of Object.entries(out)) {
+    if (d.level === "bundle-string") continue; // the bundle's own constants beat any table
+    const range = useTable ? expoCompatRange(sdk!, name) : null;
+    if (range !== null && range !== d.version) {
+      out[name] = { ...d, version: range, note: d.versionDerived ? `pinned from Expo SDK ${sdk} bundledNativeModules.json` : `signature version ${d.version} conflicts with Expo SDK ${sdk} (${range}); using the SDK's range` };
+    } else if (range === null && d.versionDerived) {
+      if ((name === "expo" || name.startsWith("expo-")) && sdk !== null) out[name] = { ...d, version: `~${sdk}.0.0`, note: `Expo SDK ${sdk} line derived from the detected RN; not in the compat table` };
+      else out[name] = { ...d, note: "unpinned: no version evidence and no compatibility table for this package" };
+    }
+  }
+  // reanimated >= 4 hard-requires react-native-worklets as a peer; without it
+  // `npm install` fails with ERESOLVE (or pulls a worklets built for another RN).
+  const reanimated = out["react-native-reanimated"];
+  const workletsRange = useTable ? expoCompatRange(sdk!, "react-native-worklets") : null;
+  if (reanimated !== undefined && out["react-native-worklets"] === undefined && workletsRange !== null && Number(/(\d+)\./.exec(reanimated.version)?.[1] ?? 0) >= 4) {
+    out["react-native-worklets"] = { version: workletsRange, level: "peer", confidence: null, versionDerived: true, note: `peer dependency of react-native-reanimated ${reanimated.version}; pinned from Expo SDK ${sdk} bundledNativeModules.json` };
+  }
+  if (report.reactNavigationApi7 === true) {
+    for (const [name, d] of Object.entries(out)) {
+      const m = /^@react-navigation\/(.+)$/.exec(name);
+      if (m === null || !NAV_7_PACKAGES.has(m[1]!) || d.level === "bundle-string") continue;
+      const major = /^[~^]?(\d+)\./.exec(d.version);
+      if (major !== null && Number(major[1]) >= 7) continue;
+      out[name] = { ...d, version: "^7.0.0", versionDerived: true, note: `signature version ${d.version} is 6.x but the bundle uses the static-config API (createStaticNavigation), which exists only in 7.x` };
+    }
+  }
+  return out;
+}
+
 export function buildPackageJson(opts: {
   readonly appName: string;
   readonly report: DepsReport;
   readonly rnVersion: string | null;
 }): Record<string, unknown> {
-  const dependencies = packageJsonDependencies(opts.report);
+  const dependencies = Object.fromEntries(Object.entries(exportDependencies(opts.report, opts.rnVersion)).map(([k, v]) => [k, v.version]).sort(([a], [b]) => (a! < b! ? -1 : 1)));
   return {
     name: opts.appName.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "decompiled-app",
     version: "0.0.0",

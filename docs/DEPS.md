@@ -518,9 +518,9 @@ shape from the human table.
 | `input` | `string` | The path passed on the CLI. |
 | `hbcVersion` | `number` | Parsed Hermes bytecode version (never guessed from the RN version — the reverse). |
 | `totalFunctions`, `totalModules` | `number` | Whole-bundle counts from the module inventory. |
-| `reactNativeVersion` | `string \| null` | Best-guess RN version, from the highest-confidence matched `react-native`/`react-native-foundation` signature; `null` if none matched at all. |
-| `reactNativeVersionConsistentWithHbc` | `boolean \| null` | F4 (issue #14): `null` when `reactNativeVersion` is `null` (nothing to reconcile) or the parsed `hbcVersion` has no documented RN range; otherwise whether `reactNativeVersion` falls inside the range `docs/TOOLCHAIN.md`'s table documents for this `hbcVersion` (e.g. HBC96 → RN 0.72.x-0.81.x, widened from 0.73.x-0.81.x 2026-09-18 -- see "RN version reconciliation (F4)" below). |
-| `reactNativeVersionExpectedRange` | `string \| null` | Human-readable RN range for this `hbcVersion` (populated whenever one is known, not only on a mismatch), e.g. `"RN 0.72.x-0.81.x"`. |
+| `reactNativeVersion` | `string \| null` | RN version: the bundle's own `ReactNativeVersion` constants when present (`reactNativeVersionSource: "bundle-string"`, `src/deps/version-evidence.ts`), else the highest-confidence matched `react-native`/`react-native-foundation` signature (`"signature-match"`: the DB only holds some versions, so this is a nearest match, not corroborated); `null` if neither. `reactVersion` is read the same way from the `react` module's version constant. A bundle-string version also replaces the version of the confirmed `react-native`/`react` entries (`versionEvidence: "bundle-string"`). |
+| `reactNativeVersionConsistentWithHbc` | `boolean \| null` | F4 (issue #14): `null` when `reactNativeVersion` is `null` (nothing to reconcile) or the parsed `hbcVersion` has no documented RN range; otherwise whether `reactNativeVersion` falls inside the range `docs/TOOLCHAIN.md`'s table documents for this `hbcVersion` (e.g. HBC96 → RN 0.72.x-0.87.x, widened from 0.73.x-0.81.x 2026-09-18 -- see "RN version reconciliation (F4)" below). |
+| `reactNativeVersionExpectedRange` | `string \| null` | Human-readable RN range for this `hbcVersion` (populated whenever one is known, not only on a mismatch), e.g. `"RN 0.72.x-0.87.x"`. |
 | `confirmedDeps` | `ConfirmedDep[]` | `{ package, version, confidence, modulesCovered, moduleTotal, source }` — `package` (not `.name`), High-tier or `--confirm`-verified. Written into `package.json`. Optional `forkOf` / `forkEvidence` (corpus-fork-relabel): `package` is a fork the bundle names, `forkOf` the upstream whose signature matched, `version` that upstream's version. |
 | `guessedDeps` | `GuessedDep[]` | `{ package, version, confidence, modules, evidence }` — evidence-scored leads clearing the precision rules (≥2 independent evidence kinds, confidence ≥0.5). Never written into `package.json`. |
 | `hintedDeps` | `HintedDep[]` | `{ package, version, confidence, evidenceKind, evidence }` — single-evidence-kind leads kept only when that one kind is high-specificity. Reported for visibility only. |
@@ -584,7 +584,7 @@ isn't. This never silently fixes a wrong match — an inconsistent version can
 still be the best (or only) evidence available and is still reported, just
 flagged.
 
-**Range.** `HBC_TO_RN_RANGE`'s HBC96 entry is `RN 0.72.x-0.81.x`: RN apps routinely pin `hermes-engine`/`hermesc` independently of the `react-native` npm version (Gradle/Podfile overrides are routine), so a HBC96 bundle built against react-native@0.72.x is a normal toolchain combination, not a wrong match. `tests/gate/deps/rn-version-range.test.ts` covers every documented HBC-to-RN pairing.
+**Range.** `HBC_TO_RN_RANGE`'s HBC96 entry is `RN 0.72.x-0.87.x`: RN apps routinely pin `hermes-engine`/`hermesc` independently of the `react-native` npm version (Gradle/Podfile overrides are routine), so a HBC96 bundle built against react-native@0.72.x is a normal toolchain combination, not a wrong match. `tests/gate/deps/rn-version-range.test.ts` covers every documented HBC-to-RN pairing.
 
 ## For the M6 emitter (D19)
 

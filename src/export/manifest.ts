@@ -50,7 +50,7 @@ export interface BuildExportManifestOptions {
   readonly appName: string;
   readonly appNameSource: string;
   readonly reactNative: { readonly version: string | null; readonly source: string; readonly consistentWithHbc: boolean | null; readonly expectedRange: string | null };
-  readonly dependencies: Readonly<Record<string, { readonly version: string; readonly kind: string; readonly source: string; readonly confidence: number | null }>>;
+  readonly dependencies: Readonly<Record<string, { readonly version: string; readonly kind: string; readonly source: string; readonly confidence: number | null; readonly note?: string }>>;
   readonly modules: readonly ExportManifestModule[];
   readonly substitutions: readonly ExportManifestSubstitution[];
   readonly unresolved: readonly ExportManifestUnresolved[];

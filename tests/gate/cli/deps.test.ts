@@ -169,6 +169,8 @@ test("deps --json output larger than the 64 KB pipe buffer arrives whole when pi
   const r = runCli(["deps", join(repoRoot(), "tests", "fixtures", "bundles", "rn-template-0.72", "index.android.hbc"), "--offline", "--no-shared-db", "--json"]);
   assert.equal(r.status, 0, r.stderr);
   assert.ok(Buffer.byteLength(r.stdout) > 65536, `expected > 64 KB of output, got ${Buffer.byteLength(r.stdout)}`);
-  const report = JSON.parse(r.stdout) as { confirmedDeps: { package: string }[] };
-  assert.equal(report.confirmedDeps.length, 0);
+  const report = JSON.parse(r.stdout) as { confirmedDeps: { package: string; versionEvidence?: string }[] };
+  // No DB -> no signature-confirmed deps; the only confirmed entries allowed are
+  // framework versions read from the bundle's own constants (react 18.2.0 here).
+  assert.deepEqual(report.confirmedDeps.filter((d) => d.versionEvidence !== "bundle-string"), []);
 });

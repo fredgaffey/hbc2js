@@ -10,6 +10,8 @@ import type { HbcModule, ParseOptions } from "../parse/types.ts";
 import { fingerprintModule, functionStringEvidence } from "./fingerprint.ts";
 import type { SigFunction } from "./sigdb-types.ts";
 import type { BundleKind } from "./wscan.ts";
+import { detectVersionEvidence } from "./version-evidence.ts";
+import type { VersionEvidence } from "./version-evidence.ts";
 import { closureOwnership, directClosures } from "./closure-owner.ts";
 
 // Same truncated-sha256 convention as fingerprint.ts's own `sha256` (96
@@ -98,6 +100,9 @@ export interface ModuleInventory {
    *  (docs/specs/32-webpack-inventory.md). Optional: hand-built
    *  inventories omit it. */
   readonly bundleKind?: BundleKind;
+  /** react-native / react versions read from the bundle's own constants
+   *  (`version-evidence.ts`); absent keys = no such constant found. */
+  readonly versionEvidence?: VersionEvidence;
 }
 
 export function buildInventoryFromModule(mod: HbcModule): ModuleInventory {
@@ -185,6 +190,7 @@ export function buildInventoryFromModule(mod: HbcModule): ModuleInventory {
     legacyExactHashes,
     legacyFuzzyHashes,
     bundleKind: bundleKind ?? "none",
+    versionEvidence: detectVersionEvidence(mod, invModules),
   };
 }
 
