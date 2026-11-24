@@ -351,6 +351,17 @@ an Expo app that reads `expoConfig` gets a stand-in embedded app config
 prints phase lines on stderr (off under `--json` unless `--progress`). Result:
 the react-navigation original now stops on a decompiler miscompile
 (docs/BUGS.md, private-field initializer naming a constructor local), so it
-stays INCONCLUSIVE for a real reason; the Expo/Ignite original gets past
-expo-linking's manifest checks and stops in the same factory on a further
-gap (`replace` of undefined, not yet diagnosed).
+stays INCONCLUSIVE for a real reason. The Expo/Ignite app is EQUIVALENT in
+both phases (register: 223 factories; run: `runApplication('main')`, one
+commit, 293 factories) after four more host fixes
+(`stub-host-standins.test.ts`): (5) native-module constants are own
+enumerable properties of the stub, since expo-constants builds `Constants` by
+spreading `ExponentConstants` (served only through the `get` trap they spread
+to `{}`, `executionEnvironment` read undefined and expo-linking's `createURL`
+hit `removeScheme(undefined)`: the `replace` of undefined); (6) a UTF-8
+`TextEncoder` when the VM has none (RN's Hermes has it since 0.74; Expo's
+runtime reads it bare); (7) rule 3 reads a lookup called through a register
+alias (`r3 = ….requireNativeModule; r1 = r3("ExpoFontLoader")`); (8) a tree
+exported without `--instrument=modules` is INCONCLUSIVE up front, naming the
+command (it booted silently, 0 factories, and read as DIVERGENT `export
+<end>`). `HBC2JS_BOOT_STACK=1` adds the error stack to a throw record.
