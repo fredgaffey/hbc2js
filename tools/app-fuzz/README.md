@@ -61,6 +61,8 @@ bounded, and avoids every Node/Hermes or strict/sloppy divergence we know of.
     node tools/app-fuzz/loop.mjs --seeds 1..30 --profile hard|mixed|ui [--root /tmp/hbc2js/app-fuzz]
     node tools/app-fuzz/loop.mjs --summary          # per-seed table + ranked clusters
     node tools/app-fuzz/loop.mjs --verify-repros    # Hermes VM triage of kept repros
+    node tools/app-fuzz/loop.mjs --reduce <repro-dir> [--budget 60]   # statement-level reduction -> reduced.js
+    node tools/app-fuzz/rebuild-repro.mjs <repro-dir> <out>            # rebuild a repro's minimal app
 
 The loop processes one seed at a time, so there is only ever one export.
 
@@ -94,10 +96,14 @@ The loop processes one seed at a time, so there is only ever one export.
    favour templates that co-occur with rare features (failures count 3x),
    and the weights are recorded in each row.
 
-The Node truth is not checked against Hermes during the loop, because the
-build box has no VM. `--verify-repros` runs each kept `headless.hbc` in
-`tools/hermes-vm/build-<v>/bin/hermes`. If Hermes disagrees with Node, the
-repro is a generator bug (an engine-dependent shape), not a decompiler bug.
+**Truth is the Hermes VM.** When `tools/hermes-vm/v<N>/bin/hermes` exists
+(built by `tools/build-hermes-vm.sh <N>`; on Linux, build it inside the
+loop's code copy), the decompiled output is compared with what the bytecode
+computes in the VM. When Node and Hermes disagree, the case is recorded as
+`hermes-vs-node` (low severity, never a decompiler bug). The first one found
+was `finallyReturn` on HBC 96 with Metro minify. Without a VM the row is
+marked `node-unverified`, and `--verify-repros` re-checks the kept repros on
+a machine that has one.
 
 ## Gate
 

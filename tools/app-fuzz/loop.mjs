@@ -39,6 +39,8 @@ function parseArgs(argv) {
     else if (a === "--summary") o.summary = true;
     else if (a === "--verify-repros") o.verifyRepros = true;
     else if (a === "--hermes") o.hermes = argv[++i];
+    else if (a === "--reduce") o.reduce = argv[++i];
+    else if (a === "--budget") o.budget = Number(argv[++i]);
   }
   return o;
 }
@@ -95,9 +97,8 @@ function recordCoverage(cov, moduleFeatures) {
 // ------------------------------------------------------------- pipeline --
 const ms = (t0) => Date.now() - t0;
 
-async function buildPlan(plan, cfg, out, ws) {
+async function buildPlan(plan, cfg, out, ws, gen = () => emitShapes(plan, `seed ${cfg.seed}`)) {
   const { build } = await import("../torture/build.mjs");
-  const gen = () => emitShapes(plan, `seed ${cfg.seed}`);
   return build({ seed: cfg.seed, functions: plan.length, hbc: cfg.hbc, minify: cfg.minify, obfuscate: cfg.obfuscate, headlessOnly: cfg.headlessOnly, out, ws, generate: gen });
 }
 
@@ -244,9 +245,9 @@ async function checkExport(exportDir, manifest, vm = null) {
 // ----------------------------------------------------------- minimising --
 /** Does `plan` (a few fn specs) still show failure `kind` for function
  *  `name` (or, for module-level static kinds, anywhere)? */
-async function reproduces(plan, cfg, kind, name, scratch, ws) {
+async function reproduces(plan, cfg, kind, name, scratch, ws, gen) {
   try {
-    const { manifest } = await buildPlan(plan, cfg, join(scratch, "b"), ws);
+    const { manifest } = await buildPlan(plan, cfg, join(scratch, "b"), ws, gen);
     const ex = runExport(join(scratch, "b/bundle.hbc"), join(scratch, "e"));
     if (!ex.ok) return kind === "export-crash" && crashSig(ex.log) === name;
     const res = await checkExport(join(scratch, "e"), manifest, vmTruth(join(scratch, "b/headless.hbc"), cfg.hbc));
@@ -396,6 +397,54 @@ async function runSeed(seed, o, cov, seenClusters) {
   return row;
 }
 
+/** Statement-level reduction of a kept repro's module source: greedily
+ *  delete statements (largest first) while the same failure persists.
+ *  Never deletes declarations or update expressions (loop counters), so
+ *  every candidate still terminates. Writes reduced.js next to repro.json. */
+async function reduceRepro(dir, ws, budget) {
+  const { parse } = await import("@babel/parser");
+  const r = JSON.parse(readFileSync(join(dir, "repro.json"), "utf8"));
+  const base = emitShapes(r.plan, "reduce");
+  const mi = base.files.findIndex(([p]) => p.startsWith("src/junk/s"));
+  let text = base.files[mi][1];
+  const scratch = join(dir, "_reduce");
+  const name = r.kind === "export-crash" ? r.error : r.plan[0]?.name;
+  const gen = (t) => () => ({ ...base, files: base.files.map((f, i) => (i === mi ? [f[0], t] : f)) });
+  const candidates = (t) => {
+    const ast = parse(t, { sourceType: "module" });
+    const out = [];
+    const visit = (node, inBody) => {
+      if (!node || typeof node.type !== "string") return;
+      if (inBody && node.type !== "VariableDeclaration" && !(node.type === "ExpressionStatement" && node.expression.type === "UpdateExpression")) out.push([node.start, node.end]);
+      for (const [k, v] of Object.entries(node)) {
+        if (k === "loc" || k === "leadingComments" || k === "trailingComments") continue;
+        const body = (node.type === "BlockStatement" && k === "body") || (node.type === "SwitchCase" && k === "consequent");
+        if (Array.isArray(v)) v.forEach((c) => visit(c, body));
+        else if (v && typeof v === "object") visit(v, false);
+      }
+    };
+    visit(ast.program, false);
+    return out.sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]));
+  };
+  let tries = 0, removed = 0;
+  let progress = true;
+  const tried = new Set();
+  while (progress && tries < budget) {
+    progress = false;
+    for (const [a, b] of candidates(text)) {
+      if (tries >= budget) break;
+      const cand = text.slice(0, a) + text.slice(b);
+      if (tried.has(cand)) continue;
+      tried.add(cand);
+      tries++;
+      if (await reproduces(r.plan, r.cfg, r.kind, name, scratch, ws, gen(cand))) { text = cand; removed++; progress = true; break; }
+    }
+  }
+  rmSync(scratch, { recursive: true, force: true });
+  writeFileSync(join(dir, "reduced.js"), text);
+  return { tries, removed, lines: text.split("\n").length };
+}
+
 function summary(root) {
   const rows = readFileSync(join(root, "seeds.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
   const lines = ["| profile | seed | hbc | min | obf | fns | junk pass | core pass | truth | hermes!=node | syntax err files | build s | export s | check s | min s | clusters |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"];
@@ -439,6 +488,7 @@ async function main() {
   const o = parseArgs(process.argv.slice(2));
   mkdirSync(o.root, { recursive: true });
   if (o.summary) { console.log(summary(o.root)); return; }
+  if (o.reduce) { console.log(JSON.stringify(await reduceRepro(o.reduce, join(o.root, "ws"), o.budget || 60))); return; }
   if (o.verifyRepros) {
     const hermesFor = (v) => o.hermes || [join(ROOT, `tools/hermes-vm/build-${v}/bin/hermes`), join(ROOT, `tools/hermesc/v${v}/hermes`)].find(existsSync) || null;
     console.log(verifyRepros(o.root, hermesFor)); return;
