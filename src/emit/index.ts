@@ -8,10 +8,10 @@ import { getBuiltinTable } from "../tables/registry.ts";
 import { helperPrelude } from "../runtime/helpers.ts";
 import type { Expr, Param, Stmt } from "./ast.ts";
 import { id, lit, p } from "./ast.ts";
-import { emitFunction, envDeclaringFunction, ownedEnvSlots } from "./function.ts";
+import { emitFunction, envDeclaringFunction } from "./function.ts";
 import { closureFunctionId } from "./lower.ts";
 import { resolveOrphanHosts } from "./placement.ts";
-import { fnName, quote } from "./names.ts";
+import { envSlot, fnName, quote } from "./names.ts";
 import { checkBindings, collectUnbound, unboundMessage } from "./scope-check.ts";
 import { printProgram } from "./print.ts";
 import { findGlobalCallSites, formatReturnAnnotation, isAsyncFunction } from "./return-annotate.ts";
@@ -186,23 +186,17 @@ const CREATE_CLOSURE_OPS: ReadonlySet<string> = new Set([
   "CreateAsyncClosure", "CreateAsyncClosureLongIndex",
 ]);
 
-export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): EmitResult {
+/** The whole-bundle closure-placement layout `emitModule` derives from the
+ *  env graph before emitting anything. It depends only on `analysis` (never
+ *  on `EmitOptions`), so it is computed once per analysis and shared by every
+ *  call -- a scoped (`onlyFunction`) render per module (export, spec 29 §4)
+ *  used to recompute it per module, quadratic in the bundle. Nothing below
+ *  mutates it after construction. */
+function buildEmitLayout(analysis: ModuleAnalysis) {
   const mod = analysis.module;
-  const provenanceComments = opts.provenanceComments ?? true;
-  // Spec 03 §6.4's R3 rule, restated at emit time. Default strict; the CLI's
-  // `--lenient-env` turns each unresolvable access into a loud marker instead
-  // of refusing the module (review M4-H2).
-  const strictEnv = opts.strictEnv ?? true;
-  const indent = opts.indent ?? "  ";
   const diagnostics: Diagnostic[] = [];
   const envGraph = analysis.envGraph;
   const globalIndex = mod.header.globalCodeIndex;
-
-  const builtinId = mod.layout.builtinTable;
-  if (builtinId === undefined) {
-    throw new Hbc2jsError(ErrorCode.E_UNSUPPORTED_VERSION, `no builtin table for bytecode version ${mod.header.version}`, { section: "emit" });
-  }
-  const builtins = getBuiltinTable(builtinId);
 
   // §6 "Function nesting": `_fn<n>` is emitted inside the function that owns its
   // `closureEnvOf` environment, so JS closure capture does the work and no
@@ -641,11 +635,6 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
 
   const declaringFunction = envDeclaringFunction(envGraph, isAncestor);
 
-  const usedHelpers = new Set<string>();
-  const useHelper = (name: string): void => {
-    usedHelpers.add(name);
-  };
-
   // §6 note: an environment created *inside a loop* is a fresh record per
   // iteration, so its slots cannot be one function-top `let`. Such an env gets
   // its declaration at the `Create*Environment` instruction (a `let` in the loop
@@ -809,6 +798,59 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
       }
     }
   }
+
+  const ownedSlotsByFn = new Map<number, string[]>();
+  {
+    // `ownedEnvSlots(envGraph, f, declaringFunction)` for every f at once (same
+    // node order, same names), instead of an O(nodes x slots) scan per function.
+    const maxSlotOf = new Map<number, number>();
+    for (const s of envGraph.slots) if (s.slot > (maxSlotOf.get(s.env) ?? -Infinity)) maxSlotOf.set(s.env, s.slot);
+    for (const node of envGraph.nodes) {
+      const f = declaringFunction.get(node.id) ?? node.ownerFunction;
+      const maxSlot = Math.max(node.size - 1, maxSlotOf.get(node.id) ?? -Infinity);
+      let list = ownedSlotsByFn.get(f);
+      if (list === undefined) ownedSlotsByFn.set(f, (list = []));
+      for (let i = 0; i <= maxSlot; i++) list.push(envSlot(node.id, i));
+    }
+  }
+  return { parentOf, isAncestor, chainUp, copyNameOf, closureNameAt, copyAt, extraCopies, createdIn, recursionGroupOf, composeRemap, childrenOf, declaringFunction, loopLocal, inlineFunctions, perCreatorInline, perCreatorFns, ownedSlotsByFn, diagnostics: diagnostics as readonly Diagnostic[] };
+}
+
+type EmitLayout = ReturnType<typeof buildEmitLayout>;
+const EMIT_LAYOUT = new WeakMap<ModuleAnalysis, EmitLayout>();
+function emitLayoutFor(analysis: ModuleAnalysis): EmitLayout {
+  let layout = EMIT_LAYOUT.get(analysis);
+  if (layout === undefined) EMIT_LAYOUT.set(analysis, (layout = buildEmitLayout(analysis)));
+  return layout;
+}
+
+export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): EmitResult {
+  const mod = analysis.module;
+  const provenanceComments = opts.provenanceComments ?? true;
+  // Spec 03 §6.4's R3 rule, restated at emit time. Default strict; the CLI's
+  // `--lenient-env` turns each unresolvable access into a loud marker instead
+  // of refusing the module (review M4-H2).
+  const strictEnv = opts.strictEnv ?? true;
+  const indent = opts.indent ?? "  ";
+  const diagnostics: Diagnostic[] = [];
+  const envGraph = analysis.envGraph;
+  const globalIndex = mod.header.globalCodeIndex;
+
+  const builtinId = mod.layout.builtinTable;
+  if (builtinId === undefined) {
+    throw new Hbc2jsError(ErrorCode.E_UNSUPPORTED_VERSION, `no builtin table for bytecode version ${mod.header.version}`, { section: "emit" });
+  }
+  const builtins = getBuiltinTable(builtinId);
+
+  const layout = emitLayoutFor(analysis);
+  const { parentOf, isAncestor, chainUp, copyNameOf, closureNameAt, copyAt, extraCopies, createdIn, recursionGroupOf, composeRemap, childrenOf, loopLocal, inlineFunctions, perCreatorInline, perCreatorFns, ownedSlotsByFn } = layout;
+  for (const d of layout.diagnostics) diagnostics.push(d);
+
+  const usedHelpers = new Set<string>();
+  const useHelper = (name: string): void => {
+    usedHelpers.add(name);
+  };
+
 
   /** True when a copy hosted in `host` must be emitted INLINE at its creation
    *  site rather than hoisted: it captured an environment `host` declares
@@ -1003,7 +1045,7 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
         children: hoisted,
         inlineChildren: inlined,
         loopLocalEnvSlots: loopLocal.get(index) ?? new Map(),
-        ownedEnvSlots: ownedEnvSlots(envGraph, index, declaringFunction).filter((name) => ![...(loopLocal.get(index)?.values() ?? [])].some((names) => names.includes(name))),
+        ownedEnvSlots: (ownedSlotsByFn.get(index) ?? []).filter((name) => ![...(loopLocal.get(index)?.values() ?? [])].some((names) => names.includes(name))),
         useHelper,
         diagnostic: (d) => diagnostics.push(d),
         provenanceComments,

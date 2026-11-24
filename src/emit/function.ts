@@ -1060,9 +1060,14 @@ function ownEnvOf(envGraph: EnvGraph, functionIndex: number): number | undefined
 }
 
 /** env id -> parent env id, for spec 27's "parent of a sibling" guard. */
+const ENV_PARENT = new WeakMap<EnvGraph, Map<number, number | null>>();
 function envParentMap(envGraph: EnvGraph): Map<number, number | null> {
+  // Computed once per env graph, not once per emitted function (read-only).
+  const cached = ENV_PARENT.get(envGraph);
+  if (cached !== undefined) return cached;
   const out = new Map<number, number | null>();
   for (const node of envGraph.nodes) out.set(node.id, node.parent);
+  ENV_PARENT.set(envGraph, out);
   return out;
 }
 
