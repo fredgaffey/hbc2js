@@ -480,6 +480,12 @@ function branchVerdict(s: Stmt, reg: string, labels: ReadonlyMap<string, Cont>, 
       return body === "read" ? "read" : "next";
     }
     case "try": {
+      // spec 30 `finally`: the finalizer runs on EVERY way out of the block --
+      // a `break L` past the whole statement included -- so a read in it is a
+      // read on every path (torture s2 hbc96: `arr.push(37)` in a loop's
+      // try/finally, its `r11 = 37` hoisted before the loop and deleted as
+      // dead because the `break` was followed straight to the label).
+      if (s.finalizer !== undefined && s.finalizer.length > 0 && scanFrom(s.finalizer, reg, 0, labels, CLEAR, memo) === "read") return "read";
       const block = scanFrom(s.block, reg, 0, labels, CLEAR, memo);
       const handler = scanFrom(s.handler, reg, 0, labels, rest, memo);
       if (block === "read" || handler === "read") return "read";

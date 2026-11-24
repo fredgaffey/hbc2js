@@ -59,7 +59,7 @@ function containsJump(list: readonly Stmt[]): boolean {
         if (containsJump(s.body)) return true;
         break;
       case "try":
-        if (containsJump(s.block) || containsJump(s.handler)) return true;
+        if (containsJump(s.block) || containsJump(s.handler) || containsJump(s.finalizer ?? [])) return true;
         break;
       case "switch":
         for (const c of s.cases) if (containsJump(c.body)) return true;
