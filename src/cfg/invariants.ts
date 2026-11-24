@@ -68,9 +68,14 @@ export function checkCfgInvariants(cfg: FunctionCfg, fn: DecodedFunction): Diagn
     for (const h of cfg.exceptionSuccs.get(b) ?? []) if (!reachable.has(h)) (reachable.add(h), stack.push(h));
   }
   const opcodeGenerator = cfg.generator.info.era === "opcode" && (cfg.generator.info.kind === "generator" || cfg.generator.info.kind === "async" || cfg.generator.info.kind === "async-generator");
+  // Only a RESUME block left unreachable means the dispatcher is missing. Other
+  // dead code is ordinary: hermesc (v84-v96) still lays out the `Catch` of an
+  // empty `try {} catch {}` with no handler-table row pointing at it, and that
+  // block is as dead in a generator body as in any other function.
+  const resumeBlocks = new Set(cfg.generator.suspendPoints.map((s) => s.resumeBlock));
   for (const b of cfg.blocks) {
     if (reachable.has(b.id)) continue;
-    if (opcodeGenerator && cfg.generator.suspendPoints.length > 0) {
+    if (opcodeGenerator && resumeBlocks.has(b.id)) {
       fail(ErrorCode.E_INTERNAL, "CFG-05", `block ${b.id} (offset ${b.start}) is unreachable in an era:"opcode" generator body — §4.5's dispatcher was not built`, f, b.start);
     }
     diags.push({ severity: "warn", code: "W_UNREACHABLE_BLOCK", message: `block ${b.id} at offset ${b.start} is unreachable`, context: { functionIndex: f, offset: b.start } });
