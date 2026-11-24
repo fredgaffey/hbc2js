@@ -1,0 +1,179 @@
+; hbc2js disassembly of 480-private-field-ctor-local-init/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=8 strings=24 globalCodeIndex=0
+function #0 "global"  params=1 frame=23 env=0 flags=dbg,overflowed  @0x00000234 size=346
+  0000  CreateFunctionEnvironment r8, 3
+  0003  DeclareGlobalVar     s20 "note"
+  0008  DeclareGlobalVar     s10 "makeOrdered"
+  000d  GetGlobalObject      r3
+  000f  CreateClosure        r4, r8, f1 "note"
+  0014  PutByIdLoose         r3, r4, #c0, s20 "note"
+  001a  LoadConstUndefined   r1
+  001c  CreateClosure        r4, r1, f2 "makeOrdered"
+  0021  PutByIdLoose         r3, r4, #c1, s10 "makeOrdered"
+  0027  NewArray             r6, 0
+  002b  StoreToEnvironment   r8, 0, r6
+  002f  NewObjectWithBuffer  r5, sh0(numProps=1), lit@0x0000
+  0035  CreateBaseClass      r4, r4, r8, 3
+  003b  PutOwnBySlotIdx      r5, r4, 0
+  003f  StoreToEnvironment   r8, 1, r5
+  0043  CreatePrivateName    r7, s13 "#e"
+  0049  StoreToEnvironment   r8, 2, r7
+  004d  CreateBaseClass      r4, r9, r8, 4
+  0053  Mov                  r10, r9
+  0056  LoadConstString      r9, s14 "eventCounts"
+  005a  CreateClosure        r8, r8, f5 "eventCounts"
+  005f  DefineOwnGetterSetterByVal r10, r9, r8, r1, 0
+  0065  GetByIdShort         r8, r4, #c0, s12 "prototype"
+  006a  NewObjectWithParent  r9, r8
+  006d  GetByIdShort         r8, r5, #c1, s17 "EventCounts"
+  0072  CreateThisForNew     r10, r8, 0
+  0076  Mov                  r15, r10
+  0079  Construct            r8, r8, 1
+  007d  PrivateIsIn          r2, r7, r9, r0
+  0082  JmpTrueLong          L2, r2
+  0088  SelectObject         r8, r10, r8
+  008c  AddOwnPrivateBySym   r9, r8, r7
+  0090  LoadConstUInt8       r0, 5
+  0093  PutByIdStrict        r9, r0, #c2, s21 "now"
+  0099  GetByIdShort         r4, r4, #c0, s12 "prototype"
+  009e  NewObjectWithParent  r4, r4
+  00a1  GetByIdShort         r5, r5, #c1, s17 "EventCounts"
+  00a6  CreateThisForNew     r8, r5, 0
+  00aa  Mov                  r15, r8
+  00ad  Construct            r5, r5, 1
+  00b1  PrivateIsIn          r2, r7, r4, r1
+  00b6  JmpTrueLong          L1, r2
+  00bc  SelectObject         r5, r8, r5
+  00c0  AddOwnPrivateBySym   r4, r5, r7
+  00c4  PutByIdStrict        r4, r0, #c2, s21 "now"
+  00ca  TryGetById           r8, r3, #c2, s22 "print"
+  00d0  GetByIdShort         r5, r9, #c3, s14 "eventCounts"
+  00d5  GetByIdShort         r13, r5, #c4, s18 "size"
+  00da  GetByIdShort         r12, r9, #c5, s21 "now"
+  00df  GetByIdShort         r10, r9, #c3, s14 "eventCounts"
+  00e4  GetByIdShort         r9, r4, #c3, s14 "eventCounts"
+  00e9  LoadConstString      r14, s9 "perf:"
+  00ed  StrictEq             r11, r10, r9
+  00f1  LoadConstUndefined   r15
+  00f3  Call                 r4, r8, 5
+  00f7  GetByIdShort         r4, r3, #c6, s10 "makeOrdered"
+  00fc  Call1                r4, r4, r1
+  0100  CreateThisForNew     r5, r4, 0
+  0104  Mov                  r15, r5
+  0107  Construct            r4, r4, 1
+  010b  SelectObject         r4, r5, r4
+  010f  TryGetById           r8, r3, #c2, s22 "print"
+  0115  GetByIdShort         r7, r4, #c7, s16 "total"
+  011a  GetByIdShort         r5, r4, #c8, s11 "first"
+  011f  LoadConstString      r4, s8 "ordered:"
+  0123  Call4                r4, r8, r1, r4, r7, r5
+  012a  TryGetById           r5, r3, #c2, s22 "print"
+  0130  GetByIdShort         r4, r6, #c9, s19 "join"
+  0135  LoadConstString      r3, s0 ","
+  0139  Call2                r4, r4, r6, r3
+  013e  LoadConstString      r3, s7 "order:"
+  0142  Call3                r3, r5, r1, r3, r4
+  0148  Ret                  r3
+L1:
+  014a  LoadConstString      r14, s1 "Cannot initialize private field …"
+  014e  CallBuiltin          r3, b44 "throwTypeError", 2
+L2:
+  0152  LoadConstString      r14, s1 "Cannot initialize private field …"
+  0156  CallBuiltin          r3, b44 "throwTypeError", 2
+
+function #1 "note"  params=3 frame=12 env=0 flags=dbg,overflowed  @0x0000038e size=25
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r2, r0, 0
+  0007  GetByIdShort         r1, r2, #c0, s23 "push"
+  000c  LoadParam            r0, 1
+  000f  Call2                r0, r1, r2, r0
+  0014  LoadParam            r0, 2
+  0017  Ret                  r0
+
+function #2 "makeOrdered"  params=1 frame=5 env=0 flags=dbg,overflowed  @0x000003a7 size=41
+  0000  CreateFunctionEnvironment r2, 1
+  0003  CreatePrivateName    r1, s15 "#t"
+  0009  StoreToEnvironment   r2, 0, r1
+  000d  CreateBaseClass      r1, r3, r2, 6
+  0013  Mov                  r4, r3
+  0016  LoadConstString      r3, s16 "total"
+  001a  LoadConstUndefined   r0
+  001c  CreateClosure        r2, r2, f7 "total"
+  0021  DefineOwnGetterSetterByVal r4, r3, r2, r0, 0
+  0027  Ret                  r1
+
+function #3 "EventCounts"  params=1 frame=14 env=0 flags=strict,dbg,overflowed,ctor  @0x000003d0 size=42
+  0000  GetNewTarget         r1
+  0002  GetByIdShort         r1, r1, #c0, s12 "prototype"
+  0007  NewObjectWithParent  r1, r1
+  000a  GetParentEnvironment r2, 0
+  000d  LoadFromEnvironment  r4, r2, 0
+  0011  GetByIdShort         r3, r4, #c1, s23 "push"
+  0016  LoadConstString      r2, s4 "counts"
+  001a  Call2                r2, r3, r4, r2
+  001f  LoadConstUInt8       r0, 3
+  0022  PutByIdStrict        r1, r0, #c0, s18 "size"
+  0028  Ret                  r1
+
+function #4 "Perf"  params=1 frame=15 env=0 flags=strict,dbg,overflowed,ctor  @0x000003fa size=72
+  0000  GetParentEnvironment r3, 0
+  0003  GetNewTarget         r2
+  0005  GetByIdShort         r2, r2, #c0, s12 "prototype"
+  000a  NewObjectWithParent  r2, r2
+  000d  LoadFromEnvironment  r4, r3, 2
+  0011  LoadFromEnvironment  r3, r3, 1
+  0015  GetByIdShort         r3, r3, #c1, s17 "EventCounts"
+  001a  CreateThisForNew     r5, r3, 0
+  001e  Mov                  r7, r5
+  0021  Construct            r3, r3, 1
+  0025  PrivateIsIn          r1, r4, r2, r0
+  002a  JmpTrue              L1, r1
+  002d  SelectObject         r3, r5, r3
+  0031  AddOwnPrivateBySym   r2, r3, r4
+  0035  LoadConstUInt8       r0, 5
+  0038  PutByIdStrict        r2, r0, #c0, s21 "now"
+  003e  Ret                  r2
+L1:
+  0040  LoadConstString      r6, s1 "Cannot initialize private field …"
+  0044  CallBuiltin          r2, b44 "throwTypeError", 2
+
+function #5 "eventCounts"  params=1 frame=2 env=0 flags=strict,dbg,overflowed,nc  @0x00000442 size=17
+  0000  GetParentEnvironment r0, 0
+  0003  LoadFromEnvironment  r1, r0, 2
+  0007  LoadParam            r0, 0
+  000a  GetOwnPrivateBySym   r0, r0, 0, r1
+  000f  Ret                  r0
+
+function #6 "Ordered"  params=1 frame=16 env=0 flags=strict,dbg,overflowed,ctor  @0x00000453 size=91
+  0000  GetNewTarget         r2
+  0002  GetByIdShort         r2, r2, #c0, s12 "prototype"
+  0007  NewObjectWithBufferAndParent r2, r2, sh1(numProps=1), lit@0x0000
+  0012  GetGlobalObject      r3
+  0014  GetByIdShort         r5, r3, #c1, s20 "note"
+  0019  LoadConstUInt8       r0, 1
+  001c  LoadConstString      r4, s11 "first"
+  0020  LoadConstUndefined   r1
+  0022  Call3                r4, r5, r1, r4, r0
+  0028  PutOwnBySlotIdx      r2, r4, 0
+  002c  GetParentEnvironment r4, 0
+  002f  LoadFromEnvironment  r4, r4, 0
+  0033  GetByIdShort         r5, r3, #c1, s20 "note"
+  0038  LoadConstUInt8       r0, 2
+  003b  LoadConstString      r3, s5 "second"
+  003f  Call3                r3, r5, r1, r3, r0
+  0045  PrivateIsIn          r1, r4, r2, r0
+  004a  JmpTrue              L1, r1
+  004d  AddOwnPrivateBySym   r2, r3, r4
+  0051  Ret                  r2
+L1:
+  0053  LoadConstString      r7, s1 "Cannot initialize private field …"
+  0057  CallBuiltin          r2, b44 "throwTypeError", 2
+
+function #7 "total"  params=1 frame=2 env=0 flags=strict,dbg,overflowed,nc  @0x000004ae size=26
+  0000  LoadParam            r0, 0
+  0003  GetParentEnvironment r1, 0
+  0006  LoadFromEnvironment  r1, r1, 0
+  000a  GetOwnPrivateBySym   r1, r0, 0, r1
+  000f  GetByIdShort         r0, r0, #c0, s11 "first"
+  0014  Add                  r0, r1, r0
+  0018  Ret                  r0
