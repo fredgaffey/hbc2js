@@ -16,6 +16,7 @@
 // INCONCLUSIVE, never a silent fallback to Node (HA-05).
 import { execFile, execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { repoRoot } from "../util/paths.ts";
 
@@ -67,14 +68,41 @@ export function hermesVmKey(version: number, opcodeTable?: string): string {
   return String(version);
 }
 
+/** Where `hbc2js setup-vm` installs fetched binaries (writable even when the
+ *  package itself lives in a read-only global prefix). Layout matches
+ *  `tools/get-hermesc.sh`'s `HERMESC_OUT_DIR`: `<dir>/v<N>/hermes`. */
+export function userVmDir(): string {
+  const base = process.env.XDG_CACHE_HOME !== undefined && process.env.XDG_CACHE_HOME.length > 0 ? process.env.XDG_CACHE_HOME : path.join(os.homedir(), ".cache");
+  return path.join(base, "hbc2js", "hermesc");
+}
+
+/** `HBC2JS_VM_SEARCH_ROOT` (tests / unusual installs) replaces BOTH the
+ *  package root and the user cache as the place VMs are looked for. */
+function vmSearchRoot(): string | undefined {
+  const r = process.env.HBC2JS_VM_SEARCH_ROOT;
+  return r !== undefined && r.length > 0 ? r : undefined;
+}
+
 /** On-disk candidate paths for a VM, in discovery order. */
 export function hermesVmCandidates(version: number, opcodeTable?: string): string[] {
   const key = hermesVmKey(version, opcodeTable);
-  return [
-    path.join(repoRoot(), "tools", "hermes-vm", `v${key}`, "bin", "hermes"),
-    path.join(repoRoot(), "tools", "hermesc", `v${key}`, "hermes"),
+  const root = vmSearchRoot() ?? repoRoot();
+  const out = [
+    path.join(root, "tools", "hermes-vm", `v${key}`, "bin", "hermes"),
+    path.join(root, "tools", "hermesc", `v${key}`, "hermes"),
   ];
+  if (vmSearchRoot() === undefined) out.push(path.join(userVmDir(), `v${key}`, "hermes"));
+  return out;
 }
+
+/** Shared "how do I get a VM" text for every no-VM failure (equiv --boot,
+ *  export-boot, hbc-equiv). Actionable: names the command, the override, and
+ *  the from-source route. */
+export const NO_VM_HELP =
+  "no Hermes VM found. Fix: run `hbc2js setup-vm 96` (explicit, pinned `npm pack` fetch of a prebuilt `hermes`; " +
+  "versions 84|94|96|98|99|all; installs to ~/.cache/hbc2js/hermesc), or pass `--vm <path-to-hermes>`, or set " +
+  "HERMES_VM_V<version>=<path>, or build one from source with tools/build-hermes-vm.sh <version> (see docs/TOOLCHAIN.md). " +
+  "The boot oracle runs in source mode, so any discovered VM works regardless of its own HBC version";
 
 /** Every version this repo currently ships an on-disk VM for (used to report
  *  "available: …" in an INCONCLUSIVE message, and by the reference policy's
@@ -223,3 +251,18 @@ export function hermesPrintProjection(r: HermesRunResult): readonly string[] {
 /** The `print`-channel projection of a sandbox trace — see trace.ts's
  *  `printLines`, kept here too for parity with the PoC's module shape. */
 export { printLines } from "./trace.ts";
+
+/** `hermesc` for an HBC version: `HERMESC_V<N>` env, then the package/repo
+ *  `tools/hermesc/v<N>/hermesc`, then the `setup-vm` user cache. Never cwd. */
+export function findHermescBinary(version: number): string | null {
+  const env = process.env[`HERMESC_V${version}`];
+  if (env !== undefined && fs.existsSync(env)) return env;
+  const root = vmSearchRoot() ?? repoRoot();
+  const cands = [path.join(root, "tools", "hermesc", `v${version}`, "hermesc")];
+  if (vmSearchRoot() === undefined) cands.push(path.join(userVmDir(), `v${version}`, "hermesc"));
+  return cands.find((c) => fs.existsSync(c)) ?? null;
+}
+
+export function defaultHermescDir(): string {
+  return path.join(vmSearchRoot() ?? repoRoot(), "tools", "hermesc");
+}

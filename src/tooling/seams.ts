@@ -2,6 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, w
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { join, relative, sep } from "node:path";
+import { findHermescBinary, defaultHermescDir } from "../harness/hermes-vm.ts";
 import { execFileSync } from "node:child_process";
 import { buildInventoryFromModule, type InventoryModule, type ModuleInventory } from "../deps/inventory.ts";
 import { parseHbc } from "../parse/module.ts";
@@ -322,8 +323,7 @@ export async function runSeams(bundleBytes: Uint8Array, opts: SeamsOptions): Pro
   const bundleInv = buildInventoryFromModule(mod);
   const bundleModules: readonly CandidateModule[] = bundleInv.modules.map((m) => ({ inventory: bundleInv, module: m }));
   const hbcVersion = mod.header.version;
-  const hermescDir = opts.hermescDir ?? join(process.cwd(), "tools", "hermesc");
-  const hermescPath = join(hermescDir, `v${hbcVersion}`, "hermesc");
+  const hermescPath = opts.hermescDir !== undefined ? join(opts.hermescDir, `v${hbcVersion}`, "hermesc") : (findHermescBinary(hbcVersion) ?? join(defaultHermescDir(), `v${hbcVersion}`, "hermesc"));
   const hermescAvailable = existsSync(hermescPath);
 
   const scan = scanRnDir(opts.rnDir);

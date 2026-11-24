@@ -11,6 +11,14 @@ tools/get-hermesc.sh all        # fetches v84, v94, v96, v98, v99 into tools/her
 tools/hermesc/v94/hermesc -emit-binary -out=out.hbc input.js
 ```
 
+**From an npm install:** `hbc2js setup-vm [84|94|96|98|99|all]` runs the
+shipped copy of `tools/get-hermesc.sh` with `HERMESC_OUT_DIR=~/.cache/hbc2js/hermesc`
+(`$XDG_CACHE_HOME/hbc2js/hermesc`); VM discovery (`findHermesVm`) checks
+`tools/hermes-vm`, `tools/hermesc` and that cache. Explicit only, never
+implicit. Integrity comes from npm's tarball verification of the pinned
+package versions (no separate checksum table). `HBC2JS_VM_SEARCH_ROOT`
+replaces all search roots (test hook).
+
 ## Optional native-side tools (APK / DEX) — never required
 
 `docs/specs/27-native-side.md` §1.2/§1.3. hbc2js reads `classes.dex`,

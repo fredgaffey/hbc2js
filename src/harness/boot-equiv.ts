@@ -18,7 +18,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decompile } from "../decompile.ts";
-import { findAllHermesVms, runHermes } from "./hermes-vm.ts";
+import { NO_VM_HELP, findAllHermesVms, runHermes } from "./hermes-vm.ts";
 import type { HermesRunResult, HermesVm } from "./hermes-vm.ts";
 import { TRACE_VERDICT, compareTraces } from "./compare.ts";
 import type { TraceComparison, TraceVerdict } from "./compare.ts";
@@ -760,7 +760,7 @@ function buildBootSource(bundleSource: string, seed: number, firstNative: number
   return `${buildPrelude(seed, firstNative, wrapFactories, run, natives)}\ntry {\n${bundleSource}\n__hbcBootEnd();\n} catch (__hbcE) {\n__hbcBootErr(__hbcE);\n}\n${drive}`;
 }
 
-const NO_VM_MESSAGE = "no Hermes VM found (tools/hermesc/v<N>/hermes or tools/hermes-vm/v<N>/bin/hermes); the boot oracle runs entirely in source mode, so any discovered VM works regardless of its own HBC version";
+const NO_VM_MESSAGE = NO_VM_HELP;
 
 /** Boots one bundle source under the stub host and returns its trace (spec
  *  §8). Always concatenates the prelude with `bundleSource`; runs

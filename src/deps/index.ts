@@ -29,6 +29,8 @@ import type { DepsReport } from "./report.ts";
 import { buildNativeChannel } from "../native/native-deps.ts";
 import type { NativeChannelReport } from "../native/native-deps.ts";
 import { buildNativeTables, openApk } from "../native/ingest.ts";
+import { findHermescBinary, defaultHermescDir } from "../harness/hermes-vm.ts";
+import { progress } from "../util/progress.ts";
 
 export interface DepsOptions {
   readonly out?: string;
@@ -101,11 +103,14 @@ function readInputInventory(inputPath: string): { inventory: ModuleInventory; ap
 }
 
 export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promise<DepsRunResult> {
+  progress(`reading ${inputPath} and building the module inventory`);
   const { inventory, apkEvidence, bundles } = readInputInventory(inputPath);
+  progress(`inventory: ${inventory.modules.length} modules; loading signature databases`);
 
   const layers = resolveDbLayers({ ...(opts.out !== undefined ? { outDir: opts.out } : {}), ...(opts.sigdb !== undefined ? { sigdb: opts.sigdb } : {}), noSharedDb: opts.noSharedDb === true });
   const otherHbcPackages = new Set<string>();
   const dbs = loadSignatures(layers, opts.exhaustive === true ? { slim: slimTargetFor(inventory, opts.minInstr) } : { candidates: deriveCandidatePackages(layers, inventory), hbcVersion: inventory.hbcVersion, otherHbcPackages, slim: slimTargetFor(inventory, opts.minInstr) });
+  progress(`matching ${inventory.modules.length} modules against ${dbs.length} signature file(s)`);
   const matched = matchInventory(inventory, dbs, { ...(opts.minInstr !== undefined ? { minInstr: opts.minInstr } : {}), uniqueHashOwners: uniqueHashOwnersInTarget(layers, inventory) });
   // corpus-fork-relabel (docs/DEPS.md "Fork relabel"): a confirmed upstream
   // whose fork the bundle names is reported under the fork's name.
@@ -113,6 +118,7 @@ export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promis
 
   const apkHints = apkEvidence !== null ? apkHintsFromEvidence(apkEvidence) : undefined;
   const knownPackages = new Set([...dbs.map((d) => d.file.package), ...otherHbcPackages]);
+  progress("guessing packages for unmatched modules");
   const guesses = await guessModules(inventory, matchReport, { offline: opts.offline === true, knownPackages, ...(apkHints !== undefined ? { apkHints } : {}) });
 
   let confirmResults: ConfirmResult[] = [];
@@ -133,7 +139,7 @@ export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promis
     // most needed (docs/DEPS.md §4, D17a/D17b).
     const baselineDirs = [...new Set([scoringProjectDir, projectDbDir, userCacheDbDir, sharedDbDir])];
     const rnVersion = matchReport.packages.find((p) => p.package === "react-native" && (p.tier === "high" || p.tier === "medium"))?.version ?? detectRnVersionFromBaselineFilenames(baselineDirs, inventory.hbcVersion) ?? undefined;
-    const hermescPath = join(opts.hermescDir ?? join(process.cwd(), "tools", "hermesc"), `v${inventory.hbcVersion}`, "hermesc");
+    const hermescPath = opts.hermescDir !== undefined ? join(opts.hermescDir, `v${inventory.hbcVersion}`, "hermesc") : (findHermescBinary(inventory.hbcVersion) ?? join(defaultHermescDir(), `v${inventory.hbcVersion}`, "hermesc"));
     if (rnVersion !== undefined) {
       const scratchDir = opts.scratchDir ?? join(opts.out ?? ".", ".hbc2js", "confirm-scratch");
       // One candidate per raw per-module guess, best-ranked first — no
@@ -174,6 +180,7 @@ export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promis
     classification = classifyInventory(inventory, commonalityIndex);
   }
 
+  progress("building the report");
   const reportWithoutNativeChannel = buildReport(inputPath, matchReport, guesses, confirmResults, classification);
   const nativeChannel = extname(inputPath).toLowerCase() === ".apk" ? nativeChannelForApk(inputPath, reportWithoutNativeChannel) : null;
   const reportWithBundles = bundles === null ? reportWithoutNativeChannel : { ...reportWithoutNativeChannel, bundles };

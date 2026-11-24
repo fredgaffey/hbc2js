@@ -25,12 +25,11 @@ async function loadParser(): Promise<BabelParseFn> {
   let mod: { parse: BabelParseFn };
   try {
     // Dynamic on purpose -- see the module doc comment. `@babel/parser` is a
-    // devDependency (package.json), not a runtime one.
+    // runtime dependency (package.json); the dynamic import only defers its load cost.
     mod = (await import("@babel/parser")) as unknown as { parse: BabelParseFn };
   } catch {
     throw new Error(
-      "hbc2js's dev-loop tooling (check-bundle/sizediff) needs the '@babel/parser' " +
-        "devDependency, which isn't installed here. Run `npm install` from the repo root, then retry.",
+      "@babel/parser could not be loaded (needed by check-bundle/sizediff). Reinstall hbc2js (`npm i -g hbc2js`) or run `npm install` in the repo root.",
     );
   }
   cachedParse = mod.parse;

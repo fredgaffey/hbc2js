@@ -26,7 +26,11 @@
   },
   "files": [
     "dist",
-    "tools/pkgsig/db"
+    "docs/agent-help",
+    ".claude/skills/hbc2js",
+    "tools/pkgsig/db",
+    "tools/get-hermesc.sh",
+    "tools/build-hermes-vm.sh"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node -e \"require('fs').chmodSync('dist/cli.js', 0o755)\" && node tools/copy-build-assets.mjs",
@@ -44,9 +48,11 @@
     "ui-server": "node src/cli.ts ui-server",
     "test:e2e": "cd ui && npm run e2e"
   },
+  "dependencies": {
+    "@babel/parser": "7.29.9"
+  },
   "devDependencies": {
     "@babel/core": "7.29.7",
-    "@babel/parser": "7.29.9",
     "@react-native/babel-preset": "0.85.3",
     "@react-native/metro-babel-transformer": "0.85.3",
     "@react-native/metro-config": "0.85.3",
