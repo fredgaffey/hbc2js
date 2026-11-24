@@ -74,7 +74,7 @@ test("0.1.2 apps: a boot-native.json that names only an Expo module makes it rea
 
 test("0.1.2 apps: an Expo-built app reads an embedded app config (expo-linking throws at module eval without one); boot-native.json can supply the real one", () => {
   const src = `__d(function(g,r,i,a,m,e,d){var c=(0,r(d[0]).requireOptionalNativeModule)('ExponentConstants')},15,[6]);\n__d(function(g,r,i,a,m,e,d){var x=r(d[0]).default.expoConfig},16,[15]);`;
-  assert.deepEqual(deriveNativeManifest(src).present.ExponentConstants!.manifest, { name: "app", slug: "app", android: { package: "com.hbc2js.boot" } });
+  assert.deepEqual(deriveNativeManifest(src).present.ExponentConstants!.manifest, { name: "app", slug: "app", scheme: "hbc2jsboot", android: { package: "com.hbc2js.boot" } });
   const real = { name: "Real", slug: "real", scheme: "real" };
   assert.deepEqual(deriveNativeManifest(src, { present: { ExponentConstants: { manifest: real } } }).present.ExponentConstants!.manifest, real);
   // A bare app that never reads expoConfig keeps the bare default.
@@ -86,6 +86,23 @@ test("0.1.2 apps: a decompiled library spec module (`…(\"X\");return _.default
     `__d(function(g,r,i,a,m,e,d){Object.defineProperty(_,"__esModule",{value:!0});var c=void 0;_.default=c;var p=(0,t(v[0]).requireOptionalNativeModule)("ExponentConstants");return _.default=p,c},551,[269]);`,
     `__d(function(g,r,i,a,m,e,d){var O=A[2];O=(0,(O=S(O)).requireOptionalNativeModule)(O="ExpoUpdates"),E=O;return c},552,[269]);`,
   ].join("\n");
+  const m = deriveNativeManifest(src);
+  assert.ok("ExponentConstants" in m.present);
+  assert.ok(!("ExpoUpdates" in m.present));
+});
+
+test("0.1.2 apps: the readable whole-file decompile's spec module (`let v = requireOptionalNativeModule(\"X\"); list[\"default\"] = v; return r0; }`) is present", () => {
+  const src = `function _fn5723(a1, a2, a3, a4, a5, a6, a7) {
+      let list = a6;
+      Object.defineProperty(list, "__esModule", {value: true});
+      let r0 = undefined;
+      list["default"] = r0;
+      let requireOptionalNativeModule = a2(a7[0]).requireOptionalNativeModule;
+      let requireOptionalNativeModule2 = requireOptionalNativeModule("ExponentConstants");
+      list["default"] = requireOptionalNativeModule2;
+      return r0;
+    }
+    function _fn5724(a1, a2) { let u = a2(0).requireOptionalNativeModule("ExpoUpdates"); if (u) { u.x(); } return u; }`;
   const m = deriveNativeManifest(src);
   assert.ok("ExponentConstants" in m.present);
   assert.ok(!("ExpoUpdates" in m.present));

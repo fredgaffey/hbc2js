@@ -93,7 +93,7 @@ const KNOWN_CONSTANTS: Readonly<Record<string, NativeConstants>> = {
 };
 
 /** The stand-in embedded app config (see deriveNativeManifest). */
-export const EMBEDDED_MANIFEST = { name: "app", slug: "app", android: { package: "com.hbc2js.boot" } } as const;
+export const EMBEDDED_MANIFEST = { name: "app", slug: "app", scheme: "hbc2jsboot", android: { package: "com.hbc2js.boot" } } as const;
 
 function ovSetsManifest(ov: NativeOverride): boolean {
   const c = ov.present?.ExponentConstants;
@@ -148,6 +148,9 @@ export function bundleEvidence(text: string): { required: Set<string>; spec: Set
     // `...('X')}` end of a factory body without Metro's trailer.
     // Decompiled, the factory ends \`…("X");return _.default=p,c},551,[269]\`.
     const tail = source.slice(m.index + m[0].length, m.index + m[0].length + 80);
+    // Readable decompile (\`let v = requireOptionalNativeModule("X");\n
+    // list["default"] = v;\n return r0;\n }\`): exported, then the factory ends.
+    if (!inTry && /^\s*;\s*[\w$.]+(?:\["default"\]|\.default)\s*=\s*[\w$]+\s*;\s*return\b[^;{}()]*;?\s*\}/.test(tail) && !/(?:\|\||&&|\?\?|!=|==)\s*[^,;=]*$/.test(before)) spec.add(name);
     if (!inTry && /^\s*;\s*return\b[^;{}()]*\}\s*,\s*-?\d+\s*,\s*\[/.test(tail) && !/(?:\|\||&&|\?\?|!=|==)\s*[^,;=]*$/.test(before)) spec.add(name);
     if (!inTry && /^\s*\}\s*(?:,\s*\d+\s*,\s*\[|\)|$)/.test(after) && !/(?:\|\||&&|\?\?|!=|==)\s*[^,;=]*$/.test(before)) spec.add(name);
   }
@@ -214,8 +217,8 @@ export function deriveNativeManifest(source: string, override: NativeOverride | 
   // An app built with Expo's tooling embeds its app config (expo's Gradle
   // plugin writes assets/app.config, which expo-constants exposes as
   // \`manifest\`); expo-linking throws at module eval without one. The real
-  // config is in the APK, not the bundle: stand in a minimal one (no URI
-  // scheme, so expo-linking takes its "native app identifier" path), unless
+  // config is in the APK, not the bundle: stand in a minimal one (with a fixed
+  // URI scheme: a standalone app's deep links need one), unless
   // boot-native.json supplies the real \`ExponentConstants.manifest\`.
   const ec = present.ExponentConstants;
   if (ec !== undefined && ec.manifest === null && !ovSetsManifest(ov) && /\bexpoConfig\b/.test(source)) present.ExponentConstants = { ...ec, manifest: EMBEDDED_MANIFEST };

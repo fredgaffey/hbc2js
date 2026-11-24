@@ -138,7 +138,10 @@ function parseTraceLines(stdout: string): TraceRecord[] {
 }
 
 function excerpt(s: string): string {
-  const t = s.trim();
+  // Hermes prints compiler warnings (undeclared globals in the prelude) before
+  // the error that matters; start the excerpt at the first error.
+  const err = s.search(/^.*: error: /m);
+  const t = (err > 0 ? s.slice(err) : s).trim();
   return t.length > 300 ? t.slice(0, 300) + "…" : t;
 }
 
@@ -876,13 +879,13 @@ export function bootTrace(bundleSourceIn: string, opts: BootTraceOptions = {}): 
     writeFileSync(file, buildBootSource(bundleSource, seed, firstNative, opts.wrapFactories ?? true, opts.run ?? null, opts.natives ?? null));
     if (opts.hermesc !== undefined) {
       const hbc = join(dir, "boot.hbc");
-      const c = spawnSync(opts.hermesc, ["-emit-binary", `-out=${hbc}`, file], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: Math.max(timeout, 120000) });
+      const c = spawnSync(opts.hermesc, ["-w", "-emit-binary", `-out=${hbc}`, file], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: Math.max(timeout, 120000) });
       if (c.status !== 0) {
         const why = `hermesc could not compile the prelude+bundle: ${excerpt(c.stderr !== "" ? c.stderr : String(c.error ?? c.status))}`;
         return { trace: { kind: "full", records: [] }, reachedEnd: false, bootError: null, vm, ran: false, why };
       }
       raw = runHermes(vm.path, hbc, { timeout, bytecode: true });
-    } else raw = runHermes(vm.path, file, { timeout, bytecode: false });
+    } else raw = runHermes(vm.path, file, { timeout, bytecode: false, quiet: true });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

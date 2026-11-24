@@ -49,3 +49,14 @@ test("0.1.2 apps: the bytecode path lowers too when its hermesc lacks private fi
   assert.equal(r.reachedEnd, true, JSON.stringify(r.bootError ?? r.why));
   assert.equal(r.lowered, true);
 });
+
+test("0.1.2 apps: thousands of undeclared-global warnings do not hide a source-mode boot (hermes -w)", (t) => {
+  const vm = findHermesVm(96);
+  if (vm === null) return t.skip("no v96 VM");
+  // Each warning echoes its 2 KB source line: on stderr without -w (over the 64 MB buffer); the run must still report.
+  // Strict-mode code warns once per undeclared name (decompiled bundles do).
+  const pad = " ".repeat(2000);
+  const src = `(function () { "use strict";\n${Array.from({ length: 40000 }, (_, i) => `function f${i}() { return undeclaredGlobal${i}; }${pad}`).join("\n")}\n})();`;
+  const r = bootTrace(src, { seed: 0, vm: vm.path, timeoutMs: 60000 });
+  assert.equal(r.reachedEnd, true, JSON.stringify(r.why));
+});
