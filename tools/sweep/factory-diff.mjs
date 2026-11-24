@@ -120,7 +120,8 @@ const PRELUDE = String.raw`(function (g) {
 
 /** Load one side and return per-module records keyed by module id. */
 export function runSide(src, { timeout = 2000, calls = false, only } = {}) {
-  const ctx = vm.createContext({});
+  // Web-platform globals RN polyfills or ships natively; Node's, shared by both sides.
+  const ctx = vm.createContext({ URL, URLSearchParams, TextEncoder, TextDecoder, structuredClone, atob, btoa, AbortController, AbortSignal, Event, EventTarget });
   vm.runInContext(PRELUDE, ctx);
   let loadError = null;
   try { vm.runInContext(src, ctx, { timeout: 120000 }); } catch (e) { loadError = String(e?.message ?? e).slice(0, 300); }
@@ -147,6 +148,13 @@ process.on("uncaughtException", (e) => { process.stderr.write(`[factory-diff] as
 /** The property name a TypeError message names, if any -- identifier names in
  *  the rest of the message differ between original and decompiled text. */
 const msgKey = (m) => /\((?:reading|setting) '([^']*)'\)/.exec(m ?? "")?.[1];
+/** A ReferenceError for a host/test global the stub host does not provide
+ *  (no original to compare against, so these say nothing about the decompiler). */
+const HOST_MISS = new Set(["jest", "MutationObserver", "define", "Deno", "Bun", "WorkerGlobalScope", "importScripts", "ResizeObserver", "IntersectionObserver"]);
+const hostMiss = (m) => {
+  const n = /([A-Za-z_$][\w$]*) is not defined/.exec(m ?? "")?.[1] ?? /Property '([^']+)' doesn't exist/.exec(m ?? "")?.[1];
+  return n !== undefined && (HOST_MISS.has(n) || n in globalThis);
+};
 const keyDiff = (a, b) => Object.keys(a ?? {}).filter((k) => !(k in (b ?? {})));
 
 /** Compare two sides' records; returns findings (sig clusters by kind). */
@@ -157,8 +165,8 @@ export function compareSides(A, B, app, hbc) {
     const a = A?.recs.get(id);
     if (b.timeout && !a?.timeout) { add(b, "FACTORY", "timeout-only-decompiled", b.hostErr); continue; }
     if (A === null) {
-      if (b.threw === "ReferenceError") add(b, "FACTORY", "throws-ReferenceError", b.msg);
-      for (const [k, v] of Object.entries(b.calls ?? {})) if (v.startsWith("throw:ReferenceError")) add(b, "CALL", "throws-ReferenceError", `${k}: ${v}`);
+      if (b.threw === "ReferenceError" && !hostMiss(b.msg)) add(b, "FACTORY", "throws-ReferenceError", b.msg);
+      for (const [k, v] of Object.entries(b.calls ?? {})) if (v.startsWith("throw:ReferenceError") && !hostMiss(v)) add(b, "CALL", "throws-ReferenceError", `${k}: ${v}`);
       continue;
     }
     if (a === undefined) { add(b, "FACTORY", "module-only-in-decompiled", id); continue; }

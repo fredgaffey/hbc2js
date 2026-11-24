@@ -74,14 +74,14 @@ export function normMsg(m: string): string {
 }
 
 export interface Finding {
-  app: string; hbc: number; fn: number; check: string; sig: string; detail: string;
+  app: string; hbc: number; fn: number; check: string; sig: string; detail: string; line?: number;
 }
 
 /** Run every static check over one decompiled program. */
 export function staticFindings(code: string, app: string, hbc: number): Finding[] {
   const out: Finding[] = [];
-  const add = (fn: number, check: string, sig: string, detail: string): void => {
-    out.push({ app, hbc, fn, check, sig: `${check}:${sig}`, detail: detail.slice(0, 300) });
+  const add = (fn: number, check: string, sig: string, detail: string, line?: number): void => {
+    out.push({ app, hbc, fn, check, sig: `${check}:${sig}`, detail: detail.slice(0, 300), ...(line ? { line } : {}) });
   };
   const ast = parse(code, {
     sourceType: "script", errorRecovery: true, allowReturnOutsideFunction: true,
@@ -130,6 +130,7 @@ export function staticFindings(code: string, app: string, hbc: number): Finding[
     for (let q = p.parentPath; q && !q.isFunction(); q = q.parentPath) {
       if (q.isClassProperty() || q.isClassPrivateProperty()) { s += ":in-class-field"; break; }
       if (q.isOptionalMemberExpression() || q.isOptionalCallExpression()) { s += ":in-optional-chain"; break; }
+      if (q.isCatchClause()) { s += q.node.param ? ":in-catch" : ":in-paramless-catch"; break; }
     }
     return s;
   };
@@ -156,7 +157,7 @@ export function staticFindings(code: string, app: string, hbc: number): Finding[
       if (p.parentPath.isUnaryExpression({ operator: "typeof" })) return;
       if (p.scope.getBinding(n) !== undefined || isGlobal(n)) return;
       if (p.isJSXIdentifier()) return;
-      add(fnAt(p), "FREE", `${nameShape(n)}@${ctxShape(p)}`, n);
+      add(fnAt(p), "FREE", `${nameShape(n)}@${ctxShape(p)}`, n, p.node.loc?.start.line);
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     AssignmentExpression(p: any) {
@@ -174,7 +175,7 @@ export function staticFindings(code: string, app: string, hbc: number): Finding[
         if (b.kind === "let" || b.kind === "const" || b.kind === "class") {
           for (const r of b.referencePaths) {
             if (r.node.start < declStart && ownerFn(r) === declOwner && b.kind !== "class") {
-              add(fnAt(r), "TDZ", `${b.kind}:${nameShape(name)}@${ctxShape(r)}`, name);
+              add(fnAt(r), "TDZ", `${b.kind}:${nameShape(name)}@${ctxShape(r)}`, name, r.node.loc?.start.line);
               break;
             }
           }
@@ -185,7 +186,7 @@ export function staticFindings(code: string, app: string, hbc: number): Finding[
         const writes = b.constantViolations as any[];
         if (reads.length === 0) continue;
         if (writes.length === 0) {
-          add(fnAt(reads[0]), "NEVER-WRITTEN", `${nameShape(name)}@${ctxShape(reads[0])}`, name);
+          add(fnAt(reads[0]), "NEVER-WRITTEN", `${nameShape(name)}@${ctxShape(reads[0])}`, name, reads[0].node.loc?.start.line);
           continue;
         }
         const firstWrite = Math.min(...writes.map((w) => w.node.start));
@@ -194,7 +195,7 @@ export function staticFindings(code: string, app: string, hbc: number): Finding[
           if (ownerFn(r) !== declOwner) continue; // closure: runs later
           if (inLoopBelow(r, declOwner)) continue; // back edge may write first
           if (writes.some((w: any) => ownerFn(w) !== declOwner)) break; // a closure may write first
-          add(fnAt(r), "READ-BEFORE-WRITE", `${nameShape(name)}@${ctxShape(r)}`, name);
+          add(fnAt(r), "READ-BEFORE-WRITE", `${nameShape(name)}@${ctxShape(r)}`, name, r.node.loc?.start.line);
           break;
         }
       }

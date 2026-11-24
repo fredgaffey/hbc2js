@@ -10,6 +10,7 @@
 //   node findings.mjs clusters [--status open]      counts per cluster, ranked
 //   node findings.mjs set-status <id|--cluster sig> <open|fixed|wontfix|duplicate|not-a-bug> [--note "..."]
 //   node findings.mjs export-md                      markdown summary on stdout
+//   node findings.mjs clear --source s --app a        delete that source's open rows for one app
 //   node findings.mjs import <file.jsonl> --source s [--kind-map sweep]
 //        bulk-insert one finding per JSONL line ({app, hbc, module?, fn, check,
 //        sig, detail}, the tools/sweep/ schema) in one transaction; the sweep
@@ -76,6 +77,11 @@ switch (cmd) {
       FROM findings GROUP BY cluster, status ORDER BY status, n DESC`).all();
     console.log("| status | count | apps | kind | cluster | example | repro |\n|---|---|---|---|---|---|---|");
     for (const r of rows) console.log(`| ${r.status} | ${r.n} | ${r.apps} | ${r.kind} | ${r.cluster} | ${String(r.ex).replace(/\|/g, "\\|")} | ${r.repro ?? ""} |`);
+    break;
+  }
+  case "clear": { // drop one source's rows for one app before a re-import (sweep reruns)
+    const r = db.prepare(`DELETE FROM findings WHERE source=? AND app=? AND status='open'`).run(need("source"), need("app"));
+    console.log(`${r.changes} cleared`);
     break;
   }
   case "import": {
