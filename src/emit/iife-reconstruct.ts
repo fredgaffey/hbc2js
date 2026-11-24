@@ -147,7 +147,7 @@ function declaredBy(stmt: Stmt): string[] {
  * they target is itself inside the range. Nested functions carry their own
  * boundary, so they are pruned.
  */
-function opaqueReason(stmts: readonly Stmt[]): string | null {
+export function opaqueReason(stmts: readonly Stmt[]): string | null {
   let reason: string | null = null;
   const fail = (r: string): void => {
     reason ??= r;

@@ -1,0 +1,2 @@
+[{"a":1,"outputRange":[10,20]},{"a":1,"outputRange":[11,21]}]
+[{"a":1,"canGoBack":true},["TB",{"b":2,"scrollEnabled":true,"contentContainerStyle":"c","tabStyle":"t","gap":20,"direction":"ltr"}]]

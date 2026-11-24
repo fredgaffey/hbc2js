@@ -86,6 +86,13 @@ function pureSetup(s: Stmt): { readonly name: string; readonly value: Expr } | n
 
 class Subst {
   private readonly map = new Map<string, Expr>();
+  /** Set when a folded value still reads a register whose absorbed setup
+   *  statement the rewrite deletes (sweep 2026-11-24 S1: `r0 = _e1_0;`
+   *  absorbed, then `r1.contentContainerStyle = r0.content` folded as
+   *  `r0.content` with the load gone -- a read of an unset `let`). Such a
+   *  run is refused: the fold only substitutes through bare identifiers and
+   *  binary operands, and a read it cannot substitute needs its load kept. */
+  leaked = false;
   resolve(e: Expr): Expr {
     if (e.k === "ident" && this.map.has(e.name)) return this.resolve(this.map.get(e.name)!);
     if (e.k === "bin") {
@@ -100,6 +107,15 @@ class Subst {
     if (setup === null) return false;
     this.map.set(setup.name, this.resolve(setup.value));
     return true;
+  }
+  /** `resolve`, then flag any absorbed register still read by the result. */
+  final(e: Expr): Expr {
+    const r = this.resolve(e);
+    if (this.map.size > 0) {
+      const uses = identUsesMany([{ k: "expr", expr: r }], this.map.keys());
+      for (const u of uses.values()) if (u.reads > 0 || u.nested > 0) this.leaked = true;
+    }
+    return r;
   }
   sameIdent(a: Expr, b: Expr): boolean {
     const ra = this.resolve(a);
@@ -168,7 +184,7 @@ function matchArray(list: readonly Stmt[], seedIndex: number): SpreadRestSite | 
     if (call !== null && isHelperCallExpr(call.value, "__hbc_b_arraySpread")) {
       const [t, src, idx] = call.value.args as readonly [Expr, Expr, Expr];
       if (!subst.sameIdent(t, { k: "ident", name: targetName }) || !indexMatches(idx)) break runLoop;
-      elements.push({ kind: "spread", source: subst.resolve(src) });
+      elements.push({ kind: "spread", source: subst.final(src) });
       expected = { kind: "reg", name: call.name };
       j += 1;
       consumedUpTo = j;
@@ -181,7 +197,7 @@ function matchArray(list: readonly Stmt[], seedIndex: number): SpreadRestSite | 
     if (store !== null && store.computed && isHelperCallExpr(store.prop, "__hbc_b_arraySpread") && subst.sameIdent(store.obj, { k: "ident", name: targetName })) {
       const [t, src, idx] = store.prop.args as readonly [Expr, Expr, Expr];
       if (!subst.sameIdent(t, { k: "ident", name: targetName }) || !indexMatches(idx)) break runLoop;
-      elements.push({ kind: "spread", source: subst.resolve(src) }, { kind: "lit", expr: subst.resolve(store.value) });
+      elements.push({ kind: "spread", source: subst.final(src) }, { kind: "lit", expr: subst.final(store.value) });
       sawSpread = true;
       j++;
       consumedUpTo = j;
@@ -189,7 +205,7 @@ function matchArray(list: readonly Stmt[], seedIndex: number): SpreadRestSite | 
     }
     // Case C: a plain store consuming the slot the previous spread returned.
     if (store !== null && store.computed && expected.kind === "reg" && subst.sameIdent(store.prop, { k: "ident", name: expected.name }) && subst.sameIdent(store.obj, { k: "ident", name: targetName })) {
-      elements.push({ kind: "lit", expr: subst.resolve(store.value) });
+      elements.push({ kind: "lit", expr: subst.final(store.value) });
       expected = { kind: "regPlus1", name: expected.name };
       j++;
       consumedUpTo = j;
@@ -198,6 +214,7 @@ function matchArray(list: readonly Stmt[], seedIndex: number): SpreadRestSite | 
     break runLoop;
   }
   if (!sawSpread) return null;
+  if (subst.leaked) return null;
   return { rule: "array", startIndex: seedIndex, endIndex: consumedUpTo, targetName, elements, seedCount, hadTrim, seedIsNewArray: false };
 }
 
@@ -233,7 +250,8 @@ function matchCall(list: readonly Stmt[], seedIndex: number): SpreadRestSite | n
       const resolvedThis = subst.resolve(thisV);
       if (!isUndefinedLit(resolvedThis)) return null; // this-not-undefined
       if (args.length === 0) return null;
-      const callee = subst.resolve(fn);
+      const callee = subst.final(fn);
+      if (subst.leaked) return null;
       return { rule: "call", startIndex: seedIndex, endIndex: j + 1, resultName: call.name, callee, args };
     }
     // `arraySpread`'s return is often discarded here (only the array's
@@ -244,14 +262,14 @@ function matchCall(list: readonly Stmt[], seedIndex: number): SpreadRestSite | n
     if (spreadCall !== null) {
       const [t, src] = spreadCall.args as readonly [Expr, Expr, Expr];
       if (!subst.sameIdent(t, { k: "ident", name: targetName })) return null;
-      args.push({ kind: "spread", source: subst.resolve(src) });
+      args.push({ kind: "spread", source: subst.final(src) });
       j++;
       consumedUpTo = j;
       continue;
     }
     const store = memberStore(s);
     if (store !== null && store.computed && subst.sameIdent(store.obj, { k: "ident", name: targetName }) && store.prop.k === "lit") {
-      args.push({ kind: "lit", expr: subst.resolve(store.value) });
+      args.push({ kind: "lit", expr: subst.final(store.value) });
       j++;
       consumedUpTo = j;
       continue;
@@ -263,6 +281,7 @@ function matchCall(list: readonly Stmt[], seedIndex: number): SpreadRestSite | n
   // S1 (an array literal, `seedCount: 0` since `new Array(0)` starts empty),
   // just reached from a `new Array(0)` seed instead of an array literal.
   if (args.length === 0) return null;
+  if (subst.leaked) return null;
   return { rule: "array", startIndex: seedIndex, endIndex: consumedUpTo, targetName, elements: args, seedCount: 0, hadTrim: false, seedIsNewArray: true };
 }
 
@@ -299,7 +318,7 @@ function matchObject(list: readonly Stmt[], seedIndex: number): SpreadRestSite |
       if (call.value.args.length !== 2) return null; // destructure-rest-form — spec 16's 3-arg shape
       const [t, src] = call.value.args as readonly [Expr, Expr];
       if (!subst.sameIdent(t, { k: "ident", name: targetName })) return null;
-      props.push({ kind: "spread", source: subst.resolve(src) });
+      props.push({ kind: "spread", source: subst.final(src) });
       sawSpread = true;
       j++;
       consumedUpTo = j;
@@ -321,7 +340,7 @@ function matchObject(list: readonly Stmt[], seedIndex: number): SpreadRestSite |
         raw = keyExpr.text;
       }
       const key = isSafeIdentifier(raw) ? raw : JSON.stringify(raw);
-      props.push({ kind: "prop", key, computed: !isSafeIdentifier(raw), value: subst.resolve(store.value) });
+      props.push({ kind: "prop", key, computed: !isSafeIdentifier(raw), value: subst.final(store.value) });
       j++;
       consumedUpTo = j;
       continue;
@@ -329,6 +348,7 @@ function matchObject(list: readonly Stmt[], seedIndex: number): SpreadRestSite |
     break;
   }
   if (!sawSpread) return null;
+  if (subst.leaked) return null;
   return { rule: "object", startIndex: seedIndex, endIndex: consumedUpTo, targetName, seedProps, props };
 }
 

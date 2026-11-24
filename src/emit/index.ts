@@ -10,7 +10,8 @@ import type { Expr, Param, Stmt } from "./ast.ts";
 import { id, lit, p } from "./ast.ts";
 import { emitFunction, envDeclaringFunction } from "./function.ts";
 import { closureFunctionId } from "./lower.ts";
-import { resolveOrphanHosts } from "./placement.ts";
+import { resolveOrphanHosts, withExtraDeclarations } from "./placement.ts";
+import { settleLoopLocalDecls } from "./loop-env-scope.ts";
 import { envSlot, fnName, quote } from "./names.ts";
 import { checkBindings, checkLabels, collectUnbound, collectUnboundLabels, unboundMessage } from "./scope-check.ts";
 import { printProgram } from "./print.ts";
@@ -750,11 +751,37 @@ function buildEmitLayout(analysis: ModuleAnalysis) {
         else list.push(insn.offset);
       }
     }
+    // An access outside the create block is still this iteration's binding
+    // when the create block DOMINATES it (every path from the entry passes the
+    // Create*Environment first). The declaration is emitted at the create
+    // site and then settled (`settleLoopLocalDecls`) up to the innermost
+    // statement list that encloses every reference without leaving the loop
+    // body, so a later block of the same iteration still sees it. Requiring
+    // the create block itself kept the slot function-wide whenever the body
+    // wrote it after a branch -- `for (let c ...) { fs.push(() => c); if (c
+    // === 3) c++; }` lowered by Babel to `_loop(c)` and inlined by hermesc
+    // v98/v99: every closure shared one `c` (torture hbc99 "per-iteration let
+    // closure capture, loop var mutated in body").
+    const avoiding = new Set<number>();
+    {
+      const stack = createBlock.id === cfg.entry ? [] : [cfg.entry];
+      while (stack.length > 0) {
+        const b = stack.pop()!;
+        if (b === createBlock.id || avoiding.has(b)) continue;
+        avoiding.add(b);
+        stack.push(...succsWithExceptional(cfg, b));
+      }
+    }
+    const dominated = (offset: number): boolean => {
+      if (inCreateBlock(offset)) return true;
+      const b = cfg.blocks.find((x) => x.start >= 0 && offset >= x.start && offset < x.end);
+      return b !== undefined && !avoiding.has(b.id);
+    };
     const closuresOutside = node.closures.some((child) => {
       const sites = closureSites.get(child);
-      return sites === undefined || sites.length === 0 || sites.some((o) => !inCreateBlock(o));
+      return sites === undefined || sites.length === 0 || sites.some((o) => !dominated(o));
     });
-    const outside = closuresOutside || accesses.some((a) => a.functionIndex === owner && !inCreateBlock(a.offset));
+    const outside = closuresOutside || accesses.some((a) => a.functionIndex === owner && !dominated(a.offset));
     if (outside) {
       diagnostics.push({
         severity: "warn",
@@ -1219,6 +1246,14 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
         ...(ctx.remap !== undefined ? { envRemap: ctx.remap } : {}),
         closureNameAt,
       });
+      const loopGroups = [...(loopLocal.get(index)?.values() ?? [])];
+      if (loopGroups.length > 0 && out.k === "func") {
+        const settled = settleLoopLocalDecls(out.body, loopGroups);
+        if (settled.body !== out.body) out = { ...out, body: settled.body };
+        for (const g of settled.widened) {
+          diagnostics.push({ severity: "warn", code: "W_LOOP_LOCAL_ENV", message: `environment slots ${g.join(", ")} are created inside a loop but read where no per-iteration binding reaches; declared function-wide`, context: { functionIndex: index } });
+        }
+      }
       if (opts.astPasses !== undefined) {
         const passed = opts.astPasses(out, cfg);
         out = passed.fn;
@@ -1326,7 +1361,44 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
       }
       return { code: "", helpersUsed: [], lineMap: [], diagnostics, stubbedFunctions, subtreeJobs: probeJobs };
     }
-    const node = emitOne(target, { path: "", remap: undefined, hosted });
+    let node = emitOne(target, { path: "", remap: undefined, hosted });
+    // docs/BUGS.md 2026-11-24 `export:orphan-multisite-closure-not-emitted`.
+    // A function with no single creation site (an orphan, or a capture-free
+    // function hosted at the lowest common ancestor of its sites) lives
+    // OUTSIDE this subtree, yet the subtree may name it. The whole-file render
+    // declares it at module level; a scoped render (one export module file)
+    // must carry its own declaration or the file throws ReferenceError at
+    // eval. Only scope-independent functions qualify -- no environment
+    // (`closureEnvOf === null`) or no known creation site at all, which the
+    // full render also emits at module level -- so a copy per module is the
+    // same program. Placed after the target's declaration prologue
+    // (`withExtraDeclarations`: environment slots are numbered in textual
+    // order), transitively, in function-index order so the text is stable.
+    if (node.k === "func") {
+      const pullable = new Map<string, number>();
+      for (let f = 0; f < mod.functions.length; f++) {
+        if (f === globalIndex || f === target || isAncestor(f, target) || isAncestor(target, f)) continue;
+        if (envGraph.closureCopies.has(f)) continue;
+        const env = envGraph.closureEnvOf.get(f);
+        if (env === null || ((env === undefined) && parentOf.get(f) === null)) pullable.set(fnName(f), f);
+      }
+      const extras: Extract<Stmt, { k: "func" }>[] = [];
+      const pulled = new Set<number>();
+      for (;;) {
+        const probe: Stmt[] = [node, ...extras];
+        const want = [...new Set(collectUnbound(probe, helperPrelude(usedHelpers).names, target).map((u) => u.name))]
+          .map((n) => pullable.get(n))
+          .filter((f): f is number => f !== undefined && !pulled.has(f) && !emitted.has(f))
+          .sort((a, b) => a - b);
+        if (want.length === 0) break;
+        for (const f of want) {
+          pulled.add(f);
+          const extra = emitOne(f);
+          if (extra.k === "func") extras.push(extra);
+        }
+      }
+      if (extras.length > 0) node = { ...node, body: withExtraDeclarations(node.body, extras) };
+    }
     const prelude = helperPrelude(usedHelpers);
     const scoped: Stmt[] = [
       { k: "comment", text: `hbc2js scoped render — function ${target} of ${opts.moduleName ?? "input.hbc"}` },

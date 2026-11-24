@@ -1059,6 +1059,27 @@ function countUses(stmts: readonly Stmt[], wanted: (name: string) => boolean, fo
       case "jsx": // D20
         jsxParts(e).forEach((x) => visitExpr(x, inNested));
         return;
+      case "destructure": {
+        // Sweep 2026-11-24 S3: a pattern default can assign a register
+        // (`groups: r3 = (r2 = new Array(1), r4 = [...], r2[0] = r4, r2)`);
+        // invisible here, F26 (`hoistRegisterInits`) turned a LATER
+        // `r4 = a1` into `let r4 = a1`, and the default then read `r4` in
+        // its TDZ. Source first, then each element in pattern order: its
+        // default, then the binding it writes.
+        visitExpr(e.source, inNested);
+        const pat = (p: Pattern): void => {
+          if (p.k === "pid") bump(p.name, inNested, true);
+          else if (p.k === "parr") p.elements.forEach(el);
+          else p.props.forEach((x) => el(x.value));
+        };
+        const el = (x: PatternElement): void => {
+          if (x.k === "hole") return;
+          if (x.k === "pel" && x.init !== undefined) visitExpr(x.init, inNested);
+          pat(x.target);
+        };
+        pat(e.pattern);
+        return;
+      }
       case "class": // F24-1: a member value is the `func` expression it is.
         classParts(e).forEach((x) => visitExpr(x, inNested));
         for (const m of e.members) if (m.value !== null && m.kind !== "field") visitExpr(m.value, inNested);

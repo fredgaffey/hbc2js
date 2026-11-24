@@ -6,6 +6,7 @@ import type { ModuleAnalysis } from "../cfg/types.ts";
 import { buildInventoryFromModule } from "../deps/inventory.ts";
 import type { Stmt } from "../emit/ast.ts";
 import { emitModule } from "../emit/index.ts";
+import { withExtraDeclarations } from "../emit/placement.ts";
 import { printProgram } from "../emit/print.ts";
 import { ErrorCode, Hbc2jsError } from "../errors.ts";
 import { parseHbc } from "../parse/module.ts";
@@ -308,42 +309,6 @@ export function scanFnIdentifiers(text: string): { readonly declared: readonly n
   return { declared, referenced };
 }
 
-/**
- * Where a pulled-in orphan declaration goes inside the factory body.
- *
- * Hermes allocates a scope's environment slots in TEXTUAL declaration order:
- * hoisting moves a function declaration's *closure creation* to the top of the
- * scope, but not its slot. Probed on hermesc v98 with two captured function
- * declarations either side of a `let a0, a1, a2;` — the same
- * `CreateClosure`/`StoreToEnvironment` sequence either way, but the `let`
- * bindings took slots 0..2 only when the function declarations came after
- * them (docs/BUGS.md 2026-09-05, `diff:LoadFromEnvironment(imm)`).
- *
- * So prepending these declarations to the factory body — which is what this
- * used to do — pushed every one of the factory's OWN `_e<env>_<slot>`
- * bindings up by the number of orphans pulled in, and every getter/closure
- * reading them recompiled with a shifted slot immediate. On
- * react-navigation-example module 681 / fn#683 (a lazy re-export barrel with
- * eleven getters) that was the uniform +2 the bug row describes: two orphans,
- * `_fn13951` and `_fn13952`.
- *
- * The declarations therefore go exactly where `emitFunction` puts a function's
- * own nested children: after the whole prologue (the `"use strict"` directive,
- * the register/env-slot `let`s, `__this`/`__args`, the dispatch and generator
- * state variables), i.e. at the first `func` statement, or after the leading
- * run of declaration-shaped statements when the body has no children of its
- * own. They stay hoisted function declarations, so every reference in the
- * factory — including ones textually above them — still resolves.
- */
-function withExtraDeclarations(body: readonly Stmt[], extras: readonly Extract<Stmt, { k: "func" }>[]): Stmt[] {
-  let at = body.findIndex((s) => s.k === "func");
-  if (at < 0) {
-    at = 0;
-    while (at < body.length && (body[at]!.k === "directive" || body[at]!.k === "comment" || body[at]!.k === "decl" || body[at]!.k === "init")) at++;
-  }
-  return [...body.slice(0, at), ...extras, ...body.slice(at)];
-}
-
 export function splitProject(bytes: Uint8Array, opts: SplitOptions = {}): SplitResult {
   const module = parseHbc(bytes);
   const inventory = buildInventoryFromModule(module);
@@ -384,14 +349,12 @@ export function splitProject(bytes: Uint8Array, opts: SplitOptions = {}): SplitR
   // an extra declaration nested inside the factory (a real JS closure, not a
   // file-top-level sibling — see the nesting note further down), transitively
   // (that body may itself reference further undeclared functions). D17i is
-  // silent on a function
-  // referenced from *two different* modules (this only arises for orphans,
-  // which by definition capture no shared closure environment, so duplicating
-  // the declaration would be safe, but the design doesn't say to) — so the
-  // first module (inventory order) to claim an orphan gets the declaration;
-  // later modules record a diagnostic instead of guessing at sharing
-  // semantics.
-  const claimedBy = new Map<number, number>();
+  // silent on a function referenced from *two different* modules; this only
+  // arises for orphans, which by definition capture no shared closure
+  // environment, so EVERY module that names one carries its own copy (each
+  // CreateClosure made a fresh function object anyway). The first-claim rule
+  // this replaces left the later modules throwing ReferenceError at eval
+  // (docs/BUGS.md export:orphan-multisite-closure-not-emitted).
 
   for (const m of inventory.modules) {
     const id = m.localModuleId;
@@ -465,23 +428,12 @@ export function splitProject(bytes: Uint8Array, opts: SplitOptions = {}): SplitR
         diagnostics.push(`module ${id}: fn#${idx} (_fn${idx}) is the bundle's global function; left undeclared rather than copied into a module file`);
         continue;
       }
-      const owner = claimedBy.get(idx);
-      if (owner !== undefined) {
-        declaredIdx.add(idx);
-        if (owner !== id) {
-          diagnostics.push(
-            `module ${id}: fn#${idx} (_fn${idx}) is referenced but was already written into module ${owner}'s split file, not duplicated (D17i has no shared-orphan-closure rule)`,
-          );
-        }
-        continue;
-      }
       const extraFn = bodies.get(idx);
       if (!isFuncStmt(extraFn)) {
         declaredIdx.add(idx);
         diagnostics.push(`module ${id}: fn#${idx} (_fn${idx}) is referenced but has no emitted body; left undeclared (runtime ReferenceError if reached)`);
         continue;
       }
-      claimedBy.set(idx, id);
       extraStmts.push(extraFn);
       scan(printProgram([extraFn], printOpts));
     }
