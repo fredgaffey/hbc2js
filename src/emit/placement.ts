@@ -1,4 +1,5 @@
 // docs/specs/05-emitter.md §6 "Function nesting" — where an *orphan* goes.
+import type { Stmt } from "./ast.ts";
 //
 // `_fn<n>` is normally emitted inside the function that owns its
 // `closureEnvOf` environment, so JS closure capture does the work. An orphan is
@@ -152,4 +153,40 @@ export function resolveOrphanHosts(input: OrphanPlacementInput): OrphanPlacement
     placements.push({ orphan, host: best, unboundAtModule, unboundAtHost: bestCost });
   }
   return placements;
+}
+
+/**
+ * Where a pulled-in orphan declaration goes inside the factory body.
+ *
+ * Hermes allocates a scope's environment slots in TEXTUAL declaration order:
+ * hoisting moves a function declaration's *closure creation* to the top of the
+ * scope, but not its slot. Probed on hermesc v98 with two captured function
+ * declarations either side of a `let a0, a1, a2;` — the same
+ * `CreateClosure`/`StoreToEnvironment` sequence either way, but the `let`
+ * bindings took slots 0..2 only when the function declarations came after
+ * them (docs/BUGS.md 2026-09-05, `diff:LoadFromEnvironment(imm)`).
+ *
+ * So prepending these declarations to the factory body — which is what this
+ * used to do — pushed every one of the factory's OWN `_e<env>_<slot>`
+ * bindings up by the number of orphans pulled in, and every getter/closure
+ * reading them recompiled with a shifted slot immediate. On
+ * react-navigation-example module 681 / fn#683 (a lazy re-export barrel with
+ * eleven getters) that was the uniform +2 the bug row describes: two orphans,
+ * `_fn13951` and `_fn13952`.
+ *
+ * The declarations therefore go exactly where `emitFunction` puts a function's
+ * own nested children: after the whole prologue (the `"use strict"` directive,
+ * the register/env-slot `let`s, `__this`/`__args`, the dispatch and generator
+ * state variables), i.e. at the first `func` statement, or after the leading
+ * run of declaration-shaped statements when the body has no children of its
+ * own. They stay hoisted function declarations, so every reference in the
+ * factory — including ones textually above them — still resolves.
+ */
+export function withExtraDeclarations(body: readonly Stmt[], extras: readonly Extract<Stmt, { k: "func" }>[]): Stmt[] {
+  let at = body.findIndex((s) => s.k === "func");
+  if (at < 0) {
+    at = 0;
+    while (at < body.length && (body[at]!.k === "directive" || body[at]!.k === "comment" || body[at]!.k === "decl" || body[at]!.k === "init")) at++;
+  }
+  return [...body.slice(0, at), ...extras, ...body.slice(at)];
 }
