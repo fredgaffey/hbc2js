@@ -113,3 +113,13 @@ is byte-identical across runs, junk contains only bounded pure code with a
 level-ordered call DAG, every function terminates in Node with a uint32 and
 the headless harness agrees with direct calls, and the module-id parser
 reads Metro's `__d` layout.
+
+## Reference numbers (seed 1, HBC 96, deb 32-core, 2026-11-24)
+
+| N | build wall | Metro | hermesc | bundle.js | bundle.hbc | HBC functions | Hermes VM vs Node |
+|---|---|---|---|---|---|---|---|
+| 1k | 12 s (+23 s first npm install) | 9 s | 1.7 s | 5.0 MB | 2.2 MB | 9,587 | 1,028/1,028 agree |
+| 10k | 47 s | 25 s | 9.6 s | 21.6 MB | 11.6 MB | 39,727 | 10,028/10,028 agree |
+| 100k | 525 s, 13 GB RSS | 292 s | 93 s | 186 MB | 117.7 MB | 338,893 | 100,028/100,028 agree |
+
+`hbc2js export` 0.1.1: 1k in 107 s (2.0 GB RSS), 10k in 1,020 s (8.1 GB RSS).
