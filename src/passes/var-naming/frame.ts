@@ -45,6 +45,10 @@ export function walkFrame(stmts: readonly Stmt[], visit: FrameVisitor): void {
       case "object":
         e.props.forEach((p) => { if (!("k" in p) && p.keyExpr !== undefined) walkExpr(p.keyExpr); walkExpr("k" in p ? p.arg : p.value); });
         return;
+      case "class": // F24-1: superclass + computed keys run in this frame; member bodies do not
+        if (e.superClass !== null) walkExpr(e.superClass);
+        for (const m of e.members) if (m.computed) walkExpr(m.key);
+        return;
       case "optmember": // F18 (bench 2026-11-24: an `r?.x` read was invisible here)
         walkExpr(e.obj);
         if (e.computed) walkExpr(e.prop);
@@ -104,6 +108,15 @@ export function walkFrame(stmts: readonly Stmt[], visit: FrameVisitor): void {
           walkExpr(s.test);
           if (s.update !== null) walkExpr(s.update);
           walkStmts(s.body);
+          break;
+        case "for-in":
+        case "for-of":
+          walkExpr(s.left);
+          walkExpr(s.right);
+          walkStmts(s.body);
+          break;
+        case "classdecl": // F24-1
+          walkExpr(s.value);
           break;
         case "labeled":
           walkStmts(s.body);
@@ -241,6 +254,10 @@ export function frameOccurrences(stmts: readonly Stmt[], names: ReadonlySet<stri
       case "object":
         e.props.forEach((p) => { if (!("k" in p) && p.keyExpr !== undefined) visitExpr(p.keyExpr, at); visitExpr("k" in p ? p.arg : p.value, at); });
         return;
+      case "class": // F24-1: superclass + computed keys run in this frame; member bodies do not
+        if (e.superClass !== null) visitExpr(e.superClass, at);
+        for (const m of e.members) if (m.computed) visitExpr(m.key, at);
+        return;
       case "optmember": // F18 (bench 2026-11-24: an `r?.x` read was invisible here)
         visitExpr(e.obj, at);
         if (e.computed) visitExpr(e.prop, at);
@@ -301,6 +318,17 @@ export function frameOccurrences(stmts: readonly Stmt[], names: ReadonlySet<stri
           visitExpr(s.test, at);
           if (s.update !== null) visitExpr(s.update, at);
           visitStmts(s.body);
+          break;
+        case "for-in":
+        case "for-of":
+          // The head binds/assigns `left` once per iteration: a def here.
+          if (s.left.k === "ident") rec(s.left.name, "defs", at);
+          else visitExpr(s.left, at);
+          visitExpr(s.right, at);
+          visitStmts(s.body);
+          break;
+        case "classdecl": // F24-1
+          visitExpr(s.value, at);
           break;
         case "labeled":
           visitStmts(s.body);
