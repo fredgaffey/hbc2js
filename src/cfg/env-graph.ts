@@ -220,6 +220,25 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
     slots.add(slot);
   };
   const slotClosure = new Map<string, { readonly fn: number; readonly env: EnvNodeId } | "conflict">();
+  // Change tracking for the fixed point (spec 29 §12). Every fact a
+  // function's run reads from the shared state is a key -- `f:<fn>` (its
+  // captured environment: closureEnvOf / closureEnvConflict / noEnvClosures /
+  // factorySelf), `p:<node>` (a node's parent), `s:<env>:<slot>` (slotEnv /
+  // slotClosure) -- and every change to one stamps it with a clock. A run
+  // whose every read is older than its previous run's start would read the
+  // same values, redo only writes already in place, and learn nothing, so the
+  // round skips it: the rounds' sequence of changes is exactly the full
+  // rounds' (`HBC2JS_ENVGRAPH_FULL_ROUNDS=1` runs every function every round,
+  // for checking that).
+  let clock = 0;
+  const lastChanged = new Map<string, number>();
+  let reads: Set<string> | null = null;
+  const rd = (k: string): void => {
+    if (reads !== null) reads.add(k);
+  };
+  const bump = (k: string): void => {
+    lastChanged.set(k, ++clock);
+  };
   /** Is the closure environment `cap` visible wherever the holder `of` is?
    *  True when `cap` is `of` or a static ancestor of it, or when `of`'s chain
    *  passes through an environment created by the same function as `cap` (the
@@ -234,6 +253,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
     while (cur !== null && cur !== undefined && !seen.has(cur)) {
       if (cur === cap || drafts[cur]!.ownerFunction === capOwner) return true;
       seen.add(cur);
+      rd(`p:${cur}`);
       cur = drafts[cur]!.parent;
     }
     return false;
@@ -243,6 +263,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
     let cur: EnvNodeId | null | undefined = start;
     for (let i = 0; i < levels; i++) {
       if (cur === null || cur === undefined) return UNKNOWN;
+      rd(`p:${cur}`);
       const next: EnvNodeId | null | undefined = drafts[cur]!.parent;
       cur = next;
     }
@@ -256,6 +277,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
 
   const runFunction = (f: number, collect: RoundOut | null): boolean => {
     const cfg = input.cfg(f);
+    rd(`f:${f}`);
     const selfEnv = factorySelf.get(f) ?? (closureEnvOf.has(f) ? closureEnvOf.get(f)! : noEnvClosures.has(f) ? null : undefined);
     let learned = false;
     let state: State = new Map();
@@ -270,19 +292,24 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
 
     const noteClosure = (fnId: number, env: EnvNodeId): void => {
       drafts[env]!.closures.add(fnId);
+      rd(`f:${fnId}`);
       const known = closureEnvOf.get(fnId);
       if (!closureEnvOf.has(fnId)) {
         closureEnvOf.set(fnId, env);
+        bump(`f:${fnId}`);
         learned = true;
       } else if (known !== env && !closureEnvConflict.has(fnId)) {
         closureEnvConflict.add(fnId);
+        bump(`f:${fnId}`);
         learned = true;
       }
     };
 
     const noteNoEnvClosure = (fnId: number): void => {
+      rd(`f:${fnId}`);
       if (noEnvClosures.has(fnId)) return;
       noEnvClosures.add(fnId);
+      bump(`f:${fnId}`);
       learned = true;
     };
 
@@ -291,6 +318,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
       if (isEnvCreate(name)) {
         const nodeId = nodeAt.get(siteKey(f, insn.offset))!;
         const draft = drafts[nodeId]!;
+        rd(`p:${nodeId}`);
         let parent: EnvNodeId | null | undefined;
         if (name === "CreateTopLevelEnvironment") parent = null;
         else if (name === "CreateFunctionEnvironment") parent = selfEnv;
@@ -302,6 +330,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
         }
         if (parent !== undefined && draft.parent === undefined) {
           draft.parent = parent;
+          bump(`p:${nodeId}`);
           learned = true;
         }
         set(insn.operands[0]!.value, { t: "env", node: nodeId });
@@ -356,6 +385,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
           const seen = new Set<EnvNodeId>();
           for (let e: EnvNodeId | null | undefined = c.env; e !== null && e !== undefined && !seen.has(e); e = drafts[e]!.parent) {
             seen.add(e);
+            rd(`p:${e}`);
             viaSlotClosure.add(`${f}:${e}`);
           }
         }
@@ -426,6 +456,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
           if (env !== null) collect.resolvedAt.set(siteKey(f, insn.offset), env);
         }
         if (env !== null) {
+          rd(`s:${env}:${slot}`);
           const held = slotEnv.get(`${env}:${slot}`);
           const heldClosure = slotClosure.get(`${env}:${slot}`);
           if (held !== undefined && held !== "conflict") set(insn.operands[0]!.value, { t: "env", node: held });
@@ -471,26 +502,32 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
         if (env !== null) {
           const val = get(insn.operands[2]!.value);
           const key = `${env}:${slot}`;
+          rd(`s:${key}`);
           const cur = slotEnv.get(key);
           if (val.t === "env") {
             if (cur === undefined) {
               slotEnv.set(key, val.node);
+              bump(`s:${key}`);
               learned = true;
             } else if (cur !== val.node && cur !== "conflict") {
               slotEnv.set(key, "conflict");
+              bump(`s:${key}`);
               learned = true;
             }
           } else if (cur !== undefined && cur !== "conflict") {
             slotEnv.set(key, "conflict");
+            bump(`s:${key}`);
             learned = true;
           }
           const curC = slotClosure.get(key);
           if (val.t === "closure" && val.env !== null) {
             if (curC === undefined) {
               slotClosure.set(key, { fn: val.fn, env: val.env });
+              bump(`s:${key}`);
               learned = true;
             } else if (curC !== "conflict" && (curC.fn !== val.fn || curC.env !== val.env)) {
               slotClosure.set(key, "conflict");
+              bump(`s:${key}`);
               learned = true;
             }
           } else if (curC !== "conflict" && val.t !== "none" && val.t !== "prim") {
@@ -499,6 +536,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
             // optional-call guard hermesc emits), so such a store never names
             // a different environment (construct 430-slot-closure-or-undefined).
             slotClosure.set(key, "conflict");
+            bump(`s:${key}`);
             learned = true;
           }
           const d = drafts[env]!;
@@ -651,16 +689,31 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
       const ps = P.get(n)!;
       if (ps.size !== 1 || ps.has(TOP)) continue;
       drafts[n]!.parent = [...ps][0]!;
+      bump(`p:${n}`);
       parentFormula.delete(n);
       any = true;
     }
     return any;
   }
 
+  const fullRounds = process.env.HBC2JS_ENVGRAPH_FULL_ROUNDS === "1";
+  const lastRunStart = new Map<number, number>();
+  const readsOf = new Map<number, readonly string[]>();
   for (let round = 0; round < MAX_ROUNDS; round++) {
     let learned = false;
     for (const f of input.functionIndices) {
+      if (!fullRounds) {
+        const start = lastRunStart.get(f);
+        const keys = readsOf.get(f);
+        if (start !== undefined && keys !== undefined && keys.every((k) => (lastChanged.get(k) ?? 0) <= start)) continue;
+        lastRunStart.set(f, clock);
+        reads = new Set();
+      }
       if (runFunction(f, null)) learned = true;
+      if (reads !== null) {
+        readsOf.set(f, [...reads]);
+        reads = null;
+      }
     }
     if (!learned && resolveParentFormulas()) learned = true;
     if (!learned) break;
