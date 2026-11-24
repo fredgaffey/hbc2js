@@ -14,7 +14,7 @@
 // -> compose source maps -> manifest.json (+ Hermes VM check when a VM for
 // that HBC version is available).
 import { mkdirSync, writeFileSync, readFileSync, cpSync, existsSync, statSync, rmSync, readdirSync } from "node:fs";
-import { join, dirname, relative } from "node:path";
+import { join, dirname, relative, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -89,7 +89,8 @@ function hermescFor(hbc, ws) {
 }
 
 function findHermesVm(hbc, explicit) {
-  const c = [explicit, process.env.HBC2JS_TORTURE_HERMES, join(ROOT, "tools/hermesc", `v${hbc}`, "hermes")];
+  const c = [explicit, process.env.HBC2JS_TORTURE_HERMES, join(ROOT, "tools/hermes-vm", `v${hbc}`, "bin/hermes"),
+    join(ROOT, "tools/hermesc", `v${hbc}`, "hermes")];
   return c.find((p) => p && existsSync(p)) || null;
 }
 
@@ -208,7 +209,7 @@ function ensureWorkspace(ws, timings) {
 function obfuscateTree(ws) {
   const obf = join(ws, "node_modules/.bin/javascript-obfuscator");
   for (const sub of ["src/core", "src/junk"]) {
-    sh(obf, [join(ws, sub), "--output", join(ws, sub), "--source-type", "module",
+    sh(obf, [join(ws, sub), "--output", join(ws, sub),
       "--compact", "true", "--string-array", "true", "--string-array-threshold", "0.75",
       "--identifier-names-generator", "hexadecimal", "--rename-globals", "false",
       "--control-flow-flattening", "false", "--seed", "1"], ws);
@@ -317,6 +318,7 @@ export async function build(opts) {
 
 /** Run headless.hbc in a Hermes VM and record agreement with the Node truth. */
 export function verifyHermes(out, vm) {
+  out = resolve(out);
   const manifest = JSON.parse(readFileSync(join(out, "manifest.json"), "utf8"));
   vm = vm || findHermesVm(manifest.hbcVersion);
   if (!vm) throw new Error("no Hermes VM found for HBC " + manifest.hbcVersion);
