@@ -949,7 +949,7 @@ export function bootTrace(bundleSourceIn: string, opts: BootTraceOptions = {}): 
     vm,
     ran,
     lowered,
-    why: ran ? null : `hermes produced no boot trace at all: ${excerpt(raw.stderr !== "" ? raw.stderr : raw.stdout)}`,
+    why: ran ? null : `hermes produced no boot trace at all: ${noTraceReason(raw)}`,
     raw,
   };
 }
@@ -989,4 +989,17 @@ export function compareBootTraces(a: BootTraceResult, b: BootTraceResult): BootC
   }
   const cmp = compareTraces(a.trace, b.trace);
   return { verdict: cmp.verdict, why: cmp.why, cmp };
+}
+
+/** Why a VM run left no trace, never an empty string: the exit status or
+ *  signal (a kernel OOM kill is a bare SIGKILL with no output), the timeout
+ *  flag, and the tail of whatever it printed. */
+export function noTraceReason(raw: { readonly timedOut: boolean; readonly status?: number | null; readonly signal?: string | null; readonly stdout: string; readonly stderr: string }): string {
+  const parts: string[] = [];
+  if (raw.timedOut) parts.push("timed out");
+  if (raw.signal !== undefined && raw.signal !== null) parts.push(`killed by ${raw.signal}${raw.signal === "SIGKILL" ? " (out of memory? check the kernel log)" : ""}`);
+  if (raw.status !== undefined && raw.status !== null) parts.push(`exit status ${raw.status}`);
+  const out = raw.stderr !== "" ? raw.stderr : raw.stdout;
+  parts.push(out.trim() === "" ? "no output" : `output tail: ${out.trim().slice(-400)}`);
+  return parts.join("; ");
 }

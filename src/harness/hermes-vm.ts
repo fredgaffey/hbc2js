@@ -136,6 +136,9 @@ export interface HermesRunResult {
   readonly lines: readonly string[];
   readonly raw: string;
   readonly status?: number | null;
+  /** The signal that ended the VM (`SIGKILL` from the kernel OOM killer, say),
+   *  or the spawn error code (`ENOBUFS`), when there was one. */
+  readonly signal?: string | null;
   /** The two channels kept apart — `print()` goes to stdout, an uncaught
    *  error's `Uncaught <Name>: <message>` report to stderr. A cross-engine
    *  comparison (`ladder.ts`) needs them apart: see `hermesPrintProjection`. */
@@ -169,10 +172,11 @@ export function runHermes(vmPath: string, file: string, opts: HermesRunOptions =
     });
     return { ok: true, timedOut: false, lines: splitLines(out), raw: out, stdout: out, stderr: "" };
   } catch (e) {
-    const err = e as { killed?: boolean; stdout?: string; stderr?: string; status?: number | null };
+    const err = e as { killed?: boolean; stdout?: string; stderr?: string; status?: number | null; signal?: string | null; code?: string };
     if (err.killed === true) return { ok: false, timedOut: true, lines: splitLines(err.stdout ?? ""), raw: err.stdout ?? "", stdout: err.stdout ?? "", stderr: err.stderr ?? "" };
     const raw = (err.stdout ?? "") + (err.stderr ?? "");
-    return { ok: false, timedOut: false, lines: splitLines(raw), raw, status: err.status ?? null, stdout: err.stdout ?? "", stderr: err.stderr ?? "" };
+    const signal = err.signal ?? (typeof err.code === "string" ? err.code : null);
+    return { ok: false, timedOut: false, lines: splitLines(raw), raw, status: err.status ?? null, signal, stdout: err.stdout ?? "", stderr: err.stderr ?? "" };
   }
 }
 
