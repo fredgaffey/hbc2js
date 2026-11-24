@@ -276,6 +276,14 @@ export async function exportBootProof(original: string, exportDir: string, opts:
     return { ...base, exportExec: "bytecode", verdict: "INCONCLUSIVE", appKeys: { a: [], b: [] }, factories: { a: 0, b: 0 }, divergence: null, masked: 0, reason: `--export-exec bytecode: ${why}` };
   }
   const run = phase === "run" ? { horizonMs: opts.horizonMs ?? DEFAULT_HORIZON_MS } : undefined;
+  // §4(b): the export side's module records come only from the instrumented
+  // registry. A tree exported without --instrument=modules boots silently (0
+  // factories), which would read as a DIVERGENT \`<end>\`: say so up front,
+  // before the slow decompile of the original.
+  const registry = join(exportDir, "src", "_hbc", "registry.js");
+  if (existsSync(registry) && !readFileSync(registry, "utf8").includes(PROBE_FN)) {
+    return { ...base, verdict: "INCONCLUSIVE", appKeys: { a: [], b: [] }, factories: { a: 0, b: 0 }, divergence: null, masked: 0, reason: `the export tree ${exportDir} is not instrumented (exported without --instrument=modules), so its modules cannot be observed; re-export it with \`hbc2js export <app.hbc> --out <dir> --instrument=modules --substitute none\`` };
+  }
 
   // The control first: if the original cannot boot here, nothing about the
   // export can be concluded, and the (slow) re-bundle is skipped.

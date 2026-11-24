@@ -213,6 +213,10 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
   var __hbcNativeLimited = false;
   var __hbcRealPrint = globalThis.print;
   var __hbcWrapFactories = ${JSON.stringify(wrapFactories)};
+  // Debug aid (HBC2JS_BOOT_STACK=1): a factory throw's record carries the
+  // error's stack too, to locate the throwing source line. Off by default so
+  // traces stay byte-identical across runs.
+  var __hbcThrowStack = ${JSON.stringify(process.env.HBC2JS_BOOT_STACK === "1")};
 
   function emit(rec) {
     var line;
@@ -312,6 +316,12 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
   }
   function hostStub(name, jsi, cs) {
     var backing = Object.create(null);
+    // Stub-host addition (spec 31 §4.2): a device's native module carries
+    // its constants as OWN enumerable properties, so \`{ ...NativeModule }\`
+    // and Object.keys see them (expo-constants builds \`Constants\` by
+    // spreading ExponentConstants; served only through \`get\` they spread to
+    // {} and \`executionEnvironment\` read undefined). A per-stub copy.
+    if (cs) for (var ck in cs) if (Object.prototype.hasOwnProperty.call(cs, ck) && ck !== "getConstants") backing[ck] = cs[ck] === undefined ? undefined : JSON.parse(JSON.stringify(cs[ck]));
     var proxy = new Proxy(backing, {
       get: function (t, p) {
         if (p === Symbol.toPrimitive) return function () { return "[hoststub " + name + "]"; };
@@ -427,6 +437,42 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
   }
 
   globalThis.global = globalThis;
+
+  // VM stand-in (spec 31 §4.2): the Hermes RN ships since 0.74 has a native
+  // UTF-8 TextEncoder that bundles read bare (Expo's runtime builds
+  // TextDecoder/TextEncoderStream on it); the standalone Hermes CLIs used
+  // here may lack it. Installed only when absent, identically on both sides.
+  if (typeof globalThis.TextEncoder === "undefined") {
+    var __hbcUtf8 = function (str, out, max) {
+      var read = 0, written = 0;
+      for (var i = 0; i < str.length; i++) {
+        var c = str.charCodeAt(i), units = 1;
+        if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length) {
+          var d = str.charCodeAt(i + 1);
+          if (d >= 0xdc00 && d <= 0xdfff) { c = 0x10000 + ((c - 0xd800) << 10) + (d - 0xdc00); units = 2; }
+        }
+        if (c >= 0xd800 && c <= 0xdfff) c = 0xfffd;
+        var bytes = c < 0x80 ? [c] : c < 0x800 ? [0xc0 | (c >> 6), 0x80 | (c & 63)] : c < 0x10000 ? [0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63)] : [0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63)];
+        if (written + bytes.length > max) break;
+        for (var b = 0; b < bytes.length; b++) out[written++] = bytes[b];
+        read += units;
+        i += units - 1;
+      }
+      return { read: read, written: written };
+    };
+    var HbcTextEncoder = function TextEncoder() {};
+    Object.defineProperty(HbcTextEncoder.prototype, "encoding", { configurable: true, get: function () { return "utf-8"; } });
+    HbcTextEncoder.prototype.encode = function encode(input) {
+      var str = input === undefined ? "" : String(input);
+      var tmp = [];
+      __hbcUtf8(str, tmp, Infinity);
+      return new Uint8Array(tmp);
+    };
+    HbcTextEncoder.prototype.encodeInto = function encodeInto(input, dest) {
+      return __hbcUtf8(String(input), dest, dest.length);
+    };
+    Object.defineProperty(globalThis, "TextEncoder", { configurable: true, writable: true, enumerable: false, value: HbcTextEncoder });
+  }
 
   globalThis.nativeLoggingHook = function (msg, level) {
     // msg is not recorded: it carries app text (spec §5 table).
@@ -597,6 +643,7 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
       exportsObj = undefined;
       try {
         thrown = extra !== null && typeof extra === "object" ? String(extra.name) + ": " + String(extra.message) : String(extra);
+        if (__hbcThrowStack && extra !== null && typeof extra === "object" && extra.stack !== undefined) thrown += "\\n" + String(extra.stack);
       } catch (e) {
         thrown = "<unstringifiable>";
       }
