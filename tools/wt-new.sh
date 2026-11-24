@@ -4,6 +4,7 @@
 # need symlinked from the main checkout. The list is derived from the main checkout's
 # `git status --ignored` (not hardcoded); build output and scratch state are skipped.
 set -euo pipefail
+self="$(cd "$(dirname "$0")" && pwd)"
 name="${1:?usage: tools/wt-new.sh <name> [base]}"
 base="${2:-main}"
 common="$(git rev-parse --path-format=absolute --git-common-dir)"
@@ -24,4 +25,4 @@ while IFS= read -r p; do
   [ -e "$dest/$p" ] || [ -L "$dest/$p" ] || { ln -s "$main/$p" "$dest/$p"; n=$((n+1)); }
 done < <(git -C "$main" status --ignored --short | sed -n 's/^!! //p' | grep -Ev "$skip" || true)
 echo "worktree $dest on branch $name (base $base), $n ignored inputs linked from $main"
-"$dest/tools/wt-check.sh" || true
+(cd "$dest" && "$self/wt-check.sh") || true
