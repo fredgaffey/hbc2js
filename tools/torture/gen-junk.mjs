@@ -12,7 +12,10 @@
 // inside a loop, so one entry call runs at most 1+2+4+8 function bodies.
 // Deterministic: same (seed, functions, perModule) -> byte-identical files.
 //
-// Usage: node tools/torture/gen-junk.mjs --seed S --functions N [--per-module K] [--out DIR]
+// --hard adds an opt-in profile of extra language shapes (see HARD_SNIPPETS) plus
+// async leaf functions (form "async", level 4, awaited by the harnesses).
+//
+// Usage: node tools/torture/gen-junk.mjs --seed S --functions N [--per-module K] [--hard] [--out DIR]
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { makeRng } from "../appgen/lib/prng.mjs";
@@ -49,6 +52,214 @@ export function entryArg(name) {
   let h = 2166136261;
   for (let i = 0; i < name.length; i++) h = Math.imul((h ^ name.charCodeAt(i)) >>> 0, 16777619) >>> 0;
   return (h % 1000) + 1;
+}
+
+
+// ---- --hard profile ---------------------------------------------------------
+// Opt-in extra shapes the default junk lacks. Driven by its OWN seeded stream
+// (`hard:<seed>`), so the default profile's bytes are unchanged and the hard
+// profile's regular functions are the default ones plus an appended section.
+// Same safety contract: pure, constant-bounded loops, no I/O/timers/eval.
+// Each snippet is a self-contained block over h/arr/str/x/mix with names
+// suffixed by a unique id; none of them calls another generated function.
+const HARD_SNIPPETS = [
+  // try/catch/finally inside switch cases inside a loop (break/continue through finally)
+  (T) => String.raw`for (let a${T} = 0; a${T} < 4; a${T}++) {
+  switch ((h + a${T}) % 3) {
+    case 0:
+      try {
+        if (a${T} === 2) throw new RangeError('r' + a${T});
+        h = mix(h, a${T});
+      } catch (e${T}) {
+        h = mix(h, e${T}.message.length);
+      } finally {
+        h = mix(h, 7);
+      }
+      break;
+    case 1:
+      try {
+        h = mix(h, 11);
+        continue;
+      } finally {
+        h = mix(h, a${T} + 1);
+      }
+    default:
+      try {
+        break;
+      } finally {
+        h = mix(h, 13);
+      }
+  }
+  h = mix(h, a${T} * 3);
+}`,
+  // generator with yield inside try/finally, next(value), return(), throw(), yield*
+  (T) => String.raw`function* g${T}(n) {
+  let s = 0;
+  try {
+    for (let k = 0; k < n; k++) {
+      const got = yield k * 2 + s;
+      s += got | 0;
+    }
+    return s;
+  } finally {
+    h = mix(h, 99);
+  }
+}
+function* w${T}() {
+  const r = yield* g${T}(2);
+  try {
+    yield r + 1;
+  } catch (e) {
+    yield e;
+  }
+}
+const it${T} = g${T}(4);
+let r${T} = it${T}.next();
+let acc${T} = 0;
+while (!r${T}.done) {
+  acc${T} += r${T}.value;
+  r${T} = it${T}.next(acc${T} & 7);
+}
+h = mix(h, acc${T} + r${T}.value);
+const ib${T} = g${T}(5);
+ib${T}.next();
+ib${T}.next(1);
+h = mix(h, ib${T}.return(5).value);
+const ic${T} = w${T}();
+const c1${T} = ic${T}.next();
+const c2${T} = ic${T}.next(3);
+const c3${T} = ic${T}.next(2);
+h = mix(h, c1${T}.value + c2${T}.value + c3${T}.value + ic${T}.throw(41).value);`,
+  // closures capturing per-iteration let bindings (including mutation inside the body)
+  (T) => String.raw`const fs${T} = [];
+for (let c${T} = 0; c${T} < 5; c${T}++) {
+  fs${T}.push(() => c${T} * (h & 7) + c${T});
+  if (c${T} === 3) c${T}++;
+}
+const gs${T} = [];
+for (let i${T} = 0, j${T} = 10; i${T} < 3; i${T}++, j${T}--) gs${T}.push(() => i${T} * 100 + j${T});
+h = mix(h, fs${T}.reduce((s, f) => s + f(), 0) + gs${T}.map((f) => f()).join('').length);`,
+  // labelled continue across nested loops
+  (T) => String.raw`outer${T}: for (let p${T} = 0; p${T} < 4; p${T}++) {
+  for (let q${T} = 0; q${T} < 4; q${T}++) {
+    if (q${T} > p${T}) continue outer${T};
+    if ((p${T} + q${T} + h) % 5 === 0) continue;
+    h = mix(h, p${T} * 4 + q${T});
+  }
+  h = mix(h, 1000 + p${T});
+}
+blk${T}: {
+  for (let u${T} = 0; u${T} < 3; u${T}++) {
+    if ((h + u${T}) % 4 === 1) break blk${T};
+    h = mix(h, u${T});
+  }
+  h = mix(h, 5);
+}`,
+  // destructuring with defaults in params (nested, holes, rest)
+  (T) => String.raw`const d${T} = ({ a = 3, b: { c = 4 } = {}, ...rest } = {}, [e = 5, , f = 6] = []) => a + c + e + f + Object.keys(rest).length;
+h = mix(h, d${T}({ z: 1 }, [undefined, 9]) + d${T}(undefined, undefined) + d${T}({ a: 1, b: { c: null } }, [1, 2, 3]));`,
+  // getters / setters / computed accessor on object literals
+  (T) => String.raw`const o${T} = { _v: x % 7, get v() { return this._v * 2; }, set v(n) { this._v = n + 1; }, get ['k' + (x % 3)]() { return 5; } };
+o${T}.v = h & 15;
+h = mix(h, o${T}.v + o${T}._v + (o${T}['k' + (x % 3)] | 0));`,
+  // optional calls / chains / nullish
+  (T) => String.raw`const oc${T} = { f: (n) => n + 1, nested: { g() { return this === oc${T}.nested ? 5 : 0; } } };
+const un${T} = h & 1 ? undefined : oc${T};
+h = mix(h, (un${T}?.f(3) ?? -1) + (oc${T}.nested?.g?.() ?? 0) + (oc${T}.missing?.() ?? 7) + (un${T}?.nested.g() ?? 2));`,
+  // sparse arrays / holes
+  (T) => String.raw`const sp${T} = [1, , 3, , ];
+sp${T}[7] = 9;
+let cn${T} = 0;
+sp${T}.forEach(() => cn${T}++);
+h = mix(h, sp${T}.length * 100 + cn${T} + (1 in sp${T} ? 1 : 0) + Object.keys(sp${T}).length + sp${T}.indexOf(undefined) + sp${T}.map((v) => v * 2).length);`,
+  // string escapes / unicode
+  (T) => String.raw`const us${T} = 'a\tb\né\u{1F600}\0\\"\'\x41' + "q'\" ";
+h = mix(h, us${T}.length);
+h = mix(h, us${T}.charCodeAt(h % us${T}.length));
+h = mix(h, [...us${T}].length + us${T}.codePointAt(5));
+str = (str + 'ü😀').slice(-9);`,
+  // numeric edge cases
+  (T) => String.raw`const ne${T} = [-0, NaN, 2 ** 53, 2 ** 53 + 2, -(2 ** 31), 0.1 + 0.2, 1 / 3, Number.MAX_SAFE_INTEGER, 1e21, 5e-324];
+h = mix(h, ne${T}.filter((v) => Object.is(v, -0)).length + String(ne${T}[2]).length + (1 / ne${T}[0] < 0 ? 3 : 4) + (ne${T}[1] !== ne${T}[1] ? 5 : 6));
+h = mix(h, (0.1 + 0.2 === 0.3 ? 1 : 2) + String(ne${T}[8]).length + (ne${T}[3] - ne${T}[2]) + (ne${T}[0] | 0) + (ne${T}[4] >>> 0) % 7 + ((2 ** 53 + 1) === 2 ** 53 ? 1 : 2) + String(ne${T}[9]).length);
+h = mix(h, Math.round(-0.5) === 0 && 1 / Math.round(-0.5) < 0 ? 1 : 2);`,
+  // exceptions used for control flow (thrown objects, finally overriding return)
+  (T) => String.raw`let ec${T} = 0;
+const th${T} = (n) => {
+  if (n > 2) throw { code: n };
+  return n;
+};
+try {
+  for (let i${T} = 0; i${T} < 5; i${T}++) ec${T} += th${T}(i${T});
+} catch (e) {
+  ec${T} += e.code * 10;
+} finally {
+  ec${T}++;
+}
+const fo${T} = () => {
+  try {
+    return 1;
+  } finally {
+    ec${T} += 5;
+  }
+};
+const fp${T} = () => {
+  try {
+    throw 1;
+  } catch (e) {
+    return 2;
+  } finally {
+    ec${T} += 3;
+    return 3;
+  }
+};
+h = mix(h, ec${T} + fo${T}() * 100 + fp${T}() * 1000 + ec${T});`,
+];
+
+function hardSection(hr, uid) {
+  const n = 1 + hr.int(3);
+  const parts = [];
+  for (let i = 0; i < n; i++) parts.push("  {\n" + HARD_SNIPPETS[hr.int(HARD_SNIPPETS.length)](`${uid}_${i}`).split("\n").map((l) => "  " + l).join("\n") + "\n  }");
+  return parts.join("\n");
+}
+
+// An async leaf: await inside try/catch/finally in a loop, Promise.all, async generator.
+function asyncFunction(name) {
+  return `export async function ${name}(x) {
+  let h = x | 0;
+  try {
+    for (let i = 0; i < 3; i++) {
+      try {
+        await null;
+        if ((h + i) % 2) throw new Error('t' + i);
+        h = mix(h, await Promise.resolve(i));
+      } catch (e) {
+        h = mix(h, e.message.length);
+      } finally {
+        h = mix(h, i + (await 1));
+      }
+    }
+  } finally {
+    h = mix(h, 5);
+  }
+  const [a, b] = await Promise.all([1, 2].map(async (v) => v * (h & 3)));
+  h = mix(h, a + b);
+  async function* ag() {
+    try {
+      yield 1;
+      yield 2;
+    } finally {
+      h = mix(h, 17);
+    }
+  }
+  for await (const v of ag()) {
+    if (v === 1) continue;
+    h = mix(h, v);
+  }
+  const settled = await Promise.allSettled([Promise.reject(new Error('z')), Promise.resolve(h & 7)]);
+  h = mix(h, settled.map((s) => (s.status === 'fulfilled' ? s.value : 100)).reduce((p, q) => p + q, 0));
+  return h >>> 0;
+}`;
 }
 
 function camel(rng, idx) {
@@ -153,8 +364,9 @@ function bodyGen(rng) {
  * modules } where every relPath is under src/junk/ and functions[i] =
  * { name, module, exported, level, callees, arg }.
  */
-export function generateJunk(seed, count, { perModule = 20, modulesPerDir = 50 } = {}) {
+export function generateJunk(seed, count, { perModule = 20, modulesPerDir = 50, hard = false } = {}) {
   const rng = makeRng(`junk:${seed}`);
+  const hr = hard ? makeRng(`hard:${seed}`) : null;
   const nMods = Math.max(1, Math.ceil(count / perModule));
   const modules = [];
   const functions = [];
@@ -202,7 +414,8 @@ export function generateJunk(seed, count, { perModule = 20, modulesPerDir = 50 }
       const head = g.block(0, 2 + rng.int(3), "  ");
       const calls = callees.map((f) => `  h = mix(h, ${f.name}((h & 1023) + ${rng.int(50)}));`).join("\n");
       const tail = g.block(0, 1 + rng.int(3), "  ");
-      const body = `${init.split("\n").map((l) => "  " + l).join("\n")}\n${head}\n${calls ? calls + "\n" : ""}${tail}\n  return h >>> 0;`;
+      const hardSec = hr && hr.int(3) === 0 ? hardSection(hr, `${fnIndex.toString(36)}`) + "\n" : "";
+      const body = `${init.split("\n").map((l) => "  " + l).join("\n")}\n${head}\n${calls ? calls + "\n" : ""}${tail}\n${hardSec}  return h >>> 0;`;
       const arrow = rng.int(5) === 0;
       bodies.push(arrow
         ? `export const ${name} = (x) => {\n${body}\n};`
@@ -210,6 +423,15 @@ export function generateJunk(seed, count, { perModule = 20, modulesPerDir = 50 }
       const fn = { name, module: path, exported: true, level, callees: callees.map((f) => f.name), arg: entryArg(name), form: arrow ? "arrow" : "function" };
       mod.fns.push(fn);
       functions.push(fn);
+    }
+    if (hr) {
+      for (let k = 0, na = Math.ceil(nFns / 5); k < na; k++) {
+        const name = `await${hr.pick(NOUNS)}${hr.pick(NOUNS)}_${m.toString(36)}x${k}`;
+        bodies.push(asyncFunction(name));
+        const fn = { name, module: path, exported: true, level: 4, callees: [], arg: entryArg(name), form: "async" };
+        mod.fns.push(fn);
+        functions.push(fn);
+      }
     }
     const rel = (to) => {
       const fromDir = dirname(path).split("/");
@@ -244,11 +466,11 @@ function main() {
   const seed = get("--seed");
   const n = Number(get("--functions", "100"));
   if (seed === undefined || !Number.isInteger(n) || n < 1) {
-    console.error("usage: node tools/torture/gen-junk.mjs --seed S --functions N [--per-module K] [--out DIR]");
+    console.error("usage: node tools/torture/gen-junk.mjs --seed S --functions N [--per-module K] [--hard] [--out DIR]");
     process.exit(2);
   }
   const out = get("--out");
-  const res = generateJunk(seed, n, { perModule: Number(get("--per-module", "20")) });
+  const res = generateJunk(seed, n, { perModule: Number(get("--per-module", "20")), hard: a.includes("--hard") });
   if (out) {
     for (const [rel, content] of res.files) {
       mkdirSync(dirname(join(out, rel)), { recursive: true });

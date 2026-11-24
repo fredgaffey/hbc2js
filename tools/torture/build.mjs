@@ -3,7 +3,7 @@
 // write its exact ground truth (tools/torture/README.md).
 //
 //   node tools/torture/build.mjs --seed S --functions N [--hbc 96|98|99]
-//        [--minify] [--obfuscate] [--out DIR] [--ws DIR]
+//        [--minify] [--obfuscate] [--hard] [--out DIR] [--ws DIR]
 //   node tools/torture/build.mjs --verify-hermes <outdir> [--hermes PATH]
 //
 // Pipeline (same no-Gradle shape as tools/appgen/build.mjs, spec 09 §2.2):
@@ -70,6 +70,7 @@ function parseArgs(argv) {
     else if (a === "--hbc") out.hbc = Number(argv[++i]);
     else if (a === "--minify") out.minify = true;
     else if (a === "--obfuscate") out.obfuscate = true;
+    else if (a === "--hard") out.hard = true;
     else if (a === "--out") out.out = argv[++i];
     else if (a === "--ws") out.ws = argv[++i];
     else if (a === "--verify-hermes") out.verify = argv[++i];
@@ -229,8 +230,8 @@ function metroBundle(ws, entry, out, minify, functions) {
 }
 
 export async function build(opts) {
-  const { seed, functions, hbc = 96, minify = false, obfuscate = false } = opts;
-  const variant = `s${seed}-n${functions}-hbc${hbc}${minify ? "-min" : ""}${obfuscate ? "-obf" : ""}`;
+  const { seed, functions, hbc = 96, minify = false, obfuscate = false, hard = false } = opts;
+  const variant = `s${seed}-n${functions}-hbc${hbc}${minify ? "-min" : ""}${obfuscate ? "-obf" : ""}${hard ? "-hard" : ""}`;
   const out = opts.out || join(HERE, "out", variant);
   const ws = opts.ws || join(HERE, "out", "_ws");
   const timings = {};
@@ -245,7 +246,7 @@ export async function build(opts) {
   }
   for (const f of readdirSync(join(HERE, "app"))) cpSync(join(HERE, "app", f), join(ws, f), { recursive: true });
   let t0 = Date.now();
-  const junk = generateJunk(seed, functions);
+  const junk = generateJunk(seed, functions, { hard });
   for (const [rel, content] of junk.files) {
     mkdirSync(dirname(join(ws, rel)), { recursive: true });
     writeFileSync(join(ws, rel), content);
@@ -343,7 +344,7 @@ async function main() {
   const a = parseArgs(process.argv.slice(2));
   if (a.verify) { console.log(JSON.stringify(verifyHermes(a.verify, a.hermes), null, 2)); return; }
   if (a.seed === undefined || !Number.isInteger(a.functions) || a.functions < 1) {
-    console.error("usage: node tools/torture/build.mjs --seed S --functions N [--hbc 96|98|99] [--minify] [--obfuscate] [--out DIR] [--ws DIR]\n" +
+    console.error("usage: node tools/torture/build.mjs --seed S --functions N [--hbc 96|98|99] [--minify] [--obfuscate] [--hard] [--out DIR] [--ws DIR]\n" +
       "       node tools/torture/build.mjs --verify-hermes <outdir> [--hermes PATH]");
     process.exit(2);
   }
