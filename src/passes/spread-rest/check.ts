@@ -11,7 +11,7 @@ import { extractFunc, match } from "./match.ts";
 import type { PropEl, SpreadRestSite } from "./match.ts";
 
 function sameJson(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  return a === b || JSON.stringify(a) === JSON.stringify(b);
 }
 
 const DUMMY: Expr = { k: "ident", name: "r999999" };

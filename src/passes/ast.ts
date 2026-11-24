@@ -2222,6 +2222,31 @@ export interface AstApplyResult {
  *  refused site is never retried" for a matcher that keeps matching. */
 const MAX_SITES_PER_PASS = 10_000;
 
+/** The per-function work budget of `applyAstPasses`, in statement visits:
+ *  every site round (one `firstAstMatch` scan + rewrite + check) is charged
+ *  the function's statement count. The drivers rescan from the top after
+ *  every accepted site and most rungs' `match`/`check` are linear in the
+ *  list, so a long straight-line body is cubic overall -- corpus a05's
+ *  icon-registry factory (7,070 `Object.defineProperty` getters, ~42k
+ *  statements) ran for hours. Deterministic (no clock): past the budget the
+ *  pass in flight is reverted, the remaining passes are skipped for that
+ *  function only, and `W_PASS_BUDGET` says so; the function keeps its
+ *  verified pre-pass body, so the output stays correct, only less readable.
+ *  `HBC2JS_AST_PASS_WORK` overrides it (tests). */
+export const AST_PASS_WORK_DEFAULT = 400_000_000;
+function astPassWorkBudget(): number {
+  const env = process.env.HBC2JS_AST_PASS_WORK;
+  const n = env === undefined || env === "" ? NaN : Number(env);
+  return Number.isFinite(n) && n > 0 ? n : AST_PASS_WORK_DEFAULT;
+}
+/** Statements in `body`, nested lists included (the unit `applyAstPasses`
+ *  charges per site round). */
+function stmtCount(body: readonly Stmt[]): number {
+  let n = 0;
+  for (const list of stmtLists(body, { sameFrame: false })) n += list.length;
+  return n;
+}
+
 type StmtListPass = Pass<readonly Stmt[]>;
 
 /**
@@ -2250,7 +2275,11 @@ export function applyAstPasses(fnBody: readonly Stmt[], passes: readonly StmtLis
   let current = fnBody;
 
   let interposed = interpose === undefined;
+  const budget = astPassWorkBudget();
+  let work = 0;
+  let overBudget = false;
   for (const pass of passes) {
+    if (overBudget) break;
     if (!interposed && pass.name === interpose!.before) {
       current = interpose!.apply(current);
       interposed = true;
@@ -2267,7 +2296,13 @@ export function applyAstPasses(fnBody: readonly Stmt[], passes: readonly StmtLis
       sites.add(node);
     };
     let firedHere = false;
+    const size = stmtCount(current);
     for (let guard = 0; guard < MAX_SITES_PER_PASS; guard++) {
+      work += size;
+      if (work > budget) {
+        overBudget = true;
+        break;
+      }
       const ctx: PassContext = { ...base, applied: appliedNames, fnBody: current, refuse };
       const site = firstAstMatch(current, pass, ctx, refused);
       if (site === null) break;
@@ -2291,6 +2326,17 @@ export function applyAstPasses(fnBody: readonly Stmt[], passes: readonly StmtLis
     }
     for (const [reason, sites] of refusals) {
       diagnostics.push({ severity: "info", code: "W_PASS_REFUSED", message: `pass ${pass.name} refused ${sites.size} site(s): ${reason}`, context: { pass: pass.name, reason, count: sites.size } });
+    }
+    if (overBudget) {
+      applied.length = appliedCountBefore;
+      current = beforePass;
+      diagnostics.push({
+        severity: "warn",
+        code: "W_PASS_BUDGET",
+        message: `fn#${base.functionIndex}: AST passes stopped at "${pass.name}" after ${work} statement visits (budget ${budget}, ${size} statements); the function keeps its unrewritten body from there on`,
+        context: { functionIndex: base.functionIndex, pass: pass.name, count: size },
+      });
+      break;
     }
     if (!firedHere) continue;
     if (parses(current)) {

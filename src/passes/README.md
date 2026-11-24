@@ -115,6 +115,15 @@ function body, re-derived after every accepted site, for a rung that needs a
 whole-function answer (liveness, free names) from one list. `--emit-ast`
 mirrors `--emit-tree`.
 
+Stage B also has a deterministic per-function **work budget** (statement
+visits: each site round is charged the function's statement count; default
+`AST_PASS_WORK_DEFAULT`, override `HBC2JS_AST_PASS_WORK`). The driver rescans
+from the top after every accepted site, so a huge straight-line body (corpus
+a05: a 42k-statement icon-registry factory) is cubic; past the budget the pass
+in flight is reverted, the remaining passes are skipped for that function,
+`W_PASS_BUDGET` fires, and the function carries a `hbc2js W_PASS_BUDGET`
+comment that export reports as `unresolved` kind `passes-skipped`.
+
 `src/passes/ast.ts` is stage B's `tree.ts`: `walk`/`mapExpr`/`mapStmts` (a
 read-only visitor and two rebuilding maps), `stmtLists`/`spliceList` (site
 enumeration and splice), `freeNames`/`parses`, `identUses`/`identUsesMany`/`registerUses` (one name; many names in one walk; every register, memoised per list — P-1), `defUse` (`rN`

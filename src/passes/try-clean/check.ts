@@ -9,7 +9,7 @@ import { applyAnalysis, collectAllTries, hasEntryStore } from "./analysis.ts";
 import { match } from "./match.ts";
 
 function deepEqual(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  return a === b || JSON.stringify(a) === JSON.stringify(b);
 }
 
 const isPcOrExcAssign = (e: { readonly k: string; readonly name?: string }): boolean => e.k === "assign" && (e.name === "__pc" || e.name === "__exc");

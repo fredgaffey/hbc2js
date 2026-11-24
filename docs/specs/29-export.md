@@ -566,7 +566,10 @@ dropped, nothing is counted twice. `unresolved[].kind` is a closed set:
 `entry-module-path-unknown`, `asset-bytes-missing`, `native-module`,
 `ambiguous-owner`, `syntax-check-failed` (§ safety net below),
 `function-isolated` (one function could not be decompiled -- an internal
-invariant failed -- and was written as a throwing stub; the export goes on).
+invariant failed -- and was written as a throwing stub; the export goes on),
+`passes-skipped` (one function's AST passes were stopped by the per-function
+work budget, `W_PASS_BUDGET`; the function is correct but not fully
+rewritten -- e.g. a 42k-statement straight-line icon-registry factory).
 
 ## 7. What the upstream index work is actually used for
 

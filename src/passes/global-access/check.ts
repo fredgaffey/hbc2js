@@ -12,12 +12,15 @@ import type { CheckResult, PassContext } from "../types.ts";
 import { hasLoopReentryClobber, hasPreGuardClobber, isLocallyProvenGlobal, isProvenGlobal, isShadowed, isTargetRead, recognizeGuard } from "./match.ts";
 import { substitute } from "./rewrite.ts";
 
+// Reference equality first: `spliceList` keeps every untouched statement as
+// the same object, so the common-prefix scans below are linear rather than a
+// JSON serialisation per statement (corpus: a 42k-statement factory).
 function sameStmt(a: Stmt, b: Stmt): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  return a === b || JSON.stringify(a) === JSON.stringify(b);
 }
 
 function sameEffect(a: Effect, b: Effect): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  return a === b || JSON.stringify(a) === JSON.stringify(b);
 }
 
 /** First index where `a`/`b` diverge, scanning their common prefix. */

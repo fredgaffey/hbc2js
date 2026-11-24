@@ -36,6 +36,7 @@ import { resolveWorkerCount } from "../parallel/pool.ts";
 import type { PoolStats, RenderJob } from "./render-pool.ts";
 import { loadModuleSyntaxCheck, syntaxStubFlatText } from "./syntax-check.ts";
 import type { ModuleSyntaxCheck } from "./syntax-check.ts";
+import { PASS_BUDGET_MARKER } from "../passes/index.ts";
 import type { ExportManifestModule, ExportManifestUnresolved } from "./manifest.ts";
 import { buildExportManifest } from "./manifest.ts";
 import { planSubstitutions } from "./substitute.ts";
@@ -133,6 +134,13 @@ export function isolatedFunctionsIn(text: string): { fn: number; code: string }[
     out.push({ fn, code: m[2]! });
   }
   return out;
+}
+
+/** Functions `astPassHook` marked as over the pass work budget. */
+export function passBudgetFunctionsIn(text: string): number[] {
+  const out = new Set<number>();
+  for (const m of text.matchAll(new RegExp(`${PASS_BUDGET_MARKER} fn#(\\d+)`, "g"))) out.add(Number(m[1]));
+  return [...out];
 }
 
 export async function exportProject(bundlePath: string, opts: ExportOptions = {}): Promise<ExportResult> {
@@ -331,6 +339,11 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
     // a throwing stub and the export went on; say so, one row per function.
     for (const fnFailure of isolatedFunctionsIn(text)) {
       unresolved.push({ kind: "function-isolated", detail: `module ${info.id} (${exportInfo.path}): fn#${fnFailure.fn} could not be decompiled (${fnFailure.code}); written as a throwing stub` });
+    }
+    // W_PASS_BUDGET: a function whose AST passes were stopped by the work
+    // budget is correct but unrewritten past that point; say so per function.
+    for (const fn of passBudgetFunctionsIn(text)) {
+      unresolved.push({ kind: "passes-skipped", detail: `module ${info.id} (${exportInfo.path}): fn#${fn}: AST passes stopped by the per-function work budget (W_PASS_BUDGET); the body is correct but not fully rewritten` });
     }
     files.set(exportInfo.path, text);
 

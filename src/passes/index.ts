@@ -258,10 +258,17 @@ export function astPassHook(analysis: ModuleAnalysis, opts: PassPipelineOptions 
       diagnostic: (d) => diagnostics.push(d),
     }, extras?.beforeVarNaming !== undefined ? { before: "var-naming", apply: extras.beforeVarNaming } : undefined);
     onResult?.(cfg.functionIndex, r);
-    const body = r.applied.length > 0 ? hoistRegisterInits(pruneRegisterDecls(r.body, fn.params)) : r.body;
+    let body = r.applied.length > 0 ? hoistRegisterInits(pruneRegisterDecls(r.body, fn.params)) : r.body;
+    // A function that ran out of pass budget says so in its own text, which
+    // is what export scans for (EXPORT.json `unresolved` kind `passes-skipped`).
+    if (r.diagnostics.some((d) => d.code === "W_PASS_BUDGET")) body = [{ k: "comment", text: `${PASS_BUDGET_MARKER} fn#${cfg.functionIndex}: AST passes stopped (work budget); the rest of this body is unrewritten` }, ...body];
     return { fn: { ...fn, body }, diagnostics: [...diagnostics, ...r.diagnostics] };
   };
 }
+
+/** The comment `astPassHook` puts at the top of a function whose AST passes
+ *  ran out of work budget (`W_PASS_BUDGET`, src/passes/ast.ts). */
+export const PASS_BUDGET_MARKER = "hbc2js W_PASS_BUDGET";
 
 /** `--list-passes`. */
 export function describePasses(): string {
