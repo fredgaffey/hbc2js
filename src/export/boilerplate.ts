@@ -330,10 +330,12 @@ export function buildPackageJson(opts: {
 }
 
 /** npm `overrides` pinning react and react-native, wherever they appear in
- *  the tree (peer edges included), to the root's own spec (`$name`). */
+ *  the tree (peer edges included), to the root's own spec. The literal spec,
+ *  not npm's `$name` reference: npm 10.9 fails `$react` with "Unable to
+ *  resolve reference" (corpus a10 re-run). */
 export function frameworkOverrides(dependencies: Readonly<Record<string, string>>): { overrides?: Record<string, string> } {
   const names = ["react", "react-native"].filter((n) => dependencies[n] !== undefined);
-  return names.length === 0 ? {} : { overrides: Object.fromEntries(names.map((n) => [n, "$" + n])) };
+  return names.length === 0 ? {} : { overrides: Object.fromEntries(names.map((n) => [n, dependencies[n]!])) };
 }
 
 export function buildAppJson(name: string): Record<string, unknown> {

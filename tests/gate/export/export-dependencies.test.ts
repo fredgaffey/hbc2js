@@ -164,6 +164,8 @@ test("corpus a10/a06: a signature `expo` version from another SDK is pinned to t
 });
 
 test("corpus a06: package.json overrides react and react-native to the root specs (optional peer ranges on other lines no longer ERESOLVE)", () => {
-  const pkg = buildPackageJson({ appName: "x", report: report({}), rnVersion: "0.83.2" }) as { overrides?: Record<string, string> };
-  assert.deepEqual(pkg.overrides, { react: "$react", "react-native": "$react-native" });
+  const pkg = buildPackageJson({ appName: "x", report: report({}), rnVersion: "0.83.2" }) as { dependencies: Record<string, string>; overrides?: Record<string, string> };
+  // The literal root specs (npm 10.9 rejects "$react": "Unable to resolve reference").
+  assert.deepEqual(pkg.overrides, { react: pkg.dependencies["react"], "react-native": pkg.dependencies["react-native"] });
+  assert.equal(pkg.overrides!["react"], "19.2.0");
 });
