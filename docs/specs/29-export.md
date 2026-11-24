@@ -598,6 +598,24 @@ A module is never omitted and never left as a dangling id. Each file's header
 comment names its tier, so the tier is visible in the tree as well as the
 manifest (the rule lane item 4 set for `readable/module_N.js`).
 
+### 7.4 No free identifiers (self-containment)
+
+Every exported module file must declare every name it reads, apart from
+host globals the original app itself reads (`typeof define`, `reportError`,
+`requestIdleCallback`, … — the source's own guarded global reads). The
+in-pipeline guard is EM-01 (`src/emit/scope-check.ts`), which walks every
+expression kind and replaces a function that would leak a name with a
+throwing stub plus `W_UNBOUND_ISOLATED`; it runs on the AST, so it is only as
+good as its walk -- the bench of 2026-11-24 (Ignite 11.5.0) found two leaks
+it could not see (a register inside a computed object key held only as a
+string, and `r?.x` reads EM-01 did not walk). The external audit is
+`node tools/export-check/free-idents.mjs <export-dir> --verbose`
+(@babel/parser + scope analysis; dev-only, since the package has no runtime
+dependencies, which is why it is not an `EXPORT.json` self-check); the gate
+runs it on `tests/fixtures/export-scope/` (`tests/gate/export/
+free-identifiers.test.ts`). On the Ignite export it reports 0 decompiler
+leaks and 18 original-source host-global reads in 15 files.
+
 ## 8. Explicitly out of scope
 
 Listed here so nobody reads an omission as an oversight; each is also in the

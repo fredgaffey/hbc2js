@@ -228,7 +228,11 @@ structure-recovery block.
   02-expr-rebuild.md`) — a new `computedStoreOf` recognises the store and
   folds key and value together once each passes the same "does not read or
   write the object's own register" check every other store's value
-  already gets (`match.ts`'s `computedStoreOf` doc comment); the key is
+  already gets (`match.ts`'s `computedStoreOf` doc comment); the key
+  expression is kept as `ObjectProp.keyExpr` (printed, and visited by every
+  shared walk -- bench 2026-11-24: a register hidden in the string key was
+  renamed at its def by var-naming but not in `{[r12]: v}`, a runtime
+  ReferenceError) and also
   rendered into `ObjectProp.key`'s string field at ASSIGNMENT precedence by
   a new `renderComputedKey` (`src/passes/ast.ts`, the same D12a
   `print.ts`-re-export gap `printProgram` already uses — `ClassMember.key`'s
