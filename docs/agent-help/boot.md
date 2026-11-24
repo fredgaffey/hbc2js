@@ -7,6 +7,11 @@ compares what each does at startup (specs 31 and 33). Verdicts: EQUIVALENT
 `divergence`), INCONCLUSIVE (2, the original itself did not boot under the
 stub host, or no VM), harness error (3).
 
+The export tree must be made with `hbc2js export <app.hbc> --out <dir>
+--instrument=modules --substitute none`: the export side's module records come
+only from the instrumented registry. A tree exported without it is reported
+INCONCLUSIVE at once, naming that command.
+
 ## Getting a VM
 
 `hbc2js setup-vm 96` installs a prebuilt Hermes VM (macOS, Linux x64;
@@ -46,14 +51,19 @@ for an app, put `boot-native.json` next to the original file:
 ```
 
 - `present`: module name to `true` or an object of constants. Constants are
-  readable as properties and from `getConstants()`.
+  readable as properties (own, enumerable: `{ ...Module }` copies them, as
+  expo-constants does) and from `getConstants()`.
 - `absent`: forced absent, even for RN core modules.
 - Expo modules (`requireNativeModule('X')`) are reached through
   expo-modules-core's JSI installer, so `ExpoModulesCore` is present whenever
   the bundle uses Expo modules; naming the Expo module in `present` is enough.
 - `ExponentConstants.manifest` is the app config Expo's build embeds in the
-  APK. The stub host stands in a minimal one with no URI scheme; supply the
+  APK. The stub host stands in a minimal one (scheme `hbc2jsboot`); supply the
   real `app.json` `expo` object here when the app's startup depends on it.
 
 The INCONCLUSIVE reason names the factory that threw and its error: that is
-the module to look at.
+the module to look at. `HBC2JS_BOOT_STACK=1` adds the error's stack (function
+names, positions in the generated boot file) to that record.
+
+The VM gets the globals RN's Hermes has that the standalone CLI may lack
+(`TextEncoder`), installed only when absent, the same on both sides.
