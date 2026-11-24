@@ -15,12 +15,17 @@ import { constants, totalmem } from "node:os";
 import { getHeapStatistics } from "node:v8";
 
 const HEAP_BYTES_PER_BUNDLE_BYTE = 250;
+/** `equiv --boot <original> <export-dir>` holds the original's whole-bundle
+ *  decompile (as export does) plus both boot traces and their projections; the
+ *  0.1.2 corpus a02 (10.4 MB, 48.7k functions) OOMed at Node's default ~4 GB
+ *  heap 180 s in, so the boot harness plans for about 3x export's share. */
+export const BOOT_HEAP_BYTES_PER_BUNDLE_BYTE = 800;
 const MEMORY_SHARE = 0.75;
 const MARKER = "HBC2JS_HEAP_REEXEC";
 
 /** The heap limit (MB) to re-run with, or null to run in this process. */
-export function heapLimitFor(bundleBytes: number, currentLimitMb: number, totalMemBytes: number): number | null {
-  const wanted = Math.ceil((bundleBytes * HEAP_BYTES_PER_BUNDLE_BYTE) / 2 ** 20);
+export function heapLimitFor(bundleBytes: number, currentLimitMb: number, totalMemBytes: number, bytesPerBundleByte: number = HEAP_BYTES_PER_BUNDLE_BYTE): number | null {
+  const wanted = Math.ceil((bundleBytes * bytesPerBundleByte) / 2 ** 20);
   const cap = Math.floor((totalMemBytes * MEMORY_SHARE) / 2 ** 20);
   const target = Math.min(wanted, cap);
   return target > currentLimitMb + 512 ? target : null;
@@ -29,7 +34,7 @@ export function heapLimitFor(bundleBytes: number, currentLimitMb: number, totalM
 /** Re-runs this CLI invocation in a child Node with a bigger heap when
  *  `inputPath` needs one; resolves to the child's exit code. Returns null
  *  (run in-process) otherwise. */
-export function maybeReexecForHeap(inputPath: string | undefined): Promise<number> | null {
+export function maybeReexecForHeap(inputPath: string | undefined, bytesPerBundleByte: number = HEAP_BYTES_PER_BUNDLE_BYTE): Promise<number> | null {
   if (inputPath === undefined || process.env[MARKER] !== undefined) return null;
   const userSet = [...process.execArgv, process.env.NODE_OPTIONS ?? ""].some((a) => /--max-old-space-size/.test(a));
   if (userSet) return null;
@@ -39,7 +44,7 @@ export function maybeReexecForHeap(inputPath: string | undefined): Promise<numbe
   } catch {
     return null; // the command itself reports the missing input
   }
-  const limit = heapLimitFor(bytes, getHeapStatistics().heap_size_limit / 2 ** 20, totalmem());
+  const limit = heapLimitFor(bytes, getHeapStatistics().heap_size_limit / 2 ** 20, totalmem(), bytesPerBundleByte);
   if (limit === null) return null;
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [...process.execArgv, `--max-old-space-size=${limit}`, ...process.argv.slice(1)], {

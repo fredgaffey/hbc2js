@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { CLI, cleanup, walk } from "./support.ts";
 import { repoRoot } from "../../support/paths.ts";
-import { heapLimitFor } from "../../../src/util/heap-reexec.ts";
+import { BOOT_HEAP_BYTES_PER_BUNDLE_BYTE, heapLimitFor } from "../../../src/util/heap-reexec.ts";
 import { initialWorkerEstimate, planRenderWorkers } from "../../../src/export/render-pool.ts";
 
 const BUNDLE = join(repoRoot(), "tests", "fixtures", "bundles", "rn-template-0.72", "index.android.hbc");
@@ -106,4 +106,17 @@ test("render worker plan: defaults fit half of RAM less the main thread; explici
   } finally {
     if (saved !== undefined) process.env.HBC2JS_WORKERS = saved;
   }
+});
+
+// 0.1.2 corpus a02: `equiv --boot` on a 10.4 MB / 48.7k-function bundle OOMed
+// in the harness's own process at Node's default heap. Export's planning
+// (250 B/B) would not re-run for it; the boot harness's share does.
+test("heap planning: equiv --boot re-runs a 10.4 MB bundle with a bigger heap where export would not", () => {
+  const GB = 2 ** 30;
+  const a02 = 10_384_892;
+  assert.equal(heapLimitFor(a02, 4144, 32 * GB), null, "export: the default suffices");
+  const boot = heapLimitFor(a02, 4144, 32 * GB, BOOT_HEAP_BYTES_PER_BUNDLE_BYTE);
+  assert.ok(boot !== null && boot >= 7000, `boot plan ${boot} MB`);
+  assert.equal(heapLimitFor(a02, 4144, 8 * GB, BOOT_HEAP_BYTES_PER_BUNDLE_BYTE), 6144, "still capped at 75% of RAM");
+  assert.equal(heapLimitFor(1_160_116, 4144, 32 * GB, BOOT_HEAP_BYTES_PER_BUNDLE_BYTE), null, "small apps run in-process");
 });

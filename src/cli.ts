@@ -83,7 +83,7 @@ import { HelpTopicError, loadHelpTopic } from "./mcp/help.ts";
 import { acquireOutLock } from "./util/out-lock.ts";
 import type { OutLock } from "./util/out-lock.ts";
 import { enableProgress } from "./util/progress.ts";
-import { maybeReexecForHeap } from "./util/heap-reexec.ts";
+import { BOOT_HEAP_BYTES_PER_BUNDLE_BYTE, maybeReexecForHeap } from "./util/heap-reexec.ts";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { userVmDir } from "./harness/hermes-vm.ts";
@@ -3637,6 +3637,14 @@ function main(): void {
     return;
   }
   if (argv[0] === "equiv") {
+    // `equiv --boot` decompiles the whole original like export does: same
+    // automatic heap re-run, sized for the boot harness (src/util/heap-reexec.ts).
+    const ea = parseEquivArgs(argv.slice(1));
+    const reexec = ea.boot && !ea.help ? maybeReexecForHeap(ea.positional[0], BOOT_HEAP_BYTES_PER_BUNDLE_BYTE) : null;
+    if (reexec !== null) {
+      void reexec.then((code) => process.exit(code));
+      return;
+    }
     void runEquiv(argv.slice(1)).then((code) => process.exit(code));
     return;
   }
