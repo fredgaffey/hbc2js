@@ -262,7 +262,18 @@ export async function exportBootProof(original: string, exportDir: string, opts:
   const traceOpts = { seed, firstNative: HOST_NATIVE_CAP, ...(vm !== undefined ? { vm } : {}), ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}) };
   const projOpts = (mask?: ReadonlySet<number>): ProjectOptions => ({ firstNative: opts.firstNative ?? DEFAULT_PROJECTED_NATIVE, ...(mask !== undefined ? { mask } : {}) });
   const mask = substitutedIds(exportDir);
-  const base = { schema: EXPORT_BOOT_SCHEMA, phase, runApplication: { a: null, b: null }, exportExec: "source" as const, views: { a: [] as string[], b: [] as string[] }, commits: { a: 0, b: 0 } };
+  // §1: the export side is compiled with the pinned hermesc (prelude
+  // prepended first) and run with `hermes -b`; source mode without one. An
+  // explicit `vm` override keeps both sides on that VM, in source mode.
+  // Chosen up front so every result, the early INCONCLUSIVE ones included,
+  // reports the mode the export side runs (or would have run) in.
+  const compiler = opts.vm === undefined && opts.exportExec !== "source" ? findHermesc(manifestVersion(exportDir)) : null;
+  const exportExec = compiler !== null ? ("bytecode" as const) : ("source" as const);
+  const base = { schema: EXPORT_BOOT_SCHEMA, phase, runApplication: { a: null, b: null }, exportExec, views: { a: [] as string[], b: [] as string[] }, commits: { a: 0, b: 0 } };
+  if (opts.exportExec === "bytecode" && compiler === null) {
+    const why = opts.vm !== undefined ? "an explicit vm runs both sides in source mode" : `no hermesc + hermes VM pair found (HBC v${manifestVersion(exportDir) ?? "?"} preferred; see spec 33 §1)`;
+    return { ...base, exportExec: "bytecode", verdict: "INCONCLUSIVE", appKeys: { a: [], b: [] }, factories: { a: 0, b: 0 }, divergence: null, masked: 0, reason: `--export-exec bytecode: ${why}` };
+  }
   const run = phase === "run" ? { horizonMs: opts.horizonMs ?? DEFAULT_HORIZON_MS } : undefined;
 
   // The control first: if the original cannot boot here, nothing about the
@@ -300,11 +311,6 @@ export async function exportBootProof(original: string, exportDir: string, opts:
     return { ...inconclusive(""), verdict: "DIVERGENT", divergence: { index: 0, a: null, b: null }, reason: `the export does not bundle offline: ${e instanceof Error ? e.message : String(e)}` };
   }
   if (!existsSync(bundlePath)) return inconclusive(`offline bundle missing at ${bundlePath}`);
-  // §1: the export side is compiled with the pinned hermesc (prelude
-  // prepended first) and run with `hermes -b`; source mode without one. An
-  // explicit `vm` override keeps both sides on that VM, in source mode.
-  const compiler = opts.vm === undefined && opts.exportExec !== "source" ? findHermesc(manifestVersion(exportDir)) : null;
-  const exportExec = compiler !== null ? "bytecode" as const : "source" as const;
   const bOpts = compiler !== null ? { ...traceOpts, vm: compiler.vm, hermesc: compiler.hermesc } : traceOpts;
   const b = bootTrace(readFileSync(bundlePath, "utf8"), { ...bOpts, natives, wrapFactories: false, ...(run !== undefined ? { run } : {}) });
   const rb = observeRun(b.trace);

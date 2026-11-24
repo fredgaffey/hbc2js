@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // docs/specs/00-project-skeleton.md §6.3 — the only place in the codebase allowed to
 // touch stdout/stderr or call process.exit.
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import v8 from "node:v8";
@@ -80,6 +80,8 @@ import { dbPath as projectDbPath } from "./projdb/artifact-read.ts";
 import { McpContext } from "./mcp/context.ts";
 import { buildToolTable, serveMcpStdio } from "./mcp/server.ts";
 import { HelpTopicError, loadHelpTopic } from "./mcp/help.ts";
+import { acquireOutLock } from "./util/out-lock.ts";
+import type { OutLock } from "./util/out-lock.ts";
 import { enableProgress } from "./util/progress.ts";
 import { maybeReexecForHeap } from "./util/heap-reexec.ts";
 import { fileURLToPath } from "node:url";
@@ -2024,6 +2026,26 @@ function runSegregateCmd(argv: readonly string[]): number {
 // React Native project tree (`--substitute none` only).
 // ---------------------------------------------------------------------------
 
+const EXPORT_USAGE = `usage: hbc2js export <bundle.hbc> --out <dir> [options]
+
+Writes a buildable React Native project tree for the bundle (docs/specs/29-export.md).
+
+  --out <dir>             the project directory to write (required; must be empty or new)
+  --overwrite             write into a non-empty --out
+  --tier passes|flat|jsx  per-module rendering: readable passes (default), flat, or passes + JSX recovery
+  --substitute none|safe  swap recognised dependency packages for npm installs (default safe)
+  --deps-report <file>    use this deps report (JSON) instead of the offline deps run
+  --app-name <name>       the app name for package.json / app.json (default: recovered from the bundle)
+  --rn-version <x.y.z>    the react-native version to pin (default: detected)
+  --instrument=modules    add per-module boot timing to the tree
+  --json                  print EXPORT.json's manifest on stdout instead of progress lines
+  -h, --help              print this help
+
+Environment: HBC2JS_WORKERS=<n> render threads (default: by cores and memory);
+HBC2JS_HEAP_REEXEC=0 keeps Node's heap limit as is.
+Two exports into the same --out at once are refused (lock file <dir>.hbc2js.lock).
+`;
+
 interface ExportArgs {
   readonly help: boolean;
   readonly input: string | undefined;
@@ -2071,7 +2093,7 @@ async function runExportCmd(argv: readonly string[]): Promise<number> {
   const args = parseExportArgs(argv);
   if (!args.json) enableProgress("export");
   if (args.help || args.input === undefined || args.out === undefined) {
-    process.stdout.write(USAGE);
+    process.stdout.write(EXPORT_USAGE);
     return args.help ? 0 : 2;
   }
   if (args.tier !== "passes" && args.tier !== "flat" && args.tier !== "jsx") {
@@ -2086,7 +2108,20 @@ async function runExportCmd(argv: readonly string[]): Promise<number> {
     process.stderr.write(`hbc2js export: --instrument must be "modules" (got ${args.instrument})\n`);
     return 2;
   }
+  let lock: OutLock;
   try {
+    lock = acquireOutLock(args.out, "hbc2js export");
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (args.json) process.stdout.write(`${JSON.stringify({ error: message })}\n`);
+    else process.stderr.write(`hbc2js export: ${message}\n`);
+    return 2;
+  }
+  try {
+    // Fail before minutes of work, not after (writeExportResult checks again).
+    if (!args.overwrite && existsSync(args.out) && readdirSync(args.out).length > 0) {
+      throw new Hbc2jsError(ErrorCode.E_USAGE, `export: ${args.out} already exists and is not empty (pass --overwrite)`);
+    }
     const depsReport = args.depsReportPath !== undefined ? (JSON.parse(readFileSync(args.depsReportPath, "utf8")) as DepsReport) : undefined;
     const result = await exportBundleProject(args.input, {
       tier: args.tier,
@@ -2109,6 +2144,8 @@ async function runExportCmd(argv: readonly string[]): Promise<number> {
     if (args.json) process.stdout.write(`${JSON.stringify({ error: message })}\n`);
     else process.stderr.write(`hbc2js export: ${message}\n`);
     return e instanceof Hbc2jsError ? exitCodeFor(e.code) : 3;
+  } finally {
+    lock.release();
   }
 }
 
