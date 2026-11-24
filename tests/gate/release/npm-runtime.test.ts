@@ -89,3 +89,59 @@ test("setup-vm --help documents the pinned fetch and exits 0", () => {
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /setup-vm/);
 });
+
+test("worker modules resolve with the caller's own extension (a .ts-only URL breaks every npm install)", async () => {
+  const { siblingWorkerPath } = await import("../../../src/util/worker-path.ts");
+  assert.match(siblingWorkerPath("stage-a-worker", "file:///pkg/dist/parallel/pool.js"), /stage-a-worker\.js$/);
+  assert.match(siblingWorkerPath("stage-a-worker", "file:///repo/src/parallel/pool.ts"), /stage-a-worker\.ts$/);
+  for (const f of ["src/parallel/pool.ts", "src/workers/runner.ts"]) {
+    assert.doesNotMatch(readFileSync(join(root, f), "utf8"), /new URL\("\.\/[\w-]+-worker\.ts"/, `${f} hardcodes a .ts worker URL`);
+  }
+});
+
+test("hermesc discovery: env override, package tools/, user cache -- never cwd", async () => {
+  const { findHermescBinary } = await import("../../../src/harness/hermes-vm.ts");
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const dir = mkdtempSync(join(tmpdir(), "hermesc-"));
+  const savedEnv = { ...process.env };
+  try {
+    mkdirSync(join(dir, "cache", "hbc2js", "hermesc", "v77"), { recursive: true });
+    writeFileSync(join(dir, "cache", "hbc2js", "hermesc", "v77", "hermesc"), "x");
+    process.env.XDG_CACHE_HOME = join(dir, "cache");
+    assert.equal(findHermescBinary(77), join(dir, "cache", "hbc2js", "hermesc", "v77", "hermesc"));
+    writeFileSync(join(dir, "env-hermesc"), "x");
+    process.env.HERMESC_V77 = join(dir, "env-hermesc");
+    assert.equal(findHermescBinary(77), join(dir, "env-hermesc"));
+    delete process.env.HERMESC_V77;
+    const cwd = process.cwd();
+    mkdirSync(join(dir, "elsewhere", "tools", "hermesc", "v78"), { recursive: true });
+    writeFileSync(join(dir, "elsewhere", "tools", "hermesc", "v78", "hermesc"), "x");
+    process.chdir(join(dir, "elsewhere"));
+    try {
+      assert.equal(findHermescBinary(78), null, "cwd/tools/hermesc must not be consulted");
+    } finally {
+      process.chdir(cwd);
+    }
+  } finally {
+    process.env = savedEnv;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("npm pack --dry-run contains the skill, agent docs and every runtime-read asset", () => {
+  const r = spawnSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], { cwd: root, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  const files = new Set((JSON.parse(r.stdout) as { files: { path: string }[] }[])[0]!.files.map((f) => f.path));
+  const required = [
+    ".claude/skills/hbc2js/SKILL.md",
+    "tools/get-hermesc.sh",
+    "tools/build-hermes-vm.sh",
+    ...["tldr", "tools", "workflow", "examples", "limits", "glossary"].map((t) => `docs/agent-help/${t}.md`),
+  ];
+  for (const f of required) assert.ok(files.has(f), `${f} is not in the npm tarball`);
+  assert.ok([...files].some((f) => f.startsWith("tools/pkgsig/db/")), "signature db missing from tarball");
+  // Every docs/ path SKILL.md cites must be packed.
+  const skill = readFileSync(join(root, ".claude", "skills", "hbc2js", "SKILL.md"), "utf8");
+  for (const m of skill.matchAll(/`(docs\/[A-Za-z0-9_./-]+\.md)`/g)) assert.ok(files.has(m[1]!), `SKILL.md cites ${m[1]} which is not packed`);
+});

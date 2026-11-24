@@ -68,13 +68,15 @@ test(".claude/skills/hbc2js/SKILL.md: every hbc2js command it shows still parses
   }
 });
 
-test(".claude/skills/hbc2js/SKILL.md: every docs/ path it cites exists", () => {
+test(".claude/skills/hbc2js/SKILL.md: every docs/ path it cites exists and ships in the npm package (docs/agent-help only)", () => {
   const text = readFileSync(SKILL_PATH, "utf8");
   const paths = new Set<string>();
   for (const m of text.matchAll(/`(docs\/[A-Za-z0-9_./-]+\.md)`/g)) {
     const p = m[1];
     if (p !== undefined) paths.add(p);
   }
-  assert.ok(paths.size > 0, "SKILL.md cites no docs/ paths");
-  for (const p of paths) assert.ok(existsSync(join(repoRoot, p)), `SKILL.md cites ${p}, which does not exist`);
+  for (const p of paths) {
+    assert.ok(existsSync(join(repoRoot, p)), `SKILL.md cites ${p}, which does not exist`);
+    assert.ok(p.startsWith("docs/agent-help/"), `SKILL.md cites ${p}, which is not shipped in the npm package; use \`hbc2js help <topic>\``);
+  }
 });

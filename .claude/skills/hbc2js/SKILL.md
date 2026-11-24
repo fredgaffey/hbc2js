@@ -8,9 +8,8 @@ description: Decompile, browse, and rename/rewrite React Native Hermes bytecode 
 hbc2js decompiles Hermes bytecode (`.hbc`, what React Native ships) into
 runnable JavaScript checked against the real Hermes VM, then layers an
 LLM-driven readability pass (naming, function rewrites, file-tree ops) on
-top. Full docs: `docs/TLDR.md`, `docs/READABILITY.md`,
-and the specs under `docs/specs/` if you are implementing rather
-than operating.
+top. Full docs ship with the package: `hbc2js help <topic>` (tldr, tools,
+workflow, examples, limits, glossary).
 
 ## The five commands that matter
 
@@ -82,10 +81,10 @@ project directory has a readable `src/` tree.
 - `hbc2js render-module`/`render-modules` write `readable/module_<id>.js`
   under `--out <dir>` (a split-tree directory) plus a `readable` field per
   module in that directory's `MODULES.json` -- one bundle parse for the
-  whole batch, never per module (docs/specs/10-artifact-format.md §2.6).
+  whole batch, never per module.
 - `hbc2js export` writes a full project tree under `--out <dir>`
   (`package.json`, `index.js`, `src/**`, `EXPORT.json`) -- `npm install &&
-  npx react-native bundle` is the finish line (docs/specs/29-export.md).
+  npx react-native bundle` is the finish line.
   `--substitute safe` (default) replaces an unambiguously-entered package
   with a real `require("<package>")`; a package entered at more than one
   module refuses and stays vendored under `src/_vendor/<pkg>/` (spec 29
@@ -112,7 +111,7 @@ expected outcome when the evidence is thin, not a failure to route around.
 ## Common failure messages
 
 - `UNIQUE constraint failed: ix_ranges.fn` from `hbc2js init` -- a known open
-  bug on some Metro-shaped bundles (`docs/BUGS.md`); use a bundle
+  bug on some Metro-shaped bundles; use a bundle
   `init` already succeeds on (the committed `rn-template-0.72` fixture) if
   you hit this mid-task.
 - `"no range recorded"` from `get_context`/`get_source`/`decompile --fn` --
@@ -138,6 +137,5 @@ expected outcome when the evidence is thin, not a failure to route around.
 
 ## Read next
 
-`docs/READABILITY.md` (the naming/rewrite/file-op layer in depth) and
-`docs/specs/28-llm-readability.md` (if you are implementing rather
-than operating hbc2js).
+`hbc2js help workflow` and `hbc2js help limits`; the source repo
+(github.com/fredgaffey/hbc2js) holds the specs for implementers.

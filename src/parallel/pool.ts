@@ -1,8 +1,8 @@
 // Worker pool across function
 // ranges for the stage-A pass pipeline. This file is the mechanism only.
+import { siblingWorkerPath } from "../util/worker-path.ts";
 import { cpus } from "node:os";
 import { Worker } from "node:worker_threads";
-import { fileURLToPath } from "node:url";
 import type { StageAResult, WorkerRequest, WorkerResponse } from "./types.ts";
 
 /** `HBC2JS_WORKERS` env override; default `max(1, cpus - 2)` (headroom for
@@ -30,7 +30,7 @@ function assign(indices: readonly number[], workerCount: number): number[][] {
   return buckets;
 }
 
-const WORKER_SCRIPT = fileURLToPath(new URL("./stage-a-worker.ts", import.meta.url));
+const WORKER_SCRIPT = siblingWorkerPath("stage-a-worker", import.meta.url);
 
 /**
  * Runs stage-A (`structure()` + the D12 pass pipeline) for every index in

@@ -251,3 +251,18 @@ export function hermesPrintProjection(r: HermesRunResult): readonly string[] {
 /** The `print`-channel projection of a sandbox trace — see trace.ts's
  *  `printLines`, kept here too for parity with the PoC's module shape. */
 export { printLines } from "./trace.ts";
+
+/** `hermesc` for an HBC version: `HERMESC_V<N>` env, then the package/repo
+ *  `tools/hermesc/v<N>/hermesc`, then the `setup-vm` user cache. Never cwd. */
+export function findHermescBinary(version: number): string | null {
+  const env = process.env[`HERMESC_V${version}`];
+  if (env !== undefined && fs.existsSync(env)) return env;
+  const root = vmSearchRoot() ?? repoRoot();
+  const cands = [path.join(root, "tools", "hermesc", `v${version}`, "hermesc")];
+  if (vmSearchRoot() === undefined) cands.push(path.join(userVmDir(), `v${version}`, "hermesc"));
+  return cands.find((c) => fs.existsSync(c)) ?? null;
+}
+
+export function defaultHermescDir(): string {
+  return path.join(vmSearchRoot() ?? repoRoot(), "tools", "hermesc");
+}

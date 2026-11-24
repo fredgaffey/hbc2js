@@ -29,6 +29,7 @@ import type { DepsReport } from "./report.ts";
 import { buildNativeChannel } from "../native/native-deps.ts";
 import type { NativeChannelReport } from "../native/native-deps.ts";
 import { buildNativeTables, openApk } from "../native/ingest.ts";
+import { findHermescBinary, defaultHermescDir } from "../harness/hermes-vm.ts";
 import { progress } from "../util/progress.ts";
 
 export interface DepsOptions {
@@ -138,7 +139,7 @@ export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promis
     // most needed (docs/DEPS.md §4, D17a/D17b).
     const baselineDirs = [...new Set([scoringProjectDir, projectDbDir, userCacheDbDir, sharedDbDir])];
     const rnVersion = matchReport.packages.find((p) => p.package === "react-native" && (p.tier === "high" || p.tier === "medium"))?.version ?? detectRnVersionFromBaselineFilenames(baselineDirs, inventory.hbcVersion) ?? undefined;
-    const hermescPath = join(opts.hermescDir ?? join(process.cwd(), "tools", "hermesc"), `v${inventory.hbcVersion}`, "hermesc");
+    const hermescPath = opts.hermescDir !== undefined ? join(opts.hermescDir, `v${inventory.hbcVersion}`, "hermesc") : (findHermescBinary(inventory.hbcVersion) ?? join(defaultHermescDir(), `v${inventory.hbcVersion}`, "hermesc"));
     if (rnVersion !== undefined) {
       const scratchDir = opts.scratchDir ?? join(opts.out ?? ".", ".hbc2js", "confirm-scratch");
       // One candidate per raw per-module guess, best-ranked first — no

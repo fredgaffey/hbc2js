@@ -5,9 +5,9 @@
 // external MCP client use, which is what makes provenance hold (spec 23 §0).
 //
 // Two rules this file exists to enforce:
+import { siblingWorkerPath } from "../util/worker-path.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { Worker } from "node:worker_threads";
-import { fileURLToPath } from "node:url";
 import type { McpResources } from "../mcp/resources.ts";
 import type { McpTools } from "../mcp/tools.ts";
 import type { Provenance } from "../project/schema.ts";
@@ -29,7 +29,7 @@ export const SUGGESTED_PREFIX = "[ai-suggested]";
  *  this switch is what lets a test prove it by running both. */
 export const READABILITY_INPROCESS_ENV = "HBC2JS_READABILITY_INPROCESS";
 
-const READABILITY_WORKER_SCRIPT = fileURLToPath(new URL("./readability-worker.ts", import.meta.url));
+const READABILITY_WORKER_SCRIPT = siblingWorkerPath("readability-worker", import.meta.url);
 
 /** A failure reported BY the worker. `transient` was decided inside the
  *  worker (only it still had the error object); `instanceof` cannot cross a
