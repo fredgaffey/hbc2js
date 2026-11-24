@@ -289,6 +289,17 @@ inline map is keyed by function index; otherwise the hoisted form is kept, since
 a wrong-scope binding that the unbound check reports is better than a silent
 binding to the wrong body.
 
+**A loop-local environment's binding is a function boundary, not a block
+`let`** (2026-11-24, `src/emit/loop-env-scope.ts`). The create block need only
+*dominate* every access, not contain it; the declaration is then settled up to
+the innermost statement list enclosing every reference without leaving the loop
+body (else it falls back to function-wide, `W_LOOP_LOCAL_ENV`). Because Hermes
+compiles without ES6 block scoping, a `let` in a loop body is one binding per
+activation there, so the declaration through the last reference is wrapped in
+`(function () { ... })();` -- lifted past any label it would `break` out of --
+when no `return`/`this`/`arguments`/`yield`/`await`/outward jump crosses it.
+Fixtures 491-loop-env-mutated-in-body and 17-closure-loop-var.
+
 **A self-capturing recursion group is a closure factory, not copies.** A
 function in `closureFactories` (spec 03 §6.2 G2) is emitted once as
 `function _mk<n>(_c<n>) { return function <name>(...) { ... }; }`, hosted in
