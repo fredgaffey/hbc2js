@@ -20,7 +20,8 @@
 // exact shim shape below is the provenance this rung uses. The consequence is
 // recorded in the spec's landed note and in docs/BUGS.md.
 import type { Expr, Param, Stmt } from "./ast.ts";
-import { freeNames, identUses, isPure, isPureStmt, isRegisterName, mapStmts, parses, walk } from "./ast.ts";
+import { identUses, isPure, isPureStmt, isRegisterName, mapStmts, walk } from "./ast.ts";
+import { checkOneStatementRewrite } from "./scoped-check.ts";
 import { childLists, mapChildLists, restructureSegments } from "./restructure.ts";
 import type { CheckResult, Match, PassContext } from "./types.ts";
 
@@ -605,9 +606,8 @@ export function makeCheck(opts: RecoverOptions): (before: readonly Stmt[] | Stmt
     let residue: string | null = null;
     walk([got], { expr: (e) => { if (e.k === "ident" && (RESIDUE as readonly string[]).includes(e.name)) residue ??= e.name; } });
     if (residue !== null) return { ok: false, reason: `\`${residue}\` survives in the recovered generator` };
-    if (!parses(a)) return { ok: false, reason: "the rewritten statement list is not syntactically valid JavaScript" };
-    const bf = freeNames(b);
-    for (const n of freeNames(a)) if (!bf.has(n)) return { ok: false, reason: `the rewrite introduced the free name \`${n}\`` };
-    return { ok: true };
+    // `parses(a)` and no free name of `a` missing from `b`, in time linear in
+    // the replaced statement (spec 29 section 12, "Scoped rewrite checks").
+    return checkOneStatementRewrite(b, a, i);
   };
 }
