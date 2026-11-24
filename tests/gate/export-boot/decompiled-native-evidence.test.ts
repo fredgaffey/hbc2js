@@ -107,3 +107,56 @@ test("0.1.2 apps: the readable whole-file decompile's spec module (`let v = requ
   assert.ok("ExponentConstants" in m.present);
   assert.ok(!("ExpoUpdates" in m.present));
 });
+
+// The same chain in the readable decompile `equiv --boot` boots (statements in
+// labelled blocks; the name hoisted by its own statement).
+const ASYNC_STORAGE_READABLE = `__d(function _fn1240(a1, a2, a3, a4, a5, a6, a7) {
+      let r0, r1, r3, r5, r7, r9;
+      L0: {
+        r5 = a2(a7[0]);
+        if (r5.TurboModuleRegistry) {
+          L1: {
+            r3 = r5.TurboModuleRegistry.get("PlatformLocalStorage");
+            if (r3) {
+              break L1;
+            }
+            r9 = r5.TurboModuleRegistry;
+            r7 = "RNC_AsyncSQLiteDBStorage";
+            r3 = r9.get(r7);
+            break L1;
+          }
+          L2: {
+            if (r3) {
+              break L2;
+            }
+            r9 = r5.TurboModuleRegistry;
+            r7 = "RNCAsyncStorage";
+            r3 = r9.get(r7);
+            break L2;
+          }
+          r1 = r3;
+          break L0;
+        }
+        L3: {
+          r1 = r5.NativeModules.PlatformLocalStorage;
+          if (r1) {
+            break L3;
+          }
+          r3 = r5.NativeModules;
+          r1 = r3.RNC_AsyncSQLiteDBStorage;
+          break L3;
+        }
+        r1 = r1 || (r3 = r5.NativeModules, r3.RNCAsyncStorage);
+        break L0;
+      }
+      r3 = !r1;
+      a6["default"] = r1;
+    }, 1239, [3]);`;
+
+test("0.1.2 apps: the readable decompile's lookup chain (labelled blocks, hoisting statement) keeps its tail module", () => {
+  const ev = bundleEvidence(ASYNC_STORAGE_READABLE);
+  assert.ok(ev.required.has("RNCAsyncStorage"), [...ev.required].join(","));
+  const m = deriveNativeManifest(ASYNC_STORAGE_READABLE);
+  assert.ok("RNCAsyncStorage" in m.present);
+  for (const n of ["PlatformLocalStorage", "RNC_AsyncSQLiteDBStorage"]) assert.ok(!(n in m.present), `${n} absent`);
+});

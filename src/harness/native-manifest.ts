@@ -118,6 +118,9 @@ export function bundleEvidence(text: string): { required: Set<string>; spec: Set
   const source = text
     .replace(HOISTED_NAME, (_m, _reg: string, name: string, call: string) => `${call}("${name}")`)
     .replace(ASSIGNED_ARG, (_m, call: string, name: string) => `${call}(${name})`)
+    // …and the readable decompile's own hoisting statement
+    // (\`r7 = "RNCAsyncStorage";\n r3 = r9.get(r7);\`).
+    .replace(HOISTED_STMT, (_m, _reg: string, name: string, call: string) => `${call}("${name}")`)
     // …and a call through a register alias of the lookup function
     // (\`r3 = a2(a7[0]).requireNativeModule;\n r1 = r3("ExpoFontLoader");\`).
     .replace(ALIASED_CALL, (m, _reg: string, kind: string, lhs: string, name: string) => `${m.slice(0, m.indexOf(";") + 1)} ${lhs} = ${kind}(${name})`);
@@ -147,6 +150,13 @@ export function bundleEvidence(text: string): { required: Set<string>; spec: Set
     // Decompiled, the tail is an assignment in parentheses: \`R||(R=b.T.get("X")),M=R\`.
     // (Not when the chain goes on: \`…get("B")),R||(R=…get("C"))\`.)
     if (/\|\|\s*(?:\(\s*[\w$]+\s*=\s*)?[\w$.()]*$/.test(before) && /^\s*[;:,)}]/.test(after) && !/^\s*\)\s*,\s*[\w$]+\s*\|\|/.test(after)) required.add(name);
+    // The readable decompile writes the chain as labelled blocks, each
+    // alternative skipped once a previous one was found:
+    // \`L2: { if (r3) { break L2; } r9 = …; r3 = r9.get("X"); break L2; }\`;
+    // the tail is the block not followed by another such block.
+    const wideBefore = source.slice(Math.max(0, m.index - 200), m.index);
+    const wideAfter = source.slice(m.index + m[0].length, m.index + m[0].length + 160);
+    if (/if\s*\(\s*[\w$]+\s*\)\s*\{\s*break\s+L\d+;\s*\}\s*(?:[\w$]+\s*=\s*[\w$.]+;\s*)*[\w$]+\s*=\s*[\w$.()[\]]*$/.test(wideBefore) && /^\s*;\s*break\s+L\d+;\s*\}/.test(wideAfter) && !/^\s*;\s*break\s+L\d+;\s*\}\s*L\d+:\s*\{\s*if\s*\(/.test(wideAfter)) required.add(name);
     // Last expression of the factory: `...('X')},<id>,[` (Metro), or the
     // `...('X')}` end of a factory body without Metro's trailer.
     // Decompiled, the factory ends \`…("X");return _.default=p,c},551,[269]\`.
@@ -186,6 +196,7 @@ export function bundleEvidence(text: string): { required: Set<string>; spec: Set
   return { required, spec };
 }
 const ASSIGNED_ARG = /(\b(?:getEnforcing|get|requireNativeModule\)?|requireOptionalNativeModule\)?))\(\s*[\w$]+\s*=\s*("[A-Z][\w$]*")\s*\)/g;
+const HOISTED_STMT = /(?<![\w$.])([\w$]+)\s*=\s*"([A-Z][\w$]*)"\s*;\s*([\w$]+\s*=\s*[\w$.()[\]]*\.(?:getEnforcing|get))\(\s*\1\s*\)/g;
 const ALIASED_CALL = /(?<![\w$.])([\w$]+)\s*=\s*[\w$.()[\]]*\.(requireNativeModule|requireOptionalNativeModule|getEnforcing)\s*;\s*([\w$]+)\s*=\s*\1\(\s*("[A-Z][\w$]*")\s*\)/g;
 const HOISTED_NAME = /(?<![\w$.])([\w$]+)="([A-Z][\w$]*)",([\w$]+=[\w$.()[\]]*\.(?:getEnforcing|get))\(\1\)/g;
 const UNGUARDED_BIND = /(?<![\w$.])([\w$]+)\s*=\s*[\w$.()[\]]*\.NativeModules\.([A-Z][\w$]*)\s*[;,]/g;
