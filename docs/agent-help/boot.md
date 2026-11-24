@@ -65,5 +65,10 @@ The INCONCLUSIVE reason names the factory that threw and its error: that is
 the module to look at. `HBC2JS_BOOT_STACK=1` adds the error's stack (function
 names, positions in the generated boot file) to that record.
 
+Each side's VM runs under an address-space cap, `HBC2JS_BOOT_VM_MEMORY_MB`
+(default 16384, 0 = uncapped; POSIX `ulimit -v`, so keep it >= 2048). A side
+that outgrows it ends INCONCLUSIVE with "ran out of memory" in the reason
+instead of drawing the kernel OOM killer.
+
 The VM gets the globals RN's Hermes has that the standalone CLI may lack
 (`TextEncoder`), installed only when absent, the same on both sides.

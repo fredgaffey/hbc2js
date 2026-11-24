@@ -125,6 +125,12 @@ export interface HermesRunOptions {
    *  bundle's undeclared-global warnings can outgrow the output buffer and
    *  hide the run (0.1.2 apps). */
   readonly quiet?: boolean;
+  /** Cap the VM's address space at this many MiB (POSIX `ulimit -v` through
+   *  `/bin/sh`; where the shell cannot set it, the run is uncapped). A run
+   *  that hits the cap aborts with the VM's own out-of-memory report instead
+   *  of growing until the kernel OOM killer takes it, or the machine, down.
+   *  The VM reserves ~1-2 GiB of address space at startup: keep it >= 2048. */
+  readonly memoryLimitMb?: number;
 }
 
 export interface HermesRunResult {
@@ -162,9 +168,12 @@ function splitLines(s: string): string[] {
 export function runHermes(vmPath: string, file: string, opts: HermesRunOptions = {}): HermesRunResult {
   const timeout = opts.timeout ?? 10000;
   const isHbc = opts.bytecode ?? file.endsWith(".hbc");
-  const args = isHbc ? ["-b", file] : opts.quiet === true ? ["-w", file] : [file];
+  const vmArgs = isHbc ? ["-b", file] : opts.quiet === true ? ["-w", file] : [file];
+  const cap = opts.memoryLimitMb !== undefined && opts.memoryLimitMb > 0 && process.platform !== "win32" ? Math.floor(opts.memoryLimitMb) : 0;
+  const exe = cap > 0 ? "/bin/sh" : vmPath;
+  const args = cap > 0 ? ["-c", `ulimit -v ${cap * 1024} 2>/dev/null; exec "$0" "$@"`, vmPath, ...vmArgs] : vmArgs;
   try {
-    const out = execFileSync(vmPath, args, {
+    const out = execFileSync(exe, args, {
       timeout,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
