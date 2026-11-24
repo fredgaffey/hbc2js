@@ -81,6 +81,18 @@ function renameExpr(e: Expr, map: Mapping): Expr {
       const arg = e.arg === null ? null : renameExpr(e.arg, map);
       return arg === e.arg ? e : { ...e, arg };
     }
+    case "class": { // F24-1: superclass + computed keys only; member bodies are separate frames
+      const superClass = e.superClass === null ? null : renameExpr(e.superClass, map);
+      let changed = superClass !== e.superClass;
+      const members = e.members.map((m) => {
+        if (!m.computed) return m;
+        const key = renameExpr(m.key, map);
+        if (key === m.key) return m;
+        changed = true;
+        return { ...m, key };
+      });
+      return changed ? { ...e, superClass, members } : e;
+    }
     case "destructure": {
       // F16 §3: "the same machinery as plain idents" — `mapPattern` renames
       // a `pid` leaf by round-tripping it through this very `renameExpr`
@@ -118,6 +130,13 @@ function renameStmts(list: readonly Stmt[], map: Mapping): readonly Stmt[] {
           update: s.update === null ? null : renameExpr(s.update, map),
           body: renameStmts(s.body, map),
         };
+      case "for-in":
+      case "for-of":
+        // Missing until 2026-11-25: a register in a for-of head/body kept its
+        // old name (render-cost 09-switch-fallthrough, overlay rename).
+        return { ...s, left: renameExpr(s.left, map), right: renameExpr(s.right, map), body: renameStmts(s.body, map) };
+      case "classdecl": // F24-1
+        return { ...s, value: renameExpr(s.value, map) };
       case "labeled":
         return { ...s, body: renameStmts(s.body, map) };
       case "return":
