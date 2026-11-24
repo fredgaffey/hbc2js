@@ -91,7 +91,11 @@ export function buildCfg(fn: DecodedFunction, ctx: BuildCfgContext): FunctionCfg
   return cfg;
 }
 
-export function analyseModule(mod: HbcModule, opts: AnalysisOptions = {}): ModuleAnalysis {
+/** `preset.envGraph`: an env graph already built for this same module and
+ *  options elsewhere (another thread; see `envGraphFromTransfer`), used
+ *  instead of re-running `buildEnvGraph` -- the diagnostics and the strict
+ *  check are applied exactly as for a freshly built one. */
+export function analyseModule(mod: HbcModule, opts: AnalysisOptions = {}, preset?: { readonly envGraph?: EnvGraph }): ModuleAnalysis {
   const strictEnv = opts.strictEnv ?? true;
   const maxBlocks = opts.maxBlocks ?? DEFAULT_MAX_BLOCKS;
   const checkInvariants = opts.checkInvariants ?? true;
@@ -132,7 +136,7 @@ export function analyseModule(mod: HbcModule, opts: AnalysisOptions = {}): Modul
   let envGraph: EnvGraph | null = null;
   const graph = (): EnvGraph => {
     if (envGraph === null) {
-      envGraph = buildEnvGraph({ module: mod, decode: decoded, cfg, functionIndices: indices });
+      envGraph = preset?.envGraph ?? buildEnvGraph({ module: mod, decode: decoded, cfg, functionIndices: indices });
       diagnostics.push(...envGraph.diagnostics);
       if (strictEnv) assertResolved(envGraph);
       // CFG-16 — every function reachable via closures has a closureEnvOf entry.

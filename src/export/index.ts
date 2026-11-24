@@ -13,7 +13,10 @@ import { exportPathForModule } from "./layout.ts";
 import type { ExportModuleInfo } from "./layout.ts";
 import { buildHelpersJs, buildRegistryJs } from "./registry.ts";
 import { rewriteModuleFile, wrapReadableModule } from "./rewrite.ts";
-import { renderModuleTiered } from "./tiers.ts";
+import { renderModuleTiered, tieredFromOutcome } from "./tiers.ts";
+import type { ReadableOutcome } from "./tiers.ts";
+import { planRenderWorkers, renderModulesInPool } from "./render-pool.ts";
+import type { RenderJob } from "./render-pool.ts";
 import type { ExportManifestModule, ExportManifestUnresolved } from "./manifest.ts";
 import { buildExportManifest } from "./manifest.ts";
 import { planSubstitutions } from "./substitute.ts";
@@ -50,6 +53,10 @@ export interface ExportOptions {
    *  vendored, byte-for-byte the 6a/6b tree. */
   readonly substitute?: SubstituteMode;
   readonly instrument?: "modules";
+  /** Render worker threads (`HBC2JS_WORKERS`, default `max(1, cpus - 2)`;
+   *  see `resolveWorkerCount`). `1` renders serially on the main thread.
+   *  The tree is byte-identical for every value. */
+  readonly workers?: number;
 }
 
 export interface ExportResult {
@@ -112,9 +119,40 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   const unresolved: ExportManifestUnresolved[] = [];
   const helpersUsedAll = new Set<string>();
 
+  // Rung 1 (the readable render) fanned out over worker threads when more
+  // than one is available; everything else below stays serial, in module
+  // order, consuming the outcomes by id -- so the tree does not depend on the
+  // worker count.
+  const workerPlan = tier === "flat" ? { count: 1, limitedBy: null } : planRenderWorkers(opts.workers, splitResult.module.functions.length, bytes.length);
+  const workerCount = workerPlan.count;
+  let pooled: Map<number, ReadableOutcome> | undefined;
+  if (workerCount > 1) {
+    const jobs: RenderJob[] = [];
+    for (const info of segregated.modules) {
+      if (plan.replacedModules.has(info.id)) continue;
+      const idxEntry = moduleIndexById.get(info.id);
+      jobs.push({
+        factoryFn: idxEntry?.factoryFn ?? splitModuleById.get(info.id)?.factoryFunctionIndex ?? null,
+        moduleId: info.id,
+        requestedTier: tier,
+        rendersJsx: idxEntry?.rendersJsx ?? false,
+        moduleName,
+        cost: splitResult.files.get(info.originalFile)?.length ?? 0,
+      });
+    }
+    progress(`rendering ${jobs.length} modules on ${Math.min(workerCount, jobs.length)} worker thread(s)${workerPlan.limitedBy === "memory" ? " (capped by physical memory)" : ""}`);
+    let reported = 0;
+    pooled = await renderModulesInPool(new Uint8Array(bytes), splitResult.analysis.envGraph, jobs, workerCount, (done) => {
+      if (done - reported >= 250) {
+        reported = done - (done % 250);
+        progress(`rendering modules ${reported}/${jobs.length}`);
+      }
+    });
+  }
+
   let renderedCount = 0;
   for (const info of segregated.modules) {
-    if (renderedCount % 250 === 0) progress(`rendering modules ${renderedCount}/${segregated.modules.length}`);
+    if (pooled === undefined && renderedCount % 250 === 0) progress(`rendering modules ${renderedCount}/${segregated.modules.length}`);
     renderedCount += 1;
     // §5.2: "every file in own(P) is deleted from the tree" -- this module's
     // id is covered instead by `substitutions[].replacedModules` (below),
@@ -132,15 +170,21 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
     const lazyDeps = depEdges.filter((d) => d.kind === "lazy").length;
     const depIds = depEdges.length > 0 ? depEdges.map((d) => d.id) : (splitModule?.deps ?? []);
 
-    const tiered = renderModuleTiered({
-      analysis: splitResult.analysis,
-      factoryFn: idxEntry?.factoryFn ?? splitModule?.factoryFunctionIndex ?? null,
-      moduleId: info.id,
-      requestedTier: tier,
-      rendersJsx: rendersJsxTag,
-      moduleName,
-      flatText: originalText,
-    });
+    const factoryFn = idxEntry?.factoryFn ?? splitModule?.factoryFunctionIndex ?? null;
+    const outcome = pooled?.get(info.id);
+    if (pooled !== undefined && outcome === undefined) throw new Error(`export: render pool returned no result for module ${info.id}`);
+    const tiered =
+      outcome !== undefined
+        ? tieredFromOutcome({ moduleId: info.id, factoryFn, flatText: originalText }, outcome)
+        : renderModuleTiered({
+            analysis: splitResult.analysis,
+            factoryFn,
+            moduleId: info.id,
+            requestedTier: tier,
+            rendersJsx: rendersJsxTag,
+            moduleName,
+            flatText: originalText,
+          });
     for (const h of tiered.helpersUsed) helpersUsedAll.add(h);
     // A flat (or stub) module is the split render's text, which calls the
     // split's own helper set; the readable render's set does not cover it

@@ -1063,3 +1063,27 @@ export function assertResolved(graph: EnvGraph): void {
     { functionIndex: a.functionIndex, offset: a.offset, section: "cfg/env-graph" },
   );
 }
+
+/** `EnvGraph` minus its `slot()` accessor: structured-clone / `v8.serialize`
+ *  safe (Maps, Sets, arrays, plain objects), for handing one computed graph
+ *  to worker threads instead of each rebuilding it (export's render pool). */
+export type EnvGraphTransfer = Omit<EnvGraph, "slot">;
+
+export function envGraphToTransfer(graph: EnvGraph): EnvGraphTransfer {
+  const { slot: _slot, ...rest } = graph;
+  return rest;
+}
+
+/** Inverse of `envGraphToTransfer`: re-attaches `slot()` over the same
+ *  `${env}:${slot}` index `buildEnvGraph` uses (slots are unique per key). */
+export function envGraphFromTransfer(t: EnvGraphTransfer): EnvGraph {
+  const slotIndex = new Map<string, number>();
+  t.slots.forEach((s, i) => slotIndex.set(`${s.env}:${s.slot}`, i));
+  return {
+    ...t,
+    slot(env: EnvNodeId, slot: number): EnvSlot | undefined {
+      const i = slotIndex.get(`${env}:${slot}`);
+      return i === undefined ? undefined : t.slots[i];
+    },
+  };
+}
