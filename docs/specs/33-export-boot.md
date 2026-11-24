@@ -364,4 +364,10 @@ runtime reads it bare); (7) rule 3 reads a lookup called through a register
 alias (`r3 = ….requireNativeModule; r1 = r3("ExpoFontLoader")`); (8) a tree
 exported without `--instrument=modules` is INCONCLUSIVE up front, naming the
 command (it booted silently, 0 factories, and read as DIVERGENT `export
-<end>`). `HBC2JS_BOOT_STACK=1` adds the error stack to a throw record.
+<end>`). `HBC2JS_BOOT_STACK=1` adds the error stack to a throw record. The
+bare RN 0.88 app's original boots once rule 3 also reads the readable
+decompile's lookup chain (labelled blocks, a hoisting statement:
+`RNCAsyncStorage`): 478 factories, keys LogBox and the app's. Its export is
+DIVERGENT, a real export bug: module 551 references a function with several
+closure-creation sites, which the split render emits nowhere (docs/BUGS.md,
+orphan multi-site closure).
