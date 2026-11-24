@@ -99,6 +99,8 @@ export interface DepsReport {
   readonly reactNativeVersionSource?: "bundle-string" | "signature-match" | null;
   /** The react version read from the `react` module's own version constant, or null. */
   readonly reactVersion?: string | null;
+  /** True when the bundle uses react-navigation's 7.x-only static-config API. */
+  readonly reactNavigationApi7?: boolean;
   /** null when no react-native version was detected at all; otherwise
    *  whether `reactNativeVersion` falls inside the RN release range the
    *  parsed HBC bytecode version is actually known to ship (F4,
@@ -510,6 +512,7 @@ export function buildReport(input: string, matchReport: MatchReport, guesses: re
     reactNativeVersion,
     reactNativeVersionSource,
     reactVersion: versionEvidence.react ?? null,
+    ...(versionEvidence.reactNavigation7 === true ? { reactNavigationApi7: true } : {}),
     reactNativeVersionConsistentWithHbc: rnReconcile.consistent,
     reactNativeVersionExpectedRange: rnReconcile.expectedRange,
     confirmedDeps,

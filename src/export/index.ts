@@ -211,9 +211,9 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   }
   unresolved.push(...plan.unresolved);
 
-  const dependencies: Record<string, { version: string; kind: string; source: string; confidence: number | null }> = {};
+  const dependencies: Record<string, { version: string; kind: string; source: string; confidence: number | null; note?: string }> = {};
   for (const [name, d] of Object.entries(exportDependencies(report, rn.version))) {
-    dependencies[name] = { version: d.version, kind: "dependency", source: d.level === "confirmed" ? "deps-confirmed" : `deps-${d.level}${d.versionDerived ? "-name-only" : ""}`, confidence: d.confidence };
+    dependencies[name] = { version: d.version, kind: "dependency", source: d.level === "confirmed" ? "deps-confirmed" : `deps-${d.level}${d.versionDerived ? "-name-only" : ""}`, confidence: d.confidence, ...(d.note === undefined ? {} : { note: d.note }) };
   }
 
   const manifest = buildExportManifest({

@@ -15,6 +15,9 @@ export interface VersionEvidence {
   /** `major.minor.patch` (plus `-prerelease`-less) from the RN version module. */
   readonly reactNative?: string;
   readonly react?: string;
+  /** The bundle uses react-navigation's static-config API (`createStaticNavigation`
+   *  / `createComponentForStaticNavigation`), which exists only in 7.x. */
+  readonly reactNavigation7?: true;
 }
 
 export interface InstructionLike {
@@ -104,7 +107,8 @@ function rnVersionFromObjectBuffer(mod: HbcModule, insns: readonly Instruction[]
 }
 
 export function detectVersionEvidence(mod: HbcModule, modules: readonly { readonly stringConstants: readonly string[]; readonly functionIndices: readonly number[] }[]): VersionEvidence {
-  const out: { reactNative?: string; react?: string } = {};
+  const out: { reactNative?: string; react?: string; reactNavigation7?: true } = {};
+  if (modules.some((m) => m.stringConstants.includes("createComponentForStaticNavigation") || m.stringConstants.includes("createStaticNavigation"))) out.reactNavigation7 = true;
   const react = reactVersionFromStrings(modules.map((m) => m.stringConstants));
   if (react !== null) out.react = react;
   const stringOf = (id: number): string | null => {

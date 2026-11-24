@@ -3,6 +3,7 @@
 // look at it, plus the toolchain table §4.3 requires (the build toolchain is
 // not derivable from the bundle at all).
 import type { DepsReport } from "../deps/report.ts";
+import { expoCompatRange, expoSdkReactNative } from "./expo-compat.ts";
 import { tierConfidenceScore } from "./substitute.ts";
 import { newestRnVersionForHbc } from "../deps/report.ts";
 
@@ -155,14 +156,18 @@ export function expoSdkForRn(rnVersion: string | null): number | null {
   return minor === null ? null : (table[minor] ?? null);
 }
 
-export type ExportDepLevel = "confirmed" | "bundle-string" | "guessed" | "hint" | "native-channel";
+export type ExportDepLevel = "confirmed" | "bundle-string" | "guessed" | "hint" | "native-channel" | "peer";
 export interface ExportDep {
   readonly version: string;
   readonly level: ExportDepLevel;
   readonly confidence: number | null;
   /** True when the version is a placeholder/derived pin rather than evidence of this package's own version. */
   readonly versionDerived: boolean;
+  /** Why the version differs from (or is not backed by) the signature evidence. */
+  readonly note?: string;
 }
+
+const NAV_7_PACKAGES = new Set(["native", "stack", "bottom-tabs", "native-stack", "drawer", "core", "routers", "material-top-tabs"]);
 
 /** Every dependency package.json should carry, with the evidence level of each:
  *  confirmed (signature match / bundle version constant), then guessed, hinted
@@ -172,17 +177,47 @@ export interface ExportDep {
 export function exportDependencies(report: DepsReport, rnVersion: string | null): Record<string, ExportDep> {
   const out: Record<string, ExportDep> = {};
   const sdk = expoSdkForRn(rnVersion);
-  const derived = (name: string): string => (name === "expo" || name.startsWith("expo-")) && sdk !== null ? `~${sdk}.0.0` : "*";
+  // Never let the Expo table contradict the detected RN: use it only when the
+  // SDK's own react-native pin is the detected RN's minor line.
+  const sdkRn = sdk === null ? null : expoSdkReactNative(sdk);
+  const useTable = sdk !== null && sdkRn !== null && rnMinor(sdkRn) === rnMinor(rnVersion);
   for (const d of report.confirmedDeps) {
     out[d.package] = { version: d.version, level: d.versionEvidence === "bundle-string" ? "bundle-string" : "confirmed", confidence: tierConfidenceScore(d.confidence), versionDerived: false };
   }
   const add = (name: string, version: string | null, level: ExportDepLevel, confidence: number | null): void => {
     if (out[name] !== undefined) return;
-    out[name] = { version: version ?? derived(name), level, confidence, versionDerived: version === null };
+    out[name] = { version: version ?? "*", level, confidence, versionDerived: version === null };
   };
   for (const g of report.guessedDeps) add(g.package, g.version, "guessed", g.confidence);
   for (const h of report.hintedDeps) add(h.package, h.version, "hint", h.confidence);
   for (const n of report.nativeChannel?.deps ?? []) add(n.package, null, "native-channel", null);
+
+  for (const [name, d] of Object.entries(out)) {
+    if (d.level === "bundle-string") continue; // the bundle's own constants beat any table
+    const range = useTable ? expoCompatRange(sdk!, name) : null;
+    if (range !== null && range !== d.version) {
+      out[name] = { ...d, version: range, note: d.versionDerived ? `pinned from Expo SDK ${sdk} bundledNativeModules.json` : `signature version ${d.version} conflicts with Expo SDK ${sdk} (${range}); using the SDK's range` };
+    } else if (range === null && d.versionDerived) {
+      if ((name === "expo" || name.startsWith("expo-")) && sdk !== null) out[name] = { ...d, version: `~${sdk}.0.0`, note: `Expo SDK ${sdk} line derived from the detected RN; not in the compat table` };
+      else out[name] = { ...d, note: "unpinned: no version evidence and no compatibility table for this package" };
+    }
+  }
+  // reanimated >= 4 hard-requires react-native-worklets as a peer; without it
+  // `npm install` fails with ERESOLVE (or pulls a worklets built for another RN).
+  const reanimated = out["react-native-reanimated"];
+  const workletsRange = useTable ? expoCompatRange(sdk!, "react-native-worklets") : null;
+  if (reanimated !== undefined && out["react-native-worklets"] === undefined && workletsRange !== null && Number(/(\d+)\./.exec(reanimated.version)?.[1] ?? 0) >= 4) {
+    out["react-native-worklets"] = { version: workletsRange, level: "peer", confidence: null, versionDerived: true, note: `peer dependency of react-native-reanimated ${reanimated.version}; pinned from Expo SDK ${sdk} bundledNativeModules.json` };
+  }
+  if (report.reactNavigationApi7 === true) {
+    for (const [name, d] of Object.entries(out)) {
+      const m = /^@react-navigation\/(.+)$/.exec(name);
+      if (m === null || !NAV_7_PACKAGES.has(m[1]!) || d.level === "bundle-string") continue;
+      const major = /^[~^]?(\d+)\./.exec(d.version);
+      if (major !== null && Number(major[1]) >= 7) continue;
+      out[name] = { ...d, version: "^7.0.0", versionDerived: true, note: `signature version ${d.version} is 6.x but the bundle uses the static-config API (createStaticNavigation), which exists only in 7.x` };
+    }
+  }
   return out;
 }
 
