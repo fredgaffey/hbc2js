@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
-import { progress } from "../util/progress.ts";
+import { progress, progressEnabled } from "../util/progress.ts";
+import { Worker } from "node:worker_threads";
+import { siblingWorkerPath } from "../util/worker-path.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { ErrorCode, Hbc2jsError } from "../errors.ts";
@@ -13,8 +15,11 @@ import { exportPathForModule } from "./layout.ts";
 import type { ExportModuleInfo } from "./layout.ts";
 import { buildHelpersJs, buildRegistryJs } from "./registry.ts";
 import { rewriteModuleFile, wrapReadableModule } from "./rewrite.ts";
-import { renderModuleTiered } from "./tiers.ts";
-import type { RenderedTier } from "./tiers.ts";
+import { renderModuleTiered, tieredFromOutcome } from "./tiers.ts";
+import type { ReadableOutcome, RenderedTier } from "./tiers.ts";
+import { planRenderWorkers, renderModulesInPool, shareForRenderWorkers } from "./render-pool.ts";
+import { resolveWorkerCount } from "../parallel/pool.ts";
+import type { PoolStats, RenderJob } from "./render-pool.ts";
 import { loadModuleSyntaxCheck, syntaxStubFlatText } from "./syntax-check.ts";
 import type { ModuleSyntaxCheck } from "./syntax-check.ts";
 import type { ExportManifestModule, ExportManifestUnresolved } from "./manifest.ts";
@@ -56,11 +61,48 @@ export interface ExportOptions {
   /** Test hook only: replaces the per-module syntax check (default: parse
    *  with `@babel/parser`, `src/export/syntax-check.ts`). */
   readonly syntaxCheck?: ModuleSyntaxCheck;
+  /** Render worker threads (`HBC2JS_WORKERS`, default `max(1, cpus - 2)`;
+   *  see `resolveWorkerCount`). `1` renders serially on the main thread.
+   *  The tree is byte-identical for every value. */
+  readonly workers?: number;
 }
 
 export interface ExportResult {
   readonly files: ReadonlyMap<string, string>;
   readonly manifest: Record<string, unknown>;
+}
+
+/** `report` settles with the deps report; `online` once the worker thread is
+ *  running -- the caller awaits it before its own long synchronous split, or
+ *  the worker would not start until the split yields. */
+function runDepsOnWorker(bundlePath: string): { readonly report: Promise<DepsReport>; readonly online: Promise<void> } {
+  const w = new Worker(siblingWorkerPath("deps-worker", import.meta.url), { workerData: { bundlePath, progress: progressEnabled() } });
+  const online = new Promise<void>((resolve) => {
+    w.once("online", () => resolve());
+    w.once("exit", () => resolve());
+  });
+  const report = new Promise<DepsReport>((resolve, reject) => {
+    let settled = false;
+    w.once("message", (msg: { ok: true; report: DepsReport } | { ok: false; message: string; code?: string }) => {
+      settled = true;
+      if (msg.ok) resolve(msg.report);
+      else if (msg.code !== undefined && (Object.values(ErrorCode) as string[]).includes(msg.code)) {
+        // Same class and exit code as an in-process failure; the message is
+        // already formatted by the worker's Hbc2jsError.
+        const e = new Hbc2jsError(msg.code as ErrorCode, "");
+        e.message = msg.message;
+        reject(e);
+      } else reject(new Error(msg.message));
+      void w.terminate();
+    });
+    w.once("error", (e) => {
+      if (!settled) (settled = true), reject(e);
+    });
+    w.once("exit", (code) => {
+      if (!settled) (settled = true), reject(new Error(`hbc2js export: deps worker exited with code ${code}`));
+    });
+  });
+  return { report, online };
 }
 
 /** `hbc2js export <bundle.hbc> --out <dir>` (spec 29 §2-§4). Builds the
@@ -79,6 +121,11 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   // per module (`renderModuleTiered` -> `renderModuleReadable`, lane item 4)
   // instead of one whole-bundle pass-ladder emit -- so one bad function's
   // pass-ladder failure downgrades ONLY that module, never the whole run.
+  // With more than one thread available the offline deps stage runs on a
+  // worker, overlapping the split (it re-reads the bundle itself).
+  const depsInWorker = opts.depsReport === undefined && resolveWorkerCount(opts.workers) > 1 ? runDepsOnWorker(bundlePath) : undefined;
+  depsInWorker?.report.catch(() => undefined); // awaited below; never an unhandled rejection meanwhile
+  if (depsInWorker !== undefined) await depsInWorker.online;
   progress("splitting the bundle into modules (decompiling every function)");
   const splitResult = splitProject(new Uint8Array(bytes), { moduleName });
 
@@ -88,8 +135,8 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   // has a `--confirm`ed report. This is a second, cheap bytecode-inventory
   // scan (`buildInventory`), not a second full decompile — `splitProject`
   // above remains the one expensive parse.
-  progress(`split: ${splitResult.modules.length} modules; ${opts.depsReport !== undefined ? "using the supplied deps report" : "running deps (offline)"}`);
-  const report: DepsReport = opts.depsReport ?? (await runDeps(bundlePath, { offline: true })).report;
+  progress(`split: ${splitResult.modules.length} modules; ${opts.depsReport !== undefined ? "using the supplied deps report" : depsInWorker !== undefined ? "waiting for deps (offline, running alongside the split)" : "running deps (offline)"}`);
+  const report: DepsReport = opts.depsReport ?? (depsInWorker !== undefined ? await depsInWorker.report : (await runDeps(bundlePath, { offline: true })).report);
 
   // §7.1/§7.2's own inputs (`DepEdge[]`, `rendersJsx`) -- reuses
   // `splitResult.module`/`.analysis` (`analyseForArtifact`), no second parse.
@@ -119,9 +166,47 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   const unresolved: ExportManifestUnresolved[] = [];
   const helpersUsedAll = new Set<string>();
 
+  // Rung 1 (the readable render) fanned out over worker threads when more
+  // than one is available; everything else below stays serial, in module
+  // order, consuming the outcomes by id -- so the tree does not depend on the
+  // worker count.
+  // The shared state is built (and the main thread's own caches dropped)
+  // before planning, so the plan's memory budget sees the main thread as it
+  // will stay during rendering.
+  const poolWanted = tier !== "flat" && planRenderWorkers(opts.workers, splitResult.module.functions.length, bytes.length).count > 1;
+  const shared = poolWanted ? shareForRenderWorkers(new Uint8Array(bytes), splitResult.analysis) : undefined;
+  const workerPlan = shared === undefined ? { count: 1, limitedBy: null, budget: null, max: 1 } : planRenderWorkers(opts.workers, splitResult.module.functions.length, bytes.length);
+  const workerCount = workerPlan.count;
+  let pooled: Map<number, ReadableOutcome> | undefined;
+  if (shared !== undefined) {
+    const jobs: RenderJob[] = [];
+    for (const info of segregated.modules) {
+      if (plan.replacedModules.has(info.id)) continue;
+      const idxEntry = moduleIndexById.get(info.id);
+      jobs.push({
+        factoryFn: idxEntry?.factoryFn ?? splitModuleById.get(info.id)?.factoryFunctionIndex ?? null,
+        moduleId: info.id,
+        requestedTier: tier,
+        rendersJsx: idxEntry?.rendersJsx ?? false,
+        moduleName,
+        cost: splitResult.files.get(info.originalFile)?.length ?? 0,
+      });
+    }
+    progress(`rendering ${jobs.length} modules on ${Math.min(workerCount, jobs.length)} worker thread(s)${workerPlan.limitedBy === "memory" ? " (capped by physical memory)" : ""}`);
+    let reported = 0;
+    const poolStats: PoolStats = { peakWorkers: 0, peakWorkerHeap: 0 };
+    pooled = await renderModulesInPool(shared, jobs, workerPlan, (done) => {
+      if (done - reported >= 250) {
+        reported = done - (done % 250);
+        progress(`rendering modules ${reported}/${jobs.length}`);
+      }
+    }, poolStats);
+    progress(`render pool: at most ${poolStats.peakWorkers} worker(s) at once, largest worker heap ${Math.round(poolStats.peakWorkerHeap / 2 ** 20)} MB; main thread rss ${Math.round(process.memoryUsage().rss / 2 ** 20)} MB (process-wide)`);
+  }
+
   let renderedCount = 0;
   for (const info of segregated.modules) {
-    if (renderedCount % 250 === 0) progress(`rendering modules ${renderedCount}/${segregated.modules.length}`);
+    if (pooled === undefined && renderedCount % 250 === 0) progress(`rendering modules ${renderedCount}/${segregated.modules.length}`);
     renderedCount += 1;
     // §5.2: "every file in own(P) is deleted from the tree" -- this module's
     // id is covered instead by `substitutions[].replacedModules` (below),
@@ -139,15 +224,21 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
     const lazyDeps = depEdges.filter((d) => d.kind === "lazy").length;
     const depIds = depEdges.length > 0 ? depEdges.map((d) => d.id) : (splitModule?.deps ?? []);
 
-    const tiered = renderModuleTiered({
-      analysis: splitResult.analysis,
-      factoryFn: idxEntry?.factoryFn ?? splitModule?.factoryFunctionIndex ?? null,
-      moduleId: info.id,
-      requestedTier: tier,
-      rendersJsx: rendersJsxTag,
-      moduleName,
-      flatText: originalText,
-    });
+    const factoryFn = idxEntry?.factoryFn ?? splitModule?.factoryFunctionIndex ?? null;
+    const outcome = pooled?.get(info.id);
+    if (pooled !== undefined && outcome === undefined) throw new Error(`export: render pool returned no result for module ${info.id}`);
+    const tiered =
+      outcome !== undefined
+        ? tieredFromOutcome({ moduleId: info.id, factoryFn, flatText: originalText }, outcome)
+        : renderModuleTiered({
+            analysis: splitResult.analysis,
+            factoryFn,
+            moduleId: info.id,
+            requestedTier: tier,
+            rendersJsx: rendersJsxTag,
+            moduleName,
+            flatText: originalText,
+          });
     for (const h of tiered.helpersUsed) helpersUsedAll.add(h);
     // A flat (or stub) module is the split render's text, which calls the
     // split's own helper set; the readable render's set does not cover it

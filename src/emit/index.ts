@@ -8,10 +8,10 @@ import { getBuiltinTable } from "../tables/registry.ts";
 import { helperPrelude } from "../runtime/helpers.ts";
 import type { Expr, Param, Stmt } from "./ast.ts";
 import { id, lit, p } from "./ast.ts";
-import { emitFunction, envDeclaringFunction, ownedEnvSlots } from "./function.ts";
+import { emitFunction, envDeclaringFunction } from "./function.ts";
 import { closureFunctionId } from "./lower.ts";
 import { resolveOrphanHosts } from "./placement.ts";
-import { fnName, quote } from "./names.ts";
+import { envSlot, fnName, quote } from "./names.ts";
 import { checkBindings, checkLabels, collectUnbound, collectUnboundLabels, unboundMessage } from "./scope-check.ts";
 import { printProgram } from "./print.ts";
 import { findGlobalCallSites, formatReturnAnnotation, isAsyncFunction } from "./return-annotate.ts";
@@ -186,41 +186,10 @@ const CREATE_CLOSURE_OPS: ReadonlySet<string> = new Set([
   "CreateAsyncClosure", "CreateAsyncClosureLongIndex",
 ]);
 
-export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): EmitResult {
-  const mod = analysis.module;
-  const provenanceComments = opts.provenanceComments ?? true;
-  // Spec 03 §6.4's R3 rule, restated at emit time. Default strict; the CLI's
-  // `--lenient-env` turns each unresolvable access into a loud marker instead
-  // of refusing the module (review M4-H2).
-  const strictEnv = opts.strictEnv ?? true;
-  const indent = opts.indent ?? "  ";
-  const diagnostics: Diagnostic[] = [];
-  const envGraph = analysis.envGraph;
-  const globalIndex = mod.header.globalCodeIndex;
-
-  const builtinId = mod.layout.builtinTable;
-  if (builtinId === undefined) {
-    throw new Hbc2jsError(ErrorCode.E_UNSUPPORTED_VERSION, `no builtin table for bytecode version ${mod.header.version}`, { section: "emit" });
-  }
-  const builtins = getBuiltinTable(builtinId);
-
-  // §6 "Function nesting": `_fn<n>` is emitted inside the function that owns its
-  // `closureEnvOf` environment, so JS closure capture does the work and no
-  // environment object exists at runtime. A function with no known creation site
-  // is emitted at top level with a comment (W_ORPHAN_FUNCTION).
-  const parentOf = new Map<number, number | null>();
-  for (let i = 0; i < mod.functions.length; i++) {
-    if (i === globalIndex) {
-      parentOf.set(i, null);
-      continue;
-    }
-    const env = envGraph.closureEnvOf.get(i);
-    if (env === undefined || env === null) {
-      parentOf.set(i, null);
-      continue;
-    }
-    parentOf.set(i, envGraph.nodes[env]!.ownerFunction);
-  }
+/** The layout's helper functions, over its final `parentOf` (they only
+ *  read it), so a layout rebuilt from transferred data (`presetEmitLayout`)
+ *  gets the same functions. */
+function layoutFunctions(parentOf: ReadonlyMap<number, number | null>) {
   const isAncestor = (candidate: number, of: number): boolean => {
     let cur: number | null = of;
     const seen = new Set<number>();
@@ -243,6 +212,47 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
     }
     return out;
   };
+  const copyNameOf = (fn: number, copy: number): string => (copy === 0 ? fnName(fn) : `${fnName(fn)}__c${copy}`);
+  /** `outer ∘ inner`: a copy nested inside another copy's subtree. */
+  const composeRemap = (outer: ReadonlyMap<number, number> | undefined, inner: ReadonlyMap<number, number>): ReadonlyMap<number, number> => {
+    if (outer === undefined) return inner;
+    const out = new Map<number, number>(outer);
+    for (const [from, to] of inner) out.set(from, outer.get(to) ?? to);
+    return out;
+  };
+  return { isAncestor, chainUp, copyNameOf, composeRemap };
+}
+
+/** The whole-bundle closure-placement layout `emitModule` derives from the
+ *  env graph before emitting anything. It depends only on `analysis` (never
+ *  on `EmitOptions`), so it is computed once per analysis and shared by every
+ *  call -- a scoped (`onlyFunction`) render per module (export, spec 29 §4)
+ *  used to recompute it per module, quadratic in the bundle. Nothing below
+ *  mutates it after construction. */
+function buildEmitLayout(analysis: ModuleAnalysis) {
+  const mod = analysis.module;
+  const diagnostics: Diagnostic[] = [];
+  const envGraph = analysis.envGraph;
+  const globalIndex = mod.header.globalCodeIndex;
+
+  // §6 "Function nesting": `_fn<n>` is emitted inside the function that owns its
+  // `closureEnvOf` environment, so JS closure capture does the work and no
+  // environment object exists at runtime. A function with no known creation site
+  // is emitted at top level with a comment (W_ORPHAN_FUNCTION).
+  const parentOf = new Map<number, number | null>();
+  for (let i = 0; i < mod.functions.length; i++) {
+    if (i === globalIndex) {
+      parentOf.set(i, null);
+      continue;
+    }
+    const env = envGraph.closureEnvOf.get(i);
+    if (env === undefined || env === null) {
+      parentOf.set(i, null);
+      continue;
+    }
+    parentOf.set(i, envGraph.nodes[env]!.ownerFunction);
+  }
+  const { isAncestor, chainUp, copyNameOf, composeRemap } = layoutFunctions(parentOf);
 
   // F24-5 (docs/BUGS.md `class-recover-orphan-methods`) — a
   // function that captures NOTHING is not an orphan. `closureEnvOf(f) === null`
@@ -502,7 +512,6 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
     }
   }
 
-  const copyNameOf = (fn: number, copy: number): string => (copy === 0 ? fnName(fn) : `${fnName(fn)}__c${copy}`);
   /** siteKey(creator, offset) -> the `_fn…` name that site must emit. */
   const closureNameAt = new Map<string, string>();
   /** siteKey -> the copy that site creates, for both the name and the remap. */
@@ -607,13 +616,6 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
     for (const f of members) if (!idx.has(f)) run(f);
   }
 
-  /** `outer ∘ inner`: a copy nested inside another copy's subtree. */
-  const composeRemap = (outer: ReadonlyMap<number, number> | undefined, inner: ReadonlyMap<number, number>): ReadonlyMap<number, number> => {
-    if (outer === undefined) return inner;
-    const out = new Map<number, number>(outer);
-    for (const [from, to] of inner) out.set(from, outer.get(to) ?? to);
-    return out;
-  };
 
   // Break any cycle (never observed, but a cycle would be an infinite emission).
   for (const [child] of parentOf) {
@@ -640,11 +642,6 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
   for (const l of childrenOf.values()) l.sort((a, b) => a - b);
 
   const declaringFunction = envDeclaringFunction(envGraph, isAncestor);
-
-  const usedHelpers = new Set<string>();
-  const useHelper = (name: string): void => {
-    usedHelpers.add(name);
-  };
 
   // §6 note: an environment created *inside a loop* is a fresh record per
   // iteration, so its slots cannot be one function-top `let`. Such an env gets
@@ -809,6 +806,77 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
       }
     }
   }
+
+  const ownedSlotsByFn = new Map<number, string[]>();
+  {
+    // `ownedEnvSlots(envGraph, f, declaringFunction)` for every f at once (same
+    // node order, same names), instead of an O(nodes x slots) scan per function.
+    const maxSlotOf = new Map<number, number>();
+    for (const s of envGraph.slots) if (s.slot > (maxSlotOf.get(s.env) ?? -Infinity)) maxSlotOf.set(s.env, s.slot);
+    for (const node of envGraph.nodes) {
+      const f = declaringFunction.get(node.id) ?? node.ownerFunction;
+      const maxSlot = Math.max(node.size - 1, maxSlotOf.get(node.id) ?? -Infinity);
+      let list = ownedSlotsByFn.get(f);
+      if (list === undefined) ownedSlotsByFn.set(f, (list = []));
+      for (let i = 0; i <= maxSlot; i++) list.push(envSlot(node.id, i));
+    }
+  }
+  return { parentOf, isAncestor, chainUp, copyNameOf, closureNameAt, copyAt, extraCopies, createdIn, recursionGroupOf, composeRemap, childrenOf, declaringFunction, loopLocal, inlineFunctions, perCreatorInline, perCreatorFns, ownedSlotsByFn, diagnostics: diagnostics as readonly Diagnostic[] };
+}
+
+type EmitLayout = ReturnType<typeof buildEmitLayout>;
+const EMIT_LAYOUT = new WeakMap<ModuleAnalysis, EmitLayout>();
+/** The plain-data part of an analysis's emit layout (no functions), for
+ *  `v8.serialize` -- serialize it TOGETHER with the env graph so the
+ *  `ClosureCopy` objects it shares with `envGraph.closureCopies` stay shared. */
+export type EmitLayoutTransfer = Omit<EmitLayout, "isAncestor" | "chainUp" | "copyNameOf" | "composeRemap">;
+
+export function emitLayoutTransfer(analysis: ModuleAnalysis): EmitLayoutTransfer {
+  const { isAncestor: _a, chainUp: _c, copyNameOf: _n, composeRemap: _r, ...data } = emitLayoutFor(analysis);
+  return data;
+}
+
+/** Installs a transferred layout (computed by another thread for the same
+ *  module) as `analysis`'s layout, so `emitModule` never builds it -- building
+ *  it reads the CFG of every environment-owning function, which a render
+ *  worker would otherwise pay for (time and memory) on top of its own share. */
+export function presetEmitLayout(analysis: ModuleAnalysis, data: EmitLayoutTransfer): void {
+  EMIT_LAYOUT.set(analysis, { ...data, ...layoutFunctions(data.parentOf) });
+}
+
+function emitLayoutFor(analysis: ModuleAnalysis): EmitLayout {
+  let layout = EMIT_LAYOUT.get(analysis);
+  if (layout === undefined) EMIT_LAYOUT.set(analysis, (layout = buildEmitLayout(analysis)));
+  return layout;
+}
+
+export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): EmitResult {
+  const mod = analysis.module;
+  const provenanceComments = opts.provenanceComments ?? true;
+  // Spec 03 §6.4's R3 rule, restated at emit time. Default strict; the CLI's
+  // `--lenient-env` turns each unresolvable access into a loud marker instead
+  // of refusing the module (review M4-H2).
+  const strictEnv = opts.strictEnv ?? true;
+  const indent = opts.indent ?? "  ";
+  const diagnostics: Diagnostic[] = [];
+  const envGraph = analysis.envGraph;
+  const globalIndex = mod.header.globalCodeIndex;
+
+  const builtinId = mod.layout.builtinTable;
+  if (builtinId === undefined) {
+    throw new Hbc2jsError(ErrorCode.E_UNSUPPORTED_VERSION, `no builtin table for bytecode version ${mod.header.version}`, { section: "emit" });
+  }
+  const builtins = getBuiltinTable(builtinId);
+
+  const layout = emitLayoutFor(analysis);
+  const { parentOf, isAncestor, chainUp, copyNameOf, closureNameAt, copyAt, extraCopies, createdIn, recursionGroupOf, composeRemap, childrenOf, loopLocal, inlineFunctions, perCreatorInline, perCreatorFns, ownedSlotsByFn } = layout;
+  for (const d of layout.diagnostics) diagnostics.push(d);
+
+  const usedHelpers = new Set<string>();
+  const useHelper = (name: string): void => {
+    usedHelpers.add(name);
+  };
+
 
   /** True when a copy hosted in `host` must be emitted INLINE at its creation
    *  site rather than hoisted: it captured an environment `host` declares
@@ -1003,7 +1071,7 @@ export function emitModule(analysis: ModuleAnalysis, opts: EmitOptions = {}): Em
         children: hoisted,
         inlineChildren: inlined,
         loopLocalEnvSlots: loopLocal.get(index) ?? new Map(),
-        ownedEnvSlots: ownedEnvSlots(envGraph, index, declaringFunction).filter((name) => ![...(loopLocal.get(index)?.values() ?? [])].some((names) => names.includes(name))),
+        ownedEnvSlots: (ownedSlotsByFn.get(index) ?? []).filter((name) => ![...(loopLocal.get(index)?.values() ?? [])].some((names) => names.includes(name))),
         useHelper,
         diagnostic: (d) => diagnostics.push(d),
         provenanceComments,

@@ -63,6 +63,61 @@ function targetReadableTier(requestedTier: ExportTier, rendersJsx: boolean): "pa
   return requestedTier === "jsx" && rendersJsx ? "jsx" : "passes";
 }
 
+/** The readable-render attempt alone (rung 1), without the flat fallback:
+ *  everything a render worker (`src/export/render-pool.ts`) needs to send
+ *  back. `tieredFromOutcome` turns it into the module's final result. */
+export type ReadableOutcome =
+  | { readonly ok: true; readonly code: string; readonly tier: "passes" | "jsx"; readonly helpersUsed: readonly string[] }
+  | { readonly ok: false; readonly reason: string };
+
+export type ReadableRenderOptions = Omit<RenderModuleTieredOptions, "flatText">;
+
+/** Rung 1 for a non-`flat` requested tier. Never throws. */
+export function renderReadableOutcome(opts: ReadableRenderOptions): ReadableOutcome {
+  const target = targetReadableTier(opts.requestedTier, opts.rendersJsx);
+  if (opts.factoryFn === null) return { ok: false, reason: "module has no resolved factory function index" };
+  try {
+    const out = renderModuleReadable(opts.analysis, opts.factoryFn, opts.moduleId, {
+      tier: target,
+      passes: target === "jsx" ? { optIn: ["jsx-recover"] } : {},
+      strictEnv: false,
+      moduleName: opts.moduleName,
+      ...(opts.store !== undefined ? { store: opts.store } : {}),
+    });
+    return { ok: true, code: out.code, tier: target, helpersUsed: out.helpersUsed };
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** §7.3's ladder below rung 1: a failed readable render falls back to the
+ *  flat `--split` text (rung 2) or the empty-factory stub (rung 3). */
+export function tieredFromOutcome(
+  opts: Pick<RenderModuleTieredOptions, "moduleId" | "factoryFn" | "flatText">,
+  outcome: ReadableOutcome,
+): TieredModuleResult {
+  if (outcome.ok) return { code: outcome.code, tier: outcome.tier, tierDowngradeReason: null, helpersUsed: outcome.helpersUsed };
+  const reason = outcome.reason;
+  if (opts.flatText.includes(UNREACHABLE_FACTORY_MARKER)) {
+    return {
+      code: opts.flatText,
+      tier: "stub",
+      tierDowngradeReason: `readable render not attempted (${reason}); factory unreachable from the module graph, wrote the empty-factory stub`,
+      unresolved: {
+        kind: "no-readable-render",
+        detail: `module ${opts.moduleId}: ${reason}; factory fn#${opts.factoryFn ?? "?"} was not reachable from the module graph`,
+      },
+      helpersUsed: [],
+    };
+  }
+  return {
+    code: opts.flatText,
+    tier: "flat",
+    tierDowngradeReason: `readable render failed (${reason}); used the flat --split text instead`,
+    helpersUsed: [],
+  };
+}
+
 export function renderModuleTiered(opts: RenderModuleTieredOptions): TieredModuleResult {
   if (opts.requestedTier === "flat") {
     return {
@@ -72,44 +127,5 @@ export function renderModuleTiered(opts: RenderModuleTieredOptions): TieredModul
       helpersUsed: [],
     };
   }
-
-  const target = targetReadableTier(opts.requestedTier, opts.rendersJsx);
-
-  const fail = (reason: string): TieredModuleResult => {
-    if (opts.flatText.includes(UNREACHABLE_FACTORY_MARKER)) {
-      return {
-        code: opts.flatText,
-        tier: "stub",
-        tierDowngradeReason: `readable render not attempted (${reason}); factory unreachable from the module graph, wrote the empty-factory stub`,
-        unresolved: {
-          kind: "no-readable-render",
-          detail: `module ${opts.moduleId}: ${reason}; factory fn#${opts.factoryFn ?? "?"} was not reachable from the module graph`,
-        },
-        helpersUsed: [],
-      };
-    }
-    return {
-      code: opts.flatText,
-      tier: "flat",
-      tierDowngradeReason: `readable render failed (${reason}); used the flat --split text instead`,
-      helpersUsed: [],
-    };
-  };
-
-  if (opts.factoryFn === null) {
-    return fail("module has no resolved factory function index");
-  }
-
-  try {
-    const out = renderModuleReadable(opts.analysis, opts.factoryFn, opts.moduleId, {
-      tier: target,
-      passes: target === "jsx" ? { optIn: ["jsx-recover"] } : {},
-      strictEnv: false,
-      moduleName: opts.moduleName,
-      ...(opts.store !== undefined ? { store: opts.store } : {}),
-    });
-    return { code: out.code, tier: target, tierDowngradeReason: null, helpersUsed: out.helpersUsed };
-  } catch (e) {
-    return fail(e instanceof Error ? e.message : String(e));
-  }
+  return tieredFromOutcome(opts, renderReadableOutcome(opts));
 }

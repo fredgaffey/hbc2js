@@ -91,7 +91,22 @@ export function buildCfg(fn: DecodedFunction, ctx: BuildCfgContext): FunctionCfg
   return cfg;
 }
 
-export function analyseModule(mod: HbcModule, opts: AnalysisOptions = {}): ModuleAnalysis {
+export interface AnalysisPreset {
+  readonly envGraph?: EnvGraph;
+  /** Drop the eager whole-module decode once `kinds` is classified, keeping
+   *  only what `cfg`/`decoded` are later asked for (re-decoded on demand,
+   *  then cached as usual). Decoded functions are most of an analysis's
+   *  memory, so a render worker that only touches part of the bundle, with
+   *  `envGraph` preset, saves most of it. Only meaningful with `envGraph`:
+   *  building the env graph decodes everything anyway. */
+  readonly releaseDecoded?: boolean;
+}
+
+/** `preset.envGraph`: an env graph already built for this same module and
+ *  options elsewhere (another thread; see `envGraphFromTransfer`), used
+ *  instead of re-running `buildEnvGraph` -- the diagnostics and the strict
+ *  check are applied exactly as for a freshly built one. */
+export function analyseModule(mod: HbcModule, opts: AnalysisOptions = {}, preset?: AnalysisPreset): ModuleAnalysis {
   const strictEnv = opts.strictEnv ?? true;
   const maxBlocks = opts.maxBlocks ?? DEFAULT_MAX_BLOCKS;
   const checkInvariants = opts.checkInvariants ?? true;
@@ -119,6 +134,7 @@ export function analyseModule(mod: HbcModule, opts: AnalysisOptions = {}): Modul
   }
 
   const kinds = classifyFunctions(mod, decoded);
+  if (preset?.releaseDecoded === true && preset.envGraph !== undefined) decodeCache.clear();
 
   const cfgCache = new Map<number, FunctionCfg>();
   const cfg = (i: number): FunctionCfg => {
@@ -132,7 +148,7 @@ export function analyseModule(mod: HbcModule, opts: AnalysisOptions = {}): Modul
   let envGraph: EnvGraph | null = null;
   const graph = (): EnvGraph => {
     if (envGraph === null) {
-      envGraph = buildEnvGraph({ module: mod, decode: decoded, cfg, functionIndices: indices });
+      envGraph = preset?.envGraph ?? buildEnvGraph({ module: mod, decode: decoded, cfg, functionIndices: indices });
       diagnostics.push(...envGraph.diagnostics);
       if (strictEnv) assertResolved(envGraph);
       // CFG-16 — every function reachable via closures has a closureEnvOf entry.
@@ -156,6 +172,11 @@ export function analyseModule(mod: HbcModule, opts: AnalysisOptions = {}): Modul
     decoded,
     options: { strictEnv, maxBlocks, checkInvariants },
     diagnostics,
+    releaseCaches(): void {
+      if (envGraph === null) graph(); // building the env graph needs every decode; never drop them before it
+      decodeCache.clear();
+      cfgCache.clear();
+    },
   };
 }
 

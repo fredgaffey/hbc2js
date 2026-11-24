@@ -541,9 +541,12 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
 
     let guard = 0;
     const budget = cfg.blocks.length * 8 + 64;
-    while (worklist.length > 0) {
+    // FIFO by a moving head: `shift()` is O(length), quadratic on a
+    // function with tens of thousands of blocks. Same pop order.
+    let head = 0;
+    while (head < worklist.length) {
       if (++guard > budget) break; // §6.2: cap and bail rather than spin
-      const id = worklist.shift()!;
+      const id = worklist[head++]!;
       inWorklist[id] = 0;
       const block = cfg.blocks[id]!;
       state = new Map(entryState[id]!);
@@ -1062,4 +1065,28 @@ export function assertResolved(graph: EnvGraph): void {
     `${graph.unresolved.length} environment access(es) could not be resolved statically; first: function ${a.functionIndex} offset ${a.offset} (${a.kind} slot ${a.slot}, ${a.unresolvedReason ?? "unknown"})`,
     { functionIndex: a.functionIndex, offset: a.offset, section: "cfg/env-graph" },
   );
+}
+
+/** `EnvGraph` minus its `slot()` accessor: structured-clone / `v8.serialize`
+ *  safe (Maps, Sets, arrays, plain objects), for handing one computed graph
+ *  to worker threads instead of each rebuilding it (export's render pool). */
+export type EnvGraphTransfer = Omit<EnvGraph, "slot">;
+
+export function envGraphToTransfer(graph: EnvGraph): EnvGraphTransfer {
+  const { slot: _slot, ...rest } = graph;
+  return rest;
+}
+
+/** Inverse of `envGraphToTransfer`: re-attaches `slot()` over the same
+ *  `${env}:${slot}` index `buildEnvGraph` uses (slots are unique per key). */
+export function envGraphFromTransfer(t: EnvGraphTransfer): EnvGraph {
+  const slotIndex = new Map<string, number>();
+  t.slots.forEach((s, i) => slotIndex.set(`${s.env}:${s.slot}`, i));
+  return {
+    ...t,
+    slot(env: EnvNodeId, slot: number): EnvSlot | undefined {
+      const i = slotIndex.get(`${env}:${slot}`);
+      return i === undefined ? undefined : t.slots[i];
+    },
+  };
 }
