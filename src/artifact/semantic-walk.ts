@@ -19,6 +19,7 @@
 // param-is-copy-propagation-safe assumption. Anything the walker cannot
 // prove is left unresolved; the caller turns "unresolved" into `"?"` with a
 // `why` (docs/specs/10-artifact-format.md §2.2) rather than guessing.
+import { Hbc2jsError } from "../errors.ts";
 import { getBuiltinTable } from "../tables/registry.ts";
 import type { BuiltinDef } from "../tables/types.ts";
 import { siteKey } from "../cfg/types.ts";
@@ -218,7 +219,15 @@ export function walkFunction(
   onSite?: (site: StringUseSite) => void,
 ): WalkResult {
   const decoded = analysis.decoded(fnIndex);
-  const cfg = analysis.cfg(fnIndex);
+  let cfg: ReturnType<ModuleAnalysis["cfg"]>;
+  try {
+    cfg = analysis.cfg(fnIndex);
+  } catch (e) {
+    // One function whose CFG cannot be built (it is emitted as an isolated
+    // throwing stub) indexes as a function with no sites, not a failed run.
+    if (!(e instanceof Hbc2jsError)) throw e;
+    return { calls: [], globals: new Map(), stringUses: new Map(), rendersJsx: false };
+  }
   const builtinId = module.layout.builtinTable;
   const builtins = builtinId === undefined ? undefined : getBuiltinTable(builtinId);
   const strings = module.strings;

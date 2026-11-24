@@ -27,6 +27,8 @@ const UNRESOLVED_KINDS = new Set([
   "asset-bytes-missing",
   "native-module",
   "ambiguous-owner",
+  "syntax-check-failed",
+  "function-isolated",
 ]);
 
 const TIERS = new Set(["passes", "jsx", "flat", "stub"]);

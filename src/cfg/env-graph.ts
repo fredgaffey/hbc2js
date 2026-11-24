@@ -275,8 +275,22 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
     readonly resolvedAt: Map<string, EnvNodeId>;
   }
 
+  // A function whose own CFG cannot be built (an internal invariant, a block
+  // budget) is opaque to the walk: it learns nothing and creates no closures
+  // here. `emitModule` turns it into a throwing stub (EM-01 isolation), so one
+  // broken function never aborts the module or the export.
+  const opaque = new Set<number>();
   const runFunction = (f: number, collect: RoundOut | null): boolean => {
-    const cfg = input.cfg(f);
+    if (opaque.has(f)) return false;
+    let cfg: FunctionCfg;
+    try {
+      cfg = input.cfg(f);
+    } catch (e) {
+      if (!(e instanceof Hbc2jsError)) throw e;
+      opaque.add(f);
+      diagnostics.push({ severity: "warn", code: "W_FUNCTION_ISOLATED", message: `function ${f}'s CFG could not be built (${e.code}: ${e.message}); skipped by the environment walk`, context: { functionIndex: f } });
+      return false;
+    }
     rd(`f:${f}`);
     const selfEnv = factorySelf.get(f) ?? (closureEnvOf.has(f) ? closureEnvOf.get(f)! : noEnvClosures.has(f) ? null : undefined);
     let learned = false;

@@ -121,6 +121,20 @@ function runDepsOnWorker(bundlePath: string): { readonly report: Promise<DepsRep
 
 /** `hbc2js export <bundle.hbc> --out <dir>` (spec 29 §2-§4). Builds the
  *  whole file map in memory; write it with `writeExportResult`. */
+/** The functions `emitModule` replaced with an isolated throwing stub
+ *  (`stubFor`'s message), in text order, each once. */
+export function isolatedFunctionsIn(text: string): { fn: number; code: string }[] {
+  const out: { fn: number; code: string }[] = [];
+  const seen = new Set<number>();
+  for (const m of text.matchAll(/hbc2js: could not decompile fn#(\d+) (?:\\u2014|\u2014) (E_[A-Z_]+)/g)) {
+    const fn = Number(m[1]);
+    if (seen.has(fn)) continue;
+    seen.add(fn);
+    out.push({ fn, code: m[2]! });
+  }
+  return out;
+}
+
 export async function exportProject(bundlePath: string, opts: ExportOptions = {}): Promise<ExportResult> {
   progress(`reading ${bundlePath}`);
   const bytes = readFileSync(bundlePath);
@@ -312,6 +326,11 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
       text = fallback;
       finalReason = `the ${tiered.tier} render failed the export syntax check (${syntaxError}); wrote the ${finalTier} render instead`;
       unresolved.push({ kind: "syntax-check-failed", detail: `module ${info.id} (${exportInfo.path}): ${finalReason}` });
+    }
+    // EM-01 isolation: a function that could not be decompiled was written as
+    // a throwing stub and the export went on; say so, one row per function.
+    for (const fnFailure of isolatedFunctionsIn(text)) {
+      unresolved.push({ kind: "function-isolated", detail: `module ${info.id} (${exportInfo.path}): fn#${fnFailure.fn} could not be decompiled (${fnFailure.code}); written as a throwing stub` });
     }
     files.set(exportInfo.path, text);
 

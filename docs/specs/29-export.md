@@ -564,7 +564,9 @@ dropped, nothing is counted twice. `unresolved[].kind` is a closed set:
 `framework-version-unknown`, `guessed-not-installed`, `anonymous-library`,
 `unclassified-module`, `no-readable-render`, `no-entry-module`,
 `entry-module-path-unknown`, `asset-bytes-missing`, `native-module`,
-`ambiguous-owner`.
+`ambiguous-owner`, `syntax-check-failed` (§ safety net below),
+`function-isolated` (one function could not be decompiled -- an internal
+invariant failed -- and was written as a throwing stub; the export goes on).
 
 ## 7. What the upstream index work is actually used for
 

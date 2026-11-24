@@ -102,6 +102,16 @@ export interface AnalysisPreset {
   readonly releaseDecoded?: boolean;
 }
 
+/** Testing hook: `HBC2JS_INJECT_CFG_FAILURE=<fn>[,<fn>...]` makes those
+ *  functions' CFG builds throw E_INTERNAL, so the isolation of one broken
+ *  function (env walk, emit, export) can be gated without a real bug. Read
+ *  per analysis, so render worker threads (same process env) see it too. */
+function injectedCfgFailures(): ReadonlySet<number> {
+  const raw = process.env["HBC2JS_INJECT_CFG_FAILURE"];
+  if (raw === undefined || raw === "") return new Set();
+  return new Set(raw.split(",").map((s) => Number(s.trim())).filter((n) => Number.isInteger(n)));
+}
+
 /** `preset.envGraph`: an env graph already built for this same module and
  *  options elsewhere (another thread; see `envGraphFromTransfer`), used
  *  instead of re-running `buildEnvGraph` -- the diagnostics and the strict
@@ -137,9 +147,11 @@ export function analyseModule(mod: HbcModule, opts: AnalysisOptions = {}, preset
   if (preset?.releaseDecoded === true && preset.envGraph !== undefined) decodeCache.clear();
 
   const cfgCache = new Map<number, FunctionCfg>();
+  const injected = injectedCfgFailures();
   const cfg = (i: number): FunctionCfg => {
     const hit = cfgCache.get(i);
     if (hit !== undefined) return hit;
+    if (injected.has(i)) throw new Hbc2jsError(ErrorCode.E_INTERNAL, `CFG-INJECTED: failure injected for function ${i} (HBC2JS_INJECT_CFG_FAILURE)`, { functionIndex: i, section: "cfg" });
     const built = buildCfg(decoded(i), { kind: kinds[i]!, maxBlocks, checkInvariants, disableResumeDispatch });
     cfgCache.set(i, built);
     return built;
