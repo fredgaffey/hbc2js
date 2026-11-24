@@ -2475,6 +2475,49 @@ export interface DeadStoreAnalysis {
  *   Otherwise "unknown": whatever follows the enclosing block might still
  *   read the old value, and this scan does not look past `list`'s own end.
  */
+/** Can control leave the list that holds `s` through `s` by a `break` or
+ *  `continue` whose target is not inside `s` itself? (`return`/`throw` are
+ *  the caller's business; a `raw` statement is opaque, so it counts.) */
+function leavesList(s: Stmt): boolean {
+  const labels: string[] = [];
+  const list = (l: readonly Stmt[], loops: number, switches: number): boolean => l.some((t) => one(t, loops, switches));
+  const one = (t: Stmt, loops: number, switches: number): boolean => {
+    switch (t.k) {
+      case "break":
+        return t.label === null ? loops + switches === 0 : !labels.includes(t.label);
+      case "continue":
+        return t.label === null ? loops === 0 : !labels.includes(t.label);
+      case "raw":
+        return true;
+      case "if":
+        return list(t.then, loops, switches) || list(t.else, loops, switches);
+      case "labeled": {
+        labels.push(t.label);
+        const r = list(t.body, loops, switches);
+        labels.pop();
+        return r;
+      }
+      case "while":
+      case "do-while":
+      case "for":
+      case "for-in":
+      case "for-of": {
+        if (t.label !== null) labels.push(t.label);
+        const r = list(t.body, loops + 1, switches);
+        if (t.label !== null) labels.pop();
+        return r;
+      }
+      case "switch":
+        return t.cases.some((c) => list(c.body, loops, switches + 1));
+      case "try":
+        return list(t.block, loops, switches) || list(t.handler, loops, switches) || list(t.finalizer ?? [], loops, switches);
+      default:
+        return false;
+    }
+  };
+  return one(s, 0, 0);
+}
+
 type LocalVerdict = "dead" | "not-dead" | "unknown";
 
 function isDeadLocally(list: readonly Stmt[], fromIndex: number, reg: string, isFnBody: boolean, exitIsDead = false): LocalVerdict {
@@ -2482,6 +2525,11 @@ function isDeadLocally(list: readonly Stmt[], fromIndex: number, reg: string, is
     const s = list[m]!;
     const u = identUses([s], reg);
     if (u.reads > 0) return "not-dead";
+    // A statement that can jump out of `list` (a `break`/`continue` whose
+    // target encloses `list`) is a path that skips everything after it, so a
+    // later plain write no longer proves the store dead (torture s4
+    // parseHarborMeadow_mn: `break L0` past the register's reuse).
+    if (leavesList(s)) return "unknown";
     if (u.writes > 0) {
       const isPlainWrite = (s.k === "expr" && s.expr.k === "assign" && s.expr.target.k === "ident" && s.expr.target.name === reg) || (s.k === "init" && s.name === reg);
       return isPlainWrite ? "dead" : "unknown";
