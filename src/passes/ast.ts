@@ -751,6 +751,11 @@ export function freeNames(stmts: readonly Stmt[]): Set<string> {
   return used;
 }
 
+/** The linear one-statement form of `parses(after)` plus "no new free name"
+ *  (spec 29 section 12), re-exported here because a rung reaches the
+ *  framework only through this file (D12a). */
+export { checkOneStatementRewrite } from "./scoped-check.ts";
+
 /** `true` when `stmts`, wrapped in a throwaway function so a bare
  *  `return`/`break`/`continue` is legal, is syntactically valid JavaScript. */
 export function parses(stmts: readonly Stmt[]): boolean {

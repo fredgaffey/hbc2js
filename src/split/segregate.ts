@@ -156,8 +156,59 @@ interface RouteKeyAssignment {
   readonly targetId: number | undefined;
 }
 
-const TRACE_STMT_RE =
+export const TRACE_STMT_RE =
   /(?<reqTarget>[A-Za-z_$][\w$]*)\s*=\s*require\((['"])\.\/module_(?<reqId>\d+)\.js\2\)\s*;|(?<paramAliasTarget>[A-Za-z_$][\w$]*)\s*=\s*(?<paramSrc>a\d+)\s*;|(?<idxTarget>[A-Za-z_$][\w$]*)\s*=\s*(?<idxBase>[A-Za-z_$][\w$]*)\[(?:(?<idxNum>\d+)|(?<idxRegRef>[A-Za-z_$][\w$]*))\]\s*;|(?<numLitTarget>[A-Za-z_$][\w$]*)\s*=\s*(?<numLitVal>\d+)\s*;|(?<objTarget>[A-Za-z_$][\w$]*)\s*=\s*\{(?<objBody>(?:\s*[A-Za-z_$][\w$]*\s*:\s*null\s*,?)+)\}\s*;|(?<emptyObjTarget>[A-Za-z_$][\w$]*)\s*=\s*\{\}\s*;|(?<litTarget>[A-Za-z_$][\w$]*)\s*=\s*(?<litQuote>['"])(?<litVal>[^'"]*)\k<litQuote>\s*;|(?<keyCallObj>[A-Za-z_$][\w$]*)\.(?<keyCallName>component)\s*=\s*(?<keyCallFn>[A-Za-z_$][\w$]*)\((?<keyCallArg>[A-Za-z_$][\w$]*)\)\.(?<keyCallProp>[A-Za-z_$][\w$]*)\s*;|(?<reflectTarget>[A-Za-z_$][\w$]*)\s*=\s*Reflect\.apply\(\s*(?<reflectFn>[A-Za-z_$][\w$]*)\s*,\s*[A-Za-z_$][\w$]*\s*,\s*\[\s*(?<reflectArg>[A-Za-z_$][\w$]*)\s*\]\s*\)\s*;|(?<callTarget>[A-Za-z_$][\w$]*)\s*=\s*(?<callFn>[A-Za-z_$][\w$]*)\((?<callArg>[A-Za-z_$][\w$]*)\)\s*;|(?<keyObj>[A-Za-z_$][\w$]*)\.(?<keyName>[A-Za-z_$][\w$]*)\s*=\s*(?<keyVal>[A-Za-z_$][\w$]*)\s*;|(?<propBracketTarget>[A-Za-z_$][\w$]*)\s*=\s*(?<propBracketBase>[A-Za-z_$][\w$]*)\[(?<propBracketQuote>['"])default\k<propBracketQuote>\]\s*;|(?<propTarget>[A-Za-z_$][\w$]*)\s*=\s*(?<propBase>[A-Za-z_$][\w$]*)\.(?<propName>[A-Za-z_$][\w$]*)\s*;|(?<adjReg>[A-Za-z_$][\w$]*)\s*=\s*(?<adjSlot>_e\d+_\d+)\s*;\s*(?<adjObj>[A-Za-z_$][\w$]*)\.(?<adjKey>name|component)\s*=\s*\k<adjReg>\s*;|(?<envAliasTarget>_e\d+_\d+)\s*=\s*(?<envAliasSrc>[A-Za-z_$][\w$]*)\s*;|(?<envAliasTarget2>[A-Za-z_$][\w$]*)\s*=\s*(?<envAliasSrc2>_e\d+_\d+)\s*;/g;
+
+/** Sticky twin of `TRACE_STMT_RE`: the match it finds at a given position is
+ *  the one the global search returns when that position is the leftmost
+ *  start (same source, same alternation order). */
+const TRACE_STMT_STICKY = new RegExp(TRACE_STMT_RE.source, "y");
+const WS_RE = /\s/;
+const isWord = (c: number): boolean => (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95 || c === 36; // [\w$]
+
+/**
+ * Exactly `text.matchAll(TRACE_STMT_RE)`, found without trying the 18-way
+ * alternation at every character.
+ *
+ * Every alternative begins `I\s*=` or `I\.J\s*=` where `I` and `J` are
+ * `[A-Za-z_$][\w$]*` (or `_e\d+_\d+`, a word too) and must end where the
+ * word run ends, because what follows them (`\s`, `=`, `.`) is not a word
+ * character. So a match can only start inside the "anchor region" of some
+ * `=` at index k: the word run (optionally `run.run`) that ends right before
+ * the whitespace preceding k. Regions hold no `=` themselves, so the regions
+ * of successive `=` are disjoint and increasing. Trying the sticky regex at
+ * every position of every region, in order, from the previous match's end,
+ * therefore meets the leftmost match first: the same matches, the same
+ * groups, in the same order.
+ */
+export function* traceStmtMatches(text: string): Generator<RegExpExecArray> {
+  let from = 0;
+  let k = text.indexOf("=", from);
+  while (k >= 0) {
+    let j = k - 1;
+    while (j >= from && WS_RE.test(text[j]!)) j--;
+    let start = j + 1;
+    while (start > from && isWord(text.charCodeAt(start - 1))) start--;
+    if (start <= j && start > from && text.charCodeAt(start - 1) === 46 /* . */) {
+      let s2 = start - 1;
+      while (s2 > from && isWord(text.charCodeAt(s2 - 1))) s2--;
+      if (s2 < start - 1) start = s2;
+    }
+    let found: RegExpExecArray | null = null;
+    for (let p = start; p <= j; p++) {
+      TRACE_STMT_STICKY.lastIndex = p;
+      found = TRACE_STMT_STICKY.exec(text);
+      if (found !== null) break;
+    }
+    if (found !== null) {
+      yield found;
+      from = found.index + found[0].length;
+      k = text.indexOf("=", from);
+    } else {
+      k = text.indexOf("=", k + 1);
+    }
+  }
+}
 
 /** Single left-to-right pass over `text` tracking, per register, which of
  *  this module's `deps` (in dependencyMap-index order) it currently traces
@@ -224,7 +275,7 @@ function traceModuleOrigins(
   }
 
   function runScan(): void {
-    for (const m of text.matchAll(TRACE_STMT_RE)) {
+    for (const m of traceStmtMatches(text)) {
     const g = m.groups!;
     if (g.reqTarget !== undefined) {
       moduleOriginByReg.set(g.reqTarget, Number(g.reqId));
