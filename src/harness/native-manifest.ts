@@ -92,6 +92,14 @@ const KNOWN_CONSTANTS: Readonly<Record<string, NativeConstants>> = {
   ExponentConstants: { executionEnvironment: "bare", appOwnership: null, isHeadless: false, statusBarHeight: 24, deviceName: "stub", systemFonts: [], sessionId: "00000000-0000-0000-0000-000000000000", manifest: null, platform: { android: {} } },
 };
 
+/** The stand-in embedded app config (see deriveNativeManifest). */
+export const EMBEDDED_MANIFEST = { name: "app", slug: "app", scheme: "hbc2jsboot", android: { package: "com.hbc2js.boot" } } as const;
+
+function ovSetsManifest(ov: NativeOverride): boolean {
+  const c = ov.present?.ExponentConstants;
+  return typeof c === "object" && c !== null && "manifest" in c;
+}
+
 export interface NativeOverride {
   readonly present?: Readonly<Record<string, NativeConstants | true>>;
   readonly absent?: readonly string[];
@@ -100,9 +108,22 @@ export interface NativeOverride {
 const LOOKUP = /(getEnforcing|\.get|requireNativeModule\)?|requireOptionalNativeModule\)?)\(\s*["']([A-Z][\w$]*)["']\s*\)/g;
 
 /** Rules 3 and 4 over a Metro bundle source (exported for tests). */
-export function bundleEvidence(source: string): { required: Set<string>; spec: Set<string> } {
+export function bundleEvidence(text: string): { required: Set<string>; spec: Set<string> } {
   const required = new Set<string>();
   const spec = new Set<string>();
+  // A decompiled original (`.hbc` input) hoists the name into a register
+  // first (\`L="RNCAsyncStorage",R=b.TurboModuleRegistry.get(L)\`); fold
+  // that back into the literal call so the rules below see one shape.
+  // Likewise an assignment in the argument: \`requireOptionalNativeModule)(O="ExpoUpdates")\`.
+  const source = text
+    .replace(HOISTED_NAME, (_m, _reg: string, name: string, call: string) => `${call}("${name}")`)
+    .replace(ASSIGNED_ARG, (_m, call: string, name: string) => `${call}(${name})`)
+    // …and the readable decompile's own hoisting statement
+    // (\`r7 = "RNCAsyncStorage";\n r3 = r9.get(r7);\`).
+    .replace(HOISTED_STMT, (_m, _reg: string, name: string, call: string) => `${call}("${name}")`)
+    // …and a call through a register alias of the lookup function
+    // (\`r3 = a2(a7[0]).requireNativeModule;\n r1 = r3("ExpoFontLoader");\`).
+    .replace(ALIASED_CALL, (m, _reg: string, kind: string, lhs: string, name: string) => `${m.slice(0, m.indexOf(";") + 1)} ${lhs} = ${kind}(${name})`);
   LOOKUP.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = LOOKUP.exec(source)) !== null) {
@@ -116,13 +137,34 @@ export function bundleEvidence(source: string): { required: Set<string>; spec: S
     // (\`get('ExpoModulesCore')?.installModules()\`): that library's own
     // native half, so present even inside a try.
     if (/^\s*\??\.\s*install\w*\(/.test(after)) required.add(name);
+    // …the same installer decompiled: \`(u=…get("X"))==(t=null)?t:u.installModules()\`.
+    if (/^\s*\)\s*==\s*\(?\s*(?:[\w$]+\s*=\s*)?null\s*\)?\s*\?\s*[\w$]+\s*:\s*[\w$]+\.install\w*\(/.test(source.slice(m.index + m[0].length, m.index + m[0].length + 80))) required.add(name);
+    // expo-modules-core in the bundle at all: its native half (the JSI
+    // installer of \`globalThis.expo\`) is autolinked with it, and every
+    // Expo module is reached only through it.
+    if (name === "ExpoModulesCore") required.add(name);
     // The last alternative of a lookup chain (\`get(A) || get(B) || get(C)\`):
     // a library's final fallback is its canonical module, the one its
     // autolinked native half registers (async-storage throws when the
     // whole chain is null).
-    if (/\|\|\s*[\w$.()]*$/.test(before) && /^\s*[;:,)}]/.test(after)) required.add(name);
+    // Decompiled, the tail is an assignment in parentheses: \`R||(R=b.T.get("X")),M=R\`.
+    // (Not when the chain goes on: \`…get("B")),R||(R=…get("C"))\`.)
+    if (/\|\|\s*(?:\(\s*[\w$]+\s*=\s*)?[\w$.()]*$/.test(before) && /^\s*[;:,)}]/.test(after) && !/^\s*\)\s*,\s*[\w$]+\s*\|\|/.test(after)) required.add(name);
+    // The readable decompile writes the chain as labelled blocks, each
+    // alternative skipped once a previous one was found:
+    // \`L2: { if (r3) { break L2; } r9 = …; r3 = r9.get("X"); break L2; }\`;
+    // the tail is the block not followed by another such block.
+    const wideBefore = source.slice(Math.max(0, m.index - 200), m.index);
+    const wideAfter = source.slice(m.index + m[0].length, m.index + m[0].length + 160);
+    if (/if\s*\(\s*[\w$]+\s*\)\s*\{\s*break\s+L\d+;\s*\}\s*(?:[\w$]+\s*=\s*[\w$.]+;\s*)*[\w$]+\s*=\s*[\w$.()[\]]*$/.test(wideBefore) && /^\s*;\s*break\s+L\d+;\s*\}/.test(wideAfter) && !/^\s*;\s*break\s+L\d+;\s*\}\s*L\d+:\s*\{\s*if\s*\(/.test(wideAfter)) required.add(name);
     // Last expression of the factory: `...('X')},<id>,[` (Metro), or the
     // `...('X')}` end of a factory body without Metro's trailer.
+    // Decompiled, the factory ends \`…("X");return _.default=p,c},551,[269]\`.
+    const tail = source.slice(m.index + m[0].length, m.index + m[0].length + 80);
+    // Readable decompile (\`let v = requireOptionalNativeModule("X");\n
+    // list["default"] = v;\n return r0;\n }\`): exported, then the factory ends.
+    if (!inTry && /^\s*;\s*[\w$.]+(?:\["default"\]|\.default)\s*=\s*[\w$]+\s*;\s*return\b[^;{}()]*;?\s*\}/.test(tail) && !/(?:\|\||&&|\?\?|!=|==)\s*[^,;=]*$/.test(before)) spec.add(name);
+    if (!inTry && /^\s*;\s*return\b[^;{}()]*\}\s*,\s*-?\d+\s*,\s*\[/.test(tail) && !/(?:\|\||&&|\?\?|!=|==)\s*[^,;=]*$/.test(before)) spec.add(name);
     if (!inTry && /^\s*\}\s*(?:,\s*\d+\s*,\s*\[|\)|$)/.test(after) && !/(?:\|\||&&|\?\?|!=|==)\s*[^,;=]*$/.test(before)) spec.add(name);
   }
   // A library that falls back to a throwing Proxy when its module is
@@ -153,6 +195,10 @@ export function bundleEvidence(source: string): { required: Set<string>; spec: S
   }
   return { required, spec };
 }
+const ASSIGNED_ARG = /(\b(?:getEnforcing|get|requireNativeModule\)?|requireOptionalNativeModule\)?))\(\s*[\w$]+\s*=\s*("[A-Z][\w$]*")\s*\)/g;
+const HOISTED_STMT = /(?<![\w$.])([\w$]+)\s*=\s*"([A-Z][\w$]*)"\s*;\s*([\w$]+\s*=\s*[\w$.()[\]]*\.(?:getEnforcing|get))\(\s*\1\s*\)/g;
+const ALIASED_CALL = /(?<![\w$.])([\w$]+)\s*=\s*[\w$.()[\]]*\.(requireNativeModule|requireOptionalNativeModule|getEnforcing)\s*;\s*([\w$]+)\s*=\s*\1\(\s*("[A-Z][\w$]*")\s*\)/g;
+const HOISTED_NAME = /(?<![\w$.])([\w$]+)="([A-Z][\w$]*)",([\w$]+=[\w$.()[\]]*\.(?:getEnforcing|get))\(\1\)/g;
 const UNGUARDED_BIND = /(?<![\w$.])([\w$]+)\s*=\s*[\w$.()[\]]*\.NativeModules\.([A-Z][\w$]*)\s*[;,]/g;
 const IS_NULL_MSG = /NativeModule\.([A-Z][\w$]*) is null\. To fix/g;
 const LINKED_OR_THROW = /\.([A-Z][\w$]*)\s*\?\s*[\w$.]*\.\1\s*:\s*new\s+Proxy\s*\(/g;
@@ -180,6 +226,17 @@ export function deriveNativeManifest(source: string, override: NativeOverride | 
   for (const [k, v] of Object.entries(RN_CORE_PRESENT)) if (!(ov.absent ?? []).includes(k)) add(k, v);
   for (const n of [...required, ...spec]) if (!absent.has(n) && !(n in present)) add(n);
   for (const [k, v] of Object.entries(ov.present ?? {})) add(k, v === true ? undefined : v);
+  // An Expo module (\`requireNativeModule('X')\`) is reachable only through
+  // expo-modules-core's installer, so a required one implies it.
+  if (!("ExpoModulesCore" in present) && !absent.has("ExpoModulesCore") && /requireNativeModule\)?\(/.test(source)) add("ExpoModulesCore");
+  // An app built with Expo's tooling embeds its app config (expo's Gradle
+  // plugin writes assets/app.config, which expo-constants exposes as
+  // \`manifest\`); expo-linking throws at module eval without one. The real
+  // config is in the APK, not the bundle: stand in a minimal one (with a fixed
+  // URI scheme: a standalone app's deep links need one), unless
+  // boot-native.json supplies the real \`ExponentConstants.manifest\`.
+  const ec = present.ExponentConstants;
+  if (ec !== undefined && ec.manifest === null && !ovSetsManifest(ov) && /\bexpoConfig\b/.test(source)) present.ExponentConstants = { ...ec, manifest: EMBEDDED_MANIFEST };
   const sorted: Record<string, NativeConstants> = {};
   for (const k of Object.keys(present).sort()) sorted[k] = present[k]!;
   return { schema: "boot-native/1", present: sorted };

@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { acquireBootSource, bootTrace } from "./boot-equiv.ts";
 import type { BootTraceResult } from "./boot-equiv.ts";
 import { findAllHermesVms, findHermesVm } from "./hermes-vm.ts";
+import { progress } from "../util/progress.ts";
 import { findHermesc as findHermescVersion } from "./roundtrip.ts";
 import type { Trace, TraceRecord } from "./trace.ts";
 
@@ -259,7 +260,7 @@ export async function exportBootProof(original: string, exportDir: string, opts:
   const phase = opts.phase ?? "register";
   const seed = opts.seed ?? 0;
   const vm = opts.vm ?? pickBootVm(exportDir);
-  const traceOpts = { seed, firstNative: HOST_NATIVE_CAP, ...(vm !== undefined ? { vm } : {}), ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}) };
+  const traceOpts = { seed, firstNative: HOST_NATIVE_CAP, lowerFrom: exportDir, ...(vm !== undefined ? { vm } : {}), ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}) };
   const projOpts = (mask?: ReadonlySet<number>): ProjectOptions => ({ firstNative: opts.firstNative ?? DEFAULT_PROJECTED_NATIVE, ...(mask !== undefined ? { mask } : {}) });
   const mask = substitutedIds(exportDir);
   // §1: the export side is compiled with the pinned hermesc (prelude
@@ -275,13 +276,23 @@ export async function exportBootProof(original: string, exportDir: string, opts:
     return { ...base, exportExec: "bytecode", verdict: "INCONCLUSIVE", appKeys: { a: [], b: [] }, factories: { a: 0, b: 0 }, divergence: null, masked: 0, reason: `--export-exec bytecode: ${why}` };
   }
   const run = phase === "run" ? { horizonMs: opts.horizonMs ?? DEFAULT_HORIZON_MS } : undefined;
+  // §4(b): the export side's module records come only from the instrumented
+  // registry. A tree exported without --instrument=modules boots silently (0
+  // factories), which would read as a DIVERGENT \`<end>\`: say so up front,
+  // before the slow decompile of the original.
+  const registry = join(exportDir, "src", "_hbc", "registry.js");
+  if (existsSync(registry) && !readFileSync(registry, "utf8").includes(PROBE_FN)) {
+    return { ...base, verdict: "INCONCLUSIVE", appKeys: { a: [], b: [] }, factories: { a: 0, b: 0 }, divergence: null, masked: 0, reason: `the export tree ${exportDir} is not instrumented (exported without --instrument=modules), so its modules cannot be observed; re-export it with \`hbc2js export <app.hbc> --out <dir> --instrument=modules --substitute none\`` };
+  }
 
   // The control first: if the original cannot boot here, nothing about the
   // export can be concluded, and the (slow) re-bundle is skipped.
   // Spec 31 §4.2 (L4): one native-module manifest, derived from the
   // original (plus its optional boot-native.json), for BOTH sides.
+  progress(original.endsWith(".hbc") ? `decompiling the original ${original} (the control)` : `reading the original ${original}`);
   const originalSource = acquireBootSource(original, { lenientEnv: true }).source;
   const natives = deriveNativeManifest(originalSource, overrideFor(original));
+  progress(`booting the original under the stub host (${vm ?? "discovered VM"}, source mode)`);
   const a = bootTrace(originalSource, { ...traceOpts, natives, wrapFactories: true, ...(run !== undefined ? { run } : {}) });
   const ra = observeRun(a.trace);
   const pa = projectBootTrace(a.trace, projOpts(mask));
@@ -303,6 +314,7 @@ export async function exportBootProof(original: string, exportDir: string, opts:
     if (gap !== null) return { ...inconclusive(`the original ${gap} under the stub host: a stub-host gap (spec 31 §4.1), not evidence about the export`), runApplication: { a: ra.runApplication, b: null }, views: { a: ra.views, b: [] }, commits: { a: ra.commits, b: 0 } };
   }
 
+  progress(`original booted: ${enters(pa)} factories, keys ${keys(pa).join(", ")}${a.lowered === true ? " (class syntax lowered for this VM)" : ""}; bundling the export offline (Metro)`);
   const { offlineBundle } = await import("../export/offline-check.ts");
   let bundlePath: string;
   try {
@@ -312,7 +324,9 @@ export async function exportBootProof(original: string, exportDir: string, opts:
   }
   if (!existsSync(bundlePath)) return inconclusive(`offline bundle missing at ${bundlePath}`);
   const bOpts = compiler !== null ? { ...traceOpts, vm: compiler.vm, hermesc: compiler.hermesc } : traceOpts;
+  progress(compiler !== null ? `booting the export (hermesc v${compiler.version} + hermes -b)` : "booting the export (source mode)");
   const b = bootTrace(readFileSync(bundlePath, "utf8"), { ...bOpts, natives, wrapFactories: false, ...(run !== undefined ? { run } : {}) });
+  progress(`export booted: ${b.ran ? "trace" : "no trace"}; comparing projections`);
   const rb = observeRun(b.trace);
   const pb = projectBootTrace(b.trace, projOpts());
   const runPart = run !== undefined ? { runApplication: { a: ra.runApplication, b: rb.runApplication }, views: { a: ra.views, b: rb.views }, commits: { a: ra.commits, b: rb.commits } } : {};

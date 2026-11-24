@@ -327,3 +327,47 @@ is a whole-file decompile: that took 19.6 min (the split export, 6 min) and
 fn#0 failed with `E_PASS_CRASH`, so it is INCONCLUSIVE before the export is
 looked at. `acquireBootSource` now decompiles an `.hbc` original with
 `--lenient-env` markers for the proof.
+
+**0.1.2: from a plain npm install (2026-11-24).** Three benchmark apps (an
+Expo/Ignite app, hbc96; a bare RN 0.88 app, hbc99; the react-navigation
+example, Expo, hbc98) were INCONCLUSIVE on 0.1.1 for reasons outside the
+export. (1) No VM: `setup-vm 98|99` installed hermesc only, because no prebuilt
+VM exists past HBC 96 (docs/TOOLCHAIN.md survey). `setup-vm 96` now installs
+the sha256-pinned facebook/hermes v0.13.0 CLI (macOS, Linux x64) and the
+others say so. (2) That classic VM has no `class` at all, and decompiled
+v98/v99 code has classes with private members: `bootTrace` probes the parsing
+engine (VM, or hermesc in bytecode mode) once and, when it cannot parse them,
+lowers the bundle with Babel's spec-mode class/private transforms (resolved
+from the export's own node_modules), identically on both sides
+(`private-field-lowering.test.ts`); source mode passes `hermes -w`, since a
+large decompile's warnings overflowed the output buffer and hid the run. (3)
+The native manifest read Metro-text shapes only; a decompiled original hoists
+names into registers and ends factories with `return`, so `ExpoModulesCore`,
+`ExponentConstants` and `RNCAsyncStorage` looked absent. The rules now read
+both shapes, expo-modules-core in the bundle implies its JSI installer (which
+is also why a `boot-native.json` naming only `ExpoLinking` did nothing), and
+an Expo app that reads `expoConfig` gets a stand-in embedded app config
+(`decompiled-native-evidence.test.ts`; `hbc2js help boot`). (4) `equiv --boot`
+prints phase lines on stderr (off under `--json` unless `--progress`). Result:
+the react-navigation original now stops on a decompiler miscompile
+(docs/BUGS.md, private-field initializer naming a constructor local), so it
+stays INCONCLUSIVE for a real reason. The Expo/Ignite app is EQUIVALENT in
+both phases (register: 223 factories; run: `runApplication('main')`, one
+commit, 293 factories) after four more host fixes
+(`stub-host-standins.test.ts`): (5) native-module constants are own
+enumerable properties of the stub, since expo-constants builds `Constants` by
+spreading `ExponentConstants` (served only through the `get` trap they spread
+to `{}`, `executionEnvironment` read undefined and expo-linking's `createURL`
+hit `removeScheme(undefined)`: the `replace` of undefined); (6) a UTF-8
+`TextEncoder` when the VM has none (RN's Hermes has it since 0.74; Expo's
+runtime reads it bare); (7) rule 3 reads a lookup called through a register
+alias (`r3 = ….requireNativeModule; r1 = r3("ExpoFontLoader")`); (8) a tree
+exported without `--instrument=modules` is INCONCLUSIVE up front, naming the
+command (it booted silently, 0 factories, and read as DIVERGENT `export
+<end>`). `HBC2JS_BOOT_STACK=1` adds the error stack to a throw record. The
+bare RN 0.88 app's original boots once rule 3 also reads the readable
+decompile's lookup chain (labelled blocks, a hoisting statement:
+`RNCAsyncStorage`): 478 factories, keys LogBox and the app's. Its export is
+DIVERGENT, a real export bug: module 551 references a function with several
+closure-creation sites, which the split render emits nowhere (docs/BUGS.md,
+orphan multi-site closure).

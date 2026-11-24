@@ -101,7 +101,7 @@ Usage:
   hbc2js equiv normalise <a.hbc> <b.hbc>  normalised-disassembly diff (D3)
   hbc2js equiv --boot <a> <b> [--first-native N] [--seed N] [--vm <path>]
                                    whole-bundle boot-trace oracle (spec 31)
-  hbc2js equiv --boot <original> <export-dir> [--phase register|run] [--horizon-ms N] [--export-exec source|bytecode] [--json]
+  hbc2js equiv --boot <original> <export-dir> [--phase register|run] [--horizon-ms N] [--export-exec source|bytecode] [--json] [--progress]
                                    export boot proof (spec 33; prints export-boot/1)
   hbc2js gate [options]            run the gate tier (spec 06 §7)
   hbc2js sweep [options]           run the sweep tier (spec 06 §7)
@@ -422,6 +422,7 @@ interface EquivArgs {
   readonly phase: string;
   readonly horizonMs: number | undefined;
   readonly exportExec: string | undefined;
+  readonly progress: boolean;
   readonly positional: string[];
 }
 
@@ -439,6 +440,7 @@ function parseEquivArgs(argv: readonly string[]): EquivArgs {
   let phase = "register";
   let horizonMs: number | undefined;
   let exportExec: string | undefined;
+  let progressFlag = false;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
@@ -456,9 +458,10 @@ function parseEquivArgs(argv: readonly string[]): EquivArgs {
     else if (a === "--phase") phase = String(argv[++i]);
     else if (a === "--horizon-ms") horizonMs = Number(argv[++i]);
     else if (a === "--export-exec") exportExec = String(argv[++i]);
+    else if (a === "--progress") progressFlag = true;
     else positional.push(a);
   }
-  return { help, hbc, boot, json, timeout, seed, fuzz, relax, firstNative, vm, phase, horizonMs, exportExec, positional };
+  return { help, hbc, boot, json, timeout, seed, fuzz, relax, firstNative, vm, phase, horizonMs, exportExec, progress: progressFlag, positional };
 }
 
 function equivCode(v: string): number {
@@ -574,6 +577,9 @@ async function runEquivExportBoot(a: string, dir: string, o: EquivArgs): Promise
     process.stderr.write(`hbc2js equiv --boot: --export-exec must be source or bytecode\n`);
     return 3;
   }
+  // Phase lines on stderr (minutes on a real app). Off under --json, as for
+  // export/deps (src/util/progress.ts), unless --progress asks for them.
+  if (!o.json || o.progress) enableProgress("equiv --boot");
   const { exportBootProof } = await import("./harness/export-boot.ts");
   let r: Awaited<ReturnType<typeof exportBootProof>>;
   try {
@@ -3439,7 +3445,10 @@ Fetch a prebuilt Hermes VM (and hermesc) with a pinned 'npm pack' of the same
 packages tools/get-hermesc.sh uses (npm verifies the tarball integrity). Needed
 by 'equiv --boot'. Installs to ${userVmDir()} (override: XDG_CACHE_HOME).
 Explicit only: hbc2js never downloads anything on its own. Default version: 96.
-VMs for versions the prebuilt route cannot reach: tools/build-hermes-vm.sh <version>.
+A prebuilt VM exists only for v84 and v96 (v96: facebook/hermes v0.13.0 release,
+sha256-pinned, macOS and Linux x64); for 94/98/99 it installs hermesc and says
+so. 'equiv --boot' runs source mode under any VM, so v96 serves every app.
+Same-version VMs for the others: tools/build-hermes-vm.sh <version>.
 `;
   if (argv.includes("--help") || argv.includes("-h")) {
     process.stdout.write(SETUP_USAGE);

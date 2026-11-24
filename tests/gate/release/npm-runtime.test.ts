@@ -137,7 +137,7 @@ test("npm pack --dry-run contains the skill, agent docs and every runtime-read a
     ".claude/skills/hbc2js/SKILL.md",
     "tools/get-hermesc.sh",
     "tools/build-hermes-vm.sh",
-    ...["tldr", "tools", "workflow", "examples", "limits", "glossary"].map((t) => `docs/agent-help/${t}.md`),
+    ...["tldr", "tools", "workflow", "examples", "limits", "glossary", "boot"].map((t) => `docs/agent-help/${t}.md`),
   ];
   for (const f of required) assert.ok(files.has(f), `${f} is not in the npm tarball`);
   assert.ok([...files].some((f) => f.startsWith("tools/pkgsig/db/")), "signature db missing from tarball");

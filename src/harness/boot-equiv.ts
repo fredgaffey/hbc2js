@@ -17,6 +17,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createRequire } from "node:module";
 import { decompile } from "../decompile.ts";
 import { NO_VM_HELP, findAllHermesVms, runHermes } from "./hermes-vm.ts";
 import type { HermesRunResult, HermesVm } from "./hermes-vm.ts";
@@ -84,6 +85,9 @@ export interface BootTraceOptions {
    *  present module with no constants beyond `hostConstants`. A comparison
    *  passes the SAME manifest (derived from the original) to both sides. */
   readonly natives?: NativeManifest;
+  /** Where to resolve Babel from when the source needs class-syntax
+   *  lowering (an export tree's directory); hbc2js's own install otherwise. */
+  readonly lowerFrom?: string;
 }
 
 export interface BootRunOptions {
@@ -109,6 +113,9 @@ export interface BootTraceResult {
   /** Human-readable reason, set whenever `vm === null` or `ran === false`. */
   readonly why: string | null;
   readonly raw?: HermesRunResult;
+  /** True when the bundle's class private members were lowered first
+   *  because the parsing engine lacks them (see `lowerClassSyntax`). */
+  readonly lowered?: boolean;
 }
 
 function resolveVm(override: string | undefined): HermesVm | null {
@@ -131,7 +138,10 @@ function parseTraceLines(stdout: string): TraceRecord[] {
 }
 
 function excerpt(s: string): string {
-  const t = s.trim();
+  // Hermes prints compiler warnings (undeclared globals in the prelude) before
+  // the error that matters; start the excerpt at the first error.
+  const err = s.search(/^.*: error: /m);
+  const t = (err > 0 ? s.slice(err) : s).trim();
   return t.length > 300 ? t.slice(0, 300) + "…" : t;
 }
 
@@ -203,6 +213,10 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
   var __hbcNativeLimited = false;
   var __hbcRealPrint = globalThis.print;
   var __hbcWrapFactories = ${JSON.stringify(wrapFactories)};
+  // Debug aid (HBC2JS_BOOT_STACK=1): a factory throw's record carries the
+  // error's stack too, to locate the throwing source line. Off by default so
+  // traces stay byte-identical across runs.
+  var __hbcThrowStack = ${JSON.stringify(process.env.HBC2JS_BOOT_STACK === "1")};
 
   function emit(rec) {
     var line;
@@ -302,6 +316,12 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
   }
   function hostStub(name, jsi, cs) {
     var backing = Object.create(null);
+    // Stub-host addition (spec 31 §4.2): a device's native module carries
+    // its constants as OWN enumerable properties, so \`{ ...NativeModule }\`
+    // and Object.keys see them (expo-constants builds \`Constants\` by
+    // spreading ExponentConstants; served only through \`get\` they spread to
+    // {} and \`executionEnvironment\` read undefined). A per-stub copy.
+    if (cs) for (var ck in cs) if (Object.prototype.hasOwnProperty.call(cs, ck) && ck !== "getConstants") backing[ck] = cs[ck] === undefined ? undefined : JSON.parse(JSON.stringify(cs[ck]));
     var proxy = new Proxy(backing, {
       get: function (t, p) {
         if (p === Symbol.toPrimitive) return function () { return "[hoststub " + name + "]"; };
@@ -417,6 +437,42 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
   }
 
   globalThis.global = globalThis;
+
+  // VM stand-in (spec 31 §4.2): the Hermes RN ships since 0.74 has a native
+  // UTF-8 TextEncoder that bundles read bare (Expo's runtime builds
+  // TextDecoder/TextEncoderStream on it); the standalone Hermes CLIs used
+  // here may lack it. Installed only when absent, identically on both sides.
+  if (typeof globalThis.TextEncoder === "undefined") {
+    var __hbcUtf8 = function (str, out, max) {
+      var read = 0, written = 0;
+      for (var i = 0; i < str.length; i++) {
+        var c = str.charCodeAt(i), units = 1;
+        if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length) {
+          var d = str.charCodeAt(i + 1);
+          if (d >= 0xdc00 && d <= 0xdfff) { c = 0x10000 + ((c - 0xd800) << 10) + (d - 0xdc00); units = 2; }
+        }
+        if (c >= 0xd800 && c <= 0xdfff) c = 0xfffd;
+        var bytes = c < 0x80 ? [c] : c < 0x800 ? [0xc0 | (c >> 6), 0x80 | (c & 63)] : c < 0x10000 ? [0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63)] : [0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63)];
+        if (written + bytes.length > max) break;
+        for (var b = 0; b < bytes.length; b++) out[written++] = bytes[b];
+        read += units;
+        i += units - 1;
+      }
+      return { read: read, written: written };
+    };
+    var HbcTextEncoder = function TextEncoder() {};
+    Object.defineProperty(HbcTextEncoder.prototype, "encoding", { configurable: true, get: function () { return "utf-8"; } });
+    HbcTextEncoder.prototype.encode = function encode(input) {
+      var str = input === undefined ? "" : String(input);
+      var tmp = [];
+      __hbcUtf8(str, tmp, Infinity);
+      return new Uint8Array(tmp);
+    };
+    HbcTextEncoder.prototype.encodeInto = function encodeInto(input, dest) {
+      return __hbcUtf8(String(input), dest, dest.length);
+    };
+    Object.defineProperty(globalThis, "TextEncoder", { configurable: true, writable: true, enumerable: false, value: HbcTextEncoder });
+  }
 
   globalThis.nativeLoggingHook = function (msg, level) {
     // msg is not recorded: it carries app text (spec §5 table).
@@ -587,6 +643,7 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
       exportsObj = undefined;
       try {
         thrown = extra !== null && typeof extra === "object" ? String(extra.name) + ": " + String(extra.message) : String(extra);
+        if (__hbcThrowStack && extra !== null && typeof extra === "object" && extra.stack !== undefined) thrown += "\\n" + String(extra.stack);
       } catch (e) {
         thrown = "<unstringifiable>";
       }
@@ -762,17 +819,104 @@ function buildBootSource(bundleSource: string, seed: number, firstNative: number
 
 const NO_VM_MESSAGE = NO_VM_HELP;
 
+// --- 0.1.2: class syntax the executing engine lacks --------------------
+// An HBC v98/v99 original decompiles to classes with private members
+// (`#e`), and the prebuilt VMs/compilers that exist (classic Hermes,
+// HBC <= 96) reject both at parse time (classic Hermes has no `class` at
+// all: Metro's preset lowered classes for it). Hermes >= v98 supports them natively on the device,
+// so the faithful move is to keep the program's meaning and change only how
+// private state is stored and how classes are wired: Babel's spec-mode
+// lowering (WeakMap / WeakSet brand checks, `#x in o` included; ES5
+// constructor functions, as Metro emits for classic Hermes), applied identically to BOTH sides of a
+// comparison, and only when the engine that parses the source cannot.
+
+const PRIVATE_SYNTAX = /(?<![\w$'"`\\])#[A-Za-z_$][\w$]*\s*(?:[=;(}]|in\b)|\.#[A-Za-z_$]|(?<![\w$.])class\s*(?:[A-Za-z_$][\w$]*\s*)?(?:extends\b|\{)/;
+const syntaxCache = new Map<string, boolean>();
+
+/** Whether `exe` (a `hermes` VM run in source mode, or a `hermesc`) parses
+ *  class private members. Probed once per binary. */
+export function classSyntaxSupported(exe: string, kind: "vm" | "hermesc"): boolean {
+  const key = `${kind}:${exe}`;
+  const hit = syntaxCache.get(key);
+  if (hit !== undefined) return hit;
+  const dir = mkdtempSync(join(tmpdir(), "hbc2js-syntax-probe-"));
+  let ok = false;
+  try {
+    const f = join(dir, "p.js");
+    writeFileSync(f, "class A { #a = 1; #m() { return this.#a; } static has(o) { return #a in o; } }\nnew A();\n");
+    const args = kind === "vm" ? [f] : ["-emit-binary", `-out=${join(dir, "p.hbc")}`, f];
+    ok = spawnSync(exe, args, { encoding: "utf8", timeout: 30000 }).status === 0;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  syntaxCache.set(key, ok);
+  return ok;
+}
+
+const LOWER_PLUGINS = [
+  "@babel/plugin-transform-class-static-block",
+  "@babel/plugin-transform-private-property-in-object",
+  "@babel/plugin-transform-private-methods",
+  "@babel/plugin-transform-class-properties",
+  "@babel/plugin-transform-classes",
+];
+
+/** Lowers classes and their private members (and static blocks, when that plugin is
+ *  installed) with Babel resolved from `fromDir` (an export tree's own
+ *  node_modules, which a bundled export always has), else from hbc2js's own
+ *  install. Text with no private syntax comes back unchanged. Null when
+ *  lowering is needed but no `@babel/core` + plugins can be resolved. */
+export function lowerClassSyntax(source: string, fromDir: string | undefined): string | null {
+  if (!PRIVATE_SYNTAX.test(source)) return source;
+  const requirers = [...(fromDir !== undefined ? [createRequire(join(fromDir, "package.json"))] : []), createRequire(import.meta.url)];
+  for (const req of requirers) {
+    let core: { transformSync: (code: string, o: object) => { code?: string | null } | null };
+    try {
+      core = req("@babel/core") as typeof core;
+    } catch {
+      continue;
+    }
+    const plugins: unknown[] = [];
+    let missing = false;
+    for (const name of LOWER_PLUGINS) {
+      try {
+        plugins.push(req(name));
+      } catch {
+        if (name !== LOWER_PLUGINS[0]) missing = true;
+      }
+    }
+    if (missing) continue;
+    const out = core.transformSync(source, { babelrc: false, configFile: false, compact: true, comments: false, sourceType: "script", plugins });
+    if (out?.code != null) return out.code;
+  }
+  return null;
+}
+
 /** Boots one bundle source under the stub host and returns its trace (spec
  *  §8). Always concatenates the prelude with `bundleSource`; runs
  *  `hermes <file.js>` in source mode, or, with `opts.hermesc` (spec 33 L2),
  *  compiles that concatenation and runs `hermes -b` on the result. */
-export function bootTrace(bundleSource: string, opts: BootTraceOptions = {}): BootTraceResult {
+export function bootTrace(bundleSourceIn: string, opts: BootTraceOptions = {}): BootTraceResult {
+  let bundleSource = bundleSourceIn;
   const seed = opts.seed ?? 0;
   const firstNative = opts.firstNative ?? DEFAULT_FIRST_NATIVE;
   const timeout = opts.timeoutMs ?? 10000;
   const vm = resolveVm(opts.vm);
   if (vm === null) {
     return { trace: { kind: "full", records: [] }, reachedEnd: false, bootError: null, vm: null, ran: false, why: NO_VM_MESSAGE };
+  }
+
+  // The engine that parses the concatenated source: hermesc when compiling,
+  // else the VM in source mode.
+  let lowered = false;
+  if (PRIVATE_SYNTAX.test(bundleSource) && !classSyntaxSupported(opts.hermesc ?? vm.path, opts.hermesc !== undefined ? "hermesc" : "vm")) {
+    const low = lowerClassSyntax(bundleSource, opts.lowerFrom);
+    if (low === null) {
+      const why = `${opts.hermesc ?? vm.path} cannot parse class private members (#x) and no @babel/core with the class-properties / private-methods / private-property-in-object plugins could be resolved to lower them (install them, use a Hermes >= v98 VM via --vm, or build one: tools/build-hermes-vm.sh 98)`;
+      return { trace: { kind: "full", records: [] }, reachedEnd: false, bootError: null, vm, ran: false, why };
+    }
+    bundleSource = low;
+    lowered = true;
   }
 
   const dir = mkdtempSync(join(tmpdir(), "hbc2js-boot-equiv-"));
@@ -782,13 +926,13 @@ export function bootTrace(bundleSource: string, opts: BootTraceOptions = {}): Bo
     writeFileSync(file, buildBootSource(bundleSource, seed, firstNative, opts.wrapFactories ?? true, opts.run ?? null, opts.natives ?? null));
     if (opts.hermesc !== undefined) {
       const hbc = join(dir, "boot.hbc");
-      const c = spawnSync(opts.hermesc, ["-emit-binary", `-out=${hbc}`, file], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: Math.max(timeout, 120000) });
+      const c = spawnSync(opts.hermesc, ["-w", "-emit-binary", `-out=${hbc}`, file], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: Math.max(timeout, 120000) });
       if (c.status !== 0) {
         const why = `hermesc could not compile the prelude+bundle: ${excerpt(c.stderr !== "" ? c.stderr : String(c.error ?? c.status))}`;
         return { trace: { kind: "full", records: [] }, reachedEnd: false, bootError: null, vm, ran: false, why };
       }
       raw = runHermes(vm.path, hbc, { timeout, bytecode: true });
-    } else raw = runHermes(vm.path, file, { timeout, bytecode: false });
+    } else raw = runHermes(vm.path, file, { timeout, bytecode: false, quiet: true });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -804,6 +948,7 @@ export function bootTrace(bundleSource: string, opts: BootTraceOptions = {}): Bo
     bootError: bootErrRec !== undefined ? { name: bootErrRec.name, message: bootErrRec.message } : null,
     vm,
     ran,
+    lowered,
     why: ran ? null : `hermes produced no boot trace at all: ${excerpt(raw.stderr !== "" ? raw.stderr : raw.stdout)}`,
     raw,
   };

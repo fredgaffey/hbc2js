@@ -121,6 +121,10 @@ export function findAllHermesVms(): readonly HermesVm[] {
 export interface HermesRunOptions {
   readonly timeout?: number;
   readonly bytecode?: boolean;
+  /** Source mode: pass \`-w\` (no compiler warnings). A large decompiled
+   *  bundle's undeclared-global warnings can outgrow the output buffer and
+   *  hide the run (0.1.2 apps). */
+  readonly quiet?: boolean;
 }
 
 export interface HermesRunResult {
@@ -155,7 +159,7 @@ function splitLines(s: string): string[] {
 export function runHermes(vmPath: string, file: string, opts: HermesRunOptions = {}): HermesRunResult {
   const timeout = opts.timeout ?? 10000;
   const isHbc = opts.bytecode ?? file.endsWith(".hbc");
-  const args = isHbc ? ["-b", file] : [file];
+  const args = isHbc ? ["-b", file] : opts.quiet === true ? ["-w", file] : [file];
   try {
     const out = execFileSync(vmPath, args, {
       timeout,
