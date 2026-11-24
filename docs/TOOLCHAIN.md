@@ -399,6 +399,22 @@ hermes-dec.
 
 ## Hermes VM (source build)
 
+**Prebuilt VMs, surveyed 2026-11-24 (0.1.2).** For macOS arm64 and Linux x64
+the only prebuilt `hermes` CLI for a current bytecode version is facebook/hermes
+GitHub release **v0.13.0** (`hermes-cli-darwin.tar.gz`, universal Mach-O,
+sha256 `f16b0214…00bd`; `hermes-cli-linux.tar.gz`, static x86-64 ELF, sha256
+`aead6eb0…68ae`; both report "HBC bytecode version: 96"). Its compiler output
+is byte-identical to react-native@0.73.11's v96 `hermesc`, and the
+react-native@0.73.11 `hermesc` output runs on it. `tools/get-hermesc.sh 96`
+(so `hbc2js setup-vm 96`) installs it, sha256-checked, when the npm tarball
+carried no `hermes` (always on Linux). Nothing prebuilt exists for v94/v98/v99:
+`hermes-compiler@*` and `react-native@*/sdks/hermesc` ship `hermesc` only;
+Maven `com.facebook.hermes:hermes-ios` ships `hermesc`, `hermes-lit` and an
+embeddable `hermesvm.framework` but no CLI; `hermes-android` is Android-only;
+GitHub releases stop at v0.13.0. setup-vm says so for those versions. The boot
+oracle does not need them: it runs source under the v96 VM, lowering classes
+and private members that classic Hermes cannot parse (spec 33, 0.1.2).
+
 `tools/get-hermesc.sh` only ever gets a `hermesc` **compiler**; the only
 prebuilt `hermes` **VM/interpreter** available on npm is bundled with
 `hermes-engine-cli`, whose last release (`0.12.0`) tops out at HBC 89 and hard-
