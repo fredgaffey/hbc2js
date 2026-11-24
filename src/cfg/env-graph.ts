@@ -541,9 +541,12 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
 
     let guard = 0;
     const budget = cfg.blocks.length * 8 + 64;
-    while (worklist.length > 0) {
+    // FIFO by a moving head: `shift()` is O(length), quadratic on a
+    // function with tens of thousands of blocks. Same pop order.
+    let head = 0;
+    while (head < worklist.length) {
       if (++guard > budget) break; // §6.2: cap and bail rather than spin
-      const id = worklist.shift()!;
+      const id = worklist[head++]!;
       inWorklist[id] = 0;
       const block = cfg.blocks[id]!;
       state = new Map(entryState[id]!);

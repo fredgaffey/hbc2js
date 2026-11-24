@@ -7,7 +7,8 @@
 // (guarded by tests/gate/export/export-workers.test.ts). Work is handed out
 // in small batches on demand, so one expensive module does not stall a
 // whole pre-assigned slice.
-import { serialize } from "node:v8";
+import { serialize, setFlagsFromString } from "node:v8";
+import { runInNewContext } from "node:vm";
 import { cpus, totalmem } from "node:os";
 import { Worker } from "node:worker_threads";
 import { resolveWorkerCount } from "../parallel/pool.ts";
@@ -128,6 +129,34 @@ export interface PoolStats {
   peakWorkerHeap: number;
 }
 
+/** Everything whole-bundle the workers need, in shared buffers. Afterwards
+ *  the caller's own per-function caches (every function, from the split)
+ *  are dead weight, so they are dropped (rebuilt on demand if the caller
+ *  renders again) and, when the runtime allows, collected at once -- so the
+ *  main thread's RSS the plan subtracts is what it really keeps. */
+export function shareForRenderWorkers(bytes: Uint8Array, analysis: ModuleAnalysis): RenderWorkerData {
+  const data: RenderWorkerData = { bytes: toShared(bytes), envGraph: toShared(serialize({ envGraph: envGraphToTransfer(analysis.envGraph), layout: emitLayoutTransfer(analysis) })) };
+  analysis.releaseCaches?.();
+  collectGarbage();
+  return data;
+}
+
+/** A full GC on this thread, via V8's `gc` extension (enabled for this
+ *  call only if the process was not started with --expose-gc). */
+function collectGarbage(): void {
+  const g = (globalThis as { gc?: () => void }).gc;
+  if (typeof g === "function") {
+    g();
+    return;
+  }
+  try {
+    setFlagsFromString("--expose-gc");
+    (runInNewContext("gc") as () => void)();
+  } catch {
+    // Best effort: without it the plan just sees a larger main thread.
+  }
+}
+
 const WORKER_SCRIPT = siblingWorkerPath("render-worker", import.meta.url);
 const BATCH = 4;
 
@@ -139,8 +168,7 @@ const BATCH = 4;
  *  budget, and one more is started while another of the largest seen still
  *  fits (up to `plan.max`) and enough work is left to repay its setup. */
 export async function renderModulesInPool(
-  bytes: Uint8Array,
-  analysis: ModuleAnalysis,
+  data: RenderWorkerData,
   jobs: readonly RenderJob[],
   plan: Pick<RenderWorkerPlan, "count" | "budget" | "max">,
   onProgress?: (done: number) => void,
@@ -160,11 +188,6 @@ export async function renderModulesInPool(
   let next = 0;
   let done = 0;
   const order = [...jobs].sort((a, b) => b.cost - a.cost || a.moduleId - b.moduleId);
-  const data: RenderWorkerData = { bytes: toShared(bytes), envGraph: toShared(serialize({ envGraph: envGraphToTransfer(analysis.envGraph), layout: emitLayoutTransfer(analysis) })) };
-  // The workers have everything whole-bundle they need; the caller's own
-  // per-function caches (every function, from the split) are dead weight
-  // from here on (rebuilt on demand if the caller renders again).
-  analysis.releaseCaches?.();
   try {
     await new Promise<void>((resolve, reject) => {
       if (jobs.length === 0) {

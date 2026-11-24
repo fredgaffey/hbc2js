@@ -17,7 +17,7 @@ import { buildHelpersJs, buildRegistryJs } from "./registry.ts";
 import { rewriteModuleFile, wrapReadableModule } from "./rewrite.ts";
 import { renderModuleTiered, tieredFromOutcome } from "./tiers.ts";
 import type { ReadableOutcome } from "./tiers.ts";
-import { planRenderWorkers, renderModulesInPool } from "./render-pool.ts";
+import { planRenderWorkers, renderModulesInPool, shareForRenderWorkers } from "./render-pool.ts";
 import { resolveWorkerCount } from "../parallel/pool.ts";
 import type { PoolStats, RenderJob } from "./render-pool.ts";
 import type { ExportManifestModule, ExportManifestUnresolved } from "./manifest.ts";
@@ -164,10 +164,15 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   // than one is available; everything else below stays serial, in module
   // order, consuming the outcomes by id -- so the tree does not depend on the
   // worker count.
-  const workerPlan = tier === "flat" ? { count: 1, limitedBy: null, budget: null, max: 1 } : planRenderWorkers(opts.workers, splitResult.module.functions.length, bytes.length);
+  // The shared state is built (and the main thread's own caches dropped)
+  // before planning, so the plan's memory budget sees the main thread as it
+  // will stay during rendering.
+  const poolWanted = tier !== "flat" && planRenderWorkers(opts.workers, splitResult.module.functions.length, bytes.length).count > 1;
+  const shared = poolWanted ? shareForRenderWorkers(new Uint8Array(bytes), splitResult.analysis) : undefined;
+  const workerPlan = shared === undefined ? { count: 1, limitedBy: null, budget: null, max: 1 } : planRenderWorkers(opts.workers, splitResult.module.functions.length, bytes.length);
   const workerCount = workerPlan.count;
   let pooled: Map<number, ReadableOutcome> | undefined;
-  if (workerCount > 1) {
+  if (shared !== undefined) {
     const jobs: RenderJob[] = [];
     for (const info of segregated.modules) {
       if (plan.replacedModules.has(info.id)) continue;
@@ -184,7 +189,7 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
     progress(`rendering ${jobs.length} modules on ${Math.min(workerCount, jobs.length)} worker thread(s)${workerPlan.limitedBy === "memory" ? " (capped by physical memory)" : ""}`);
     let reported = 0;
     const poolStats: PoolStats = { peakWorkers: 0, peakWorkerHeap: 0 };
-    pooled = await renderModulesInPool(new Uint8Array(bytes), splitResult.analysis, jobs, workerPlan, (done) => {
+    pooled = await renderModulesInPool(shared, jobs, workerPlan, (done) => {
       if (done - reported >= 250) {
         reported = done - (done % 250);
         progress(`rendering modules ${reported}/${jobs.length}`);
