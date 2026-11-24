@@ -1009,43 +1009,33 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
       return out;
     };
     const copied = new Set(closureCopies.keys());
-    /** The copied functions that create `fn`, directly or through a chain of
-     *  creators that are not copied themselves (corpus a03, zustand's inlined
-     *  `toThenable`: copied `f` creates `then`, which creates `f` again over
-     *  an environment `then` owns -- `f` creates itself one hop removed). */
-    const copiedCreatorsMemo = new Map<number, ReadonlySet<number>>();
-    const copiedCreators = (fn: number): ReadonlySet<number> => {
-      const memo = copiedCreatorsMemo.get(fn);
-      if (memo !== undefined) return memo;
-      const out = new Set<number>();
-      const seen = new Set<number>([fn]);
-      const work = [fn];
-      while (work.length > 0) {
-        const cur = work.pop()!;
-        for (const key of closureCreationSites.get(cur)?.keys() ?? []) {
-          const c = Number(key.slice(0, key.indexOf(":")));
-          if (copied.has(c)) out.add(c);
-          else if (!seen.has(c)) {
-            seen.add(c);
-            work.push(c);
-          }
-        }
-      }
-      copiedCreatorsMemo.set(fn, out);
-      return out;
-    };
     const succ = new Map<number, Set<number>>();
     for (const g of copied) {
-      for (const c of copiedCreators(g)) {
+      for (const key of closureCreationSites.get(g)?.keys() ?? []) {
+        const c = Number(key.slice(0, key.indexOf(":")));
+        if (!copied.has(c)) continue;
         let set = succ.get(c);
         if (set === undefined) succ.set(c, (set = new Set()));
         set.add(g);
       }
     }
-    /** `owner` is `f` or one of the functions `f` creates through uncopied
-     *  creators -- an environment it owns has a fresh instance per instance
-     *  of `f`, so a copy over it would nest inside itself. */
-    const ownedWithin = (owner: number, f: number): boolean => owner === f || (!copied.has(owner) && copiedCreators(owner).has(f));
+    /** `g` is `f` or lexically nested in it: following captured
+     *  environments' owners from `g` outward reaches `f`. An environment
+     *  owned by such a `g` has a fresh instance per instance of `f`, so a copy
+     *  of `f` over it would be hosted inside `f`'s own body. Mere creation is
+     *  not nesting: react-navigation fn 11444 creates sibling 11442 over their
+     *  shared outer environment, and 11442 creates 11444 over an environment
+     *  it owns -- that copy is hosted in 11442, outside 11444, and is fine. */
+    const lexicallyWithin = (g: number, f: number): boolean => {
+      const seen = new Set<number>();
+      for (let cur: number | undefined = g; cur !== undefined && !seen.has(cur); ) {
+        if (cur === f) return true;
+        seen.add(cur);
+        const env = closureEnvOf.get(cur);
+        cur = env === undefined || env === null ? undefined : drafts[env]!.ownerFunction;
+      }
+      return false;
+    };
     // Tarjan's SCC over the copied functions' "creates" relation.
     const index = new Map<number, number>();
     const low = new Map<number, number>();
@@ -1082,7 +1072,7 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
       // Only where copies are impossible: some member captures an environment
       // it creates itself (the captured and the fresh instance share a name).
       // Other recursion groups keep spec 05 §6's per-instance copies.
-      if (!comp.some((f) => closureCopies.get(f)!.some((c) => ownedWithin(drafts[c.env]!.ownerFunction, f)))) continue;
+      if (!comp.some((f) => closureCopies.get(f)!.some((c) => drafts[c.env]!.ownerFunction === f))) continue;
       const picks = new Map<number, { env0: EnvNodeId; parent: EnvNodeId }>();
       for (const f of comp) {
         const envs = closureCopies.get(f)!.map((c) => c.env);
@@ -1096,6 +1086,25 @@ export function buildEnvGraph(input: EnvGraphInput): EnvGraph {
       }
       if (picks.size !== comp.length) continue;
       for (const [f, pk] of picks) chosen.set(f, pk);
+    }
+    // The same collision one hop removed (corpus a03, zustand's inlined
+    // `toThenable`): `f` creates `then` inside its own body, and `then`
+    // creates `f` over an environment `then` owns, so that copy would nest
+    // inside itself. Only lexical nesting triggers this (see lexicallyWithin).
+    // Same "parents agree" condition, and the shared parent must lie outside
+    // `f` (else the factory would be hosted inside itself).
+    for (const f of [...copied].sort((x, y) => x - y)) {
+      if (chosen.has(f)) continue;
+      const copies = closureCopies.get(f)!;
+      if (!copies.some((c) => drafts[c.env]!.ownerFunction !== f && lexicallyWithin(drafts[c.env]!.ownerFunction, f))) continue;
+      const envs = copies.map((c) => c.env);
+      const chains = envs.map(chainOf);
+      const c0 = chains[0];
+      if (c0 === null || c0 === undefined || c0.length < 2) continue;
+      if (!chains.every((c) => c !== null && c.length === c0.length && c.every((e, k) => k === 0 || e === c0[k]))) continue;
+      const env0 = envs.find((e) => !lexicallyWithin(drafts[e]!.ownerFunction, f));
+      if (env0 === undefined || lexicallyWithin(drafts[c0[1]!]!.ownerFunction, f)) continue;
+      chosen.set(f, { env0, parent: c0[1]! });
     }
     // A copied function with a creation environment owned by a factory would be
     // a copy hosted inside a factory body (and its `.name` a copy name): it
