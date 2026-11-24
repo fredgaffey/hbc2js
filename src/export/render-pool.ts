@@ -62,7 +62,7 @@ export const POOL_MIN_FUNCTIONS = 8000;
  *  worker has reported (deb, 2026-11-24, workers dropping their per-module
  *  caches: see spec 29 section 12). Only the starting count uses it; the pool
  *  then sizes itself from what the workers measure (`WorkerHeap`). */
-const WORKER_BYTES_PER_BUNDLE_BYTE = 60;
+const WORKER_BYTES_PER_BUNDLE_BYTE = 100;
 const WORKER_MIN_BYTES = 256 * 2 ** 20;
 /** Native (non-heap) memory per worker on top of its V8 heap: thread stack,
  *  code space, the deserialized env-graph buffers' malloc slack. */
@@ -77,6 +77,17 @@ const DEFAULT_MAX_WORKERS = 12;
  *  and only lets garbage pile up. */
 const WORKER_MIN_HEAP_MB = 512;
 const WORKER_MAX_HEAP_MB = 1024;
+/** A bound below this many bytes per bundle byte makes a bigger bundle's
+ *  large modules run out of heap and be redone (deb, 39k-function / 16 MB
+ *  app at 1 GB: render 81 s against 57 s unbounded), so the bound never
+ *  goes under it. */
+const WORKER_HEAP_BYTES_PER_BUNDLE_BYTE = 120;
+
+/** The old-generation bound for one worker with `share` bytes of budget. */
+export function heapBoundMb(share: number, bundleBytes: number): number {
+  const floor = Math.max(WORKER_MIN_HEAP_MB, Math.ceil((bundleBytes * WORKER_HEAP_BYTES_PER_BUNDLE_BYTE) / 2 ** 20));
+  return Math.max(floor, Math.min(WORKER_MAX_HEAP_MB, Math.floor(share / 2 ** 20)));
+}
 
 export interface RenderWorkerPlan {
   /** Workers to start with. */
@@ -175,14 +186,22 @@ export async function renderModulesInPool(
   stats: PoolStats = { peakWorkers: 0, peakWorkerHeap: 0 },
 ): Promise<Map<number, ReadableOutcome>> {
   const results = new Map<number, ReadableOutcome>();
-  const count = Math.max(1, Math.min(plan.count, Math.ceil(jobs.length / BATCH)));
+  const bytesLength = data.bytes.byteLength;
   // With a memory budget, each worker's old generation is bounded to its
   // share (within WORKER_MIN_HEAP_MB..WORKER_MAX_HEAP_MB; `HBC2JS_WORKER_HEAP_MB` overrides): a worker's live heap is small (deb,
   // 15.5k-function app: under 500 MB after a GC) but V8 lets garbage pile
   // up to the limit it is given, and that, not live data, was the pool's
   // RSS. A module that needs more is redone without the bound (below).
   const envLimit = Number.parseInt(process.env.HBC2JS_WORKER_HEAP_MB ?? "", 10);
-  const heapLimitMb = Number.isFinite(envLimit) && envLimit > 0 ? envLimit : plan.budget !== null ? Math.min(WORKER_MAX_HEAP_MB, Math.max(WORKER_MIN_HEAP_MB, Math.floor((plan.budget / count - WORKER_NATIVE_BYTES) / 2 ** 20))) : null;
+  const startCount = Math.max(1, Math.min(plan.count, Math.ceil(jobs.length / BATCH)));
+  const heapLimitMb = Number.isFinite(envLimit) && envLimit > 0 ? envLimit : plan.budget !== null ? heapBoundMb(plan.budget / startCount - WORKER_NATIVE_BYTES, bytesLength) : null;
+  // A bounded worker's old generation never passes its bound, so bound +
+  // native per worker is a hard ceiling: never more workers than fit the
+  // budget at that ceiling (reported heaps are taken between batches, after
+  // a cache drop, and understate a worker mid-module).
+  const ceiling = heapLimitMb !== null ? heapLimitMb * 2 ** 20 + WORKER_NATIVE_BYTES : 0;
+  const maxLive = plan.budget !== null && heapLimitMb !== null ? Math.max(1, Math.min(plan.max, Math.floor(plan.budget / ceiling))) : plan.max;
+  const count = Math.min(startCount, maxLive);
   const workers: Worker[] = [];
   let live = 0;
   let next = 0;
@@ -256,7 +275,7 @@ export async function renderModulesInPool(
               return;
             }
             const left = order.length - next;
-            if (live < plan.max && footprint + stats.peakWorkerHeap + WORKER_NATIVE_BYTES <= plan.budget && left > live * BATCH * 4) feed(spawn());
+            if (live < maxLive && footprint + stats.peakWorkerHeap + WORKER_NATIVE_BYTES <= plan.budget && left > live * BATCH * 4) feed(spawn());
           }
           feed(w);
         });
