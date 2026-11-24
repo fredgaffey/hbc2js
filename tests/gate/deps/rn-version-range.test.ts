@@ -34,7 +34,7 @@ test("reconcileReactNativeVersion: HBC96 + RN 0.72.17 is no longer a false posit
   // react-native version was 0.72.17.
   const { consistent, expectedRange } = reconcileReactNativeVersion(96, "0.72.17");
   assert.equal(consistent, true);
-  assert.equal(expectedRange, "RN 0.72.x-0.81.x");
+  assert.equal(expectedRange, "RN 0.72.x-0.87.x");
 });
 
 test("reconcileReactNativeVersion: a genuinely wrong era is still flagged", () => {
@@ -48,7 +48,7 @@ test("reconcileReactNativeVersion: a genuinely wrong era is still flagged", () =
 test("reconcileReactNativeVersion: no RN version detected -> null, not false", () => {
   const { consistent, expectedRange } = reconcileReactNativeVersion(96, null);
   assert.equal(consistent, null);
-  assert.equal(expectedRange, "RN 0.72.x-0.81.x");
+  assert.equal(expectedRange, "RN 0.72.x-0.87.x");
 });
 
 test("reconcileReactNativeVersion: undocumented HBC version -> null range and null consistency", () => {

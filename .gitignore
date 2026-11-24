@@ -42,3 +42,5 @@ cache/llm-readability/
 !/.claude/
 /.claude/*
 !/.claude/skills/
+tests/fixtures/bundles/ignite-11.5.0/*.hbc
+tests/fixtures/bundles/ignite-11.5.0/deps-truth.json

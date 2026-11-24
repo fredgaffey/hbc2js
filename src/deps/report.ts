@@ -9,6 +9,7 @@ import { isHintEligibleEvidence } from "./guess.ts";
 import type { ConfirmResult } from "./confirm.ts";
 import type { ClassificationReport } from "./classify.ts";
 import type { NativeChannelReport } from "../native/native-deps.ts";
+import type { VersionEvidence } from "./version-evidence.ts";
 
 export interface ConfirmedDep {
   readonly package: string;
@@ -16,7 +17,7 @@ export interface ConfirmedDep {
   readonly confidence: ConfidenceTier;
   readonly modulesCovered: number;
   readonly moduleTotal: number;
-  readonly source: "db-match" | "confirmed";
+  readonly source: "db-match" | "confirmed" | "bundle-string";
   /** How `version` was pinned (spec 13 `docs/specs/13-reuse-validation.md`
    *  §3.2's "version key" distinction — added for the OSV lane's two-key
    *  gate, additive/optional so no existing consumer breaks). `source:
@@ -33,7 +34,7 @@ export interface ConfirmedDep {
    *  reports built before this field existed (older cached JSON) — callers
    *  that care (the OSV gate) treat `undefined` as `"exact-hash"` for
    *  `db-match` and as unknown/non-direct for `"confirmed"`. */
-  readonly versionEvidence?: "exact-hash" | "date-inferred";
+  readonly versionEvidence?: "exact-hash" | "date-inferred" | "bundle-string";
   /** corpus-fork-relabel: the upstream package whose signature matched,
    *  when the bundle names this fork of it instead (`src/deps/fork-relabel.ts`).
    *  `version` is then the upstream version whose code matched. */
@@ -91,6 +92,13 @@ export interface DepsReport {
   readonly totalFunctions: number;
   readonly totalModules: number;
   readonly reactNativeVersion: string | null;
+  /** Where `reactNativeVersion` came from: `"bundle-string"` = the bundle's
+   *  own `ReactNativeVersion` constants (version-evidence.ts; trustworthy),
+   *  `"signature-match"` = the signature DB's nearest react-native build
+   *  (NOT corroborated: the DB only holds some versions), null = not detected. */
+  readonly reactNativeVersionSource?: "bundle-string" | "signature-match" | null;
+  /** The react version read from the `react` module's own version constant, or null. */
+  readonly reactVersion?: string | null;
   /** null when no react-native version was detected at all; otherwise
    *  whether `reactNativeVersion` falls inside the RN release range the
    *  parsed HBC bytecode version is actually known to ship (F4,
@@ -173,6 +181,9 @@ export interface DepsReport {
 // is catching a match that's flatly *wrong* (a different HBC era's version
 // entirely), not nitpicking exact patches.
 interface RnRange {
+  /** Minor used by `newestRnVersionForHbc`'s build-toolchain fallback (the
+   *  range's top may be newer than anything safe to default to). */
+  readonly fallbackMinor?: number;
   readonly minMajor: number;
   readonly minMinor: number;
   readonly maxMajor: number;
@@ -185,7 +196,9 @@ const HBC_TO_RN_RANGE: ReadonlyMap<number, RnRange> = new Map([
   [89, { minMajor: 0, minMinor: 70, maxMajor: 0, maxMinor: 70, label: "RN 0.70.x" }],
   [90, { minMajor: 0, minMinor: 71, maxMajor: 0, maxMinor: 71, label: "RN 0.71.x" }],
   [94, { minMajor: 0, minMinor: 72, maxMajor: 0, maxMinor: 72, label: "RN 0.72.x" }],
-  [96, { minMajor: 0, minMinor: 72, maxMajor: 0, maxMinor: 81, label: "RN 0.72.x-0.81.x" }],
+  // HBC96 still ships with RN 0.82/0.83+ (hermes-compiler 0.14-0.17,
+  // docs/TOOLCHAIN.md): a real RN 0.83.2 / Expo 55 app is HBC96.
+  [96, { minMajor: 0, minMinor: 72, maxMajor: 0, maxMinor: 87, fallbackMinor: 81, label: "RN 0.72.x-0.87.x" }],
   [98, { minMajor: 0, minMinor: 82, maxMajor: 0, maxMinor: 87, label: "RN 0.82.x-0.87.x" }],
   // v99 ("1000.x" line per docs/TOOLCHAIN.md) has no documented upper bound
   // yet — Number.MAX_SAFE_INTEGER-ish ceiling so it never flags a mismatch.
@@ -256,7 +269,7 @@ export function reconcileReactNativeVersion(hbcVersion: number, reactNativeVersi
 export function newestRnVersionForHbc(hbcVersion: number): string | null {
   const range = HBC_TO_RN_RANGE.get(hbcVersion);
   if (range === undefined || range.maxMinor >= 999999) return null;
-  return `${range.maxMajor}.${range.maxMinor}.0`;
+  return `${range.maxMajor}.${range.fallbackMinor ?? range.maxMinor}.0`;
 }
 
 // Toolchain/foundation baseline files (docs/PACKAGE-SIGNATURES.md §5.2:
@@ -280,7 +293,7 @@ const BASELINE_ALIAS: ReadonlyMap<string, string | null> = new Map([
   ["metro-toolchain-empty", null],
 ]);
 
-export function buildReport(input: string, matchReport: MatchReport, guesses: readonly ModuleGuess[], confirmResults: readonly ConfirmResult[] = [], classification: ClassificationReport | null = null, nativeChannel: NativeChannelReport | null = null): DepsReport {
+export function buildReport(input: string, matchReport: MatchReport, guesses: readonly ModuleGuess[], confirmResults: readonly ConfirmResult[] = [], classification: ClassificationReport | null = null, nativeChannel: NativeChannelReport | null = null, versionEvidence: VersionEvidence = {}): DepsReport {
   const confirmedDeps: ConfirmedDep[] = [];
   const confirmedNamesFromRealPackages = new Set<string>();
   for (const p of matchReport.packages) {
@@ -314,6 +327,20 @@ export function buildReport(input: string, matchReport: MatchReport, guesses: re
       });
     }
   }
+  // Framework versions read from the bundle's own constants beat any
+  // signature-DB nearest match (which can only name versions the DB holds).
+  const applyBundleVersion = (pkg: string, version: string | undefined): void => {
+    if (version === undefined) return;
+    const i = confirmedDeps.findIndex((d) => d.package === pkg);
+    if (i >= 0) {
+      const old = confirmedDeps[i]!;
+      confirmedDeps[i] = { ...old, version, versionEvidence: "bundle-string" };
+    } else {
+      confirmedDeps.push({ package: pkg, version, confidence: "high", modulesCovered: 0, moduleTotal: matchReport.totalModules, source: "bundle-string", versionEvidence: "bundle-string" });
+    }
+  };
+  applyBundleVersion("react-native", versionEvidence.reactNative);
+  applyBundleVersion("react", versionEvidence.react);
   const confirmedPackageNames = new Set(confirmedDeps.map((d) => d.package));
 
   // Guessed candidates are aggregated per package name (rather than reported
@@ -392,6 +419,12 @@ export function buildReport(input: string, matchReport: MatchReport, guesses: re
     if (reason === null) guessedDeps.push(row);
     else suppressedGuesses.push({ package: pkg, confidence: v.confidence, evidence: row.evidence, reason });
   }
+  // `expo` itself has no native-module name of its own in a bundle, but any
+  // Expo SDK module (expo-*, ExpoModulesCore) requires it.
+  const expoModules = [...confirmedDeps.map((d) => d.package), ...guessedDeps.map((d) => d.package), ...hintedDeps.map((d) => d.package)].filter((n) => n.startsWith("expo-"));
+  if (expoModules.length > 0 && !confirmedPackageNames.has("expo") && !guessedDeps.some((d) => d.package === "expo") && !hintedDeps.some((d) => d.package === "expo")) {
+    hintedDeps.push({ package: "expo", version: null, confidence: 0.7, evidenceKind: "dependency-edge", evidence: [`required by ${expoModules.length} detected Expo SDK module(s): ${expoModules.slice(0, 4).join(", ")}`] });
+  }
   guessedDeps.sort((a, b) => b.confidence - a.confidence);
   hintedDeps.sort((a, b) => b.confidence - a.confidence);
   suppressedGuesses.sort((a, b) => b.confidence - a.confidence);
@@ -451,7 +484,9 @@ export function buildReport(input: string, matchReport: MatchReport, guesses: re
   const percentAttributedByWeight = totalInstrWeight === 0 ? 0 : ((matchedInstrWeight + guessedInstrWeight) / totalInstrWeight) * 100;
   const percentVerifiedByWeight = totalInstrWeight === 0 ? 0 : (matchedInstrWeight / totalInstrWeight) * 100;
 
-  const reactNativeVersion = detectReactNativeVersion(matchReport);
+  const signatureRnVersion = detectReactNativeVersion(matchReport);
+  const reactNativeVersion = versionEvidence.reactNative ?? signatureRnVersion;
+  const reactNativeVersionSource = versionEvidence.reactNative !== undefined ? "bundle-string" : signatureRnVersion !== null ? "signature-match" : null;
   const rnReconcile = reconcileReactNativeVersion(matchReport.hbcVersion, reactNativeVersion);
 
   const confirmedVersionByPackage = new Map(confirmedDeps.map((d) => [d.package, d.version]));
@@ -473,6 +508,8 @@ export function buildReport(input: string, matchReport: MatchReport, guesses: re
     totalFunctions: matchReport.totalFunctions,
     totalModules: matchReport.totalModules,
     reactNativeVersion,
+    reactNativeVersionSource,
+    reactVersion: versionEvidence.react ?? null,
     reactNativeVersionConsistentWithHbc: rnReconcile.consistent,
     reactNativeVersionExpectedRange: rnReconcile.expectedRange,
     confirmedDeps,
@@ -519,7 +556,7 @@ export function formatReportText(report: DepsReport): string {
   for (const b of bundles.slice(0, 8)) lines.push(`  bundle ${b.entryPath}: ${b.kind}, ${b.totalModules} modules${b.analysed ? " (analysed)" : ""}`);
   if (bundles.length > 8) lines.push(`  ... ${bundles.length - 8} more bundles (${bundles.filter((b) => b.analysed).length} of ${bundles.length} analysed)`);
   if (report.reactNativeVersion !== null) {
-    let rnLine = `  react-native: ${report.reactNativeVersion} (detected from matched module signatures)`;
+    let rnLine = `  react-native: ${report.reactNativeVersion} (${report.reactNativeVersionSource === "bundle-string" ? "read from the bundle's ReactNativeVersion constants" : "nearest signature-DB match -- NOT corroborated by a version constant in the bundle; treat as a guess"})`;
     if (report.reactNativeVersionConsistentWithHbc === false) {
       rnLine += ` — WARNING: inconsistent with parsed HBC v${report.hbcVersion} (expected ${report.reactNativeVersionExpectedRange ?? "a different range"})`;
     } else if (report.reactNativeVersionExpectedRange !== null) {

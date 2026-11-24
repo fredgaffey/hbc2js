@@ -174,7 +174,7 @@ export async function runDeps(inputPath: string, opts: DepsOptions = {}): Promis
     classification = classifyInventory(inventory, commonalityIndex);
   }
 
-  const reportWithoutNativeChannel = buildReport(inputPath, matchReport, guesses, confirmResults, classification);
+  const reportWithoutNativeChannel = buildReport(inputPath, matchReport, guesses, confirmResults, classification, null, inventory.versionEvidence ?? {});
   const nativeChannel = extname(inputPath).toLowerCase() === ".apk" ? nativeChannelForApk(inputPath, reportWithoutNativeChannel) : null;
   const reportWithBundles = bundles === null ? reportWithoutNativeChannel : { ...reportWithoutNativeChannel, bundles };
   const report = nativeChannel === null ? reportWithBundles : { ...reportWithBundles, nativeChannel };
@@ -241,7 +241,7 @@ export function runInformedDeps(inputPath: string, known: readonly KnownPackage[
     const commonalityIndex = loadCommonalityIndex(opts.commonalityIndexPath ?? join(process.cwd(), DEFAULT_COMMONALITY_INDEX_PATH));
     classification = classifyInventory(inventory, commonalityIndex);
   }
-  const report = buildReport(inputPath, matchReport, [], [], classification, null);
+  const report = buildReport(inputPath, matchReport, [], [], classification, null, inventory.versionEvidence ?? {});
 
   const loadedNames = new Set(dbs.map((d) => d.file.package));
   const bestTier = new Map<string, import("./match.ts").ConfidenceTier>();

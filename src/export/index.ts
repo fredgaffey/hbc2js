@@ -15,7 +15,7 @@ import { rewriteModuleFile, wrapReadableModule } from "./rewrite.ts";
 import { renderModuleTiered } from "./tiers.ts";
 import type { ExportManifestModule, ExportManifestUnresolved } from "./manifest.ts";
 import { buildExportManifest } from "./manifest.ts";
-import { planSubstitutions, tierConfidenceScore } from "./substitute.ts";
+import { planSubstitutions } from "./substitute.ts";
 import type { SubstituteMode } from "./substitute.ts";
 import {
   buildAppJson,
@@ -24,6 +24,7 @@ import {
   buildIndexJs,
   buildMetroConfigJs,
   buildPackageJson,
+  exportDependencies,
   recoverAppName,
   resolveReactNativeVersion,
 } from "./boilerplate.ts";
@@ -208,14 +209,11 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
       detail: `no react-native version detected and no known RN range for HBC v${splitResult.module.header.version}`,
     });
   }
-  for (const g of report.guessedDeps) {
-    unresolved.push({ kind: "guessed-not-installed", detail: `${g.package}: guessed, not confirmed -- not written into package.json` });
-  }
   unresolved.push(...plan.unresolved);
 
   const dependencies: Record<string, { version: string; kind: string; source: string; confidence: number | null }> = {};
-  for (const d of report.confirmedDeps) {
-    dependencies[d.package] = { version: d.version, kind: "dependency", source: "deps-confirmed", confidence: tierConfidenceScore(d.confidence) };
+  for (const [name, d] of Object.entries(exportDependencies(report, rn.version))) {
+    dependencies[name] = { version: d.version, kind: "dependency", source: d.level === "confirmed" ? "deps-confirmed" : `deps-${d.level}${d.versionDerived ? "-name-only" : ""}`, confidence: d.confidence };
   }
 
   const manifest = buildExportManifest({

@@ -278,14 +278,18 @@ finds no component — the acceptance test in §9 checks exactly that agreement.
 Two disjoint groups, with two different provenances, both recorded per package
 in the manifest:
 
-- **`dependencies`** — from `DepsReport.confirmedDeps` only (`{package,
-  version}`, confirmed tier, the M6 contract in `docs/DEPS.md` "For the M6
-  emitter"), via the existing `packageJsonDependencies(report)`. Versions are
-  **exact pins** (`"0.72.17"`, never `^`/`~`): the bundle is evidence for one
-  build, and a caret would install a different one. `guessedDeps`/`hintedDeps`
-  are NEVER written into `package.json` (DEPS.md's own rule); they land in the
-  manifest's `unresolved` list with kind `guessed-not-installed`, visible and
-  actionable, never silently applied.
+- **`dependencies`** — every package the deps stage detected, at any
+  evidence level (`exportDependencies`, `src/export/boilerplate.ts`):
+  `confirmedDeps` (exact pins; react/react-native versions read from the
+  bundle's own constants carry level `bundle-string`), then `guessedDeps`,
+  `hintedDeps` (native-module names, `expo` implied by Expo SDK modules) and
+  native-channel deps. A detection with no version evidence gets the Expo SDK
+  line for the detected RN (`~55.0.0` for RN 0.83) when it is an `expo*`
+  package, else `*`. EXPORT.json's `dependencies.<pkg>.source` records the
+  evidence level (`deps-confirmed`, `deps-bundle-string`, `deps-guessed`,
+  `deps-hint`, `deps-native-channel`; a `-name-only` suffix means the version is
+  a derived placeholder, not evidence). `guessed-not-installed` is no longer
+  emitted: guesses are installed, and labelled.
 - **`devDependencies`** — the build toolchain, which is *not derivable from the
   bundle at all*: `@react-native/babel-preset`, `@react-native/metro-config`,
   `@react-native-community/cli`, `metro`/`metro-react-native-babel-*` (per RN
@@ -510,7 +514,7 @@ Written at the tree root. `hbc2js-export/1`.
               "moduleCount": 435, "entryModule": 434 },
   "app": { "name": "HelloHermes072", "nameSource": "registerComponent" },
   "reactNative": { "version": "0.72.17", "source": "deps-confirmed",
-                   "consistentWithHbc": true, "expectedRange": "RN 0.72.x-0.81.x" },
+                   "consistentWithHbc": true, "expectedRange": "RN 0.72.x-0.87.x" },
   "dependencies": { "react-native": { "version": "0.72.17", "kind": "dependency",
                                       "source": "deps-confirmed", "confidence": 0.94 } },
   "modules": [

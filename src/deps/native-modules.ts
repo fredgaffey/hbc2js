@@ -162,6 +162,9 @@ export const NATIVE_MODULE_TO_PACKAGE: ReadonlyMap<string, string> = new Map(
   ExpoFontUtils: "expo-font",
   ExpoLinking: "expo-linking",
   ExpoSplashScreen: "expo-splash-screen",
+  ExpoApplication: "expo-application",
+  ExpoLocalization: "expo-localization",
+  ExpoSystemUI: "expo-system-ui",
   }),
 );
 
