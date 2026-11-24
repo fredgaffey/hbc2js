@@ -104,3 +104,43 @@ test("ignite-11.5.0: deps report RN 0.83.2 / React 19.2.0 from bundle constants 
   for (const name of ["expo", "expo-font", "expo-linking", "react-native-screens", "react-native-safe-area-context"]) assert.ok(deps[name] !== undefined, `${name} missing`);
   assert.equal(deps["react"]!.version, "19.2.0");
 });
+
+// 0.1.2 corpus a02 (RN 0.82.1, no deps matched): package.json had no
+// react-native at all and paired cli 13 / metro 0.80 with RN 0.78, so
+// `npx react-native bundle` failed "unknown command 'bundle'".
+test("react-native and react are always dependencies once the RN version is known", () => {
+  const empty = report({ reactNativeVersion: null, confirmedDeps: [], guessedDeps: [], hintedDeps: [], nativeChannel: null } as Partial<DepsReport>);
+  const deps = exportDependencies(empty, "0.82.1");
+  assert.equal(deps["react-native"]!.version, "0.82.1");
+  assert.equal(deps["react"]!.version, "^19.1.1");
+  assert.equal(deps["react"]!.level, "peer");
+  const pj = buildPackageJson({ appName: "X", report: empty, rnVersion: "0.82.1" }) as { dependencies: Record<string, string> };
+  assert.ok(pj.dependencies["react-native"] !== undefined && pj.dependencies["react"] !== undefined);
+  assert.deepEqual(Object.keys(exportDependencies(empty, null)), [], "no RN version: nothing invented");
+});
+
+test("the CLI and metro devDependencies match the line each RN minor ships against (npm registry)", () => {
+  const want: [string, string | undefined, string][] = [
+    ["0.69.12", undefined, "^0.76.0"], // RN's own cli dependency serves; not tabled
+    ["0.70.15", "^9.3.0", "^0.72.0"],
+    ["0.71.19", "^10.2.0", "^0.73.0"],
+    ["0.72.17", "^11.4.0", "^0.76.0"],
+    ["0.73.11", "^12.3.0", "^0.80.0"],
+    ["0.74.7", "^13.6.0", "^0.80.0"],
+    ["0.75.5", "^14.0.0", "^0.80.0"],
+    ["0.76.9", "^15.0.0", "^0.81.0"],
+    ["0.77.3", "^15.0.0", "^0.81.0"],
+    ["0.78.3", "^15.0.0", "^0.81.0"],
+    ["0.79.7", "^18.0.0", "^0.82.0"],
+    ["0.80.3", "^19.0.0", "^0.82.0"],
+    ["0.81.6", "^20.0.0", "^0.83.0"],
+    ["0.82.1", "^20.0.0", "^0.83.0"],
+    ["0.84.1", "^20.0.0", "^0.83.0"],
+  ];
+  for (const [rn, cli, metro] of want) {
+    const t = TOOLCHAIN_FOR_RN(rn);
+    assert.equal(t["@react-native-community/cli"], cli, `cli for RN ${rn}`);
+    assert.equal(t["metro"], metro, `metro for RN ${rn}`);
+    if (Number(rn.split(".")[1]) < 73) assert.equal(t["metro-react-native-babel-preset"], metro, `legacy preset for RN ${rn} follows metro`);
+  }
+});

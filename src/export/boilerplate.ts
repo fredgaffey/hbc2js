@@ -149,22 +149,36 @@ function rnMinor(rnVersion: string | null): number | null {
   return m !== null ? Number(m[2]) : null;
 }
 
-/** The `@react-native-community/cli` and `metro` lines RN ships against, by
- *  RN minor (RN 0.83 bundles with cli 20 / metro 0.83; the old 13 / 0.80 pair
- *  cannot drive it). */
-function cliAndMetroFor(minor: number | null): { readonly cli: string; readonly metro: string } {
-  if (minor !== null && minor >= 81) return { cli: "^20.0.0", metro: "^0.83.0" };
-  if (minor === 80) return { cli: "^19.0.0", metro: "^0.82.0" };
-  if (minor === 79) return { cli: "^18.0.0", metro: "^0.82.0" };
-  return { cli: "^13.0.0", metro: "^0.80.0" };
+/** The `@react-native-community/cli` and `metro` lines RN ships against, by RN
+ *  minor (npm registry: react-native@<minor>'s own `@react-native-community/cli`
+ *  dependency up to 0.75, `@react-native/community-cli-plugin`'s `metro`
+ *  dependency from 0.73). From RN 0.76 RN no longer depends on the CLI and
+ *  `npx react-native bundle` needs it as a project devDependency; before 0.76
+ *  RN brings its own, so the devDependency only has to agree with it. Lines
+ *  older than 0.70 are not tabled: `cli` is null (RN's own dependency serves). */
+export function cliAndMetroFor(minor: number | null): { readonly cli: string | null; readonly metro: string } {
+  if (minor === null || minor >= 81) return { cli: "^20.0.0", metro: "^0.83.0" };
+  const rows: readonly (readonly [number, string, string])[] = [
+    [80, "^19.0.0", "^0.82.0"],
+    [79, "^18.0.0", "^0.82.0"],
+    [76, "^15.0.0", "^0.81.0"],
+    [75, "^14.0.0", "^0.80.0"],
+    [74, "^13.6.0", "^0.80.0"],
+    [73, "^12.3.0", "^0.80.0"],
+    [72, "^11.4.0", "^0.76.0"],
+    [71, "^10.2.0", "^0.73.0"],
+    [70, "^9.3.0", "^0.72.0"],
+  ];
+  for (const [from, cli, metro] of rows) if (minor >= from) return { cli, metro };
+  return { cli: null, metro: "^0.76.0" };
 }
 
 export function TOOLCHAIN_FOR_RN(rnVersion: string | null): Record<string, string> {
   const modern = isModernRnToolchain(rnVersion);
   const tool = cliAndMetroFor(rnMinor(rnVersion));
-  const common = {
+  const common: Record<string, string> = {
     "@babel/core": "^7.25.0",
-    "@react-native-community/cli": tool.cli,
+    ...(tool.cli === null ? {} : { "@react-native-community/cli": tool.cli }),
   };
   if (modern) {
     return {
@@ -174,11 +188,13 @@ export function TOOLCHAIN_FOR_RN(rnVersion: string | null): Record<string, strin
       metro: tool.metro,
     };
   }
+  // Legacy toolchain: the babel preset and metro-config are published in
+  // lockstep with metro itself.
   return {
     ...common,
-    "metro-react-native-babel-preset": "^0.77.0",
-    metro: "^0.76.0",
-    "metro-config": "^0.76.0",
+    "metro-react-native-babel-preset": tool.metro,
+    metro: tool.metro,
+    "metro-config": tool.metro,
   };
 }
 
@@ -237,6 +253,16 @@ export function exportDependencies(report: DepsReport, rnVersion: string | null)
         out[name] = pin !== null ? { ...d, version: pin.version, note: pin.note } : { ...d, note: "unpinned: no version evidence and no compatibility table for this package" };
       }
     }
+  }
+  // Every RN app needs react-native and react themselves; a bundle whose deps
+  // pass matched neither (corpus a02: 48k functions, no confirmed deps) still
+  // gets them, or `npx react-native bundle` has no `bundle` command at all.
+  if (rnVersion !== null && out["react-native"] === undefined) {
+    out["react-native"] = { version: useTable && sdkRn !== null ? sdkRn : rnVersion, level: "peer", confidence: null, versionDerived: true, note: "every React Native app depends on react-native; version from EXPORT.json reactNative" };
+  }
+  if (rnVersion !== null && out["react"] === undefined) {
+    const peer = (useTable ? expoCompatRange(sdk!, "react") : null) ?? rnReactPeer(rnVersion);
+    if (peer !== null) out["react"] = { version: peer, level: "peer", confidence: null, versionDerived: true, note: `peer dependency of react-native ${rnVersion}` };
   }
   // react and react-native are peers of each other's line: keep the RN entry on
   // the resolved RN, and move a weaker-evidenced react onto RN's react peer.
