@@ -203,7 +203,7 @@ export function walk(stmts: readonly Stmt[], visit: Visitor): void {
         e.elements.forEach(walkExpr);
         return;
       case "object":
-        e.props.forEach((p) => walkExpr("k" in p ? p.arg : p.value));
+        e.props.forEach((p) => { if (!("k" in p) && p.keyExpr !== undefined) walkExpr(p.keyExpr); walkExpr("k" in p ? p.arg : p.value); });
         return;
       case "spread": // F17
         walkExpr(e.arg);
@@ -393,9 +393,10 @@ export function mapExpr(e: Expr, fx: (e: Expr) => Expr): Expr {
           if (arg !== p.arg) changed = true;
           return arg === p.arg ? p : { ...p, arg };
         }
+        const keyExpr = p.keyExpr === undefined ? undefined : mapExpr(p.keyExpr, fx);
         const value = mapExpr(p.value, fx);
-        if (value !== p.value) changed = true;
-        return value === p.value ? p : { ...p, value };
+        if (value !== p.value || keyExpr !== p.keyExpr) changed = true;
+        return value === p.value && keyExpr === p.keyExpr ? p : { ...p, value, ...(keyExpr === undefined ? {} : { keyExpr }) };
       });
       rebuilt = changed ? { ...e, props } : e;
       break;
@@ -1026,10 +1027,24 @@ function countUses(stmts: readonly Stmt[], wanted: (name: string) => boolean, fo
         e.elements.forEach((x) => visitExpr(x, inNested));
         return;
       case "object":
-        e.props.forEach((p) => visitExpr("k" in p ? p.arg : p.value, inNested));
+        e.props.forEach((p) => { if (!("k" in p) && p.keyExpr !== undefined) visitExpr(p.keyExpr, inNested); visitExpr("k" in p ? p.arg : p.value, inNested); });
         return;
       case "spread": // F17
         visitExpr(e.arg, inNested);
+        return;
+      case "optmember": // F18 (bench 2026-11-24: an `r?.x` read was invisible here)
+        visitExpr(e.obj, inNested);
+        if (e.computed) visitExpr(e.prop, inNested);
+        return;
+      case "optcall": // F18
+        visitExpr(e.callee, inNested);
+        for (const a of e.args) visitExpr(a, inNested);
+        return;
+      case "await": // F25-1
+        visitExpr(e.arg, inNested);
+        return;
+      case "yield":
+        if (e.arg !== null) visitExpr(e.arg, inNested);
         return;
       case "seq":
         e.exprs.forEach((x) => visitExpr(x, inNested));
@@ -1240,10 +1255,24 @@ function defUseWalk(stmts: readonly Stmt[], nextAt: (s: Stmt) => number): Map<st
         e.elements.forEach((x) => visitExpr(x, at));
         return;
       case "object":
-        e.props.forEach((p) => visitExpr("k" in p ? p.arg : p.value, at));
+        e.props.forEach((p) => { if (!("k" in p) && p.keyExpr !== undefined) visitExpr(p.keyExpr, at); visitExpr("k" in p ? p.arg : p.value, at); });
         return;
       case "spread": // F17
         visitExpr(e.arg, at);
+        return;
+      case "optmember": // F18 (bench 2026-11-24: an `r?.x` read was invisible here)
+        visitExpr(e.obj, at);
+        if (e.computed) visitExpr(e.prop, at);
+        return;
+      case "optcall": // F18
+        visitExpr(e.callee, at);
+        for (const a of e.args) visitExpr(a, at);
+        return;
+      case "await": // F25-1
+        visitExpr(e.arg, at);
+        return;
+      case "yield":
+        if (e.arg !== null) visitExpr(e.arg, at);
         return;
       case "seq":
         e.exprs.forEach((x) => visitExpr(x, at));
@@ -1702,7 +1731,10 @@ export function effectSequence(stmts: readonly Stmt[]): readonly Effect[] {
           if ("k" in p) {
             visitExpr(p.arg);
             out.push({ k: "call", callee: "<spread>", arity: 1 });
-          } else visitExpr(p.value);
+          } else {
+            if (p.keyExpr !== undefined) visitExpr(p.keyExpr); // a computed key evaluates before its value
+            visitExpr(p.value);
+          }
         });
         return;
       case "spread":

@@ -16,6 +16,15 @@ function renameExpr(e: Expr, map: Mapping): Expr {
       const prop = e.computed ? renameExpr(e.prop, map) : e.prop;
       return obj === e.obj && prop === e.prop ? e : { ...e, obj, prop };
     }
+    case "optmember": {
+      // F18. Bench 2026-11-24 (Ignite export): this case was missing, so a
+      // register read only as `r7?.x` kept its old name after the decl was
+      // renamed -- a free identifier that throws at runtime.
+      const obj = renameExpr(e.obj, map);
+      const prop = e.computed ? renameExpr(e.prop, map) : e.prop;
+      return obj === e.obj && prop === e.prop ? e : { ...e, obj, prop };
+    }
+    case "optcall":
     case "call":
     case "new": {
       const callee = renameExpr(e.callee, map);
@@ -48,12 +57,29 @@ function renameExpr(e: Expr, map: Mapping): Expr {
       return elements.every((x, i) => x === e.elements[i]) ? e : { ...e, elements };
     }
     case "object": {
-      const props = e.props.map((p) => ("k" in p ? { ...p, arg: renameExpr(p.arg, map) } : { ...p, value: renameExpr(p.value, map) }));
-      return props.every((p, i) => ("k" in p ? p.arg === (e.props[i] as { arg: unknown }).arg : p.value === (e.props[i] as { value: unknown }).value)) ? e : { ...e, props };
+      // A computed key's `keyExpr` (bench 2026-11-24: `{[r12]: v}` kept r12
+      // after the def became `key`) is renamed with the value.
+      const props = e.props.map((p) => ("k" in p ? { ...p, arg: renameExpr(p.arg, map) } : { ...p, value: renameExpr(p.value, map), ...(p.keyExpr === undefined ? {} : { keyExpr: renameExpr(p.keyExpr, map) }) }));
+      return props.every((p, i) => ("k" in p ? p.arg === (e.props[i] as { arg: unknown }).arg : p.value === (e.props[i] as { value: unknown }).value && p.keyExpr === (e.props[i] as { keyExpr?: unknown }).keyExpr)) ? e : { ...e, props };
     }
+    case "template": // F14
     case "seq": {
       const exprs = e.exprs.map((x) => renameExpr(x, map));
       return exprs.every((x, i) => x === e.exprs[i]) ? e : { ...e, exprs };
+    }
+    case "tagged": { // F14
+      const tag = renameExpr(e.tag, map);
+      const quasi = renameExpr(e.quasi, map);
+      return tag === e.tag && quasi === e.quasi ? e : { ...e, tag, quasi };
+    }
+    case "spread": // F17
+    case "await": { // F25-1
+      const arg = renameExpr(e.arg, map);
+      return arg === e.arg ? e : { ...e, arg };
+    }
+    case "yield": {
+      const arg = e.arg === null ? null : renameExpr(e.arg, map);
+      return arg === e.arg ? e : { ...e, arg };
     }
     case "destructure": {
       // F16 §3: "the same machinery as plain idents" — `mapPattern` renames

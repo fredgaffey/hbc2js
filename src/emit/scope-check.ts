@@ -142,10 +142,31 @@ function scan(program: readonly Stmt[], helperNames: readonly string[], globalIn
         for (const x of e.elements) walkExpr(x, scopes, where);
         return;
       case "object":
-        for (const p of e.props) walkExpr("k" in p ? p.arg : p.value, scopes, where);
+        for (const p of e.props) { if (!("k" in p) && p.keyExpr !== undefined) walkExpr(p.keyExpr, scopes, where); walkExpr("k" in p ? p.arg : p.value, scopes, where); }
         return;
       case "spread": // F17
         walkExpr(e.arg, scopes, where);
+        return;
+      case "optmember": // F18 (bench 2026-11-24: an `r?.x` read was invisible here)
+        walkExpr(e.obj, scopes, where);
+        if (e.computed) walkExpr(e.prop, scopes, where);
+        return;
+      case "optcall": // F18
+        walkExpr(e.callee, scopes, where);
+        for (const a of e.args) walkExpr(a, scopes, where);
+        return;
+      case "template": // F14
+        for (const x of e.exprs) walkExpr(x, scopes, where);
+        return;
+      case "tagged": // F14
+        walkExpr(e.tag, scopes, where);
+        walkExpr(e.quasi, scopes, where);
+        return;
+      case "await": // F25-1
+        walkExpr(e.arg, scopes, where);
+        return;
+      case "yield":
+        if (e.arg !== null) walkExpr(e.arg, scopes, where);
         return;
       case "seq":
         for (const x of e.exprs) walkExpr(x, scopes, where);
@@ -176,6 +197,17 @@ function scan(program: readonly Stmt[], helperNames: readonly string[], globalIn
         walkPatternScope(e.pattern);
         return;
       }
+      case "class": // F24-1: superclass, computed keys, member values (each a `func` or field initialiser)
+        // A named class expression binds its own name inside its body.
+        if (e.superClass !== null) walkExpr(e.superClass, scopes, where);
+        {
+          const inside = e.name === null ? scopes : [...scopes, new Set<string>([e.name])];
+          for (const m of e.members) {
+            if (m.computed) walkExpr(m.key, inside, where);
+            if (m.value !== null) walkExpr(m.value, inside, where);
+          }
+        }
+        return;
       case "func": {
         const inner = new Set<string>(e.params.map((x) => x.name));
         collect(e.body, inner);
@@ -226,6 +258,21 @@ function scan(program: readonly Stmt[], helperNames: readonly string[], globalIn
         walkExpr(s.test, scopes, where);
         if (s.update !== null) walkExpr(s.update, scopes, where);
         walkNested(s.body, scopes, where);
+        return;
+      case "for-in":
+      case "for-of": {
+        // A declared head (`for (const k in o)`) binds `left` for the body only.
+        walkExpr(s.right, scopes, where);
+        if (s.decl !== null && s.left.k === "ident") {
+          walkNested(s.body, [...scopes, new Set<string>([s.left.name])], where);
+          return;
+        }
+        walkExpr(s.left, scopes, where);
+        walkNested(s.body, scopes, where);
+        return;
+      }
+      case "classdecl":
+        walkExpr(s.value, [...scopes, new Set<string>([s.name])], where);
         return;
       case "labeled":
         walkNested(s.body, scopes, where);

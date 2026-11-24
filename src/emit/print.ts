@@ -619,7 +619,7 @@ function render(e: Expr): string {
     case "array":
       return `[${e.elements.map((x) => expr(x, ASSIGNMENT)).join(", ")}]`;
     case "object":
-      return `{${e.props.map((p) => ("k" in p ? `...${expr(p.arg, ASSIGNMENT)}` : `${p.computed ? `[${p.key}]` : p.key}: ${expr(p.value, ASSIGNMENT)}`)).join(", ")}}`;
+      return `{${e.props.map((p) => ("k" in p ? `...${expr(p.arg, ASSIGNMENT)}` : `${p.computed ? `[${p.keyExpr !== undefined ? expr(p.keyExpr, ASSIGNMENT) : p.key}]` : p.key}: ${expr(p.value, ASSIGNMENT)}`)).join(", ")}}`;
     case "spread": // F17
       return `...${expr(e.arg, ASSIGNMENT)}`;
     case "seq":

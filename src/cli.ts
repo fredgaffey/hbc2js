@@ -165,7 +165,8 @@ Options (decompile):
                             render would, in time proportional to that subtree
                             (not the whole bundle). Also 'hbc2js decompile <hbc>
                             --fn N'. Output is fn N's slice of the full render;
-                            names it captures from enclosing scopes appear free.
+                            names it captures from enclosing scopes appear free
+                            (listed in the header comment).
   --function=N              restrict --emit-tree to function index N
   --no-verify               skip the structurer's round-trip isomorphism check
   --emit-tree               print the structurer's tree IR instead of JavaScript

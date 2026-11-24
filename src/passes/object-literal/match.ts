@@ -412,7 +412,7 @@ export function match(list: readonly Stmt[], ctx: PassContext): ObjectLiteralMat
           const keyU = identUses([{ k: "expr", expr: cst.keyExpr }], def.reg);
           const valU = identUses([{ k: "expr", expr: cst.value }], def.reg);
           if (keyU.reads + keyU.writes === 0 && valU.reads + valU.writes === 0) {
-            props.push({ key: renderComputedKey(cst.keyExpr), computed: true, value: cst.value });
+            props.push({ key: renderComputedKey(cst.keyExpr), computed: true, keyExpr: cst.keyExpr, value: cst.value });
             n++;
             consumed.push(list[j]!);
             sawComputedKey = true;
