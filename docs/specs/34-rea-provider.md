@@ -47,6 +47,8 @@ Common rules:
 - **Size and time.** hbc2js sets no wall-clock limit of its own. REA owns the deadline and kills the process; a kill leaves no state behind. Memory: honour `NODE_OPTIONS=--max-old-space-size=<MB>`. When the heap estimate exceeds the limit, fail fast with `E_RESOURCE` (exit 3) and `context.requiredMb`, never an OOM crash. `source` is never truncated: REA pages or caps its own projection.
 - **Stability.** Within `contract: 1`, fields are only added, never renamed or removed. A breaking change bumps `contract` and the schema tag.
 
+**Optional evidence (spec 35).** The four calls accept `--evidence`. Only then does the reply gain an `evidence` object (`labels` mapping fields to `observed`, `derived` or `inferred`; `unknowns`; `limitations`; `provenance` with `producer`, `version`, `input.sha256` and `passes`). Without the flag the output is byte-identical to before; every existing field is unchanged when it is set. On a build that predates it, `--evidence` exits 2 (`E_USAGE`), which is the capability probe. Pinned by `tests/cli/machine-evidence.test.ts` and the golden under `tests/fixtures/agent/machine-no-evidence/`.
+
 ## Acceptance tests (`tests/cli/machine-contract.test.ts`)
 
 1. `--version --json` parses, and `contract === 1` and `hbc2js === VERSION`.

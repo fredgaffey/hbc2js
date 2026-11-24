@@ -16,6 +16,8 @@ import { parseHbc } from "./parse/module.ts";
 import type { HbcModule, OpcodeTableId } from "./parse/types.ts";
 import { listOpcodeTableIds } from "./tables/registry.ts";
 import { VERSION } from "./version.ts";
+import { withEvidence } from "./agent/evidence.ts";
+import type { EvidenceLabel, EvidenceUnknown } from "./agent/evidence.ts";
 
 export const MACHINE_SCHEMA = "hbc2js-machine/1";
 export const MACHINE_CONTRACT = 1;
@@ -31,6 +33,55 @@ export function supportedHbcVersions(): number[] {
     if (m !== null) out.add(Number(m[1]));
   }
   return [...out].sort((a, b) => a - b);
+}
+
+/** Spec 35 Part 1: the optional `evidence` block for a machine reply. Only called under `--evidence`. */
+export function machineEvidence(reply: Record<string, unknown>, labels: Readonly<Record<string, EvidenceLabel>>, extra: { passes?: string; unknowns?: readonly EvidenceUnknown[]; limitations?: readonly string[] } = {}): Record<string, unknown> {
+  const sha = (reply["input"] as { sha256?: string } | undefined)?.sha256;
+  const present: Record<string, EvidenceLabel> = {};
+  for (const [k, v] of Object.entries(labels)) if (k in reply) present[k] = v;
+  return withEvidence(reply, {
+    labels: present,
+    ...(extra.unknowns !== undefined ? { unknowns: extra.unknowns } : {}),
+    ...(extra.limitations !== undefined ? { limitations: extra.limitations } : {}),
+    provenance: { producer: "hbc2js", version: VERSION, ...(sha !== undefined ? { input: { sha256: sha } } : {}), ...(extra.passes !== undefined ? { passes: extra.passes } : {}) },
+  });
+}
+
+export function versionEvidence(reply: Record<string, unknown>): Record<string, unknown> {
+  return machineEvidence(reply, { schema: "observed", kind: "observed", ok: "observed", hbc2js: "observed", contract: "observed", hbcVersions: "derived", node: "observed" });
+}
+
+export function infoEvidence(reply: Record<string, unknown>): Record<string, unknown> {
+  return machineEvidence(reply, {
+    input: "observed", version: "observed", functionCount: "observed", stringCount: "observed", sections: "observed",
+    layoutClass: "derived", opcodeTable: "derived", probe: "derived", warnings: "derived", diagnostics: "derived",
+  });
+}
+
+export function modulesEvidence(reply: Record<string, unknown>): Record<string, unknown> {
+  return machineEvidence(reply, { input: "observed", warnings: "derived", metro: "derived", total: "derived", offset: "derived", rows: "derived", next: "derived" });
+}
+
+/** The fn-naming pass chose a readable name for some `_fnN` binding in the rendered source. */
+export function sourceHasPassNames(source: string): boolean {
+  const body = source.split("\n").filter((l) => !l.startsWith("//"));
+  return body.some((l) => {
+    const m = /\bfunction\s+([A-Za-z_$][\w$]*)\s*\(/.exec(l);
+    return m !== null && !/^_fn\d+$/.test(m[1] as string);
+  });
+}
+
+export function functionEvidence(reply: Record<string, unknown>, passesNone: boolean, renameOff: boolean = passesNone): Record<string, unknown> {
+  const renamed = !renameOff && typeof reply["source"] === "string" && sourceHasPassNames(reply["source"]);
+  return machineEvidence(
+    reply,
+    {
+      input: "observed", fn: "observed", name: renamed ? "inferred" : "observed", moduleId: "derived", factoryOf: "derived",
+      source: "derived", verified: "derived", warnings: "derived", passes: "observed", error: "derived",
+    },
+    { passes: passesNone ? "none" : "default" },
+  );
 }
 
 export function versionReply(): Record<string, unknown> {
@@ -176,7 +227,7 @@ export function runModules(argv: readonly string[]): number {
       for (const r of rows) process.stdout.write(`${r.id}\tfn#${r.factoryFn}\tdeps=${r.deps.join(",")}\tfns=${r.fnCount}\n`);
       return 0;
     }
-    write({
+    const modulesReply: Record<string, unknown> = {
       schema: MACHINE_SCHEMA,
       kind: "modules",
       ok: true,
@@ -188,7 +239,8 @@ export function runModules(argv: readonly string[]): number {
       offset,
       rows,
       next,
-    });
+    };
+    write(argv.includes("--evidence") ? modulesEvidence(modulesReply) : modulesReply);
     return 0;
   } catch (e) {
     return argv.includes("--json") ? writeError(e) : writeTextError(e);
@@ -213,6 +265,8 @@ export interface MachineDecompileArgs {
   readonly lenientEnv: boolean;
   readonly passes: { readonly none: boolean; readonly skip: readonly string[]; readonly optIn: readonly string[] };
   readonly opcodeTable?: OpcodeTableId | undefined;
+  /** Spec 35: add the optional `evidence` block (off by default; the reply is byte-identical without it). */
+  readonly evidence?: boolean | undefined;
 }
 
 /** `decompile <in.hbc> --fn N|--module M --json`; returns the exit code. */
@@ -269,12 +323,13 @@ export function runMachineDecompile(a: MachineDecompileArgs): number {
       verified: { structurer: a.verify, syntax: syntax.ok },
       passes: a.passes.none ? "none" : "default",
     };
+    const out = (): Record<string, unknown> => (a.evidence === true ? functionEvidence(reply, a.passes.none, a.passes.none || a.passes.skip.includes("fn-naming")) : reply);
     if (!syntax.ok) {
       reply.error = { code: "E_SYNTAX", message: syntax.message, context: {} };
-      write(reply);
+      write(out());
       return 5;
     }
-    write(reply);
+    write(out());
     return 0;
   } catch (e) {
     return writeError(e);

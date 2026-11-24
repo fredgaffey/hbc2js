@@ -12,7 +12,7 @@ const GATE_GLOBS = [
   "tests/projdb/**/*.test.ts", "tests/secrets/**/*.test.ts", "tests/security/**/*.test.ts",
   "tests/appgen/**/*.test.ts", "tests/mcp/**/*.test.ts", "tests/readability/**/*.test.ts",
   "tests/workers/**/*.test.ts", "tests/ui-core/**/*.test.ts", "tests/ui-server/**/*.test.ts",
-  "tests/fuzz/spec-consistency.test.ts", "tests/cli/**/*.test.ts",
+  "tests/fuzz/spec-consistency.test.ts", "tests/cli/**/*.test.ts", "tests/agent/**/*.test.ts",
 ];
 
 function run(cmd, args, env) {

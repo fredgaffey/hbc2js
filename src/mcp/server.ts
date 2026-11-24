@@ -42,6 +42,8 @@ import type { ReadabilityContext } from "../readability/surfaces.ts";
 import { ReadabilitySurfaceError } from "../readability/surfaces.ts";
 import { Hbc2jsError } from "../errors.ts";
 import { VERSION } from "../version.ts";
+import { isPlainObject, labelAll, withEvidence } from "../agent/evidence.ts";
+import type { EvidenceLabel } from "../agent/evidence.ts";
 
 export interface McpServerOpts extends McpContextOpts {
   readonly readability?: ReadabilityContext;
@@ -95,8 +97,35 @@ function stringField(args: unknown, key: string): string {
  *  `McpResources` instance `ctx` holds, so a read here is never stale
  *  relative to a write through this same server's write tools
  *  (`McpContext`'s own doc comment). */
+/** Spec 35 Part 1: add `evidence` inside an object-shaped read result; every
+ *  existing field is untouched, a non-object result is returned as is. */
+function readEvidence<T>(result: T, label: EvidenceLabel = "derived"): T {
+  if (!isPlainObject(result)) return result;
+  return withEvidence(result, { labels: labelAll(result, label), provenance: { producer: "hbc2js", version: VERSION } }) as T;
+}
+
+/** Fields of a readability result that come from the oracle or the store, not the model. */
+const READABILITY_NON_MODEL_FIELDS: Readonly<Record<string, EvidenceLabel>> = { equiv: "derived", verdict: "derived", accepted: "derived", txId: "derived", refused: "derived" };
+
+function readabilityEvidence<T>(ctx: ReadabilityContext, result: T): T {
+  if (!isPlainObject(result)) return result;
+  return withEvidence(result, {
+    labels: labelAll(result, "inferred", READABILITY_NON_MODEL_FIELDS),
+    provenance: { producer: "hbc2js", version: VERSION, backend: ctx.backendId ?? ctx.backend.id },
+  }) as T;
+}
+
 function readTools(ctx: McpContext): ToolTable {
   const r = ctx.resources;
+  const table = rawReadTools(r);
+  const out: Record<string, ToolDef> = {};
+  for (const [name, def] of Object.entries(table)) {
+    out[name] = { ...def, handler: (args) => readEvidence(def.handler(args), name === "get_disasm" ? "observed" : "derived") };
+  }
+  return out;
+}
+
+function rawReadTools(r: McpContext["resources"]): ToolTable {
   return {
     get_context: {
       description: "Scoped decompiled context for one function: source, summary, xrefs, strings (the same shape the UI's context pane reads).",
@@ -201,7 +230,10 @@ function readabilityTools(ctx: ReadabilityContext): ToolTable {
     out[tool] = {
       description: READABILITY_TOOL_DESCRIPTIONS[tool],
       inputSchema: READABILITY_TOOL_SCHEMAS[tool],
-      handler: handlers[tool],
+      handler: (args) => {
+        const result = handlers[tool](args);
+        return result instanceof Promise ? result.then((x) => readabilityEvidence(ctx, x)) : readabilityEvidence(ctx, result);
+      },
       ...(READABILITY_TOOL_EXAMPLES[tool] !== undefined ? { examples: READABILITY_TOOL_EXAMPLES[tool] } : {}),
     };
   }

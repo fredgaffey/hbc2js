@@ -24,3 +24,15 @@
   two separate systems that both answer to "propose a change"; a
   transaction is what `revert_change` and `promote_change`'s `txId` field
   address.
+- **evidence**: an optional block on a JSON reply that says how much to trust
+  each field (`labels`, plus `unknowns`, `limitations` and `provenance`). The
+  three labels:
+  - **observed**: decoded directly from the file (header, string table,
+    function count).
+  - **derived**: a deterministic, checkable computation over observed facts
+    (decompiled source with `verified.*`, module deps, an oracle verdict).
+  - **inferred**: a heuristic or model guess (names, classification, any
+    readability-tool output); `provenance.backend` names the backend that
+    produced it.
+  - **heuristic**: the backend ID reported when the non-LLM heuristic backend
+    produced an inferred value.

@@ -11,7 +11,7 @@ import type { LayoutClass, OpcodeTableId } from "./parse/types.ts";
 import { printModule } from "./disasm/print.ts";
 import type { DisasmMode } from "./disasm/print.ts";
 import { VERSION } from "./version.ts";
-import { MACHINE_SCHEMA, errorReply, inputDigest, runMachineDecompile, runModules, versionReply, warningsOf } from "./machine.ts";
+import { MACHINE_SCHEMA, errorReply, infoEvidence, inputDigest, runMachineDecompile, runModules, versionEvidence, versionReply, warningsOf } from "./machine.ts";
 import { runProgram } from "./harness/runner.ts";
 import type { RunOptions } from "./harness/runner.ts";
 import { compareTraces, TRACE_VERDICT } from "./harness/compare.ts";
@@ -269,6 +269,7 @@ interface ParsedArgs {
   readonly opcodeTable: OpcodeTableId | undefined;
   readonly verify: boolean;
   readonly json: boolean;
+  readonly evidence: boolean;
 }
 
 function parseArgs(argv: readonly string[]): ParsedArgs {
@@ -279,9 +280,11 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
   let opcodeTable: OpcodeTableId | undefined;
   let verify = false;
   let json = false;
+  let evidence = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (a === "--help" || a === "-h") help = true;
+    else if (a === "--evidence") evidence = true;
     else if (a === "--version" || a === "-v") version = true;
     else if (a === "--info") info = argv[++i];
     else if (a.startsWith("--layout=")) layout = a.slice("--layout=".length) as LayoutClass;
@@ -290,7 +293,7 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
     else if (a === "--json") json = true;
     else if (info === undefined && !a.startsWith("-")) info = a;
   }
-  return { help, version, info, layout, opcodeTable, verify, json };
+  return { help, version, info, layout, opcodeTable, verify, json, evidence };
 }
 
 function fail(code: ErrorCode, message: string, exitCode: number, json: boolean, context: Record<string, unknown> = {}): never {
@@ -702,6 +705,8 @@ interface DecompileArgs {
   /** `--no-return-annotations` (H3b): drop the two default-on return header comments. */
   readonly returnAnnotations: boolean;
   readonly json: boolean;
+  /** Spec 35: `--evidence` adds the optional evidence block to the machine (--json) reply. */
+  readonly evidence: boolean;
   readonly moduleId: number | undefined;
   readonly passes: { readonly none: boolean; readonly skip: readonly string[]; readonly optIn: readonly string[] };
 }
@@ -727,6 +732,7 @@ function parseDecompileArgs(argv: readonly string[]): DecompileArgs {
   let returnAnnotations = true;
   let passesNone = false;
   let json = false;
+  let evidence = false;
   let moduleId: number | undefined;
   const skipPasses: string[] = [];
   const positional: string[] = [];
@@ -736,6 +742,7 @@ function parseDecompileArgs(argv: readonly string[]): DecompileArgs {
     else if (a === "-o") outPath = argv[++i];
     else if (a === "--passes=none") passesNone = true;
     else if (a === "--json") json = true;
+    else if (a === "--evidence") evidence = true;
     else if (a === "--module") moduleId = Number(argv[++i]);
     else if (a.startsWith("--module=")) moduleId = Number(a.slice("--module=".length));
     else if (a === "--no-pass") skipPasses.push(String(argv[++i]));
@@ -760,7 +767,7 @@ function parseDecompileArgs(argv: readonly string[]): DecompileArgs {
   }
   input = positional[0];
   if (outPath === undefined) outPath = positional[1];
-  return { help, input, outPath, functionIndex, scopedFn, verify, emitTree, emitAst, nodeCheck: check, split, overwrite, opcodeTable, forceV98, strictLayout, stats, lenientEnv, jsx, returnAnnotations, json, moduleId, passes: { none: passesNone, skip: skipPasses, optIn: jsx ? ["jsx-recover"] : [] } };
+  return { help, input, outPath, functionIndex, scopedFn, verify, emitTree, emitAst, nodeCheck: check, split, overwrite, opcodeTable, forceV98, strictLayout, stats, lenientEnv, jsx, returnAnnotations, json, evidence, moduleId, passes: { none: passesNone, skip: skipPasses, optIn: jsx ? ["jsx-recover"] : [] } };
 }
 
 function warnIfHeapTooSmall(inputBytes: number, name: string): void {
@@ -3563,7 +3570,7 @@ function main(): void {
   }
   if (args.version) {
     if (args.json) {
-      process.stdout.write(JSON.stringify(versionReply()) + "\n");
+      process.stdout.write(JSON.stringify(args.evidence ? versionEvidence(versionReply()) : versionReply()) + "\n");
       process.exit(0);
     }
     process.stdout.write(`${VERSION}\n`);
@@ -3587,9 +3594,7 @@ function main(): void {
       verifyFooter: args.verify,
     });
     if (args.json) {
-      process.stdout.write(
-        JSON.stringify(
-          {
+      const infoReply: Record<string, unknown> = {
             schema: MACHINE_SCHEMA,
             kind: "info",
             ok: true,
@@ -3604,11 +3609,8 @@ function main(): void {
             stringCount: module.strings.count,
             sections: module.sections.all,
             diagnostics: module.diagnostics,
-          },
-          null,
-          2,
-        ) + "\n",
-      );
+          };
+      process.stdout.write(JSON.stringify(args.evidence ? infoEvidence(infoReply) : infoReply, null, 2) + "\n");
     } else {
       process.stdout.write(`hbc2js --info ${args.info}\n`);
       process.stdout.write(`  version:       ${module.header.version}\n`);

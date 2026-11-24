@@ -1,0 +1,1 @@
+{"schema":"hbc2js-machine/1","kind":"error","ok":false,"code":"E_BAD_FUNCTION_ID","message":"E_BAD_FUNCTION_ID: no module 0 in this bundle","error":{"code":"E_BAD_FUNCTION_ID","message":"E_BAD_FUNCTION_ID: no module 0 in this bundle","context":{"expected":"one of 0 registered module ids"}}}

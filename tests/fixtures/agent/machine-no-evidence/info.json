@@ -1,0 +1,136 @@
+{
+  "schema": "hbc2js-machine/1",
+  "kind": "info",
+  "ok": true,
+  "hbc2js": "0.1.0",
+  "input": {
+    "sha256": "58e6a77678a78e5b275466f5ff0e3b7398b269df005f809348676a002d9258b3",
+    "bytes": 1077
+  },
+  "warnings": [],
+  "version": 94,
+  "layoutClass": "C",
+  "opcodeTable": "hbc94",
+  "probe": {
+    "candidates": [
+      {
+        "layoutClass": "C",
+        "passed": true
+      }
+    ],
+    "chosen": "C/hbc94",
+    "forced": false,
+    "decidedBy": [
+      "P2",
+      "version"
+    ],
+    "exhaustive": true,
+    "sampledFunctions": 7,
+    "totalFunctions": 7
+  },
+  "functionCount": 7,
+  "stringCount": 14,
+  "sections": [
+    {
+      "name": "header",
+      "offset": 0,
+      "size": 128
+    },
+    {
+      "name": "functionHeaders",
+      "offset": 128,
+      "size": 112
+    },
+    {
+      "name": "stringKinds",
+      "offset": 240,
+      "size": 8
+    },
+    {
+      "name": "identifierHashes",
+      "offset": 248,
+      "size": 20
+    },
+    {
+      "name": "smallStringTable",
+      "offset": 268,
+      "size": 56
+    },
+    {
+      "name": "overflowStringTable",
+      "offset": 324,
+      "size": 0
+    },
+    {
+      "name": "stringStorage",
+      "offset": 324,
+      "size": 93
+    },
+    {
+      "name": "literalValueBuffer",
+      "offset": 420,
+      "size": 1
+    },
+    {
+      "name": "objKeyBuffer",
+      "offset": 424,
+      "size": 0
+    },
+    {
+      "name": "objValueBuffer",
+      "offset": 424,
+      "size": 0
+    },
+    {
+      "name": "bigIntTable",
+      "offset": 424,
+      "size": 0
+    },
+    {
+      "name": "bigIntStorage",
+      "offset": 424,
+      "size": 0
+    },
+    {
+      "name": "regExpTable",
+      "offset": 424,
+      "size": 0
+    },
+    {
+      "name": "regExpStorage",
+      "offset": 424,
+      "size": 0
+    },
+    {
+      "name": "cjsModuleTable",
+      "offset": 424,
+      "size": 0
+    },
+    {
+      "name": "functionSourceTable",
+      "offset": 424,
+      "size": 0
+    },
+    {
+      "name": "functionBodies",
+      "offset": 424,
+      "size": 388
+    },
+    {
+      "name": "functionInfo",
+      "offset": 424,
+      "size": 388
+    },
+    {
+      "name": "debugInfo",
+      "offset": 812,
+      "size": 245
+    },
+    {
+      "name": "footer",
+      "offset": 1057,
+      "size": 20
+    }
+  ],
+  "diagnostics": []
+}
