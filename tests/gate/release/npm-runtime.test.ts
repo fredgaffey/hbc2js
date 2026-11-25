@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { repoRoot } from "../../support/paths.ts";
@@ -32,8 +32,11 @@ function tsFiles(dir: string, out: string[] = []): string[] {
 }
 
 // Imported lazily behind a try/catch with an actionable message; they power
-// the dev-loop only (offline Metro bundling, seams), never a default command.
-const OPTIONAL_DEV_LOOP = new Set(["metro", "metro-transform-worker", "@react-native/babel-preset", "@babel/core"]);
+// the dev-loop only (`seams`), never a default command. NOT metro or its babel
+// transformer: `equiv --boot` (a shipped command) bundles with them, so they
+// must come from the export tree's own node_modules (0.1.2 benchmark b1:
+// "Cannot find package 'metro'" from an npm install).
+const OPTIONAL_DEV_LOOP = new Set(["metro-transform-worker", "@react-native/babel-preset", "@babel/core"]);
 
 test("npm package: every bare import in src/ is a runtime dependency (or a documented dev-loop optional)", () => {
   const bad: string[] = [];
@@ -49,6 +52,43 @@ test("npm package: every bare import in src/ is a runtime dependency (or a docum
     }
   }
   assert.deepEqual(bad, [], "shipped code imports packages that are not in `dependencies`");
+});
+
+test("npm package: no shipped .cjs/.mjs in src/ requires a package that is not a runtime dependency", () => {
+  const bad: string[] = [];
+  const walk = (dir: string): string[] => readdirSync(dir).flatMap((e) => { const p = join(dir, e); return statSync(p).isDirectory() ? walk(p) : /\.(c|m)js$/.test(p) ? [p] : []; });
+  for (const f of walk(join(root, "src"))) {
+    const text = readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    for (const m of text.matchAll(/(?:require\(\s*|from\s+|import\(\s*)"([^".\/][^"]*)"/g)) {
+      const spec = m[1]!;
+      if (spec.startsWith("node:")) continue;
+      const name = spec.startsWith("@") ? spec.split("/").slice(0, 2).join("/") : spec.split("/")[0]!;
+      if (pkg.dependencies?.[name] === undefined) bad.push(`${f.slice(root.length + 1)} requires ${name}`);
+    }
+  }
+  assert.deepEqual(bad, []);
+});
+
+test("offline bundle check: an export with no node_modules (npm-installed hbc2js) says to npm install there", async () => {
+  const { offlineBundle } = await import("../../../src/export/offline-check.ts");
+  const tree = mkdtempSync(join(tmpdir(), "hbc2js-noinstall-"));
+  const fakeHbc2js = mkdtempSync(join(tmpdir(), "hbc2js-pkg-"));
+  try {
+    writeFileSync(join(tree, "package.json"), "{}");
+    writeFileSync(join(fakeHbc2js, "package.json"), "{}");
+    await assert.rejects(offlineBundle(tree, fakeHbc2js), (e: Error) => {
+      assert.match(e.message, /npm install/);
+      assert.ok(e.message.includes(tree), e.message);
+      return true;
+    });
+    assert.ok(!existsSync(join(tree, "node_modules")), "must not symlink a toolchain-less node_modules into the tree");
+    // 0.1.2 benchmark b2: a RELATIVE export dir reached createRequire raw
+    // ("argument 'filename' must be a file URL ... Received 'out/package.json'").
+    await assert.rejects(offlineBundle(relative(process.cwd(), tree), relative(process.cwd(), fakeHbc2js)), /npm install/);
+  } finally {
+    rmSync(tree, { recursive: true, force: true });
+    rmSync(fakeHbc2js, { recursive: true, force: true });
+  }
 });
 
 test("npm package: files ship the agent docs, skill and VM helper scripts", () => {

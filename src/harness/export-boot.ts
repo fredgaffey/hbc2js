@@ -11,7 +11,7 @@
 // the export registry's `r()` under `--instrument=modules` (§4 b).
 import { deriveNativeManifest, overrideFor } from "./native-manifest.ts";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acquireBootSource, bootTrace } from "./boot-equiv.ts";
 import type { BootTraceResult } from "./boot-equiv.ts";
@@ -256,7 +256,8 @@ function keys(p: readonly string[]): string[] {
 /** Spec 33 §1: `exportBootProof(original, exportDir, opts)`. Phase
  *  "register" is B1; "run" is B2 (B1 over the longer window, plus the
  *  runApplication key, view-name sequence and commits). */
-export async function exportBootProof(original: string, exportDir: string, opts: ExportBootOptions = {}): Promise<ExportBootResult> {
+export async function exportBootProof(original: string, exportDirIn: string, opts: ExportBootOptions = {}): Promise<ExportBootResult> {
+  const exportDir = resolve(exportDirIn); // 0.1.2 benchmark b2: relative dirs reached createRequire
   const phase = opts.phase ?? "register";
   const seed = opts.seed ?? 0;
   const vm = opts.vm ?? pickBootVm(exportDir);
