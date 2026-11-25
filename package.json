@@ -1,6 +1,6 @@
 {
   "name": "hbc2js",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Hermes bytecode (HBC) -> runnable JavaScript decompiler",
   "license": "MIT",
   "repository": {

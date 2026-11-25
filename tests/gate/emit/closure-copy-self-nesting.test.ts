@@ -17,8 +17,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { runInNewContext } from "node:vm";
 import { repoRoot } from "../../support/paths.ts";
-import { decompile, decompileFunction } from "../../../src/decompile.ts";
-import { parseHbc } from "../../../src/parse/module.ts";
+import { decompile, decompileFunction, parseForDecompile } from "../../../src/decompile.ts";
 import { analyseModule } from "../../../src/cfg/index.ts";
 
 const DIR = join(repoRoot(), "tests", "fixtures", "constructs", "501-closure-copy-self-nesting");
@@ -36,7 +35,7 @@ for (const v of [84, 94, 96, 98, 99]) {
 
 test("react-navigation fn 11444: creation without lexical nesting stays per-site copies; decompile completes", () => {
   const bytes = new Uint8Array(readFileSync(join(repoRoot(), "tests", "fixtures", "bundles", "react-navigation-example-0.85.3", "react-navigation-example.hbc")));
-  const graph = analyseModule(parseHbc(bytes, { resolveV98Ambiguity: true }), { lenientEnv: true }).envGraph;
+  const graph = analyseModule(parseForDecompile(bytes, { resolveV98Ambiguity: true }).module, { strictEnv: false }).envGraph;
   assert.ok(!graph.closureFactories.has(11444), "11444 must not become a G2 factory");
   assert.deepEqual([...graph.closureFactories].sort((a, b) => a - b), [11751, 12280, 12406, 12407, 12408, 12754, 13078, 13523, 13524, 14287, 14983, 14984, 14985, 14986, 15373]);
   for (const fn of [793, 11444]) {

@@ -103,3 +103,35 @@ run — regenerate with the run command above; regeneration is approved as a bat
 | readability: `rN`/1k lines | 1298.8 |
 | readability: `Reflect.apply(`/1k lines | 28.4 |
 | readability: `_fnN`/1k lines | 35.9 |
+
+## Unseen-app corpus: export, install, bundle, boot (0.1.2)
+
+Ten React Native apps taken from F-Droid's published release APKs (sha256
+checked against the F-Droid index), each with the exact source commit F-Droid
+built from; none was used while developing hbc2js. For each app the pipeline
+is: `hbc2js export --instrument=modules --substitute none` → every exported
+file parses → `npm install` → `npx react-native bundle --platform android
+--dev false` → `hbc2js equiv --boot <app.hbc> <export> --phase register`.
+EQUIVALENT means the original bytecode and the exported source register the
+same module factories and app keys, in the same order, under the same stub
+host. Run on the Linux box (32 cores), release-0.1.2 code.
+
+| app | licence | Expo/bare | bytecode | functions | export | parses | install | bundle | boot (register) |
+|---|---|---|---|---|---|---|---|---|---|
+| Standard Notes | AGPL-3.0 | bare | 96 | 16,532 | 26 s | ✓ | ✓ | ✓ | EQUIVALENT |
+| Notesnook | GPL-3.0 | bare | 96 | 48,680 | 21 s | ✓ | ✓ | ✓ | n/a: built with Re.Pack, not Metro (`no-metro-modules`) |
+| Breathly | MPL-2.0 | Expo | 98 | 8,591 | 22 s | ✓ | ✓ | ✓ | EQUIVALENT (run phase too) |
+| LessPass | GPL-3.0 | bare | 96 | 10,971 | 14 s | ✓ | ✓ | ✓ | EQUIVALENT |
+| Colota | AGPL-3.0 | bare | 98 | 18,758 | 73 s | ✓ | ✓ | ✓ | EQUIVALENT |
+| Formulus | MIT | bare | 96 | 25,403 | 75 s | ✓ | ✓ | ✓ | EQUIVALENT |
+| AwakeOnLAN | GPL-3.0 | bare | 96 | 7,099 | 22 s | ✓ | ✓ | ✓ | EQUIVALENT |
+| Bangumi | MIT | Expo (RN 0.66) | 84 | 34,285 | 193 s | ✓ | ✓ | ✗ | INCONCLUSIVE (stub host lacks reanimated 2's JSI global) |
+| SyncUp | MPL-2.0 | Expo | 98 | 11,026 | 37 s | ✓ | ✓ | ✓ | EQUIVALENT |
+| Spix | AGPL-3.0 | Expo | 96 | 34,742 | 106 s | ✓ | ✓ | ✓ | EQUIVALENT |
+
+8 of 10 boot EQUIVALENT; none DIVERGENT. The two open items are in
+`docs/BUGS.md` (Bangumi's Metro 0.66 bundle step and its JSI host object).
+Also EQUIVALENT outside the corpus: Ignite (MIT, Expo, both phases) and
+BlueWallet (MIT, bare RN 0.88, register phase). Every decompiler bug the
+corpus exposed on the way (about twenty) has a construct fixture and a gate
+test; see `CHANGELOG.md`.

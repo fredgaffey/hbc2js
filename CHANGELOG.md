@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.2 (unreleased)
+## 0.1.2 (2026-11-25)
 
 Measured against real, unseen open-source apps for the first time: ten
 F-Droid release builds (with their exact source commits) plus Ignite and
