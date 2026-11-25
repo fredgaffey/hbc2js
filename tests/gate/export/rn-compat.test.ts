@@ -98,3 +98,16 @@ test("corpus a08: a wildcard react-native peer admits only versions published by
   }
   assert.match(rnCompatPin("@react-navigation/native", "0.83.2")?.version ?? "", /^7\./); // a modern RN keeps the 7.x line
 });
+
+test("0.1.2 benchmark b1: an old specific peer range does not beat a newer wildcard segment the RN line reached", () => {
+  // react-native-safe-area-context declares `>=0.59` up to 0.6.2 and `*`
+  // from then on. RN 0.78.3 got 0.6.2 (a 2019 release), which conflicts with
+  // @react-navigation/stack 7.x's peer `react-native-safe-area-context >= 4`
+  // (npm ERESOLVE). The wildcard segment admits the newest version published
+  // by the end of the RN 0.78 line (2025-07: 5.5.2).
+  const pin = rnCompatPin("react-native-safe-area-context", "0.78.3");
+  assert.equal(pin?.version, "5.5.2", pin?.note);
+  assert.ok(satisfies(pin!.version, ">= 4.0.0"), "must satisfy @react-navigation/stack@7's peer");
+  // RN 0.60 (2019-09) still predates the wildcard segment's reach: keep the specific pin.
+  assert.equal(Number(rnCompatPin("react-native-safe-area-context", "0.60.6")!.version.split(".")[0]) <= 1, true);
+});

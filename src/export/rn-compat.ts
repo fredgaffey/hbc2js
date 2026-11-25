@@ -98,17 +98,34 @@ export function rnCompatPin(pkg: string, rnVersion: string): RnPin | null {
   // ERESOLVE beside RN 0.66's react 17) because their newest versions declare
   // `*`. A wildcard admits a version only up to the newest one published by
   // the end of the RN line (rule 2's pin); newer ones fall through to rule 2.
+  // `peers` rows are segments: [the LAST version declaring range, range],
+  // so a row covers the versions after the previous row's up to its own.
+  // 0.1.2 benchmark b1: react-native-safe-area-context is `>=0.59` up to
+  // 0.6.2, then `*`; skipping the whole wildcard row pinned the 2019 0.6.2
+  // beside RN 0.78 (ERESOLVE against @react-navigation/stack 7's peer >= 4).
+  // A wildcard row whose segment holds rule 2's pin yields that pin.
   const timeBound = pinByTime(t, entry, rnVersion);
+  const rows = [...entry.peers].sort((a, b) => cmpVer(parseVer(a[0])!, parseVer(b[0])!));
   let best: string | null = null;
-  for (const [v, range] of entry.peers) {
+  let bestRange = "";
+  for (let i = 0; i < rows.length; i++) {
+    const [v, range] = rows[i]!;
     if (!satisfies(rnVersion, range)) continue;
-    if (isWildcardRange(range) && (timeBound === null || cmpVer(parseVer(v)!, parseVer(timeBound.version)!) > 0)) continue;
-    const pv = parseVer(v)!;
-    if (best === null || cmpVer(pv, parseVer(best)!) > 0) best = v;
+    let cand: string | null = v;
+    if (isWildcardRange(range)) {
+      if (timeBound === null) continue;
+      const tb = parseVer(timeBound.version)!;
+      const prev = i > 0 ? parseVer(rows[i - 1]![0])! : null;
+      cand = cmpVer(parseVer(v)!, tb) <= 0 ? v : prev === null || cmpVer(tb, prev) > 0 ? timeBound.version : null;
+      if (cand === null) continue;
+    }
+    if (best === null || cmpVer(parseVer(cand)!, parseVer(best)!) > 0) { best = cand; bestRange = range; }
   }
   if (best !== null) {
-    const range = entry.peers.find(([v]) => v === best)![1];
-    return { version: best, note: `newest version whose react-native peer range (${range}) admits ${rnVersion} (rn-compat.json, npm registry, ${t.generatedOn})` };
+    if (isWildcardRange(bestRange) && best === timeBound?.version) {
+      return { version: best, note: `newest version published by ${timeBound.month} (end of the RN ${minorOf(rnVersion)} line), within a react-native peer range (${bestRange}) that admits ${rnVersion} (rn-compat.json, npm registry, ${t.generatedOn})` };
+    }
+    return { version: best, note: `newest version whose react-native peer range (${bestRange}) admits ${rnVersion} (rn-compat.json, npm registry, ${t.generatedOn})` };
   }
   if (timeBound === null) return null;
   return { version: timeBound.version, note: `newest version published by ${timeBound.month} (end of the RN ${minorOf(rnVersion)} line); declares no specific react-native peer range admitting ${rnVersion} (rn-compat.json, npm registry, ${t.generatedOn})` };
