@@ -209,7 +209,13 @@ export async function exportProject(bundlePath: string, opts: ExportOptions = {}
   // The shared state is built (and the main thread's own caches dropped)
   // before planning, so the plan's memory budget sees the main thread as it
   // will stay during rendering.
-  const poolWanted = tier !== "flat" && planRenderWorkers(opts.workers, splitResult.module.functions.length, bytes.length).count > 1;
+  // Whether to pool asks only whether more than one worker could be used
+  // (`max`): the memory-capped `count` is decided after the release, since
+  // the main thread before it (the split's caches, ~8 GB on a 45 MB app)
+  // is not what it holds while rendering -- deciding on it rendered the
+  // largest bundles serially on the main thread (44 min where a pool takes
+  // a fraction).
+  const poolWanted = tier !== "flat" && planRenderWorkers(opts.workers, splitResult.module.functions.length, bytes.length).max > 1;
   const shared = poolWanted ? shareForRenderWorkers(new Uint8Array(bytes), splitResult.analysis) : undefined;
   const workerPlan = shared === undefined ? { count: 1, limitedBy: null, budget: null, max: 1 } : planRenderWorkers(opts.workers, splitResult.module.functions.length, bytes.length);
   const workerCount = workerPlan.count;
