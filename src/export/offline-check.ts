@@ -36,6 +36,42 @@ function resolveFrom(req: NodeJS.Require, name: string, via: readonly string[]):
   return req.resolve(name); // throws the standard not-found error
 }
 
+/** The babel transformer RN's own CLI bundles the tree with:
+ *  `@react-native/metro-babel-transformer` from RN 0.73, before that RN's own
+ *  `metro-react-native-babel-transformer` dependency (corpus a08, RN 0.66.4:
+ *  the modern name alone failed "Cannot find module"). */
+export function upstreamBabelTransformer(tree: string): string {
+  const treeReq = createRequire(join(tree, "package.json"));
+  try {
+    return resolveFrom(treeReq, "@react-native/metro-babel-transformer", ["@react-native/metro-config", "react-native/package.json"]);
+  } catch {
+    return resolveFrom(treeReq, "metro-react-native-babel-transformer", ["react-native/package.json"]);
+  }
+}
+
+export interface RnSerializerDefaults {
+  readonly getPolyfills?: (o: { platform: string | null }) => readonly string[];
+  readonly getModulesRunBeforeMainModule?: (entry: string) => readonly string[];
+}
+
+/** RN's serializer defaults, as RN's CLI layers them over a bare config:
+ *  `@react-native/metro-config`'s from RN 0.73 (0.72 has it too); before it
+ *  none exists and the CLI (cli-plugin-metro's loadMetroConfig) uses
+ *  `react-native/rn-get-polyfills` and InitializeCore directly (corpus a08). */
+export function rnSerializerDefaults(tree: string): RnSerializerDefaults {
+  const treeReq = createRequire(join(tree, "package.json"));
+  try {
+    const cfg = treeReq(resolveFrom(treeReq, "@react-native/metro-config", ["react-native/package.json"])) as { getDefaultConfig(root: string): { serializer: RnSerializerDefaults } };
+    return cfg.getDefaultConfig(tree).serializer;
+  } catch {
+    const rn = dirname(treeReq.resolve("react-native/package.json"));
+    const rnReq = createRequire(join(rn, "package.json"));
+    const polyfills = rnReq(join(rn, "rn-get-polyfills.js")) as () => readonly string[];
+    const initializeCore = rnReq.resolve(join(rn, "Libraries", "Core", "InitializeCore"));
+    return { getPolyfills: () => polyfills(), getModulesRunBeforeMainModule: () => [initializeCore] };
+  }
+}
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const OFFLINE_TRANSFORMER = join(HERE, "offline-babel-transformer.cjs");
 
@@ -61,7 +97,7 @@ export async function offlineBundle(treeIn: string, repoRootIn: string): Promise
   }
   const realModules = realpathSync(link);
   const metro = treeReq(resolveFrom(treeReq, "metro", [])) as MetroApi;
-  const upstreamTransformer = resolveFrom(treeReq, "@react-native/metro-babel-transformer", ["@react-native/metro-config", "react-native/package.json"]);
+  const upstreamTransformer = upstreamBabelTransformer(tree);
   const loaded = await metro.loadConfig({ cwd: tree, watchFolders: realModules !== link ? [realModules] : [] });
   // Applied AFTER loading: `loadConfig`'s second argument is only a default,
   // which the tree's own metro.config.js (the original toolchain's
@@ -75,7 +111,7 @@ export async function offlineBundle(treeIn: string, repoRootIn: string): Promise
   // config brings none.
   let serializer = loaded.serializer;
   if (serializer.getPolyfills({ platform: "android" }).length === 0) {
-    const rnDefaults = (treeReq(resolveFrom(treeReq, "@react-native/metro-config", ["react-native/package.json"])) as { getDefaultConfig(root: string): { serializer: Partial<typeof serializer> } }).getDefaultConfig(tree).serializer;
+    const rnDefaults = rnSerializerDefaults(tree) as Partial<typeof serializer>;
     serializer = { ...serializer, ...(rnDefaults.getPolyfills !== undefined ? { getPolyfills: rnDefaults.getPolyfills } : {}), ...(rnDefaults.getModulesRunBeforeMainModule !== undefined ? { getModulesRunBeforeMainModule: rnDefaults.getModulesRunBeforeMainModule } : {}) };
   }
   // Spec 33 L2: a silent reporter (Metro's banner and progress went to
