@@ -971,6 +971,14 @@ export function emitFunction(input: EmitFunctionInput): Stmt {
         const needsBinding = range !== undefined || node.shape?.bindsExc !== false;
         if (needsBinding) handler.push(assign(id(EXC_VALUE), id(excParam)));
         lowerTree(node.handler, handler);
+        // Sweep 2026-11-26 (:copy): without the binding the exception is dead
+        // (try-shape proved `catchRegister` unread in and after the handler), so
+        // the `Catch rX` lowering `rX = __exc` is a dead copy of a never-written
+        // `__exc`; drop it rather than print an unwritten read.
+        if (!needsBinding) {
+          const i = handler.findIndex((s) => s.k === "expr" && s.expr.k === "assign" && s.expr.value.k === "ident" && s.expr.value.name === EXC_VALUE);
+          if (i >= 0) handler.splice(i, 1);
+        }
         if (range !== undefined) {
           // A deep nest of guarded regions prints as one try (src/emit/try-ladder.ts).
           out.push(guardedTry(block, excParam, { k: "logical", op: "&&", left: bin(">=", id(PC_VAR), num(range[0])), right: bin("<=", id(PC_VAR), num(range[1])) }, handler.slice(1)));

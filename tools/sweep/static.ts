@@ -163,6 +163,50 @@ export function staticFindings(code: string, app: string, hbc: number): Finding[
     return null;
   };
 
+  // Dead-copy targets: a local whose value is never observed -- every
+  // reference is the source of a plain copy `T = x;` / `let T = x` into
+  // another dead local (greatest fixed point, so copy cycles stay dead).
+  // Copying an unwritten (undefined) register into one is unobservable, so
+  // such reads are reported as WARN:DEAD-COPY, not NEVER-WRITTEN /
+  // READ-BEFORE-WRITE (sweep 2026-11-26 :copy triage).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const copyTarget = (r: any): any => {
+    const par = r.parentPath;
+    if (par?.isAssignmentExpression() && par.node.operator === "=" && par.node.right === r.node && par.node.left.type === "Identifier" && par.parentPath.isExpressionStatement()) return par.scope.getBinding(par.node.left.name) ?? null;
+    if (par?.isVariableDeclarator() && par.node.init === r.node && par.node.id.type === "Identifier") return par.scope.getBinding(par.node.id.name) ?? null;
+    return null;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const deadLocals = new Set<any>();
+  {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const all: any[] = [];
+    traverse(ast, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      Scope(p: any) {
+        for (const b of Object.values(p.scope.bindings) as any[]) if (b.scope === p.scope && (b.kind === "let" || b.kind === "var" || b.kind === "const")) all.push(b);
+      },
+    });
+    for (const b of all) deadLocals.add(b);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const feeds = new Map<any, any[]>(); // target -> bindings copied into it
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const work: any[] = [];
+    for (const b of all) {
+      for (const r of b.referencePaths) {
+        const t = copyTarget(r);
+        if (t === null || !deadLocals.has(t)) { work.push(b); continue; }
+        (feeds.get(t) ?? feeds.set(t, []).get(t)!).push(b);
+      }
+    }
+    while (work.length > 0) {
+      const b = work.pop();
+      if (!deadLocals.delete(b)) continue;
+      for (const s of feeds.get(b) ?? []) work.push(s);
+    }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const deadCopy = (r: any): boolean => useOf(r) === "copy" && deadLocals.has(copyTarget(r));
   traverse(ast, {
     Function: { enter(p: { node: object }) { markFn(p.node); } },
   });
@@ -202,6 +246,7 @@ export function staticFindings(code: string, app: string, hbc: number): Finding[
         const writes = b.constantViolations as any[];
         if (reads.length === 0) continue;
         if (writes.length === 0) {
+          if (reads.every(deadCopy)) { add(fnAt(reads[0]), "WARN", `DEAD-COPY:NEVER-WRITTEN:${nameShape(name)}@${ctxShape(reads[0])}`, name, reads[0].node.loc?.start.line); continue; }
           add(fnAt(reads[0]), "NEVER-WRITTEN", `${nameShape(name)}@${ctxShape(reads[0])}:${useOf(reads[0])}`, name, reads[0].node.loc?.start.line);
           continue;
         }
@@ -211,6 +256,7 @@ export function staticFindings(code: string, app: string, hbc: number): Finding[
           if (ownerFn(r) !== declOwner) continue; // closure: runs later
           if (inLoopBelow(r, declOwner)) continue; // back edge may write first
           if (writes.some((w: any) => ownerFn(w) !== declOwner)) break; // a closure may write first
+          if (deadCopy(r)) { add(fnAt(r), "WARN", `DEAD-COPY:READ-BEFORE-WRITE:${nameShape(name)}@${ctxShape(r)}`, name, r.node.loc?.start.line); continue; }
           add(fnAt(r), "READ-BEFORE-WRITE", `${nameShape(name)}@${ctxShape(r)}:${useOf(r)}`, name, r.node.loc?.start.line);
           break;
         }
