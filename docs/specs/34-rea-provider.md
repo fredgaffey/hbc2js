@@ -49,6 +49,13 @@ Common rules:
 
 **Optional evidence (spec 35).** The four calls accept `--evidence`. Only then does the reply gain an `evidence` object (`labels` mapping fields to `observed`, `derived` or `inferred`; `unknowns`; `limitations`; `provenance` with `producer`, `version`, `input.sha256` and `passes`). Without the flag the output is byte-identical to before; every existing field is unchanged when it is set. On a build that predates it, `--evidence` exits 2 (`E_USAGE`), which is the capability probe. Pinned by `tests/cli/machine-evidence.test.ts` and the golden under `tests/fixtures/agent/machine-no-evidence/`.
 
+**Offline.** No machine call can reach the network. Network-capable features
+(npm registry lookups behind `deps --confirm`/guessing, the OSV security gate,
+the Anthropic readability backend) live behind other commands;
+`tests/gate/release/machine-offline.test.ts` walks the import graph from
+`src/machine.ts` and fails if any reachable module could open a connection
+(raised on morluto/rea#7038).
+
 ## Acceptance tests (`tests/cli/machine-contract.test.ts`)
 
 1. `--version --json` parses, and `contract === 1` and `hbc2js === VERSION`.
