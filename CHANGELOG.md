@@ -43,6 +43,11 @@ See `docs/e2e/OSS-BENCHMARK.md` for the table.
 - Faster: function-granularity rendering of giant modules, a linear scoped
   rewrite check, index-only rows, change-tracked environment-graph rounds.
 - Bundles with no Metro registrations are reported (`no-metro-modules`).
+- React Native version read from the app's own bundled `package.json`
+  (exact `dependencies` pin) when the bundle carries it.
+- Peer-range pins: a newer wildcard (`*`) peer segment reached by the end of
+  the React Native line now wins over an older specific range (a 2019
+  `react-native-safe-area-context` 0.6.2 had been pinned beside RN 0.78).
 
 ### Boot check (`equiv --boot`)
 - Stub-host stand-ins for Expo modules, AsyncStorage, native constants,
@@ -51,6 +56,10 @@ See `docs/e2e/OSS-BENCHMARK.md` for the table.
   for versions with no prebuilt VM; `hbc2js help boot`.
 - Reports why a VM left no trace (signal, out-of-memory, timeout); a VM
   memory cap (`HBC2JS_BOOT_VM_MEMORY_MB`); the harness sizes its own heap.
+- Works from an npm install: Metro and the babel transformer come from the
+  export tree's own `node_modules` (run `npm install` there first; the
+  message says so), relative paths are accepted, and the bundle form lowers
+  private fields with the Babel found above the bundle.
 
 ### Tooling
 - `tools/torture/`: a generated app with exact per-function checksums
