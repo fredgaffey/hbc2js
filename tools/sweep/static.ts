@@ -172,7 +172,7 @@ export function staticFindings(code: string, app: string, hbc: number): Finding[
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const copyTarget = (r: any): any => {
     const par = r.parentPath;
-    if (par?.isAssignmentExpression() && par.node.operator === "=" && par.node.right === r.node && par.node.left.type === "Identifier" && par.parentPath.isExpressionStatement()) return par.scope.getBinding(par.node.left.name) ?? null;
+    if (par?.isAssignmentExpression() && par.node.operator === "=" && par.node.right === r.node && par.node.left.type === "Identifier" && (par.parentPath.isExpressionStatement() || (par.parentPath.isSequenceExpression() && par.parentPath.node.expressions.at(-1) !== par.node))) return par.scope.getBinding(par.node.left.name) ?? null;
     if (par?.isVariableDeclarator() && par.node.init === r.node && par.node.id.type === "Identifier") return par.scope.getBinding(par.node.id.name) ?? null;
     return null;
   };

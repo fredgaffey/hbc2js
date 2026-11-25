@@ -56,6 +56,10 @@ test("sweep 2026-11-26 :copy: static checker reports copies into never-read loca
   assert.deepEqual(checks("function f() { let r1; let r2; let r3; r2 = r1; r3 = r2; g(r3); }"), ["NEVER-WRITTEN r1"]);
   // read-before-write into a dead local, then a live read before the write
   assert.deepEqual(checks("function f() { let r1; let r2; r2 = r1; g(r1); r1 = 2; }"), ["READ-BEFORE-WRITE r1", "WARN r1"]);
+  // hermesc's construct-call setup: a dead copy inside a sequence
+  assert.deepEqual(checks("function f(C) { let r5; let r14; let r2 = (r14 = r5, new C()); return r2; }"), ["WARN r5"]);
+  // ... but the sequence's final value is used
+  assert.deepEqual(checks("function f() { let r5; let r14; return (0, r14 = r5); }"), ["NEVER-WRITTEN r5"]);
   // the assignment's value is used: not a plain copy statement
   assert.deepEqual(checks("function f() { let r1; let r2; g(r2 = r1); }"), ["NEVER-WRITTEN r1"]);
 });
