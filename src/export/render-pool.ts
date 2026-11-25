@@ -184,6 +184,16 @@ function collectGarbage(): void {
   }
 }
 
+/** What the live workers take, for the pool's grow/retire decisions: the
+ *  larger of their reported heaps (plus native overhead) and what the
+ *  process's RSS has grown by since the pool started. A worker's RSS is
+ *  well above its reported V8 heap (its own parse of the bundle, code
+ *  space, malloc slack), so the reported sum alone lets the pool grow
+ *  past physical memory. Used to decide growth only. */
+export function poolFootprint(reported: number, rssGrowth: number): number {
+  return Math.max(reported, rssGrowth);
+}
+
 const WORKER_SCRIPT = siblingWorkerPath("render-worker", import.meta.url);
 const BATCH = 4;
 
@@ -216,12 +226,13 @@ export async function renderModulesInPool(
   const envLimit = Number.parseInt(process.env.HBC2JS_WORKER_HEAP_MB ?? "", 10);
   const startCount = Math.max(1, Math.min(plan.count, Math.ceil(jobs.length / BATCH) + [...splits.values()].reduce((n, l) => n + l.length, 0)));
   const heapLimitMb = Number.isFinite(envLimit) && envLimit > 0 ? envLimit : plan.budget !== null ? heapBoundMb(plan.budget / startCount - WORKER_NATIVE_BYTES, bytesLength) : null;
-  // A bounded worker's old generation never passes its bound, so bound +
-  // native per worker is a hard ceiling: never more workers than fit the
-  // budget at that ceiling (reported heaps are taken between batches, after
-  // a cache drop, and understate a worker mid-module).
-  const ceiling = heapLimitMb !== null ? heapLimitMb * 2 ** 20 + WORKER_NATIVE_BYTES : 0;
-  const maxLive = plan.budget !== null && heapLimitMb !== null ? Math.max(1, Math.min(plan.max, Math.floor(plan.budget / ceiling))) : plan.max;
+  // The heap bound is a per-worker safety limit, not a footprint: a 45 MB
+  // bundle's floor (`WORKER_HEAP_BYTES_PER_BUNDLE_BYTE`) is 5 GB where its
+  // workers settle near 2 GB, so capping the live count by it held that app
+  // to one or two workers. The bound caps the start; growth past it is
+  // decided by the footprint the workers really have (`poolFootprint`).
+  const maxLive = plan.max;
+  const rssAtStart = process.memoryUsage().rss;
   const count = Math.min(startCount, maxLive);
   const workers: Worker[] = [];
   let live = 0;
@@ -301,9 +312,12 @@ export async function renderModulesInPool(
           if (plan.budget !== null && !settled) {
             // The pool's footprint now: each live worker's last report (one
             // not yet reported counts as the largest seen), plus native.
-            let footprint = 0;
-            for (const x of workers) if (!retired.has(x)) footprint += (heapOf.get(x) ?? stats.peakWorkerHeap) + WORKER_NATIVE_BYTES;
-            if (footprint > plan.budget && live > 1 && queue.length > 0) {
+            let reported = 0;
+            for (const x of workers) if (!retired.has(x)) reported += (heapOf.get(x) ?? stats.peakWorkerHeap) + WORKER_NATIVE_BYTES;
+            const footprint = poolFootprint(reported, process.memoryUsage().rss - rssAtStart);
+            // Retiring goes by the reports alone: RSS is a high-water mark
+            // that a retired worker's exit does not promptly lower.
+            if (reported > plan.budget && live > 1 && queue.length > 0) {
               // Over budget: retire this (now idle) worker; the rest carry on.
               retired.add(w);
               live--;
@@ -312,7 +326,8 @@ export async function renderModulesInPool(
               return;
             }
             const left = queue.length;
-            if (live < maxLive && footprint + stats.peakWorkerHeap + WORKER_NATIVE_BYTES <= plan.budget && left > live * BATCH * 4) feed(spawn());
+            const perWorker = Math.max(stats.peakWorkerHeap + WORKER_NATIVE_BYTES, footprint / live);
+            if (live < maxLive && footprint + perWorker <= plan.budget && left > live * BATCH * 4) feed(spawn());
           }
           feed(w);
         });
