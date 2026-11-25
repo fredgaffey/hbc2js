@@ -1,0 +1,79 @@
+; hbc2js disassembly of 502-paramless-catch-dead-exc-copy/v96.hbc
+; version=96 layout=C opcodeTable=hbc96 functions=6 strings=10 globalCodeIndex=0
+function #0 "global"  params=1 frame=15 env=0 flags=strict,dbg  @0x00000140 size=148
+  0000  DeclareGlobalVar     s6 "f"
+  0005  DeclareGlobalVar     s7 "h"
+  000a  CreateEnvironment    r5
+  000c  CreateClosure        r1, r5, f1 "f"
+  0011  GetGlobalObject      r0
+  0013  PutById              r0, r1, #c1, s6 "f"
+  0019  CreateClosure        r1, r5, f2 "h"
+  001e  PutById              r0, r1, #c2, s7 "h"
+  0024  TryGetById           r2, r0, #c1, s8 "print"
+  002a  GetByIdShort         r4, r0, #c2, s6 "f"
+  002f  LoadConstUndefined   r1
+  0031  CreateClosure        r3, r5, f3 ""
+  0036  Call2                r3, r4, r1, r3
+  003b  NewArray             r4, 4
+  003f  PutOwnByIndex        r4, r3, 0
+  0043  GetByIdShort         r6, r0, #c2, s6 "f"
+  0048  CreateClosure        r3, r5, f4 ""
+  004d  Call2                r3, r6, r1, r3
+  0052  PutOwnByIndex        r4, r3, 1
+  0056  GetByIdShort         r6, r0, #c3, s7 "h"
+  005b  NewObject            r3
+  005d  Call2                r3, r6, r1, r3
+  0062  PutOwnByIndex        r4, r3, 2
+  0066  GetByIdShort         r3, r0, #c3, s7 "h"
+  006b  NewObject            r0
+  006d  CreateClosure        r5, r5, f5 "x"
+  0072  PutNewOwnByIdShort   r0, r5, s9 "x"
+  0076  Call2                r0, r3, r1, r0
+  007b  PutOwnByIndex        r4, r0, 3
+  007f  GetByIdShort         r3, r4, #c4, s5 "join"
+  0084  LoadConstString      r0, s1 ","
+  0088  Call2                r0, r3, r4, r0
+  008d  Call2                r0, r2, r1, r0
+  0092  Ret                  r0
+
+function #1 "f"  params=2 frame=10 env=0 flags=strict,exc,dbg  @0x000001d4 size=21
+  .try T1..T2 -> L1 ; handler 0
+  0000  LoadParam            r1, 1
+  0003  LoadConstUInt8       r0, 1
+T1:
+  0006  Mov                  r2, r1
+  0009  LoadConstUndefined   r1
+  000b  Call1                r0, r2, r1
+T2:
+  000f  Jmp                  L2
+L1:
+  0011  Catch                r1
+L2:
+  0013  Ret                  r0
+
+function #2 "h"  params=2 frame=9 env=0 flags=strict,exc,dbg  @0x000001e9 size=29
+  .try T1..T2 -> L1 ; handler 0
+  0000  LoadParam            r0, 1
+T1:
+  0003  Mov                  r1, r0
+  0006  GetByIdShort         r0, r1, #c1, s9 "x"
+  000b  Call1                r0, r0, r1
+T2:
+  000f  LoadConstString      r0, s4 "yes"
+  0013  Ret                  r0
+L1:
+  0015  Catch                r0
+  0017  LoadConstString      r0, s3 "no"
+  001b  Ret                  r0
+
+function #3 ""  params=1 frame=1 env=0 flags=strict,dbg  @0x00000206 size=5
+  0000  LoadConstUInt8       r0, 1
+  0003  Throw                r0
+
+function #4 ""  params=1 frame=1 env=0 flags=strict  @0x0000020b size=5
+  0000  LoadConstUInt8       r0, 2
+  0003  Ret                  r0
+
+function #5 "x"  params=1 frame=1 env=0 flags=strict  @0x00000210 size=4
+  0000  LoadConstUndefined   r0
+  0002  Ret                  r0

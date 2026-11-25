@@ -1,0 +1,76 @@
+; hbc2js disassembly of 502-paramless-catch-dead-exc-copy/v99.hbc
+; version=99 layout=E opcodeTable=hbc99-mar2026 functions=6 strings=10 globalCodeIndex=0
+function #0 "global"  params=1 frame=15 env=0 flags=strict,dbg,overflowed  @0x00000134 size=150
+  0000  DeclareGlobalVar     s6 "f"
+  0005  DeclareGlobalVar     s7 "h"
+  000a  GetGlobalObject      r1
+  000c  LoadConstUndefined   r0
+  000e  CreateClosure        r2, r0, f1 "f"
+  0013  PutByIdStrict        r1, r2, #c0, s6 "f"
+  0019  CreateClosure        r2, r0, f2 "h"
+  001e  PutByIdStrict        r1, r2, #c1, s7 "h"
+  0024  TryGetById           r2, r1, #c0, s8 "print"
+  002a  GetByIdShort         r4, r1, #c1, s6 "f"
+  002f  CreateClosure        r3, r0, f3 ""
+  0034  Call2                r3, r4, r0, r3
+  0039  NewArray             r4, 4
+  003d  DefineOwnInDenseArray r4, r3, 0
+  0041  GetByIdShort         r5, r1, #c1, s6 "f"
+  0046  CreateClosure        r3, r0, f4 ""
+  004b  Call2                r3, r5, r0, r3
+  0050  DefineOwnInDenseArray r4, r3, 1
+  0054  GetByIdShort         r5, r1, #c2, s7 "h"
+  0059  NewObject            r3
+  005b  Call2                r3, r5, r0, r3
+  0060  DefineOwnInDenseArray r4, r3, 2
+  0064  GetByIdShort         r3, r1, #c2, s7 "h"
+  0069  NewObjectWithBuffer  r1, sh0(numProps=1), lit@0x0000
+  006f  CreateClosure        r5, r0, f5 "x"
+  0074  PutOwnBySlotIdx      r1, r5, 0
+  0078  Call2                r1, r3, r0, r1
+  007d  DefineOwnInDenseArray r4, r1, 3
+  0081  GetByIdShort         r3, r4, #c3, s5 "join"
+  0086  LoadConstString      r1, s1 ","
+  008a  Call2                r1, r3, r4, r1
+  008f  Call2                r1, r2, r0, r1
+  0094  Ret                  r1
+
+function #1 "f"  params=2 frame=11 env=0 flags=strict,exc,dbg,overflowed  @0x000001ca size=18
+  .try T1..T2 -> L1 ; handler 0
+  0000  LoadConstUInt8       r0, 1
+T1:
+  0003  LoadParam            r2, 1
+  0006  LoadConstUndefined   r1
+  0008  Call1                r0, r2, r1
+  000c  Jmp                  L2
+T2:
+L1:
+  000e  Catch                r1
+L2:
+  0010  Ret                  r0
+
+function #2 "h"  params=2 frame=10 env=0 flags=strict,exc,dbg,overflowed  @0x000001dc size=26
+  .try T1..T2 -> L1 ; handler 0
+T1:
+  0000  LoadParam            r1, 1
+  0003  GetByIdShort         r0, r1, #c0, s9 "x"
+  0008  Call1                r0, r0, r1
+T2:
+  000c  LoadConstString      r0, s4 "yes"
+  0010  Ret                  r0
+L1:
+  0012  Catch                r0
+  0014  LoadConstString      r0, s3 "no"
+  0018  Ret                  r0
+
+function #3 ""  params=1 frame=1 env=0 flags=strict,dbg,overflowed  @0x000001f6 size=5
+  0000  LoadConstUInt8       r0, 1
+  0003  Throw                r0
+
+function #4 ""  params=1 frame=1 env=0 flags=strict  @0x000001fb size=5
+  0000  LoadConstUInt8       r0, 2
+  0003  Ret                  r0
+
+function #5 "x"  params=1 frame=1 env=0 flags=strict  @0x00000200 size=4
+  0000  LoadConstUndefined   r0
+  0002  Ret                  r0
