@@ -43,6 +43,11 @@ export interface NativeManifest {
    *  readable as properties, as RN's legacy bridge and Expo modules expose
    *  them). */
   readonly present: Readonly<Record<string, NativeConstants>>;
+  /** JSI globals (`global.__<x>ModuleProxy`) the native side installs
+   *  before any JS runs and the bundle reads without installing them itself
+   *  (reanimated 2.0-2.2, corpus a08); the stub host stands in a recording
+   *  host object for each. Absent when there are none. */
+  readonly jsiGlobals?: readonly string[];
 }
 
 /** The per-app override file, looked for next to the original bundle. */
@@ -276,5 +281,23 @@ export function deriveNativeManifest(source: string, override: NativeOverride | 
   if (ec !== undefined && ec.manifest === null && !ovSetsManifest(ov) && /\bexpoConfig\b/.test(source)) present.ExponentConstants = { ...ec, manifest: EMBEDDED_MANIFEST };
   const sorted: Record<string, NativeConstants> = {};
   for (const k of Object.keys(present).sort()) sorted[k] = present[k]!;
-  return { schema: "boot-native/1", present: sorted };
+  const jsi = jsiGlobalEvidence(source);
+  return { schema: "boot-native/1", present: sorted, ...(jsi.length > 0 ? { jsiGlobals: jsi } : {}) };
 }
+
+/** `global.__<x>ModuleProxy` read (not assigned) by the bundle, when the bundle
+ *  has no installer call of its own: from reanimated 2.3 / worklets the library
+ *  calls `<X>Module.installTurboModule()` first (the host's installTurboModule
+ *  hook stands the global in then, as on a device, where it is undefined
+ *  until that call); before that the native package installs it at startup.
+ *  `__turboModuleProxy` is the host's own (always provided). */
+export function jsiGlobalEvidence(source: string): string[] {
+  if (/\binstallTurboModule\b/.test(source)) return [];
+  const out = new Set<string>();
+  JSI_GLOBAL_READ.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = JSI_GLOBAL_READ.exec(source)) !== null) if (m[1] !== "__turboModuleProxy") out.add(m[1]!);
+  return [...out].sort();
+}
+
+const JSI_GLOBAL_READ = /\.(__[a-z][\w$]*ModuleProxy)(?![\w$])(?!\s*=[^=])/g;

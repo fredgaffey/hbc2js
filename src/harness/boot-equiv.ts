@@ -437,6 +437,11 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
   }
 
   globalThis.global = globalThis;
+  // Stub-host addition (spec 31 §4.2): JSI globals a native package installs
+  // at startup (manifest \`jsiGlobals\`, reanimated 2's
+  // \`__reanimatedModuleProxy\`, corpus a08) are recording host objects.
+  var __hbcJsiGlobals = ${JSON.stringify(natives === null ? [] : (natives.jsiGlobals ?? []))};
+  for (var __hbcJi = 0; __hbcJi < __hbcJsiGlobals.length; __hbcJi++) if (globalThis[__hbcJsiGlobals[__hbcJi]] === undefined) globalThis[__hbcJsiGlobals[__hbcJi]] = hostStub(__hbcJsiGlobals[__hbcJi], true);
 
   // VM stand-in (spec 31 §4.2): the Hermes RN ships since 0.74 has a native
   // UTF-8 TextEncoder that bundles read bare (Expo's runtime builds

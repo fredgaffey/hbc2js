@@ -267,3 +267,43 @@ test("corpus a08: a spec module exporting NativeModules.X through a register (re
   // Read but not exported at the factory end: not a spec module.
   assert.ok(!bundleEvidence(REANIMATED2_SPEC.replace('list["default"] = r1;', "use(r1);")).spec.has("ReanimatedModule"));
 });
+
+// corpus a08 (reanimated 2.0-2.2, factories 1460/1463): NativeReanimated reads
+// the JSI host object the native side installs before any JS runs
+// (`global.__reanimatedModuleProxy`, no installTurboModule() in this line),
+// then 1463 calls `.installCoreFunctions(...)` on it at module eval. A
+// native-module entry cannot cover a JSI global: the manifest names it, and
+// the stub host stands in one recording host object, on both sides.
+const REANIMATED2_PROXY_READABLE = `__d(function _fn15837(a1, a2, a3, a4, a5, a6, a7) {
+  let r5 = a2;
+  let r2 = a6;
+  let r0 = undefined;
+  Object.defineProperty(r2, "__esModule", {value: true});
+  let r3_9 = a1;
+  let r3_10 = r3_9.__reanimatedModuleProxy;
+  _e4868_2 = r3_10;
+  r2.NativeReanimated = r0;
+  return r0;
+}, 1460, [1, 12, 13]);`;
+
+test("corpus a08: a read JSI global `__<x>ModuleProxy` with no installer in the bundle is in the manifest", () => {
+  assert.deepEqual(deriveNativeManifest(REANIMATED2_PROXY_READABLE).jsiGlobals, ["__reanimatedModuleProxy"]);
+  // reanimated >= 2.3 installs it itself (installTurboModule; the host's hook
+  // stands it in then), so the bundle's own installer keeps it out.
+  const installs = REANIMATED2_PROXY_READABLE + `\n__d(function(g,r,i,a,m,e,d){var R=r(d[0]).NativeModules.ReanimatedModule;R&&R.installTurboModule()},1459,[]);`;
+  assert.equal(deriveNativeManifest(installs).jsiGlobals, undefined);
+  // An assignment is not a read; the host's own __turboModuleProxy is not one.
+  assert.equal(deriveNativeManifest(`global.__fooModuleProxy = x; y = global.__turboModuleProxy;`).jsiGlobals, undefined);
+});
+
+test("corpus a08: the stub host stands in a manifest JSI global, and its methods are recording host calls", (t) => {
+  if (!vmOrSkip(t)) return;
+  const src = `
+    var proxy = globalThis.__reanimatedModuleProxy;
+    if (proxy === undefined) throw new Error("Cannot read property 'installCoreFunctions' of undefined");
+    proxy.installCoreFunctions(function () {});
+  `;
+  const r = bootTrace(src, { seed: 0, natives: deriveNativeManifest(REANIMATED2_PROXY_READABLE) });
+  assert.equal(r.reachedEnd, true, JSON.stringify(r.bootError ?? r.why));
+  assert.ok(JSON.stringify(r.trace).includes("__reanimatedModuleProxy.installCoreFunctions"), "the call is recorded");
+});
