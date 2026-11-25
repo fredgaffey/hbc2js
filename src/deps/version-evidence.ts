@@ -49,6 +49,16 @@ export function rnVersionFromPackageJsonLiteral(entries: ReadonlyMap<string, str
   return v;
 }
 
+/** The app's own `package.json` (bundled when the app requires it): its
+ *  `dependencies` literal pins react-native, almost always exactly. Only an
+ *  exact semver counts, and only beside a `react` key (a dependencies map,
+ *  not some other object that happens to have a react-native key). */
+export function rnVersionFromAppDependencies(entries: ReadonlyMap<string, string>): string | null {
+  if (!entries.has("react")) return null;
+  const v = entries.get("react-native");
+  return v !== undefined && /^\d+\.\d+\.\d+$/.test(v) ? v : null;
+}
+
 export interface InstructionLike {
   readonly name: string;
   readonly operands: readonly { readonly value: number }[];
@@ -144,7 +154,9 @@ function rnVersionFromObjectBuffer(mod: HbcModule, insns: readonly Instruction[]
 
 function rnVersionFromPackageJson(mod: HbcModule, insns: readonly Instruction[]): string | null {
   for (const { keys, vals } of objectLiterals(mod, insns)) {
-    if (!keys.includes("name") || !keys.includes("version")) continue;
+    const pkgJson = keys.includes("name") && keys.includes("version");
+    const deps = keys.includes("react-native") && keys.includes("react");
+    if (!pkgJson && !deps) continue;
     const entries = new Map<string, string>();
     keys.forEach((k, i) => {
       const v = vals[i];
@@ -156,7 +168,7 @@ function rnVersionFromPackageJson(mod: HbcModule, insns: readonly Instruction[])
         }
       } else if (v) entries.set(k, "");
     });
-    const found = rnVersionFromPackageJsonLiteral(entries);
+    const found = (pkgJson ? rnVersionFromPackageJsonLiteral(entries) : null) ?? (deps ? rnVersionFromAppDependencies(entries) : null);
     if (found !== null) return found;
   }
   return null;

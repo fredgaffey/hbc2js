@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildReport } from "../../../src/deps/report.ts";
 import { probeVerdict } from "../../../src/deps/optional-probes.ts";
-import { expoRuntimeFromStrings, rnVersionFromPackageJsonLiteral } from "../../../src/deps/version-evidence.ts";
+import { expoRuntimeFromStrings, rnVersionFromAppDependencies, rnVersionFromPackageJsonLiteral } from "../../../src/deps/version-evidence.ts";
 import type { MatchReport } from "../../../src/deps/match.ts";
 import type { ModuleGuess, Evidence } from "../../../src/deps/guess.ts";
 
@@ -54,4 +54,15 @@ test("react-native's own package.json literal gives the exact RN version (0.73 b
   assert.equal(rnVersionFromPackageJsonLiteral(new Map([["name", "left-pad"], ["version", "1.0.0"], ["description", "x"]])), null);
   assert.equal(rnVersionFromPackageJsonLiteral(new Map([["name", "react-native"], ["version", "next"], ["description", "x"]])), null);
   assert.equal(rnVersionFromPackageJsonLiteral(new Map([["name", "react-native"], ["version", "0.73.11"]])), null);
+});
+
+// 0.1.2 benchmark b1: the app bundles its OWN package.json (require("./package.json")),
+// whose `dependencies` literal pins react-native exactly ("0.80.0"); the export
+// fell back to a signature match (0.78.3).
+test("RN version from the app's own bundled package.json dependencies", () => {
+  const deps = new Map([["@react-navigation/bottom-tabs", "^7.3.15"], ["react", "19.1.0"], ["react-native", "0.80.0"], ["react-native-screens", "^4.11.1"]]);
+  assert.equal(rnVersionFromAppDependencies(deps), "0.80.0");
+  assert.equal(rnVersionFromAppDependencies(new Map([["react", "19.1.0"], ["react-native", "^0.80.0"]])), null, "a range is not an exact version");
+  assert.equal(rnVersionFromAppDependencies(new Map([["react-native", "0.80.0"]])), null, "needs react beside it (a dependencies map, not a lone key)");
+  assert.equal(rnVersionFromAppDependencies(new Map([["react", "19.1.0"], ["react-native", "file:../rn"]])), null);
 });
