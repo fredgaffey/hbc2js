@@ -92,9 +92,17 @@ export function rnCompatPin(pkg: string, rnVersion: string): RnPin | null {
   const t = table();
   const entry = t.packages[pkg];
   if (entry === undefined) return null;
+  // A wildcard react-native peer (`*`) says nothing about which RN a version
+  // was built for: corpus a08 (RN 0.66.4) got reanimated 4.2.2, gesture
+  // handler 3.5.0 and @react-navigation/native 7.5.2 (peer react >= 18.2,
+  // ERESOLVE beside RN 0.66's react 17) because their newest versions declare
+  // `*`. A wildcard admits a version only up to the newest one published by
+  // the end of the RN line (rule 2's pin); newer ones fall through to rule 2.
+  const timeBound = pinByTime(t, entry, rnVersion);
   let best: string | null = null;
   for (const [v, range] of entry.peers) {
     if (!satisfies(rnVersion, range)) continue;
+    if (isWildcardRange(range) && (timeBound === null || cmpVer(parseVer(v)!, parseVer(timeBound.version)!) > 0)) continue;
     const pv = parseVer(v)!;
     if (best === null || cmpVer(pv, parseVer(best)!) > 0) best = v;
   }
@@ -102,14 +110,23 @@ export function rnCompatPin(pkg: string, rnVersion: string): RnPin | null {
     const range = entry.peers.find(([v]) => v === best)![1];
     return { version: best, note: `newest version whose react-native peer range (${range}) admits ${rnVersion} (rn-compat.json, npm registry, ${t.generatedOn})` };
   }
-  const minor = rnVersion.split(".").slice(0, 2).join(".");
-  const released = t.rn[minor];
+  if (timeBound === null) return null;
+  return { version: timeBound.version, note: `newest version published by ${timeBound.month} (end of the RN ${minorOf(rnVersion)} line); declares no specific react-native peer range admitting ${rnVersion} (rn-compat.json, npm registry, ${t.generatedOn})` };
+}
+
+/** `*`, `x`, empty, or `>=0`: a range that admits every react-native. */
+function isWildcardRange(range: string): boolean {
+  return /^\s*(\*|x|X|>=\s*0(\.0)*(\.0)?)?\s*$/.test(range);
+}
+
+/** Rule 2: the newest version published by the end of the RN line. */
+function pinByTime(t: Table, entry: Table["packages"][string], rnVersion: string): { readonly version: string; readonly month: string } | null {
+  const released = t.rn[minorOf(rnVersion)];
   if (released === undefined) return null;
   const month = released.slice(0, 7);
   let byTime: string | null = null;
   for (const [ym, v] of entry.months) if (ym <= month) byTime = v;
-  if (byTime === null) return null;
-  return { version: byTime, note: `newest version published by ${month} (end of the RN ${minor} line); declares no react-native peer range admitting ${rnVersion} (rn-compat.json, npm registry, ${t.generatedOn})` };
+  return byTime === null ? null : { version: byTime, month };
 }
 
 const minorOf = (v: string): string => v.split(".").slice(0, 2).join(".");

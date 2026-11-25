@@ -25,7 +25,15 @@ export interface ModuleRegistration {
   readonly moduleId: number | null;
   readonly depCount: number | null;
   readonly depIds: readonly number[] | null;
+  /** The raw string id when the bundle registers modules under string ids
+   *  (a custom Metro `createModuleIdFactory`, corpus a10: 8-hex-digit hashes
+   *  like `__d(factory, "bb416d32", ["d339d332"])`). `moduleId`/`depIds` then
+   *  hold synthetic numeric ids: see `stringModuleIdMap`. */
+  readonly moduleKey?: string;
 }
+
+/** A registration as scanned, before string ids are numbered. */
+type RawRegistration = { readonly factoryFunctionIndex: number; readonly id: number | string | null; readonly deps: readonly (number | string | null)[] | null };
 
 const LOAD_CONST_NUMERIC = new Set(["LoadConstZero", "LoadConstUInt8", "LoadConstInt", "LoadConstDouble"]);
 const GET_BY_ID_LIKE = new Set(["TryGetById", "TryGetByIdLong", "GetById", "GetByIdLong", "GetByIdShort"]);
@@ -36,15 +44,19 @@ export function isDefineGlobalName(name: string | undefined): boolean {
   return name === "__d" || (name !== undefined && /^[A-Za-z0-9_$]+__d$/.test(name));
 }
 
-type RegState = { readonly kind: "__d" } | { readonly kind: "factory"; readonly index: number } | { readonly kind: "id"; readonly value: number | null } | { readonly kind: "deps"; readonly ids: readonly number[] | null } | undefined;
+type RegState = { readonly kind: "__d" } | { readonly kind: "factory"; readonly index: number } | { readonly kind: "id"; readonly value: number | string | null } | { readonly kind: "deps"; readonly ids: readonly (number | string | null)[] | null } | undefined;
 
 /**
  * Scan `global`'s (function index 0) decoded instructions for every
  * `__d(factory, id, deps)` registration call.
  */
 export function scanModuleRegistrations(mod: HbcModule, globalFn: DecodedFunction): ModuleRegistration[] {
+  return numberRegistrations(scanRaw(mod, globalFn));
+}
+
+function scanRaw(mod: HbcModule, globalFn: DecodedFunction): RawRegistration[] {
   const regState = new Map<number, RegState>();
-  const modules: ModuleRegistration[] = [];
+  const modules: RawRegistration[] = [];
 
   for (const insn of globalFn.instructions) {
     const ops = insn.operands;
@@ -70,6 +82,13 @@ export function scanModuleRegistrations(mod: HbcModule, globalFn: DecodedFunctio
       continue;
     }
 
+    if ((insn.name === "LoadConstString" || insn.name === "LoadConstStringLongIndex") && ops[0]?.role === "reg") {
+      const strOp = ops.find((o) => o.role === "string");
+      const value = strOp !== undefined ? mod.strings.get(strOp.value) : undefined;
+      regState.set(ops[0].value, { kind: "id", value: value ?? null });
+      continue;
+    }
+
     if (insn.name === "NewArray" && ops[0]?.role === "reg") {
       const sizeHint = ops[1]?.value ?? -1;
       regState.set(ops[0].value, { kind: "deps", ids: sizeHint === 0 ? [] : null });
@@ -79,16 +98,16 @@ export function scanModuleRegistrations(mod: HbcModule, globalFn: DecodedFunctio
     if ((insn.name === "NewArrayWithBuffer" || insn.name === "NewArrayWithBufferLong") && ops[0]?.role === "reg") {
       const numLiterals = ops[2]?.value ?? 0;
       const litOp = ops.find((o) => o.role === "literalOffset");
-      let ids: (number | null)[] | null = null;
+      let ids: (number | string | null)[] | null = null;
       if (litOp !== undefined) {
         try {
           const { values } = readLiterals(mod.literalValueBuffer, litOp.value, numLiterals, mod.header.version);
-          ids = values.map((v) => (v.kind === "integer" || v.kind === "number" ? v.value : null));
+          ids = values.map((v) => (v.kind === "integer" || v.kind === "number" ? v.value : v.kind === "string" ? (mod.strings.get(v.stringId) ?? null) : null));
         } catch {
           ids = null;
         }
       }
-      regState.set(ops[0].value, { kind: "deps", ids: ids as readonly number[] | null });
+      regState.set(ops[0].value, { kind: "deps", ids });
       continue;
     }
 
@@ -102,9 +121,8 @@ export function scanModuleRegistrations(mod: HbcModule, globalFn: DecodedFunctio
         if (factory?.kind === "factory") {
           modules.push({
             factoryFunctionIndex: factory.index,
-            moduleId: id?.kind === "id" ? id.value : null,
-            depCount: deps?.kind === "deps" && deps.ids !== null ? deps.ids.length : null,
-            depIds: deps?.kind === "deps" ? deps.ids : null,
+            id: id?.kind === "id" ? id.value : null,
+            deps: deps?.kind === "deps" ? deps.ids : null,
           });
         }
       }
@@ -121,6 +139,42 @@ export function scanModuleRegistrations(mod: HbcModule, globalFn: DecodedFunctio
 }
 
 /**
+ * Number a scan's registrations. Numeric ids pass through. String ids (a
+ * custom Metro `createModuleIdFactory`; corpus a10 registers all 4688 modules
+ * under 8-hex-digit string hashes) get synthetic ids: the ordinal of the id's
+ * first registration among string-id registrations, so 0, 1, 2, ... in
+ * registration order. The export harness's original-side prelude numbers
+ * string ids the same way at runtime (`__d` call order), so both sides of a
+ * boot comparison agree. A dep naming an unregistered string id stays null.
+ */
+function numberRegistrations(raw: readonly RawRegistration[]): ModuleRegistration[] {
+  const map = new Map<string, number>();
+  for (const r of raw) if (typeof r.id === "string" && !map.has(r.id)) map.set(r.id, map.size);
+  const num = (v: number | string | null): number | null => (typeof v === "string" ? (map.get(v) ?? null) : v);
+  return raw.map((r) => {
+    const depIds = r.deps === null ? null : r.deps.map(num);
+    return {
+      factoryFunctionIndex: r.factoryFunctionIndex,
+      moduleId: num(r.id),
+      depCount: depIds === null ? null : depIds.length,
+      // Elements that resolve to no id stay null (as for a non-numeric
+      // literal in a numeric-id bundle, unchanged).
+      depIds: depIds as readonly number[] | null,
+      ...(typeof r.id === "string" ? { moduleKey: r.id } : {}),
+    };
+  });
+}
+
+/** The string-id -> synthetic-id table `numberRegistrations` uses, for
+ *  callers that meet a raw string id elsewhere (the global function's
+ *  `__r("<id>")` startup calls). Empty for a numeric-id bundle. */
+export function stringModuleIdMap(regs: readonly ModuleRegistration[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const r of regs) if (r.moduleKey !== undefined && r.moduleId !== null && !map.has(r.moduleKey)) map.set(r.moduleKey, r.moduleId);
+  return map;
+}
+
+/**
  * Every module registration in the bundle. The global function (index 0) is
  * scanned first; only when it registers nothing are the functions it creates
  * directly (one level) scanned too. That covers the two corpus-B4 shapes: a
@@ -132,8 +186,8 @@ export function scanModuleRegistrations(mod: HbcModule, globalFn: DecodedFunctio
 export function scanBundleRegistrations(mod: HbcModule, decode: (mod: HbcModule, index: number) => DecodedFunction): ModuleRegistration[] {
   if (mod.functions.length === 0) return [];
   const globalFn = decode(mod, 0);
-  const top = scanModuleRegistrations(mod, globalFn);
-  if (top.length > 0) return top;
+  const top = scanRaw(mod, globalFn);
+  if (top.length > 0) return numberRegistrations(top);
   const children: number[] = [];
   const seen = new Set<number>([0]);
   for (const insn of globalFn.instructions) {
@@ -144,7 +198,7 @@ export function scanBundleRegistrations(mod: HbcModule, decode: (mod: HbcModule,
       }
     }
   }
-  const out: ModuleRegistration[] = [];
-  for (const idx of children) out.push(...scanModuleRegistrations(mod, decode(mod, idx)));
-  return out;
+  const out: RawRegistration[] = [];
+  for (const idx of children) out.push(...scanRaw(mod, decode(mod, idx)));
+  return numberRegistrations(out);
 }

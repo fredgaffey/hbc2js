@@ -30,7 +30,7 @@ test("package.json carries guessed/hinted/native-channel deps, not just confirme
   assert.equal(deps["react-native"]!.level, "bundle-string");
   assert.equal(deps["react-native-screens"]!.level, "hint");
   assert.equal(deps["react-native-screens"]!.versionDerived, true);
-  assert.equal(deps["expo-font"]!.version, "~55.0.4"); // pinned from Expo SDK 55's bundledNativeModules.json
+  assert.equal(deps["expo-font"]!.version, "~55.0.8"); // pinned from Expo SDK 55's bundledNativeModules.json (expo 55.0.32)
   assert.equal(deps["react-native-mmkv"]!.level, "native-channel");
   const pkg = buildPackageJson({ appName: "x", report: report({}), rnVersion: "0.83.2" }) as { dependencies: Record<string, string> };
   assert.equal(pkg.dependencies["react-native-screens"], "~4.23.0");
@@ -50,7 +50,7 @@ test("Expo SDK compat table pins name-only deps and overrides conflicting signat
   const deps = exportDependencies(r, "0.83.2");
   assert.equal(deps["react-native-reanimated"]!.version, "4.2.1");
   assert.match(deps["react-native-reanimated"]!.note ?? "", /3\.19\.5.*Expo SDK 55/);
-  assert.equal(deps["react-native-worklets"]!.version, "0.7.2"); // reanimated 4's peer
+  assert.equal(deps["react-native-worklets"]!.version, "0.7.4"); // reanimated 4's peer (SDK 55 at expo 55.0.32)
   assert.equal(deps["react-native-worklets"]!.level, "peer");
   assert.equal(deps["react-native"]!.version, "0.83.2"); // bundle evidence is never overridden
   assert.equal(deps["some-unknown-lib"]!.version, "*");
@@ -143,4 +143,48 @@ test("the CLI and metro devDependencies match the line each RN minor ships again
     assert.equal(t["metro"], metro, `metro for RN ${rn}`);
     if (Number(rn.split(".")[1]) < 73) assert.equal(t["metro-react-native-babel-preset"], metro, `legacy preset for RN ${rn} follows metro`);
   }
+});
+
+test("corpus a10/a06: a signature `expo` version from another SDK is pinned to the detected RN's SDK release", () => {
+  const r = report({
+    confirmedDeps: [
+      { package: "react-native", version: "0.83.2", confidence: "high", modulesCovered: 0, moduleTotal: 1, source: "bundle-string", versionEvidence: "bundle-string" },
+      { package: "expo", version: "52.0.28", confidence: "high", modulesCovered: 2, moduleTotal: 2, source: "db-match", versionEvidence: "exact-hash" },
+    ],
+  });
+  const deps = exportDependencies(r, "0.83.2");
+  assert.equal(deps["expo"]!.version, "55.0.32");
+  assert.match(deps["expo"]!.note ?? "", /52\.0\.28.*SDK 55/);
+  // The SDK table and its expo release agree: expo-modules-core's floor and
+  // worklets are those of expo 55.0.32 (55.0.5's worklets 0.7.2 conflicted
+  // with the expo-modules-core ~55.0.14 that npm floats to 55.0.27).
+  assert.equal(exportDependencies(report({}), "0.83.2")["expo"]!.version, "55.0.32");
+  // No SDK for the RN: the signature version stays.
+  assert.equal(exportDependencies(r, "0.75.4")["expo"]!.version, "52.0.28");
+});
+
+test("corpus a06: package.json overrides react and react-native to the root specs (optional peer ranges on other lines no longer ERESOLVE)", () => {
+  const pkg = buildPackageJson({ appName: "x", report: report({}), rnVersion: "0.83.2" }) as { dependencies: Record<string, string>; overrides?: Record<string, string> };
+  // The literal root specs (npm 10.9 rejects "$react": "Unable to resolve reference").
+  assert.deepEqual(pkg.overrides, { react: pkg.dependencies["react"], "react-native": pkg.dependencies["react-native"] });
+  assert.equal(pkg.overrides!["react"], "19.2.0");
+});
+
+test("corpus a06: a fork-relabelled confirmed dep does not carry the upstream's version (npm ETARGET)", () => {
+  const r = report({
+    confirmedDeps: [
+      { package: "react-native", version: "0.83.1", confidence: "high", modulesCovered: 0, moduleTotal: 1, source: "bundle-string", versionEvidence: "bundle-string" },
+      { package: "react-native-camera-kit-no-google", version: "4.2.1", confidence: "high", modulesCovered: 3, moduleTotal: 3, source: "db-match", versionEvidence: "exact-hash", forkOf: "react-native-camera-kit", forkEvidence: ["x"] },
+    ],
+  });
+  const d = exportDependencies(r, "0.83.1")["react-native-camera-kit-no-google"]!;
+  assert.notEqual(d.version, "4.2.1");
+  assert.equal(d.versionDerived, true);
+});
+
+test("corpus a08: a pre-0.73 metro.config.js maps md4 (gone in OpenSSL 3) to a supported digest", async () => {
+  const { buildMetroConfigJs } = await import("../../../src/export/boilerplate.ts");
+  const js = buildMetroConfigJs("0.66.4");
+  assert.match(js, /algorithm === "md4" \? "sha256"/);
+  assert.doesNotMatch(buildMetroConfigJs("0.83.2"), /md4/);
 });

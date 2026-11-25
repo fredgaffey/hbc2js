@@ -3,7 +3,7 @@
 // look at it, plus the toolchain table §4.3 requires (the build toolchain is
 // not derivable from the bundle at all).
 import type { DepsReport } from "../deps/report.ts";
-import { expoCompatRange, expoSdkReactNative } from "./expo-compat.ts";
+import { expoCompatRange, expoSdkExpoVersion, expoSdkReactNative } from "./expo-compat.ts";
 import { reactFitsRn, rnCompatPin, rnForReact, rnReactPeer } from "./rn-compat.ts";
 import { tierConfidenceScore } from "./substitute.ts";
 import { newestRnVersionForHbc } from "../deps/report.ts";
@@ -231,6 +231,14 @@ export function exportDependencies(report: DepsReport, rnVersion: string | null)
   const sdkRn = sdk === null ? null : expoSdkReactNative(sdk);
   const useTable = sdk !== null && sdkRn !== null && rnMinor(sdkRn) === rnMinor(rnVersion);
   for (const d of report.confirmedDeps) {
+    // A fork relabel (`forkOf`): the matched signature, and so the version,
+    // is the UPSTREAM package's. The fork has its own version line (corpus
+    // a06: react-native-camera-kit-no-google has no 4.2.1, npm ETARGET), so
+    // its version is unknown, not the upstream's.
+    if (d.forkOf !== undefined) {
+      out[d.package] = { version: "*", level: "confirmed", confidence: tierConfidenceScore(d.confidence), versionDerived: true, note: `fork of ${d.forkOf}; the signature version ${d.version} is ${d.forkOf}'s, not this package's` };
+      continue;
+    }
     out[d.package] = { version: d.version, level: d.versionEvidence === "bundle-string" ? "bundle-string" : "confirmed", confidence: tierConfidenceScore(d.confidence), versionDerived: false };
   }
   const add = (name: string, version: string | null, level: ExportDepLevel, confidence: number | null): void => {
@@ -253,6 +261,15 @@ export function exportDependencies(report: DepsReport, rnVersion: string | null)
         out[name] = pin !== null ? { ...d, version: pin.version, note: pin.note } : { ...d, note: "unpinned: no version evidence and no compatibility table for this package" };
       }
     }
+  }
+  // `expo` itself is not in its own bundledNativeModules.json, so a signature
+  // version survived even when the RN pins another SDK (corpus a10: expo
+  // 52.0.28 beside SDK 55's expo-* ranges; a06: 51.0.29 under RN 0.83). The
+  // table was read from one `expo` release: pin exactly that one.
+  const expoDep = out["expo"];
+  const expoVersion = useTable ? expoSdkExpoVersion(sdk!) : null;
+  if (expoDep !== undefined && expoVersion !== null && expoDep.level !== "bundle-string" && expoDep.version !== expoVersion) {
+    out["expo"] = { ...expoDep, version: expoVersion, versionDerived: true, note: `${expoDep.versionDerived ? "no version evidence" : `signature version ${expoDep.version}`}; Expo SDK ${sdk} (the detected RN's SDK) is expo ${expoVersion}, the release the SDK table was read from` };
   }
   // Every RN app needs react-native and react themselves; a bundle whose deps
   // pass matched neither (corpus a02: 48k functions, no confirmed deps) still
@@ -312,7 +329,21 @@ export function buildPackageJson(opts: {
     },
     dependencies,
     devDependencies: TOOLCHAIN_FOR_RN(opts.rnVersion),
+    // Every package in the tree sees the app's own react / react-native: a
+    // dependency whose (often optional) peer range names another line no
+    // longer fails `npm install` with ERESOLVE (corpus a06: ai@2.2.32's
+    // optional peer react ^18.2.0 beside RN 0.83's react 19).
+    ...frameworkOverrides(dependencies),
   };
+}
+
+/** npm `overrides` pinning react and react-native, wherever they appear in
+ *  the tree (peer edges included), to the root's own spec. The literal spec,
+ *  not npm's `$name` reference: npm 10.9 fails `$react` with "Unable to
+ *  resolve reference" (corpus a10 re-run). */
+export function frameworkOverrides(dependencies: Readonly<Record<string, string>>): { overrides?: Record<string, string> } {
+  const names = ["react", "react-native"].filter((n) => dependencies[n] !== undefined);
+  return names.length === 0 ? {} : { overrides: Object.fromEntries(names.map((n) => [n, dependencies[n]!])) };
 }
 
 export function buildAppJson(name: string): Record<string, unknown> {
@@ -330,6 +361,14 @@ export function buildMetroConfigJs(rnVersion: string | null): string {
     // `metro-config`'s own loader is the RN-version-agnostic equivalent.
     return [
       `const { getDefaultConfig, mergeConfig } = require("metro-config");`,
+      ``,
+      // Old Metro (metro-cache stableHash) hashes with md4, which OpenSSL 3
+      // (Node >= 17) no longer provides: "error:0308010C:digital envelope
+      // routines::unsupported" before any bundling (corpus a08, RN 0.66.4 on
+      // Node 22). The cache key only needs a stable digest.
+      `const crypto = require("node:crypto");`,
+      `const createHash = crypto.createHash;`,
+      `crypto.createHash = (algorithm, ...rest) => createHash(algorithm === "md4" ? "sha256" : algorithm, ...rest);`,
       ``,
       `const config = {};`,
       ``,

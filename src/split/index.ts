@@ -14,7 +14,9 @@ import type { HbcModule } from "../parse/types.ts";
 import { astPassHook, passHook } from "../passes/index.ts";
 import type { PassPipelineOptions } from "../passes/index.ts";
 import { helperPrelude } from "../runtime/helpers.ts";
-import { resolveStartupModuleIds } from "./entry.ts";
+import { resolveStartupModuleIds, type StringModuleIds } from "./entry.ts";
+import { scanBundleRegistrations, stringModuleIdMap } from "../deps/dscan.ts";
+import { decodeFunction } from "../disasm/decode.ts";
 import { rewriteFactoryBody } from "./rewrite.ts";
 
 /**
@@ -521,7 +523,9 @@ export function splitProject(bytes: Uint8Array, opts: SplitOptions = {}): SplitR
   modules.sort((a, b) => a.id - b.id);
 
   const globalFn = bodies.get(module.header.globalCodeIndex);
-  const startupIds = isFuncStmt(globalFn) ? resolveStartupModuleIds(globalFn.body, analysis.cfg(module.header.globalCodeIndex)) : [];
+  const sids = stringModuleIdMap(scanBundleRegistrations(module, decodeFunction));
+  const stringIds: StringModuleIds | undefined = sids.size > 0 ? { ids: sids, stringOf: (i) => module.strings.get(i) } : undefined;
+  const startupIds = isFuncStmt(globalFn) ? resolveStartupModuleIds(globalFn.body, analysis.cfg(module.header.globalCodeIndex), stringIds) : [];
   const entryModuleId = startupIds.length > 0 ? startupIds[startupIds.length - 1]! : null;
   if (entryModuleId === null || !known.has(entryModuleId)) {
     diagnostics.push(`could not resolve an entry module id from the global function's __r() call`);
