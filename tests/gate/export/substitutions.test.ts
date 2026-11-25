@@ -138,6 +138,8 @@ test("spec 29 §4.4: every bare require specifier names an installed package", S
     for (const rel of walk(out).filter((f) => f.endsWith(".js"))) {
       for (const spec of requireSpecifiers(readFileSync(join(out, rel), "utf8"))) {
         if (spec.startsWith("./") || spec.startsWith("../")) continue;
+        // `node:` built-ins (metro.config.js runs under Node) are never npm packages.
+        if (spec.startsWith("node:")) continue;
         const root = spec.startsWith("@") ? spec.split("/").slice(0, 2).join("/") : (spec.split("/")[0] ?? spec);
         assert.ok(
           installed.has(root) || builtins.has(root),

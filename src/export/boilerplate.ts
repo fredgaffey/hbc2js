@@ -231,6 +231,14 @@ export function exportDependencies(report: DepsReport, rnVersion: string | null)
   const sdkRn = sdk === null ? null : expoSdkReactNative(sdk);
   const useTable = sdk !== null && sdkRn !== null && rnMinor(sdkRn) === rnMinor(rnVersion);
   for (const d of report.confirmedDeps) {
+    // A fork relabel (`forkOf`): the matched signature, and so the version,
+    // is the UPSTREAM package's. The fork has its own version line (corpus
+    // a06: react-native-camera-kit-no-google has no 4.2.1, npm ETARGET), so
+    // its version is unknown, not the upstream's.
+    if (d.forkOf !== undefined) {
+      out[d.package] = { version: "*", level: "confirmed", confidence: tierConfidenceScore(d.confidence), versionDerived: true, note: `fork of ${d.forkOf}; the signature version ${d.version} is ${d.forkOf}'s, not this package's` };
+      continue;
+    }
     out[d.package] = { version: d.version, level: d.versionEvidence === "bundle-string" ? "bundle-string" : "confirmed", confidence: tierConfidenceScore(d.confidence), versionDerived: false };
   }
   const add = (name: string, version: string | null, level: ExportDepLevel, confidence: number | null): void => {
@@ -353,6 +361,14 @@ export function buildMetroConfigJs(rnVersion: string | null): string {
     // `metro-config`'s own loader is the RN-version-agnostic equivalent.
     return [
       `const { getDefaultConfig, mergeConfig } = require("metro-config");`,
+      ``,
+      // Old Metro (metro-cache stableHash) hashes with md4, which OpenSSL 3
+      // (Node >= 17) no longer provides: "error:0308010C:digital envelope
+      // routines::unsupported" before any bundling (corpus a08, RN 0.66.4 on
+      // Node 22). The cache key only needs a stable digest.
+      `const crypto = require("node:crypto");`,
+      `const createHash = crypto.createHash;`,
+      `crypto.createHash = (algorithm, ...rest) => createHash(algorithm === "md4" ? "sha256" : algorithm, ...rest);`,
       ``,
       `const config = {};`,
       ``,

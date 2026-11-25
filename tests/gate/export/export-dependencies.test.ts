@@ -169,3 +169,22 @@ test("corpus a06: package.json overrides react and react-native to the root spec
   assert.deepEqual(pkg.overrides, { react: pkg.dependencies["react"], "react-native": pkg.dependencies["react-native"] });
   assert.equal(pkg.overrides!["react"], "19.2.0");
 });
+
+test("corpus a06: a fork-relabelled confirmed dep does not carry the upstream's version (npm ETARGET)", () => {
+  const r = report({
+    confirmedDeps: [
+      { package: "react-native", version: "0.83.1", confidence: "high", modulesCovered: 0, moduleTotal: 1, source: "bundle-string", versionEvidence: "bundle-string" },
+      { package: "react-native-camera-kit-no-google", version: "4.2.1", confidence: "high", modulesCovered: 3, moduleTotal: 3, source: "db-match", versionEvidence: "exact-hash", forkOf: "react-native-camera-kit", forkEvidence: ["x"] },
+    ],
+  });
+  const d = exportDependencies(r, "0.83.1")["react-native-camera-kit-no-google"]!;
+  assert.notEqual(d.version, "4.2.1");
+  assert.equal(d.versionDerived, true);
+});
+
+test("corpus a08: a pre-0.73 metro.config.js maps md4 (gone in OpenSSL 3) to a supported digest", async () => {
+  const { buildMetroConfigJs } = await import("../../../src/export/boilerplate.ts");
+  const js = buildMetroConfigJs("0.66.4");
+  assert.match(js, /algorithm === "md4" \? "sha256"/);
+  assert.doesNotMatch(buildMetroConfigJs("0.83.2"), /md4/);
+});
