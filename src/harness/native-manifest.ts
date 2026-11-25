@@ -131,7 +131,11 @@ export function bundleEvidence(text: string): { required: Set<string>; spec: Set
   // (corpus a08, RN 0.66: async-storage 1.x has no TurboModuleRegistry arm,
   // so its tail RNCAsyncStorage was never found). Only the lookup scan reads
   // this view; the rules after it keep the source as written.
-  const scan = source.replace(NM_PROP, (_m, nm: string, name: string) => `${nm}.get("${name}")`);
+  // …also through a register holding NativeModules (`r1 = r1.NativeModules;
+  // r1 = r1.ReanimatedModule;`, reanimated 2's NativeReanimated, corpus a08).
+  const scan = source
+    .replace(NM_REG_PROP, (_m, reg: string, nm: string, lhs: string, name: string) => `${reg} = ${nm}; ${lhs} = NativeModules.get("${name}");`)
+    .replace(NM_PROP, (_m, nm: string, name: string) => `${nm}.get("${name}")`);
   LOOKUP.lastIndex = 0;
   let m: RegExpExecArray | null;
   {
@@ -163,17 +167,18 @@ export function bundleEvidence(text: string): { required: Set<string>; spec: Set
     // The readable decompile writes the chain as labelled blocks, each
     // alternative skipped once a previous one was found:
     // \`L2: { if (r3) { break L2; } r9 = …; r3 = r9.get("X"); break L2; }\`;
-    // the tail is the block not followed by another such block.
+    // the tail is the block not followed by another such block (nor by an
+    // `r1 = r1 || …` continuation of the chain).
     const wideBefore = source.slice(Math.max(0, m.index - 200), m.index);
     const wideAfter = source.slice(m.index + m[0].length, m.index + m[0].length + 160);
-    if (/if\s*\(\s*[\w$]+\s*\)\s*\{\s*break\s+L\d+;\s*\}\s*(?:[\w$]+\s*=\s*[\w$.]+;\s*)*[\w$]+\s*=\s*[\w$.()[\]]*$/.test(wideBefore) && /^\s*;\s*break\s+L\d+;\s*\}/.test(wideAfter) && !/^\s*;\s*break\s+L\d+;\s*\}\s*L\d+:\s*\{\s*if\s*\(/.test(wideAfter)) required.add(name);
+    if (/if\s*\(\s*[\w$]+\s*\)\s*\{\s*break\s+L\d+;\s*\}\s*(?:[\w$]+\s*=\s*[\w$.]+;\s*)*[\w$]+\s*=\s*[\w$.()[\]]*$/.test(wideBefore) && /^\s*;\s*break\s+L\d+;\s*\}/.test(wideAfter) && !/^\s*;\s*break\s+L\d+;\s*\}\s*L\d+:\s*\{\s*if\s*\(/.test(wideAfter) && !/^\s*;\s*break\s+L\d+;\s*\}\s*([\w$]+)\s*=\s*\1\s*\|\|/.test(wideAfter)) required.add(name);
     // Last expression of the factory: `...('X')},<id>,[` (Metro), or the
     // `...('X')}` end of a factory body without Metro's trailer.
     // Decompiled, the factory ends \`…("X");return _.default=p,c},551,[269]\`.
     const tail = source.slice(m.index + m[0].length, m.index + m[0].length + 80);
     // Readable decompile (\`let v = requireOptionalNativeModule("X");\n
     // list["default"] = v;\n return r0;\n }\`): exported, then the factory ends.
-    if (!inTry && /^\s*;\s*[\w$.]+(?:\["default"\]|\.default)\s*=\s*[\w$]+\s*;\s*return\b[^;{}()]*;?\s*\}/.test(tail) && !/(?:\|\||&&|\?\?|!=|==)\s*[^,;=]*$/.test(before)) spec.add(name);
+    if (!inTry && /^\s*;\s*(?:break\s+L\d+\s*;\s*\}\s*)?[\w$.]+(?:\["default"\]|\.default)\s*=\s*[\w$]+\s*;\s*return\b[^;{}()]*;?\s*\}/.test(tail) && !/(?:\|\||&&|\?\?|!=|==)\s*[^,;=]*$/.test(before)) spec.add(name);
     // …or exported as a live binding (TS/Babel `export default
     // TurboModuleRegistry.get("X")`): stored into the variable a `default`
     // getter returns, then the factory ends (`let v = T.get("X");\n _e1130_0
@@ -229,6 +234,7 @@ const HOISTED_STMT = /(?<![\w$.])([\w$]+)\s*=\s*"([A-Z][\w$]*)"\s*;\s*([\w$]+\s*
 const ALIASED_CALL = /(?<![\w$.])([\w$]+)\s*=\s*[\w$.()[\]]*\.(requireNativeModule|requireOptionalNativeModule|getEnforcing)\s*;\s*([\w$]+)\s*=\s*\1\(\s*("[A-Z][\w$]*")\s*\)/g;
 const HOISTED_NAME = /(?<![\w$.])([\w$]+)="([A-Z][\w$]*)",([\w$]+=[\w$.()[\]]*\.(?:getEnforcing|get))\(\1\)/g;
 const UNGUARDED_BIND = /(?<![\w$.])([\w$]+)\s*=\s*[\w$.()[\]]*\.NativeModules\.([A-Z][\w$]*)\s*[;,]/g;
+const NM_REG_PROP = /(?<![\w$.])([\w$]+)\s*=\s*([\w$.()[\]]*\.NativeModules)\s*;\s*([\w$]+)\s*=\s*\1\.([A-Z][\w$]*)\s*;/g;
 const NM_PROP = /((?:\.|(?<![\w$.]))NativeModules\)?)\.([A-Z][\w$]*)(?![\w$(])(?!\s*=[^=])/g;
 const NATIVE_MODULE_NAME = /\bnativeModuleName\s*[:=]\s*(?:[\w$]+\s*=\s*)?"([A-Z][\w$]*)"|(?<![\w$.])([\w$]+)\s*=\s*"([A-Z][\w$]*)"\s*[;,]\s*[\w$]+\.nativeModuleName\s*=\s*\2(?![\w$])/g;
 const IS_NULL_MSG = /NativeModule\.([A-Z][\w$]*) is null\. To fix/g;

@@ -242,3 +242,28 @@ test("corpus a09: a spec module exported as a live binding (default getter) is p
   // Stored into a variable no getter returns: not a spec export.
   assert.ok(!bundleEvidence(BLOB_UTIL_SPEC.replace("return _e1130_0;", "return other;")).spec.has("ReactNativeBlobUtil"));
 });
+
+// a08 (reanimated 2's NativeReanimated, factory 1428): the default export is
+// `NativeModules.ReanimatedModule` read through a register, inside a
+// labelled block whose other arm is the web mock.
+const REANIMATED2_SPEC = `__d(function _fn15378(a1, a2, a3, a4, a5, a6, a7) {
+  L0: {
+    r4 = r4.nativeShouldBeMock;
+    r4 = r4();
+    if (r4) {
+      r1 = r3["default"];
+      break L0;
+    }
+    r1 = r1.NativeModules;
+    r1 = r1.ReanimatedModule;
+    break L0;
+  }
+  list["default"] = r1;
+  return r0;
+}, 1428, [1, 5, 1429, 1430]);`;
+
+test("corpus a08: a spec module exporting NativeModules.X through a register (reanimated 2) is present", () => {
+  assert.ok(bundleEvidence(REANIMATED2_SPEC).spec.has("ReanimatedModule"));
+  // Read but not exported at the factory end: not a spec module.
+  assert.ok(!bundleEvidence(REANIMATED2_SPEC.replace('list["default"] = r1;', "use(r1);")).spec.has("ReanimatedModule"));
+});
