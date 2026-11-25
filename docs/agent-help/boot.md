@@ -10,7 +10,15 @@ stub host, or no VM), harness error (3).
 The export tree must be made with `hbc2js export <app.hbc> --out <dir>
 --instrument=modules --substitute none`: the export side's module records come
 only from the instrumented registry. A tree exported without it is reported
-INCONCLUSIVE at once, naming that command.
+INCONCLUSIVE at once, naming that command. Run `npm install` in the export
+tree first: the boot check bundles it with the tree's own Metro.
+
+Always pass the export DIRECTORY as the second argument. Do not pass a Metro
+bundle you built from the export (`npx react-native bundle ...`): Metro
+renumbers the modules when it rebuilds, so its trace cannot line up with the
+original's module ids and the bundle form reports DIVERGENT at record 0 even
+for a correct export. The bundle form is for the app's own original JS bundle
+(e.g. the `index.android.bundle` an app ships before Hermes compilation).
 
 ## Getting a VM
 
