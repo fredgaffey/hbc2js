@@ -314,8 +314,11 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
       has: function (t, p) { return typeof p === "string" && present(p); },
     });
   }
-  function hostStub(name, jsi, cs) {
-    var backing = Object.create(null);
+  // \`fnLike\`: a startup JSI global's values (manifest \`jsiGlobals\`) may be
+  // host functions (reanimated 2's makeShareable(worklet), then called), so
+  // the stub and what its methods return are callable, recording the call.
+  function hostStub(name, jsi, cs, fnLike) {
+    var backing = fnLike === true ? function () {} : Object.create(null);
     // Stub-host addition (spec 31 §4.2): a device's native module carries
     // its constants as OWN enumerable properties, so \`{ ...NativeModule }\`
     // and Object.keys see them (expo-constants builds \`Constants\` by
@@ -323,6 +326,10 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
     // {} and \`executionEnvironment\` read undefined). A per-stub copy.
     if (cs) for (var ck in cs) if (Object.prototype.hasOwnProperty.call(cs, ck) && ck !== "getConstants") backing[ck] = cs[ck] === undefined ? undefined : JSON.parse(JSON.stringify(cs[ck]));
     var proxy = new Proxy(backing, {
+      apply: function () {
+        if (nativeGate()) callRecord(name + "()", [], undefined);
+        return hostStub(name + "()", true, undefined, true);
+      },
       get: function (t, p) {
         if (p === Symbol.toPrimitive) return function () { return "[hoststub " + name + "]"; };
         if (p === Symbol.toStringTag) return "HostStub";
@@ -365,7 +372,7 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
           // JSI \`globalThis.NitroModulesProxy\` (createHybridObject, box, ...),
           // which the library reads back at once (spec 33 apps).
           if (p === "install" && /\.NitroModules$/.test(name) && globalThis.NitroModulesProxy === undefined) globalThis.NitroModulesProxy = hostStub("NitroModulesProxy", true);
-          if (jsi === true) return hostStub(name + "." + String(p) + "()", true);
+          if (jsi === true) return hostStub(name + "." + String(p) + "()", true, undefined, fnLike);
           return undefined;
         };
         t[p] = child;
@@ -441,7 +448,7 @@ function buildPrelude(seed: number, firstNative: number, wrapFactories: boolean,
   // at startup (manifest \`jsiGlobals\`, reanimated 2's
   // \`__reanimatedModuleProxy\`, corpus a08) are recording host objects.
   var __hbcJsiGlobals = ${JSON.stringify(natives === null ? [] : (natives.jsiGlobals ?? []))};
-  for (var __hbcJi = 0; __hbcJi < __hbcJsiGlobals.length; __hbcJi++) if (globalThis[__hbcJsiGlobals[__hbcJi]] === undefined) globalThis[__hbcJsiGlobals[__hbcJi]] = hostStub(__hbcJsiGlobals[__hbcJi], true);
+  for (var __hbcJi = 0; __hbcJi < __hbcJsiGlobals.length; __hbcJi++) if (globalThis[__hbcJsiGlobals[__hbcJi]] === undefined) globalThis[__hbcJsiGlobals[__hbcJi]] = hostStub(__hbcJsiGlobals[__hbcJi], true, undefined, true);
 
   // VM stand-in (spec 31 §4.2): the Hermes RN ships since 0.74 has a native
   // UTF-8 TextEncoder that bundles read bare (Expo's runtime builds

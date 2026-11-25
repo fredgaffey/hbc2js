@@ -302,6 +302,10 @@ test("corpus a08: the stub host stands in a manifest JSI global, and its methods
     var proxy = globalThis.__reanimatedModuleProxy;
     if (proxy === undefined) throw new Error("Cannot read property 'installCoreFunctions' of undefined");
     proxy.installCoreFunctions(function () {});
+    // reanimated 2.0-2.2 \`runOnUI(worklet)\` is \`makeShareable(worklet)\`, then
+    // called (a08's next throw: "Object is not a function"): a JSI host value
+    // can be a host function, so the stand-in's results are callable.
+    proxy.makeShareable(function () {})();
   `;
   const r = bootTrace(src, { seed: 0, natives: deriveNativeManifest(REANIMATED2_PROXY_READABLE) });
   assert.equal(r.reachedEnd, true, JSON.stringify(r.bootError ?? r.why));
