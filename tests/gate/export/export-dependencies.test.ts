@@ -168,6 +168,10 @@ test("corpus a08: pre-0.70 RN gets the metro line its own CLI bundles with", () 
     const t = TOOLCHAIN_FOR_RN(rn);
     assert.equal(t["@react-native-community/cli"], undefined, `RN ${rn} brings its own cli`);
     for (const p of ["metro", "metro-config", "metro-react-native-babel-preset"]) assert.equal(t[p], metro, `${p} for RN ${rn}`);
+    // The legacy preset rewrites interop to `@babel/runtime/helpers/*`
+    // requires; RN's own template had it as a devDependency (a08's next
+    // bundle failure: "Unable to resolve module @babel/runtime/helpers/interopRequireDefault").
+    assert.equal(t["@babel/runtime"], "^7.12.5", `@babel/runtime for RN ${rn}`);
   }
 });
 

@@ -204,9 +204,12 @@ export function TOOLCHAIN_FOR_RN(rnVersion: string | null): Record<string, strin
     };
   }
   // Legacy toolchain: the babel preset and metro-config are published in
-  // lockstep with metro itself.
+  // lockstep with metro itself. The preset turns interop into
+  // `@babel/runtime/helpers/*` requires, which RN's own app template carried as
+  // a devDependency (corpus a08, RN 0.66.4).
   return {
     ...common,
+    "@babel/runtime": "^7.12.5",
     "metro-react-native-babel-preset": tool.metro,
     metro: tool.metro,
     "metro-config": tool.metro,
