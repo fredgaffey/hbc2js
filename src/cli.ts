@@ -528,8 +528,12 @@ function runEquivBoot(a: string, b: string, o: EquivArgs): number {
   const opts = { seed: o.seed, firstNative: o.firstNative, timeoutMs: o.timeout, ...(o.vm !== undefined ? { vm: o.vm } : {}) };
   // Spec 31 §4.2 (L4): side A's native-module manifest, for both sides.
   const natives = deriveNativeManifest(srcA.source, overrideFor(a));
-  const ta = bootTrace(srcA.source, { ...opts, natives });
-  const tb = bootTrace(srcB.source, { ...opts, natives });
+  // Class-syntax lowering resolves Babel from the bundle's directory upward
+  // (nearest node_modules), the same Babel for both sides (0.1.2 benchmark
+  // b2: an npm-installed hbc2js has no Babel of its own).
+  const lowerFrom = dirname(resolve(b));
+  const ta = bootTrace(srcA.source, { ...opts, natives, lowerFrom });
+  const tb = bootTrace(srcB.source, { ...opts, natives, lowerFrom });
   const cmp = compareBootTraces(ta, tb);
   const inconclusive = cmp.verdict === TRACE_VERDICT.INCONCLUSIVE;
   const vmPath = ta.vm?.path ?? tb.vm?.path ?? null;

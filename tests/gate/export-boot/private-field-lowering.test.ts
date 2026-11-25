@@ -10,6 +10,9 @@ import assert from "node:assert/strict";
 import { findHermesVm } from "../../../src/harness/hermes-vm.ts";
 import { bootTrace, classSyntaxSupported, lowerClassSyntax } from "../../../src/harness/boot-equiv.ts";
 import { findHermesc } from "../../../src/harness/export-boot.ts";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { join, relative } from "node:path";
+import { tmpdir } from "node:os";
 
 const SRC = `
   class Base { #seen = 0; static #count = 0; static made() { return Base.#count; }
@@ -59,4 +62,26 @@ test("0.1.2 apps: thousands of undeclared-global warnings do not hide a source-m
   const src = `(function () { "use strict";\n${Array.from({ length: 40000 }, (_, i) => `function f${i}() { return undeclaredGlobal${i}; }${pad}`).join("\n")}\n})();`;
   const r = bootTrace(src, { seed: 0, vm: vm.path, timeoutMs: 60000 });
   assert.equal(r.reachedEnd, true, JSON.stringify(r.why));
+});
+
+// 0.1.2 benchmark b2: bundle form (`equiv --boot app.hbc some/android.bundle`)
+// resolved Babel only from hbc2js's own install (none from npm). Babel is
+// resolved from the bundle's directory upward (nearest node_modules) first.
+test("lowerClassSyntax resolves Babel from the nearest node_modules above fromDir (also relative)", () => {
+  const top = mkdtempSync(join(tmpdir(), "hbc2js-lower-"));
+  try {
+    const mod = (name: string, body: string): void => {
+      mkdirSync(join(top, "node_modules", name), { recursive: true });
+      writeFileSync(join(top, "node_modules", name, "package.json"), JSON.stringify({ name, main: "index.js" }));
+      writeFileSync(join(top, "node_modules", name, "index.js"), body);
+    };
+    mod("@babel/core", "exports.transformSync = () => ({ code: '/*from-bundle-dir*/' });");
+    for (const p of ["class-static-block", "private-property-in-object", "private-methods", "class-properties", "classes"]) mod(`@babel/plugin-transform-${p}`, "module.exports = {};");
+    const deep = join(top, "a", "b");
+    mkdirSync(deep, { recursive: true });
+    assert.equal(lowerClassSyntax(SRC, deep), "/*from-bundle-dir*/");
+    assert.equal(lowerClassSyntax(SRC, relative(process.cwd(), deep)), "/*from-bundle-dir*/");
+  } finally {
+    rmSync(top, { recursive: true, force: true });
+  }
 });

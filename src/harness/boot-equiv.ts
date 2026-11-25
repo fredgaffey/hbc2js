@@ -16,7 +16,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { decompile } from "../decompile.ts";
 import { NO_VM_HELP, findAllHermesVms, runHermes } from "./hermes-vm.ts";
@@ -878,7 +878,9 @@ const LOWER_PLUGINS = [
  *  lowering is needed but no `@babel/core` + plugins can be resolved. */
 export function lowerClassSyntax(source: string, fromDir: string | undefined): string | null {
   if (!PRIVATE_SYNTAX.test(source)) return source;
-  const requirers = [...(fromDir !== undefined ? [createRequire(join(fromDir, "package.json"))] : []), createRequire(import.meta.url)];
+  // `fromDir` first (absolute: createRequire rejects relative paths), which
+  // walks up to the nearest node_modules; hbc2js's own install last.
+  const requirers = [...(fromDir !== undefined ? [createRequire(join(resolve(fromDir), "package.json"))] : []), createRequire(import.meta.url)];
   for (const req of requirers) {
     let core: { transformSync: (code: string, o: object) => { code?: string | null } | null };
     try {
@@ -922,7 +924,7 @@ export function bootTrace(bundleSourceIn: string, opts: BootTraceOptions = {}): 
   if (PRIVATE_SYNTAX.test(bundleSource) && !classSyntaxSupported(opts.hermesc ?? vm.path, opts.hermesc !== undefined ? "hermesc" : "vm")) {
     const low = lowerClassSyntax(bundleSource, opts.lowerFrom);
     if (low === null) {
-      const why = `${opts.hermesc ?? vm.path} cannot parse class private members (#x) and no @babel/core with the class-properties / private-methods / private-property-in-object plugins could be resolved to lower them (install them, use a Hermes >= v98 VM via --vm, or build one: tools/build-hermes-vm.sh 98)`;
+      const why = `${opts.hermesc ?? vm.path} cannot parse class private members (#x) and no @babel/core with the class-properties / private-methods / private-property-in-object plugins could be resolved to lower them (install them in the export tree or beside the bundle (\`npm install\` there${opts.lowerFrom !== undefined ? `; searched upward from ${opts.lowerFrom}` : ""}), use a Hermes >= v98 VM via --vm, or build one: tools/build-hermes-vm.sh 98)`;
       return { trace: { kind: "full", records: [] }, reachedEnd: false, bootError: null, vm, ran: false, why };
     }
     bundleSource = low;
