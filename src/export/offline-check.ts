@@ -121,9 +121,15 @@ export async function offlineBundle(treeIn: string, repoRootIn: string): Promise
   const bundlePath = join(tree, "android.bundle.js");
   const prev = process.env[OFFLINE_UPSTREAM_ENV];
   process.env[OFFLINE_UPSTREAM_ENV] = upstreamTransformer;
+  // Old Metro (0.66, corpus a08) prints "Writing bundle output to:" with
+  // console.log whatever the reporter: stdout must stay the caller's
+  // (`equiv --boot --json`), so Metro's log goes to stderr while it builds.
+  const log = console.log;
+  console.log = (...a: unknown[]): void => { console.error(...a); };
   try {
     await metro.runBuild(config, { entry: "index.js", platform: "android", dev: false, minify: false, out: bundlePath });
   } finally {
+    console.log = log;
     if (prev === undefined) delete process.env[OFFLINE_UPSTREAM_ENV];
     else process.env[OFFLINE_UPSTREAM_ENV] = prev;
   }

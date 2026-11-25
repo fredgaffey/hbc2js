@@ -33,3 +33,27 @@ test("corpus a08: a pre-0.73 tree's offline bundle uses RN's own transformer and
   assert.deepEqual(d.getPolyfills!({ platform: "android" }), [join(tree, "node_modules/react-native/Libraries/polyfills/error-guard.js")]);
   assert.deepEqual(d.getModulesRunBeforeMainModule!(tree), [join(tree, "node_modules/react-native/Libraries/Core/InitializeCore.js")]);
 });
+
+// The next a08 gap: Metro 0.66's runBuild prints "Writing bundle output to:"
+// with console.log whatever the reporter, which put text before
+// `equiv --boot --json`'s JSON on stdout. The offline bundle keeps stdout clean.
+test("corpus a08: an old Metro's console.log during the offline bundle does not reach stdout", async () => {
+  const tree = legacyTree();
+  const nm = join(tree, "node_modules");
+  mkdirSync(join(nm, "metro"), { recursive: true });
+  writeFileSync(join(nm, "metro/package.json"), `{"name":"metro","version":"0.66.2","main":"index.js"}`);
+  writeFileSync(join(nm, "metro/index.js"), `module.exports = {
+    loadConfig: async () => ({ serializer: { getPolyfills: () => ["p"] }, resolver: {}, transformer: {} }),
+    runBuild: async (c, o) => { console.log("Writing bundle output to: " + o.out); require("fs").writeFileSync(o.out, ""); },
+  };`);
+  const { offlineBundle } = await import("../../../src/export/offline-check.ts");
+  const write = process.stdout.write.bind(process.stdout);
+  let out = "";
+  process.stdout.write = ((chunk: string | Uint8Array): boolean => { out += String(chunk); return true; }) as typeof process.stdout.write;
+  try {
+    await offlineBundle(tree, tree);
+  } finally {
+    process.stdout.write = write;
+  }
+  assert.ok(!out.includes("Writing bundle output"), `stdout got: ${JSON.stringify(out)}`);
+});

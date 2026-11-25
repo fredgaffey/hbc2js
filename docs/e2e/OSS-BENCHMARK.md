@@ -125,12 +125,15 @@ host. Run on the Linux box (32 cores), release-0.1.2 code.
 | Colota | AGPL-3.0 | bare | 98 | 18,758 | 73 s | ✓ | ✓ | ✓ | EQUIVALENT |
 | Formulus | MIT | bare | 96 | 25,403 | 75 s | ✓ | ✓ | ✓ | EQUIVALENT |
 | AwakeOnLAN | GPL-3.0 | bare | 96 | 7,099 | 22 s | ✓ | ✓ | ✓ | EQUIVALENT |
-| Bangumi | MIT | Expo (RN 0.66) | 84 | 34,285 | 193 s | ✓ | ✓ | ✗ | INCONCLUSIVE (stub host lacks reanimated 2's JSI global) |
+| Bangumi | MIT | Expo (RN 0.66) | 84 | 34,285 | 190 s | ✓ | ✓ | ✓ | EQUIVALENT (re-measured on fix-a08: 3,172 factories, app key `main`) |
 | SyncUp | MPL-2.0 | Expo | 98 | 11,026 | 37 s | ✓ | ✓ | ✓ | EQUIVALENT |
 | Spix | AGPL-3.0 | Expo | 96 | 34,742 | 106 s | ✓ | ✓ | ✓ | EQUIVALENT |
 
-8 of 10 boot EQUIVALENT; none DIVERGENT. The two open items are in
-`docs/BUGS.md` (Bangumi's Metro 0.66 bundle step and its JSI host object).
+9 of 10 boot EQUIVALENT; none DIVERGENT; the tenth (Notesnook) is not a
+Metro bundle. Bangumi needed the pre-0.70 Metro line and `@babel/runtime` in the
+export's toolchain, a stand-in for reanimated 2's startup JSI global, and an
+offline bundle that uses RN 0.66's own transformer and polyfills (resolved rows
+in `docs/BUGS.md`).
 Also EQUIVALENT outside the corpus: Ignite (MIT, Expo, both phases) and
 BlueWallet (MIT, bare RN 0.88, register phase). Every decompiler bug the
 corpus exposed on the way (about twenty) has a construct fixture and a gate
