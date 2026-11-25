@@ -121,7 +121,7 @@ test("react-native and react are always dependencies once the RN version is know
 
 test("the CLI and metro devDependencies match the line each RN minor ships against (npm registry)", () => {
   const want: [string, string | undefined, string][] = [
-    ["0.69.12", undefined, "^0.76.0"], // RN's own cli dependency serves; not tabled
+    ["0.69.12", undefined, "^0.70.0"], // RN's own cli dependency serves; metro follows it
     ["0.70.15", "^9.3.0", "^0.72.0"],
     ["0.71.19", "^10.2.0", "^0.73.0"],
     ["0.72.17", "^11.4.0", "^0.76.0"],
@@ -142,6 +142,32 @@ test("the CLI and metro devDependencies match the line each RN minor ships again
     assert.equal(t["@react-native-community/cli"], cli, `cli for RN ${rn}`);
     assert.equal(t["metro"], metro, `metro for RN ${rn}`);
     if (Number(rn.split(".")[1]) < 73) assert.equal(t["metro-react-native-babel-preset"], metro, `legacy preset for RN ${rn} follows metro`);
+  }
+});
+
+// corpus a08 (RN 0.66.4): the export pinned metro/metro-config ^0.76 next to
+// RN 0.66's own cli 6 (cli-plugin-metro -> metro ^0.66.1), so the 0.66 worker
+// ran under a 0.76 default config and `npx react-native bundle` died in
+// countLines(undefined) ("reading 'match'") transforming index.js. Before
+// RN 0.70 the metro line is the one RN's own CLI resolves (react-native@<minor>'s
+// own metro-react-native-babel-transformer dependency, npm registry).
+test("corpus a08: pre-0.70 RN gets the metro line its own CLI bundles with", () => {
+  const want: [string, string][] = [
+    ["0.60.6", "^0.54.1"],
+    ["0.61.5", "^0.56.0"],
+    ["0.62.3", "^0.58.0"],
+    ["0.63.5", "^0.59.0"],
+    ["0.64.4", "^0.64.0"],
+    ["0.65.3", "^0.66.2"],
+    ["0.66.4", "^0.66.2"],
+    ["0.67.5", "^0.66.2"],
+    ["0.68.7", "^0.67.0"],
+    ["0.69.12", "^0.70.0"],
+  ];
+  for (const [rn, metro] of want) {
+    const t = TOOLCHAIN_FOR_RN(rn);
+    assert.equal(t["@react-native-community/cli"], undefined, `RN ${rn} brings its own cli`);
+    for (const p of ["metro", "metro-config", "metro-react-native-babel-preset"]) assert.equal(t[p], metro, `${p} for RN ${rn}`);
   }
 });
 

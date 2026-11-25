@@ -154,8 +154,8 @@ function rnMinor(rnVersion: string | null): number | null {
  *  dependency up to 0.75, `@react-native/community-cli-plugin`'s `metro`
  *  dependency from 0.73). From RN 0.76 RN no longer depends on the CLI and
  *  `npx react-native bundle` needs it as a project devDependency; before 0.76
- *  RN brings its own, so the devDependency only has to agree with it. Lines
- *  older than 0.70 are not tabled: `cli` is null (RN's own dependency serves). */
+ *  RN brings its own, so the devDependency only has to agree with it. Before
+ *  0.70 `cli` is null (RN's own dependency serves) and `metro` is RN's own line. */
 export function cliAndMetroFor(minor: number | null): { readonly cli: string | null; readonly metro: string } {
   if (minor === null || minor >= 81) return { cli: "^20.0.0", metro: "^0.83.0" };
   const rows: readonly (readonly [number, string, string])[] = [
@@ -170,7 +170,22 @@ export function cliAndMetroFor(minor: number | null): { readonly cli: string | n
     [70, "^9.3.0", "^0.72.0"],
   ];
   for (const [from, cli, metro] of rows) if (minor >= from) return { cli, metro };
-  return { cli: null, metro: "^0.76.0" };
+  // Before 0.70 RN's own CLI (cli 2-8, through cli-plugin-metro from cli 6)
+  // bundles with the metro line of RN's own `metro-react-native-babel-transformer`
+  // dependency; the devDependencies must be that line, or the CLI's worker runs
+  // under a newer metro-config's defaults (corpus a08: RN 0.66.4 + metro 0.76
+  // config -> countLines(undefined) in metro-transform-worker 0.66).
+  const legacy: readonly (readonly [number, string])[] = [
+    [69, "^0.70.0"],
+    [68, "^0.67.0"],
+    [65, "^0.66.2"],
+    [64, "^0.64.0"],
+    [63, "^0.59.0"],
+    [62, "^0.58.0"],
+    [61, "^0.56.0"],
+  ];
+  for (const [from, metro] of legacy) if (minor >= from) return { cli: null, metro };
+  return { cli: null, metro: "^0.54.1" };
 }
 
 export function TOOLCHAIN_FOR_RN(rnVersion: string | null): Record<string, string> {
