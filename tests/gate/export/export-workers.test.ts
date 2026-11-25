@@ -99,6 +99,12 @@ test("render worker plan: defaults fit half of RAM less the main thread; explici
     const big = planRenderWorkers(undefined, 99_000, 45.6e6, { total: 16 * GB, mainRss: 6 * GB, cpus: 10 });
     assert.equal(big.limitedBy, "memory");
     assert.equal(big.count, Math.floor((2 * GB) / initialWorkerEstimate(45.6e6)) || 1);
+    // perf-ex: a memory-capped count of 1 still allows a pool (`max`), so
+    // the export asks `max`, not `count`, before releasing the split's
+    // caches -- asking `count` rendered that app serially (44 min on deb).
+    const capped = planRenderWorkers(undefined, 99_000, 45.6e6, { total: 31 * GB, mainRss: 8.6 * GB, cpus: 32 });
+    assert.equal(capped.count, 1);
+    assert.equal(capped.max, 12);
     // Small bundles render serially; an explicit count is never resized.
     assert.equal(planRenderWorkers(undefined, 5000, 1e6, { total: 16 * GB, mainRss: GB, cpus: 10 }).count, 1);
     const explicit = planRenderWorkers(5, 99_000, 45.6e6, { total: 16 * GB, mainRss: 6 * GB, cpus: 10 });
