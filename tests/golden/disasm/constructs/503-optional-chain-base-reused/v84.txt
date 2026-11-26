@@ -1,0 +1,89 @@
+; hbc2js disassembly of 503-optional-chain-base-reused/v84.hbc
+; version=84 layout=B opcodeTable=hbc84 functions=3 strings=16 globalCodeIndex=0
+function #0 "global"  params=1 frame=16 env=0 flags=strict,dbg  @0x0000014c size=196
+  0000  DeclareGlobalVar     s12 "f"
+  0005  DeclareGlobalVar     s9 "g"
+  000a  CreateEnvironment    r1
+  000c  CreateClosure        r2, r1, f1 "f"
+  0011  GetGlobalObject      r0
+  0013  PutById              r0, r2, #c1, s12 "f"
+  0019  CreateClosure        r1, r1, f2 "g"
+  001e  PutById              r0, r1, #c2, s9 "g"
+  0024  TryGetById           r2, r0, #c1, s13 "print"
+  002a  GetByIdShort         r5, r0, #c2, s12 "f"
+  002f  NewObject            r4
+  0031  NewObject            r1
+  0033  LoadConstString      r3, s2 "P"
+  0037  PutNewOwnByIdShort   r1, r3, s14 "pubkey"
+  003b  PutNewOwnByIdShort   r4, r1, s8 "a"
+  003f  LoadConstUndefined   r1
+  0041  LoadConstString      r3, s8 "a"
+  0045  Call3                r3, r5, r1, r4, r3
+  004b  NewArray             r4, 5
+  004f  PutOwnByIndex        r4, r3, 0
+  0053  GetByIdShort         r6, r0, #c2, s12 "f"
+  0058  NewObject            r5
+  005a  LoadConstString      r3, s4 "b"
+  005e  Call3                r3, r6, r1, r5, r3
+  0064  PutOwnByIndex        r4, r3, 1
+  0068  GetByIdShort         r5, r0, #c3, s9 "g"
+  006d  NewObject            r6
+  006f  LoadConstUInt8       r3, 1
+  0072  PutNewOwnByIdShort   r6, r3, s15 "stack"
+  0076  NewArray             r3, 1
+  007a  PutOwnByIndex        r3, r6, 0
+  007e  Call2                r3, r5, r1, r3
+  0083  PutOwnByIndex        r4, r3, 2
+  0087  GetByIdShort         r5, r0, #c3, s9 "g"
+  008c  NewArrayWithBuffer   r3, 1, 1, lit@0x0000
+  0094  Call2                r3, r5, r1, r3
+  0099  PutOwnByIndex        r4, r3, 3
+  009d  GetByIdShort         r3, r0, #c3, s9 "g"
+  00a2  NewArray             r0, 0
+  00a6  Call2                r0, r3, r1, r0
+  00ab  PutOwnByIndex        r4, r0, 4
+  00af  GetByIdShort         r3, r4, #c4, s11 "join"
+  00b4  LoadConstString      r0, s0 ","
+  00b8  Call2                r0, r3, r4, r0
+  00bd  Call2                r0, r2, r1, r0
+  00c2  Ret                  r0
+
+function #1 "f"  params=3 frame=4 env=0 flags=strict,dbg  @0x00000210 size=51
+  0000  LoadParam            r2, 2
+  0003  LoadParam            r0, 1
+  0006  GetByVal             r0, r0, r2
+  000a  LoadConstNull        r3
+  000c  LoadConstUndefined   r1
+  000e  JEqual               L1, r0, r3
+  0012  GetByIdShort         r1, r0, #c1, s14 "pubkey"
+L1:
+  0017  JmpTrue              L2, r1
+  001a  LoadConstString      r1, s7 "none"
+  001e  Ret                  r1
+L2:
+  0020  LoadConstString      r1, s1 ":"
+  0024  Add                  r1, r2, r1
+  0028  GetByIdShort         r0, r0, #c1, s14 "pubkey"
+  002d  Add                  r0, r1, r0
+  0031  Ret                  r0
+
+function #2 "g"  params=2 frame=4 env=0 flags=strict,dbg  @0x00000243 size=55
+  0000  LoadConstInt         r0, -1
+  0006  LoadParam            r3, 1
+  0009  LoadConstZero        r1
+  000b  GetByVal             r1, r3, r1
+  000f  LoadConstNull        r3
+  0011  LoadConstUndefined   r2
+  0013  JEqual               L1, r1, r3
+  0017  GetByIdShort         r2, r1, #c1, s15 "stack"
+L1:
+  001c  JmpTrue              L3, r2
+  001f  TypeOf               r3, r1
+  0022  LoadConstString      r2, s5 "string"
+  0026  JStrictNotEqual      L2, r3, r2
+  002a  GetByIdShort         r0, r1, #c2, s10 "length"
+L2:
+  002f  Ret                  r0
+L3:
+  0031  LoadConstString      r0, s15 "stack"
+  0035  Ret                  r0

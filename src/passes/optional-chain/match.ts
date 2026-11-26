@@ -512,6 +512,15 @@ function parseChainAt(list: readonly Stmt[], start: number, fnBody: readonly Stm
       const endIndex = afterLink + 1;
       if (!labelExclusive(list, label!, start, endIndex)) return null; // label-shared
       if (identUses(list.slice(start, endIndex), rRes).reads > 0) return null; // result-read-early
+      // temp-live (fixture 503, sweep 4): the rewrite drops every link
+      // temp's write, so a temp read anywhere outside the run would read a
+      // register the output never assigns (`r = m[k]; if (r?.p) use(r.p)`).
+      const span = list.slice(start, endIndex);
+      for (const t of tempRegs) {
+        const all = identUses(fnBody, t);
+        if (all.nested > 0) return null;
+        if (all.reads > identUses(span, t).reads && !tempDeadAfter(fnBody, list, endIndex, t)) return null;
+      }
       return { kind: "chain", rRes, base, links, startIndex: start, endIndex, label: label!, tempRegs };
     }
     if (!isRegisterName(target)) return null;
@@ -534,6 +543,95 @@ function labelExclusive(list: readonly Stmt[], label: string, start: number, end
     if (s.k === "break" && s.label === label) return false;
   }
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// temp-live (fixture 503): is a link temp's value dead once the run ends?
+// ---------------------------------------------------------------------------
+
+/** True when `x` (a statement, statement list or expression, not entered
+ *  through nested functions) holds a `break`/`continue` that leaves it: a
+ *  jump to a label it defines itself, or an unlabelled one inside its own
+ *  loop/`switch`, stays inside and does not count. */
+function hasJump(x: unknown, labels: ReadonlySet<string> = new Set(), inLoop = false): boolean {
+  if (Array.isArray(x)) return x.some((y) => hasJump(y, labels, inLoop));
+  if (x === null || typeof x !== "object") return false;
+  const o = x as Record<string, unknown>;
+  const k = o.k;
+  if (k === "break" || k === "continue") {
+    const label = o.label as string | null;
+    return label === null ? !inLoop : !labels.has(label);
+  }
+  if (k === "func") return false;
+  let ls = labels;
+  if (typeof o.label === "string" && (k === "labeled" || k === "while" || k === "do-while" || k === "for" || k === "for-in" || k === "for-of")) ls = new Set([...labels, o.label]);
+  const loop = inLoop || k === "while" || k === "do-while" || k === "for" || k === "for-in" || k === "for-of" || k === "switch";
+  return Object.values(o).some((v) => typeof v === "object" && v !== null && hasJump(v, ls, loop));
+}
+
+/** Straight-line scan of `stmts[from..]` for `t`: `dead` at a plain store
+ *  `t = E` (E not reading `t`) reached with no read before it, `live` at any
+ *  other mention or at a skipped statement whose jump leaves the scan,
+ *  `end` when the list runs out. A `labeled` block is entered in order; a
+ *  `break` to it (`inner`) lands after it, so a store found inside only
+ *  counts when the scan after the block is not `live` either. */
+function scanTemp(stmts: readonly Stmt[], from: number, t: string, inner: ReadonlySet<string> = new Set(), jumped: Set<string> = new Set()): "dead" | "live" | "end" {
+  for (let k = from; k < stmts.length; k++) {
+    const s = stmts[k]!;
+    const u = identUses([s], t);
+    if (u.reads === 0 && u.writes === 0 && u.nested === 0) {
+      if (hasJump(s, inner)) return "live";
+      for (const l of inner) if (!jumped.has(l) && hasJump(s, new Set([...inner].filter((x) => x !== l)))) jumped.add(l);
+      continue;
+    }
+    if (s.k === "expr" && s.expr.k === "assign" && s.expr.target.k === "ident" && s.expr.target.name === t && u.nested === 0 && identUses([{ k: "expr", expr: s.expr.value }], t).reads === 0) return "dead";
+    if (s.k === "labeled") {
+      const seen = new Set<string>();
+      const r = scanTemp(s.body, 0, t, new Set([...inner, s.label]), seen);
+      for (const l of seen) if (l !== s.label) jumped.add(l);
+      if (r === "live") return "live";
+      if (r === "end") continue;
+      if (!seen.has(s.label)) return "dead"; // no `break` to s.label ran before the store
+      return scanTemp(stmts, k + 1, t, inner); // the break path: both meet after the block
+    }
+    return "live";
+  }
+  return "end";
+}
+
+/** Path of `(list, index)` pairs from `body` down to the list `target`
+ *  (exclusive), entering if/labeled/loop/try/switch bodies, never a nested
+ *  function. `null` when `target` is not reachable that way. */
+function pathTo(body: readonly Stmt[], target: readonly Stmt[]): Array<[readonly Stmt[], number]> | null {
+  if (body === target) return [];
+  for (let i = 0; i < body.length; i++) {
+    const s = body[i]! as Stmt & Record<string, unknown>;
+    if (s.k === "func") continue;
+    const kids: unknown[] = [s.then, s.else, s.body, s.block, s.handler, s.finalizer];
+    if (Array.isArray(s.cases)) for (const c of s.cases as Array<{ body?: unknown }>) kids.push(c.body);
+    for (const kid of kids) {
+      if (!Array.isArray(kid)) continue;
+      const sub = pathTo(kid as Stmt[], target);
+      if (sub !== null) return [[body, i], ...sub];
+    }
+  }
+  return null;
+}
+
+/** Is `t`, as left by the run ending at `list[end]`, redefined before any
+ *  read on every path? Conservative: leaving through a loop, `try` or
+ *  `switch` (back edges, handlers, fallthrough) answers no. */
+function tempDeadAfter(fnBody: readonly Stmt[], list: readonly Stmt[], end: number, t: string): boolean {
+  const path = pathTo(fnBody, list);
+  if (path === null) return false;
+  let r = scanTemp(list, end, t);
+  for (let lvl = path.length - 1; r === "end" && lvl >= 0; lvl--) {
+    const [pl, pi] = path[lvl]!;
+    const k = pl[pi]!.k;
+    if (k !== "if" && k !== "labeled") return false;
+    r = scanTemp(pl, pi + 1, t);
+  }
+  return r !== "live";
 }
 
 // ---------------------------------------------------------------------------

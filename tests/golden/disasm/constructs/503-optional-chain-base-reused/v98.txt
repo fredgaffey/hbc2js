@@ -1,0 +1,83 @@
+; hbc2js disassembly of 503-optional-chain-base-reused/v98.hbc
+; version=98 layout=E opcodeTable=hbc98-late functions=3 strings=15 globalCodeIndex=0
+function #0 "global"  params=1 frame=17 env=0 flags=strict,dbg,overflowed  @0x00000164 size=191
+  0000  DeclareGlobalVar     s11 "f"
+  0005  DeclareGlobalVar     s8 "g"
+  000a  GetGlobalObject      r1
+  000c  LoadConstUndefined   r0
+  000e  CreateClosure        r2, r0, f1 "f"
+  0013  PutByIdStrict        r1, r2, #c0, s11 "f"
+  0019  CreateClosure        r2, r0, f2 "g"
+  001e  PutByIdStrict        r1, r2, #c1, s8 "g"
+  0024  TryGetById           r2, r1, #c0, s12 "print"
+  002a  GetByIdShort         r5, r1, #c1, s11 "f"
+  002f  NewObjectWithBuffer  r4, sh0(numProps=1), lit@0x0000
+  0035  NewObjectWithBuffer  r3, sh1(numProps=1), lit@0x0001
+  003b  PutOwnBySlotIdx      r4, r3, 0
+  003f  LoadConstString      r3, s7 "a"
+  0043  Call3                r3, r5, r0, r4, r3
+  0049  NewArray             r4, 5
+  004d  DefineOwnInDenseArray r4, r3, 0
+  0051  GetByIdShort         r6, r1, #c1, s11 "f"
+  0056  LoadConstString      r5, s4 "b"
+  005a  NewObject            r3
+  005c  Call3                r3, r6, r0, r3, r5
+  0062  DefineOwnInDenseArray r4, r3, 1
+  0066  GetByIdShort         r5, r1, #c2, s8 "g"
+  006b  NewArray             r3, 1
+  006f  NewObjectWithBuffer  r6, sh2(numProps=1), lit@0x0004
+  0075  DefineOwnInDenseArray r3, r6, 0
+  0079  Call2                r3, r5, r0, r3
+  007e  DefineOwnInDenseArray r4, r3, 2
+  0082  GetByIdShort         r5, r1, #c2, s8 "g"
+  0087  NewArrayWithBuffer   r3, 1, 1, lit@0x0009
+  008f  Call2                r3, r5, r0, r3
+  0094  DefineOwnInDenseArray r4, r3, 3
+  0098  GetByIdShort         r3, r1, #c2, s8 "g"
+  009d  NewArray             r1, 0
+  00a1  Call2                r1, r3, r0, r1
+  00a6  DefineOwnInDenseArray r4, r1, 4
+  00aa  GetByIdShort         r3, r4, #c3, s10 "join"
+  00af  LoadConstString      r1, s0 ","
+  00b3  Call2                r1, r3, r4, r1
+  00b8  Call2                r1, r2, r0, r1
+  00bd  Ret                  r1
+
+function #1 "f"  params=3 frame=5 env=0 flags=strict,dbg,overflowed  @0x00000223 size=54
+  0000  LoadParam            r3, 2
+  0003  LoadParam            r1, 1
+  0006  GetByVal             r1, r1, r3
+  000a  LoadConstNull        r0
+  000c  Eq                   r0, r1, r0
+  0010  LoadConstUndefined   r2
+  0012  JmpTrue              L1, r0
+  0015  GetByIdShort         r2, r1, #c0, s13 "pubkey"
+L1:
+  001a  JmpTrue              L2, r2
+  001d  LoadConstString      r2, s6 "none"
+  0021  Ret                  r2
+L2:
+  0023  LoadConstString      r2, s1 ":"
+  0027  Add                  r2, r3, r2
+  002b  GetByIdShort         r1, r1, #c0, s13 "pubkey"
+  0030  Add                  r1, r2, r1
+  0034  Ret                  r1
+
+function #2 "g"  params=2 frame=4 env=0 flags=strict,dbg,overflowed  @0x00000259 size=53
+  0000  LoadParam            r1, 1
+  0003  GetByIndex           r2, r1, 0
+  0007  LoadConstNull        r0
+  0009  Eq                   r0, r2, r0
+  000d  LoadConstUndefined   r1
+  000f  JmpTrue              L1, r0
+  0012  GetByIdShort         r1, r2, #c0, s14 "stack"
+L1:
+  0017  JmpTrue              L3, r1
+  001a  LoadConstInt         r1, -1
+  0020  JmpTypeOfIs          L2, r2, 507
+  0028  GetByIdShort         r1, r2, #c1, s9 "length"
+L2:
+  002d  Ret                  r1
+L3:
+  002f  LoadConstString      r1, s14 "stack"
+  0033  Ret                  r1
