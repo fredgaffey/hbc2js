@@ -8,7 +8,7 @@ second — never by executing any package's code.
 ## Usage
 
 ```sh
-hbc2js deps <bundle.hbc|app.apk> [--out <dir>] [--confirm] [--confirm-cache] [--offline] \
+hbc2js deps <bundle.hbc|app.apk> [--out <dir>] [--confirm] [--confirm-cache] [--online] [--offline] \
   [--sigdb <dir>] [--no-shared-db] [--min-instr <n>] [--json] [--exhaustive]
 ```
 
@@ -33,12 +33,15 @@ hbc2js deps <bundle.hbc|app.apk> [--out <dir>] [--confirm] [--confirm-cache] [--
   silent no-op. Re-running `deps <apk> --out <dir>` is idempotent, and a
   native-ingestion problem is reported to stderr without failing the
   JS-side run (native is optional-by-construction — spec 27 §1.4).
-- `--confirm` — run the npm confirm stage (§4 below). Requires network.
+- `--confirm` — run the npm confirm stage (§4 below). Requires network; implies `--online`.
 - `--confirm-cache` — also write `--confirm`-built signatures into the user
   cache, which later runs read. Off by default (corpus-confirm-precision).
-- `--offline` — skip npm registry search and the confirm stage entirely; the
+- `--online` — allow the npm registry search fallback (network). Off by
+  default since 2026-11-26: with neither `--online` nor `--confirm`, `deps`
+  makes no network request.
+- `--offline` — no network at all, even with `--online` or `--confirm`; the
   match and guess stages still run against whatever signature DB is
-  reachable locally.
+  reachable locally. This is the default without `--online`/`--confirm`.
 - `--sigdb <dir>` — override the project-local DB directory outright
   (instead of `<out>/.hbc2js/sigdb`). It keeps the layer name `project`
   (dedup priority and report `layer` fields unchanged) but is marked
@@ -218,7 +221,7 @@ hbc2js deps <bundle.hbc|app.apk> [--out <dir>] [--confirm] [--confirm-cache] [--
    | Package-name string literal (curated name, `native-modules.ts`/host-map values) | 0.30 | A bare match (`"react-native-gesture-handler"` as a whole string) carries no version and, alone, is too generic to report (any code can contain a popular package's name). A `name@version`-shaped single literal (`"react-native-gesture-handler@2.14.0"`) carries a version and is the stronger, self-corroborating form — see the `hint` tier below. |
    | APK evidence (manifest permission, bundled `.so` name, asset file) | 0.20 | Only available for `.apk` input |
    | Dependency-edge propagation | up to 0.50, `0.2 * identified-dep-count` | Only fires when depOwners agree unanimously **and** either ≥2 deps are identified or ≥50% of the module's declared deps are — a single coincidental hit is deliberately not enough (this threshold was tightened after an early version attributed thousands of an app's own modules to "react-foundation" off a 1-in-7 dependency coincidence). Baseline-package owners never seed this clue. |
-   | npm registry search fallback | 0.15 per hit | Network, `--offline` disables it; only tried when there's a name lead (a native-module-derived guess or a package-name-shaped string) |
+   | npm registry search fallback | 0.15 per hit | Network, opt-in (`--online` or `--confirm`); only tried when there's a name lead (a native-module-derived guess or a package-name-shaped string) |
 
    Guessed candidates are aggregated per package (not per module) in the
    report, and pass the precision rules in `src/deps/report.ts`

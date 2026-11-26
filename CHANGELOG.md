@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- `hbc2js deps` makes no network request by default. The npm registry search
+  fallback now needs `--online`; `--confirm` (the npm confirm stage) implies
+  it, and `--offline` still turns both off. Before this, a plain `deps` run
+  could query `registry.npmjs.org` when a module had a name lead but no
+  signature match.
+
+### Fixed
+- Corpus app Bangumi (React Native 0.66) now exports, bundles and boots
+  EQUIVALENT: pre-0.70 apps get the Metro line their React Native ships with,
+  `@babel/runtime` for the legacy preset, a stand-in for startup JSI globals
+  such as reanimated 2's `__reanimatedModuleProxy`, and an offline bundle step
+  that works before React Native 0.73.
+- A `catch` with no exception binding no longer prints a dead `rX = __exc`
+  copy.
+
 ## 0.1.2 (2026-11-25)
 
 Measured against real, unseen open-source apps for the first time: ten

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // docs/specs/00-project-skeleton.md §6.3 — the only place in the codebase allowed to
 // touch stdout/stderr or call process.exit.
+import { parseDepsArgs, type DepsArgs } from "./deps/cli-args.ts";
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -242,10 +243,11 @@ Options (gate, sweep):
 
 Options (deps):
   --out <dir>               decompile-project output dir (project-local DB lives at <dir>/.hbc2js/sigdb)
-  --confirm                 run the npm confirm stage (network; never executes package code)
+  --confirm                 run the npm confirm stage (network, implies --online; never executes package code)
   --confirm-jobs N          parallel confirm workers, one scratch RN project each (default min(4, cpus/2); 1 = serial)
   --confirm-cache           also write confirm-built signatures to the user cache (read by later runs)
-  --offline                 skip npm registry search + the confirm stage entirely
+  --online                  allow the npm registry search (network; off by default)
+  --offline                 no network at all, even with --confirm (the default without --online/--confirm)
   --sigdb <dir>             override the project-local signature-DB directory
   --no-shared-db            don't consult tools/pkgsig/db (this repo's starter set)
   --min-instr <n>           minimum-instruction floor before a hash is trusted (default 8)
@@ -1367,55 +1369,6 @@ function runHbcproj(argv: readonly string[]): number {
 // ---------------------------------------------------------------------------
 // `hbc2js deps` — docs/DECISIONS.md D17/D17a/D17b.
 // ---------------------------------------------------------------------------
-
-interface DepsArgs {
-  readonly help: boolean;
-  readonly input: string | undefined;
-  readonly out: string | undefined;
-  readonly confirm: boolean;
-  readonly confirmCache: boolean;
-  readonly confirmJobs: number | undefined;
-  readonly offline: boolean;
-  readonly sigdb: string | undefined;
-  readonly noSharedDb: boolean;
-  readonly minInstr: number | undefined;
-  readonly json: boolean;
-  readonly exhaustive: boolean;
-  readonly known: string | undefined;
-}
-
-function parseDepsArgs(argv: readonly string[]): DepsArgs {
-  let help = false;
-  let input: string | undefined;
-  let out: string | undefined;
-  let confirm = false;
-  let confirmCache = false;
-  let confirmJobs: number | undefined;
-  let offline = false;
-  let sigdb: string | undefined;
-  let noSharedDb = false;
-  let minInstr: number | undefined;
-  let json = false;
-  let exhaustive = false;
-  let known: string | undefined;
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i]!;
-    if (a === "--help" || a === "-h") help = true;
-    else if (a === "--out") out = argv[++i];
-    else if (a === "--confirm") confirm = true;
-    else if (a === "--confirm-cache") confirmCache = true;
-    else if (a === "--confirm-jobs") confirmJobs = Math.max(1, Math.floor(Number(argv[++i])) || 1);
-    else if (a === "--offline") offline = true;
-    else if (a === "--sigdb") sigdb = argv[++i];
-    else if (a === "--no-shared-db") noSharedDb = true;
-    else if (a === "--min-instr") minInstr = Number(argv[++i]);
-    else if (a === "--json") json = true;
-    else if (a === "--exhaustive") exhaustive = true;
-    else if (a === "--known") known = argv[++i];
-    else if (input === undefined && !a.startsWith("-")) input = a;
-  }
-  return { help, input, out, confirm, confirmCache, confirmJobs, offline, sigdb, noSharedDb, minInstr, json, exhaustive, known };
-}
 
 /** J7's `--known` path: informed confirm, offline by construction (see
  *  `runInformedDeps`'s doc comment). Text mode prints one line per
