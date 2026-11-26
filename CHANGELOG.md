@@ -17,6 +17,9 @@
   that works before React Native 0.73.
 - A `catch` with no exception binding no longer prints a dead `rX = __exc`
   copy.
+- An optional chain whose base value is read again after the chain
+  (`r = m[k]; ... r?.p ...; r.p`) no longer drops the base's assignment, which
+  left the later read on an unassigned variable (TypeError at run time).
 
 ## 0.1.2 (2026-11-25)
 
