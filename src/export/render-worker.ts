@@ -62,7 +62,7 @@ parentPort!.on("message", (jobs: readonly RenderTask[]) => {
     // memory tracks the module in hand rather than every function this
     // worker has rendered (rebuilt on demand, identically); below it they
     // stay warm for the functions modules share.
-    if (TRACE) process.stderr.write(`hbc2js render-trace: ${jobs.map((j) => `${j.kind === "module" ? "module" : j.kind === "assemble" ? "assemble" : `fn#${j.sub.index} of`} ${j.job.moduleId}(${j.job.cost})`).join(" ")} ${Math.round(performance.now() - t0)} ms, heap ${getHeapStatistics().used_heap_size >> 20} MB\n`);
+    if (TRACE) process.stderr.write(`hbc2js render-trace: ${jobs.map((j) => `${j.kind === "module" ? "module" : j.kind === "assemble" ? "assemble" : `fn#${j.sub.index} of`} ${j.job.moduleId}(${j.job.cost})`).join(" ")} ${Math.round(performance.now() - t0)} ms, heap ${Math.round(getHeapStatistics().used_heap_size / 2 ** 20)} MB, external ${Math.round(getHeapStatistics().external_memory / 2 ** 20)} MB\n`);
     let h = getHeapStatistics();
     if (h.used_heap_size > RELEASE_AT) {
       analysis.releaseCaches?.();

@@ -194,6 +194,10 @@ export function poolFootprint(reported: number, rssGrowth: number): number {
   return Math.max(reported, rssGrowth);
 }
 
+/** `HBC2JS_RENDER_TRACE=1`: also one stderr line per pool decision. */
+const POOL_TRACE = process.env.HBC2JS_RENDER_TRACE === "1";
+const mb = (n: number): number => Math.round(n / 2 ** 20);
+
 const WORKER_SCRIPT = siblingWorkerPath("render-worker", import.meta.url);
 const BATCH = 4;
 
@@ -317,6 +321,7 @@ export async function renderModulesInPool(
             const footprint = poolFootprint(reported, process.memoryUsage().rss - rssAtStart);
             // Retiring goes by the reports alone: RSS is a high-water mark
             // that a retired worker's exit does not promptly lower.
+            if (POOL_TRACE) process.stderr.write(`hbc2js pool-trace: live ${live} reported ${mb(reported)} MB rss-growth ${mb(process.memoryUsage().rss - rssAtStart)} MB budget ${mb(plan.budget)} MB queue ${queue.length}\n`);
             if (reported > plan.budget && live > 1 && queue.length > 0) {
               // Over budget: retire this (now idle) worker; the rest carry on.
               retired.add(w);
