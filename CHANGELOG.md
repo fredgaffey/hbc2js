@@ -9,6 +9,14 @@
   could query `registry.npmjs.org` when a module had a name lead but no
   signature match.
 
+### Faster
+- `export` of the largest bundles no longer falls back to rendering on the
+  main thread: the pool decision is made after the split releases its
+  caches, and the pool grows by measured memory rather than the per-worker
+  heap ceiling. Expensify (45 MB of bytecode): about 45-55 min -> 16-20 min
+  on a 32-core Linux box, 13.5 min on a 10-core 32 GB Mac; output
+  byte-identical.
+
 ### Fixed
 - Corpus app Bangumi (React Native 0.66) now exports, bundles and boots
   EQUIVALENT: pre-0.70 apps get the Metro line their React Native ships with,
